@@ -3,37 +3,42 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
   {
-    path: '/twst',
+    path: '/',
     name: 'top',
     component: () => import('@/views/top.vue'),
   },
   {
-    path: '/twst/drop',
+    path: '/top',
+    name: 'top',
+    component: () => import('@/views/top.vue'),
+  },
+  {
+    path: '/drop',
     name: 'drop',
     component: () => import('@/views/drop.vue'),
   },
   {
-    path: '/twst/grow',
+    path: '/grow',
     name: 'grow',
     component: () => import('@/views/grow.vue'),
   },
   {
-    path: '/twst/other',
+    path: '/other',
     name: 'other',
     component: () => import('@/views/other.vue'),
   },
   {
-    path: '/twst/comfort',
+    path: '/comfort',
     name: 'comfort',
     component: () => import('@/views/redirect.vue'),
   },
   {
-    path: '/twst/invite',
+    path: '/invite',
     name: 'invite',
     component: () => import('@/views/redirect.vue'),
   },
   {
-    path: '/twst/simulator',
+    path: '/simulator',
     name: 'simulator',
     component: () => import('@/views/redirect.vue'),
   },
