@@ -6,11 +6,25 @@
   <link rel="preload" as="style" onload="this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=Roboto:wght@100;300;400;500;700;900&display=swap">
 
     <meta charset="UTF-8" />
-    <link rel="icon" href="/twst/assets/akita-43e09f0a.png" />
+    <link rel="icon" href="./assets/akita-43e09f0a.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ツイステツール置き場</title>
-  <script type="module" crossorigin src="/twst/assets/index-311a026b.js"></script>
-  <link rel="stylesheet" href="/twst/assets/index-f6935fcb.css">
+    <script>
+    (function (l) {
+        if (l.search) {
+            var q = {};
+            l.search.slice(1).split('&').forEach(function (v) { // ?p=/fooの分解
+                var a = v.split('='); // 'p=/foo' となっているはずなので=で分割
+                q[a[0]] = a[1]; // {p: '/foo'} 形式に修正
+            });
+            if (q.p !== undefined) {
+                window.history.replaceState(null, null, l.pathname.slice(0, -1) + (q.p || '')); // https://hoge.com/fooへ遷移
+            }
+        }
+    }(window.location))
+</script>
+  <script type="module" crossorigin src="./assets/index-6c1df49b.js"></script>
+  <link rel="stylesheet" href="./assets/index-3a3e3257.css">
 </head>
 
 <body>

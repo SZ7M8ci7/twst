@@ -1,8 +1,9 @@
 <template>
+  <meta name="viewport" content="width=device-width">
   <v-app>
     <v-main>
       <NavigationDrawer />
-      <router-view/>
+      <router-view></router-view>
     </v-main>
   </v-app>
 </template>

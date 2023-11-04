@@ -9,7 +9,8 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base:"twst",
+  base: (process.env.NODE_ENV === 'poduction')
+  ? 'twst' : './',
   plugins: [
     vue({
       template: { transformAssetUrls }

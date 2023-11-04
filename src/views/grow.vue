@@ -9,26 +9,26 @@
               <th>No</th>
               <th>レア度</th>
               <th>属性</th>
-              <th>Lv From</th>
-              <th>Lv To</th>
+              <th>Fr</th>
+              <th>To</th>
               <th>数</th>
               <th>削除</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(member, index) in grow_members" v-bind:key="index">
-              <td>{{ index + 1 }}</td>
-              <td><v-select :items="rare" v-model="member.rare" solo :style="{ width: '6em' }" hide-details></v-select></td>
-              <td><v-select :items="type" v-model="member.type" solo :style="{ width: '5em' }" hide-details></v-select></td>
-              <td><v-select :items="level" v-model="member.from" solo :style="{ width: '6em' }" hide-details></v-select></td>
-              <td><v-select :items="level" v-model="member.to" solo :style="{ width: '6em' }" hide-details></v-select></td>
+              <td :style="{ width: 'fit-content' ,maxWidth:'1em' }">{{ index + 1 }}</td>
+              <td><v-select :items="rare" menu-icon="" v-model="member.rare" solo :style="{ width: 'fit-content' ,minWidth:'4em'}" hide-details></v-select></td>
+              <td><v-select :items="type" menu-icon="" v-model="member.type" solo :style="{ width: 'fit-content' ,minWidth:'3.1em'}" hide-details></v-select></td>
+              <td><v-select :items="level" menu-icon="" v-model="member.from" solo :style="{ width: 'fit-content' ,minWidth:'3em'}" hide-details></v-select></td>
+              <td><v-select :items="level" menu-icon="" v-model="member.to" solo :style="{ width: 'fit-content' ,minWidth:'3.3em'}" hide-details></v-select></td>
               <td><v-text-field v-model="member.num" type="number" @keydown="checkNumber"
-                  :style="{ width: '4em' }" hide-details></v-text-field></td>
-              <td><v-btn v-on:click="deleteRow(index)">削除</v-btn></td>
+                  :style="{ width: 'fit-content',maxWidth:'6em',minWidth:'3.3em' }" hide-details></v-text-field></td>
+              <td><v-btn v-on:click="deleteRow(index)" icon="mdi-minus" size="x-small"></v-btn></td>
             </tr>
           </tbody>
         </table>
-        <v-btn v-on:click="addRow()">行追加</v-btn>
+        <v-btn v-on:click="addRow()" icon="mdi-plus" size="x-small"></v-btn>
       </div>
       </v-col>
     </v-row>
@@ -215,6 +215,13 @@ watchEffect((): void => {
 })
 </script>
 <style scoped>
+#app{
+
+    transform: scale(0.5);
+    transform-origin: left top;
+    height: calc(100% / 0.5);
+    width: calc(100% / 0.5);
+}
 v-simple-table {
   width: 100%;
   border-spacing: 0;
