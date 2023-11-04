@@ -9,11 +9,11 @@ import { onUpdated } from 'vue';
 const route = useRoute();
 const url = ref("");
 function select_path(){
-  if (route.path == "/twst/comfort") {
+  if (route.path == "/comfort") {
     url.value = "https://sz7m8ci7.github.io/roomcalc/";
-  } else if (route.path == "/twst/invite") {
+  } else if (route.path == "/invite") {
     url.value = "https://sz7m8ci7.github.io/roomcalc/invite.html";
-  } else if (route.path == "/twst/simulator") {
+  } else if (route.path == "/simulator") {
     url.value = "https://sz7m8ci7.github.io/simulator/";
   }
 }
