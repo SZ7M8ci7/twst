@@ -4,7 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const routes = [
   {
     path: '/twst',
-    name: 'Top',
+    name: 'top',
     component: () => import('@/views/top.vue'),
   },
   {

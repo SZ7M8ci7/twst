@@ -2,37 +2,37 @@
   <v-app-bar-nav-icon @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
   <v-navigation-drawer v-model="drawer" absolute bottom temporary>
     <v-list nav dense>
-      <RouterLink to="/">
+      <RouterLink :to="{name:'top'}">
       <v-list-item
         title="TOP"
         @click="drawer = false;"
       /></RouterLink>
-      <RouterLink to="/drop">
+      <RouterLink :to="{name:'drop'}">
       <v-list-item
         title="錬金術ドロップ数計算"
         @click="drawer = false;"
       /></RouterLink>
-      <RouterLink to="/grow">
+      <RouterLink :to="{name:'grow'}">
       <v-list-item
         title="必要育成アイテム数計算"
         @click="drawer = false;"
       /></RouterLink>
-      <RouterLink to="/comfort">
+      <RouterLink :to="{name:'comfort'}">
       <v-list-item
         title="いごこち度検討ツール"
         @click="drawer = false;"
       /></RouterLink>
-      <RouterLink to="/invite">
+      <RouterLink :to="{name:'invite'}">
       <v-list-item
         title="招待部屋検討ツール"
         @click="drawer = false;"
         /></RouterLink>
-      <RouterLink to="/simulator">
+      <RouterLink :to="{name:'simulator'}">
       <v-list-item
         title="デッキシミュレータ"
         @click="drawer = false;"
       /></RouterLink>
-      <RouterLink to="/other">
+      <RouterLink :to="{name:'other'}">
       <v-list-item
         title="その他"
         @click="drawer = false;"
