@@ -13,27 +13,18 @@
     (function (l) {
         if (l.search) {
             var q = {};
-            l.search.slice(1).split('&').forEach(function (v) {
-                var a = v.split('=');
-                q[a[0]] = a[1];
+            l.search.slice(1).split('&').forEach(function (v) { // ?p=/fooの分解
+                var a = v.split('='); // 'p=/foo' となっているはずなので=で分割
+                q[a[0]] = a[1]; // {p: '/foo'} 形式に修正
             });
             if (q.p !== undefined) {
-                window.history.replaceState(null, null, l.pathname.slice(0, -1) + (q.p || ''));
+                window.history.replaceState(null, null, l.pathname.slice(0, -1) + (q.p || '')); // https://hoge.com/fooへ遷移
             }
         }
     }(window.location))
 </script>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-Y913SBH9Z7"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-Y913SBH9Z7');
-</script>
-  <script type="module" crossorigin src="./assets/index-0e3b0d8f.js"></script>
-  <link rel="stylesheet" href="./assets/index-f907fd22.css">
+  <script type="module" crossorigin src="./assets/index-a06fd1b6.js"></script>
+  <link rel="stylesheet" href="./assets/index-3a3e3257.css">
 </head>
 
 <body>
