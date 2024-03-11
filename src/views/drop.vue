@@ -77,6 +77,18 @@
                     <td class="text-right">{{ candy.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
+                    <td>ハーブティーS</td>
+                    <td class="text-right">{{ tea_s.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
+                  </tr>
+                  <tr>
+                    <td>ハーブティーM</td>
+                    <td class="text-right">{{ tea_m.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
+                  </tr>
+                  <tr>
+                    <td>ハーブティーL</td>
+                    <td class="text-right">{{ tea_l.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
+                  </tr>
+                  <tr>
                     <td>マドル</td>
                     <td class="text-right">{{ madol.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
@@ -105,6 +117,9 @@ const memo = ref(0);
 const medal = ref(0);
 const candy = ref(0);
 const madol = ref(0);
+const tea_s = ref(0);
+const tea_m = ref(0);
+const tea_l = ref(0);
 
 watchEffect((): void => {
   if (radios.value == "normal") {
@@ -113,12 +128,18 @@ watchEffect((): void => {
     memo.value = total_ap.value * 0.84;
     medal.value = total_ap.value * 0.66;
     candy.value = total_ap.value * 0.10;
+    tea_s.value = total_ap.value * 0;
+    tea_m.value = total_ap.value * 0;
+    tea_l.value = total_ap.value * 0;
   } else {
-    grimoire.value = total_ap.value * 0.20;
-    textbook.value = total_ap.value * 0.60;
-    memo.value = total_ap.value * 0.90;
-    medal.value = total_ap.value * 0.111;
-    candy.value = total_ap.value * 0.066;
+    grimoire.value = total_ap.value * 0.62;
+    textbook.value = total_ap.value * 0.54;
+    memo.value = total_ap.value * 0.17;
+    medal.value = total_ap.value * 1.3;
+    candy.value = total_ap.value * 0.09;
+    tea_s.value = total_ap.value * 0.10;
+    tea_m.value = total_ap.value * 0.20;
+    tea_l.value = total_ap.value * 0.40;
   }
   madol.value = total_ap.value * 250
 })
