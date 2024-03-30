@@ -1,0 +1,41 @@
+name: Update twst repository with content from simulator
+
+on:
+  schedule:
+    # Runs at 01:00 UTC every day
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  update_twst_repo:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout simulator repository
+      uses: actions/checkout@v2
+      with:
+        repository: 'SZ7M8ci7/simulator'
+        path: 'simulator-repo'
+
+    - name: Checkout twst repository
+      uses: actions/checkout@v2
+      with:
+        path: 'twst-repo'
+
+    - name: Copy img folder and chara.json to twst repository
+      run: |
+        cp -R ./simulator-repo/img ./twst-repo/img
+        cp ./simulator-repo/chara.json ./twst-repo/chara.json
+
+    - name: Commit and push changes to twst repository
+      run: |
+        cd ./twst-repo
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
+        git add img chara.json
+        git commit -m "Automated update: img folder and chara.json from simulator repository"
+        if git diff --staged --quiet; then
+          echo "No changes to commit."
+        else
+          git push
+        fi
