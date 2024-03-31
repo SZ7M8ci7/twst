@@ -24,8 +24,9 @@ jobs:
 
     - name: Copy img folder and chara.json to twst repository
       run: |
-        cp -R ./simulator-repo/img ./twst-repo/src/assets/img
+        cp -R ./simulator-repo/img/* ./twst-repo/src/assets/img/
         cp ./simulator-repo/chara.json ./twst-repo/src/assets/chara.json
+
 
     - name: Commit and push changes to twst repository
       run: |
