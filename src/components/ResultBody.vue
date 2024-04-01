@@ -6,6 +6,7 @@
         :items="results"
         class="elevation-1"
         :items-per-page="-1"
+        :mobile-breakpoint="0"
       >
         <!-- カスタムコンテンツのスロットを使用 -->
         <template v-slot:item="{ item }">
@@ -62,5 +63,8 @@ const headers = [
 }
 .right-align {
   margin-left: auto; /* 左側の余白を自動で最大にして右寄せにする */
+}
+::v-deep .v-data-table td {
+  padding: 1px 4px !important;
 }
 </style>

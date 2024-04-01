@@ -3,12 +3,14 @@
     <div>
       <SearchHeader @search-started="handleSearchStarted" />
     </div>
-    <v-tabs v-model="tab" color="indigo-darken-2" fixed-tabs>
+    <v-tabs v-model="tab" color="indigo-darken-2" fixed-tabs 
+      :show-arrows="false"
+      :mobile-breakpoint="Infinity">
       <v-tab value="search">キャラ一覧</v-tab>
       <v-tab value="result">検索結果</v-tab>
     </v-tabs>
     <v-card-text>
-      <v-window v-model="tab">
+      <v-window v-model="tab" disabled >
         <v-window-item value="search">
           <SearchBody />
         </v-window-item>

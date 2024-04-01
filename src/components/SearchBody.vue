@@ -1,21 +1,23 @@
 <template>
   <v-app>
     <v-container>
-      <span class="table-top">
-        <v-text-field
-          type="number"
-          v-model="bulkLevel"
-          class="mb-4 level-input"
-          label="Lv"
-          hide-details="auto"
-          :min="0"
-          :max="110"
-        />
-        <v-btn @click="applyBulkLevel">表示キャラレベル一括設定</v-btn>
-        <div class="right-align">
-          <v-btn @click="saveLevels">レベルをキャッシュに保存</v-btn>
+      <div class="controls-container">
+        <div class="level-controls">
+          <v-text-field
+            type="number"
+            v-model="bulkLevel"
+            class="level-input"
+            label="Lv"
+            hide-details="auto"
+            :min="0"
+            :max="110"
+          ></v-text-field>
+          <v-btn @click="applyBulkLevel">表示キャラレベル一括設定</v-btn>
         </div>
-      </span>
+        <v-btn @click="saveLevels" class="save-levels-btn">レベルをキャッシュに保存</v-btn>
+      </div>
+
+
       <v-data-table
         :headers="headers"
         :items="visibleCharacters"
@@ -122,4 +124,31 @@ onMounted(() => {
 .right-align {
   margin-left: auto; /* 左側の余白を自動で最大にして右寄せにする */
 }
+.controls-container {
+  display: flex;
+  flex-wrap: wrap; /* Allow wrapping as necessary */
+  gap: 10px; /* Space between items */
+  align-items: center; /* Align items vertically */
+}
+
+.level-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Space between text field and button */
+}
+.save-levels-btn {
+  margin-left: auto; 
+}
+@media (max-width: 600px) {
+  .controls-container {
+    flex-direction: column; /* Stack items vertically on narrow screens */
+    align-items: center; /* Align items to the start */
+  }
+
+  .save-levels-btn {
+    width: 100%;
+  }
+}
+
+
 </style>

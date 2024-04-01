@@ -248,6 +248,8 @@ function isGroupFullySelected(group: string): boolean {
   background-color: white;
   padding: 20px; /* パディングを調整 */
   border-radius: 8px; /* 角を丸くする */
+  max-height: 95vh; /* Maximum height - 80% of the viewport height */
+  overflow-y: auto; /* Enable vertical scrolling if content overflows */
 }
 
 .button-container {

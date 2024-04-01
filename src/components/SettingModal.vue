@@ -21,11 +21,14 @@
             dense
             style="max-width: 130px;"
           ></v-select>
-          <v-btn icon @click="removeSortOption(index)">
-            <v-icon>mdi-close</v-icon>
+          <v-btn icon @click="removeSortOption(index)" size="x-small">
+            <v-icon>mdi-minus</v-icon>
           </v-btn>
         </div>
-        <v-btn @click="addSortOption">ソート条件を追加</v-btn>
+        <div class="add-button-container">
+          <v-btn icon fab @click="addSortOption" size="x-small"><v-icon>mdi-plus</v-icon></v-btn>
+        </div>
+
       </v-card-text>
       <v-card-title>最低値設定</v-card-title>
       <v-card-text class="sort-option">
@@ -167,6 +170,8 @@ function cancel() {
   background-color: white;
   padding: 20px; /* パディングを調整 */
   border-radius: 8px; /* 角を丸くする */
+  max-height: 95vh; /* Maximum height - 80% of the viewport height */
+  overflow-y: auto; /* Enable vertical scrolling if content overflows */
 }
 
 .button-container {
@@ -195,4 +200,10 @@ function cancel() {
 ::v-deep .v-card-text {
   padding: 5px;
 }
+.add-button-container {
+  display: flex;
+  justify-content: center; /* Center the button horizontally */
+  padding: 0px 0px 5px 0px; /* Add some padding above and below the button */
+}
+
 </style>
