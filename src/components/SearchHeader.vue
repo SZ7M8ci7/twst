@@ -18,10 +18,10 @@
     <v-row class="mb-1">
       <v-col cols="12" sm="3"/>
       <v-col cols="12" sm="2">
-        <v-btn block color="red" @click="stopSearch">検索中止</v-btn>
+        <v-btn block color="red" @click="stopSearch">探索中止</v-btn>
       </v-col>
       <v-col cols="12" sm="2">
-        <v-btn block color="green" @click="startSearch">検索開始</v-btn>
+        <v-btn block color="green" @click="startSearch">探索開始</v-btn>
       </v-col>
       <v-col cols="12" sm="2">
         <span v-if="totalResults && nowResults">{{ nowResults }}/{{ totalResults }} ({{ searchPercentage }}%)</span>
@@ -49,6 +49,8 @@ import SettingModal from "@/components/SettingModal.vue";
 import { storeToRefs } from "pinia";
 import { calcDecks } from "./common";
 import { useSearchResultStore } from '@/store/searchResult';
+import { event } from 'vue-gtag'
+
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, isSearching } = storeToRefs(searchResultStore);
 
@@ -71,6 +73,7 @@ const emit = defineEmits(['search-started']);
 function startSearch(){
   isSearching.value = true;
   emit('search-started',)
+  event('search start')
   setTimeout(() => {
     calcDecks();
   }, 300); // 300 ミリ秒の遅延

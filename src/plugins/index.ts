@@ -11,10 +11,16 @@ import router from '../router'
 
 // Types
 import type { App } from 'vue'
-
+import VueGTag from 'vue-gtag'
 export function registerPlugins (app: App) {
   app
     .use(vuetify)
     .use(router)
     .use(pinia)
+    .use(  VueGTag,
+      {
+        config: {
+          id: '{ G-4RSRD920TZ }'
+        }
+      },)
 }
