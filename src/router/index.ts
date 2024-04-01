@@ -42,6 +42,11 @@ const routes = [
     name: 'simulator',
     component: () => import('@/views/redirect.vue'),
   },
+  {
+    path: '/twst/search',
+    name: 'search',
+    component: () => import('@/views/search.vue'),
+  },
   { path: '/twst/', component: () => import('@/views/top.vue') }
 ]
 

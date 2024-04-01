@@ -32,6 +32,11 @@
         title="デッキシミュレータ"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'search'}">
+      <v-list-item
+        title="デッキ探索ツール"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'other'}">
       <v-list-item
         title="その他"
