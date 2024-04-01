@@ -20,6 +20,7 @@ export interface SearchResultState {
   nowResults: number;
   results: any[];
   isSearching: boolean;
+  errorMessage: string;
 }
 
 export const useSearchResultStore = defineStore('searchResult', {
@@ -28,5 +29,6 @@ export const useSearchResultStore = defineStore('searchResult', {
     nowResults: 0,
     results: [],
     isSearching: false,
+    errorMessage: '',
   }),
 });

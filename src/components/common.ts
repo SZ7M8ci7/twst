@@ -7,7 +7,7 @@ const { minEHP, minHP, minHPBuddy, minEvasion, maxResult, sortOptions, allowSame
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
-const { totalResults, nowResults, results, isSearching} = storeToRefs(searchResultStore);
+const { totalResults, nowResults, results, isSearching, errorMessage} = storeToRefs(searchResultStore);
 // 数値入力で＋とeを弾く
 export function checkNumber(input:KeyboardEvent){
   if (input.key === 'e' || input.key === '+') {
@@ -174,6 +174,10 @@ function dynamicSortMultiple(criteria: SortCriterion[]) {
 export async function calcDecks() {
   const nonZeroLevelCharacters = characters.value.filter(character => character.level > 0);
   const listLength = nonZeroLevelCharacters.length;
+  if (listLength < 5) {
+    errorMessage.value = 'レベル設定されたキャラが少なすぎます';
+    return;
+  }
   nowResults.value = 0;
   const sortCriteria = [];
   for (const key of sortOptions.value) {
@@ -310,4 +314,12 @@ export async function calcDecks() {
       }
     }
   }
+  // ソート基準と方向に基づいてソート
+  results.value.sort(dynamicSortMultiple(sortCriteria));
+
+  // 上位のみを保持
+  const topResults = results.value.slice(0, maxResult.value);
+
+  // リアクティブな状態を更新
+  results.value = [...topResults];
 }

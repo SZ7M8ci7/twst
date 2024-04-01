@@ -39,25 +39,30 @@
   <v-dialog v-model="isSettingModalVisible" persistent :max-width="dialogWidth">
     <setting-modal @close="isSettingModalVisible = false" />
   </v-dialog>
+  <v-dialog v-model="isErrorModalVisible" persistent :max-width="dialogWidth">
+    <error-modal @close="isErrorModalVisible = false" />
+  </v-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import InfoModal from "@/components/InfoModal.vue";
 import FilterModal from "@/components/FilterModal.vue";
 import SettingModal from "@/components/SettingModal.vue";
+import ErrorModal from "@/components/ErrorModal.vue";
 import { storeToRefs } from "pinia";
 import { calcDecks } from "./common";
 import { useSearchResultStore } from '@/store/searchResult';
 import { event } from 'vue-gtag'
 
 const searchResultStore = useSearchResultStore();
-const { totalResults, nowResults, isSearching } = storeToRefs(searchResultStore);
+const { totalResults, nowResults, isSearching, errorMessage } = storeToRefs(searchResultStore);
 
 // モーダルの表示状態を管理するためのリアクティブな変数
 const isInfoModalVisible = ref(false);
 const isFilterModalVisible = ref(false);
 const isSettingModalVisible = ref(false);
+const isErrorModalVisible = ref(false);
 const dialogWidth = computed(() => {
   const screenWidth = window.innerWidth;
   const maxWidth = screenWidth * 0.8;
@@ -81,6 +86,11 @@ function startSearch(){
 function stopSearch(){
   isSearching.value = false; // 検索中状態をfalseに設定してループを中止
 }
+watch(errorMessage, (newVal, oldVal) => {
+  if(newVal !== '') { // errorMessageが空でない場合
+    isErrorModalVisible.value = true; // エラーモーダルを表示する
+  }
+});
 </script>
 
 <style scoped>
