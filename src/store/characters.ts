@@ -38,6 +38,7 @@ export interface Character {
   imgUrl: Ref;
   required: boolean;
   evasion: number;
+  selections: any;
 }
 function formatEtc(etc:string) {
   // <br>をカンマに置換

@@ -47,6 +47,11 @@ const routes = [
     name: 'search',
     component: () => import('@/views/search.vue'),
   },
+  {
+    path: '/twst/hand',
+    name: 'hand',
+    component: () => import('@/views/hand.vue'),
+  },
   { path: '/twst/', component: () => import('@/views/top.vue') }
 ]
 

@@ -37,6 +37,11 @@
         title="デッキ探索ツール"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'hand'}">
+      <v-list-item
+        title="手札ガチャ"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'other'}">
       <v-list-item
         title="その他"
