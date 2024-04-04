@@ -42,6 +42,11 @@
         title="手札ガチャ"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'data'}">
+      <v-list-item
+        title="データ"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'other'}">
       <v-list-item
         title="その他"

@@ -31,8 +31,9 @@ const { characters } = storeToRefs(characterStore);
 import { useDeckStore } from '@/store/deckStore';
 const deckStore = useDeckStore();
 // visibleプロパティがtrueのキャラクターだけを表示
-const visibleCharacters = computed(() => characters.value.filter(character => character.visible));
-
+const visibleCharacters = computed(() => 
+  characters.value.filter(character => character.visible && character.imgUrl )
+);
 const headers = [
   { title: '追加', value: 'level', sortable: false },
   { title: 'キャラ', value: 'name', sortable: false  },
@@ -51,8 +52,12 @@ onMounted(() => {
     if (levelsCache[character.name]) {
       character.level = levelsCache[character.name];
     }
-    const module = await import(`@/assets/img/${character.name}.png`);
-    character.imgUrl = module.default;
+    try {
+      const module = await import(`@/assets/img/${character.name}.png`);
+      character.imgUrl = module.default;
+    } catch {
+      character.imgUrl = '';
+    }
   });
 });
 </script>

@@ -82,6 +82,7 @@ export const useCharacterStore = defineStore('characters', {
       magic3heal: character.magic3heal || '',
       imgUrl: ref(''),
       evasion: countEvasion(character.etc),
+      selections:[],
     })) as Character[],
   }),
 });

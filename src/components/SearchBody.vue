@@ -56,8 +56,9 @@ const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const bulkLevel = ref(110);
 // visibleプロパティがtrueのキャラクターだけを表示
-const visibleCharacters = computed(() => characters.value.filter(character => character.visible));
-
+const visibleCharacters = computed(() => 
+  characters.value.filter(character => character.visible && character.imgUrl )
+);
 const headers = [
   { title: 'Lv', value: 'level', sortable: false },
   // { title: '必須', value: 'required', sortable: false  },
@@ -102,8 +103,12 @@ onMounted(() => {
     if (levelsCache[character.name]) {
       character.level = levelsCache[character.name];
     }
-    const module = await import(`@/assets/img/${character.name}.png`);
-    character.imgUrl = module.default;
+    try {
+      const module = await import(`@/assets/img/${character.name}.png`);
+      character.imgUrl = module.default;
+    } catch {
+      character.imgUrl = '';
+    }
   });
 });
 

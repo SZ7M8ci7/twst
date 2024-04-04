@@ -52,6 +52,11 @@ const routes = [
     name: 'hand',
     component: () => import('@/views/hand.vue'),
   },
+  {
+    path: '/twst/data',
+    name: 'data',
+    component: () => import('@/views/data.vue'),
+  },
   { path: '/twst/', component: () => import('@/views/top.vue') }
 ]
 
