@@ -1,57 +1,56 @@
 <template>
-  <v-container class="container">
-    <v-text-field
-      v-model="search"
-      label="Search"
-      prepend-inner-icon="mdi-magnify"
-      variant="outlined"
-      hide-details
-      single-line
-      style="max-height: 60px"
-    ></v-text-field>
-    <v-card style="overflow-x: auto;">
-      <v-data-table
-        :headers="headers"
-        :items="visibleCharacters"
-        class="elevation-1"
-        :items-per-page="-1"
-        :search="search"
-        style="max-height: calc(100vh - 250px); overflow-y: auto;"
-        :hide-default-footer="true"
-        fixed-header
-        :mobile-breakpoint="0"
-      >
-        <!-- level列のカスタムテンプレート定義 -->
-        <template v-slot:[`item.type`]="{ item }">
-          <div class="text-no-wrap">{{ item.growtype.slice(-3) }}</div>
-        </template>
-        <template v-slot:[`item.buddy1s`]="{ item }">
-          <div class="text-no-wrap">{{ formatBuddy(item.buddy1s) }}</div>
-        </template>
-        <template v-slot:[`item.buddy2s`]="{ item }">
-          <div class="text-no-wrap">{{ formatBuddy(item.buddy2s) }}</div>
-        </template>
-        <template v-slot:[`item.buddy3s`]="{ item }">
-          <div class="text-no-wrap">{{ formatBuddy(item.buddy3s) }}</div>
-        </template>
-        <template v-slot:[`item.name`]="{ item }">
-          <img :src="item.imgUrl" :alt="item.name" class="character-image" />
-        </template>
-      </v-data-table>
-    </v-card>
-  </v-container>
+  <!-- ロード中に表示するロードスクリーン -->
+  <div v-if="loadingImgUrl" class="text-center">
+    <v-progress-circular indeterminate></v-progress-circular>
+    <p>キャラクター情報を読み込んでいます...</p>
+  </div>
+
+  <!-- ロード完了後に表示するメインコンテンツ -->
+  <div v-else>
+    <v-container class="container">
+      <v-text-field v-model="search" label="Search" prepend-inner-icon="mdi-magnify" variant="outlined" hide-details
+        single-line style="max-height: 60px"></v-text-field>
+      <v-card style="overflow-x: auto;">
+        <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1"
+          :search="search" style="max-height: calc(100vh - 250px); overflow-y: auto;" :hide-default-footer="true"
+          fixed-header :mobile-breakpoint="0">
+          <!-- level列のカスタムテンプレート定義 -->
+          <template v-slot:[`item.type`]="{ item }">
+            <div class="text-no-wrap">{{ item.growtype.slice(-3) }}</div>
+          </template>
+          <template v-slot:[`item.buddy1s`]="{ item }">
+            <div class="text-no-wrap">{{ formatBuddy(item.buddy1s) }}</div>
+          </template>
+          <template v-slot:[`item.buddy2s`]="{ item }">
+            <div class="text-no-wrap">{{ formatBuddy(item.buddy2s) }}</div>
+          </template>
+          <template v-slot:[`item.buddy3s`]="{ item }">
+            <div class="text-no-wrap">{{ formatBuddy(item.buddy3s) }}</div>
+          </template>
+          <template v-slot:[`item.name`]="{ item }">
+            <img :src="item.imgUrl" :alt="item.name" class="character-image" />
+          </template>
+        </v-data-table>
+      </v-card>
+    </v-container>
+
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
+const loadingImgUrl = ref(true);
 // visibleプロパティがtrueのキャラクターだけを表示
-const visibleCharacters = computed(() => 
-  characters.value.filter(character => character.visible && character.imgUrl )
-);
+const visibleCharacters = computed(() => {
+  if (loadingImgUrl.value) {
+    return []; // 画像URLの読み込み中は空の配列を返す
+  }
+  return characters.value.filter(character => character.visible && character.imgUrl);
+});
 const search = ref('');
 const headers = [
   { title: 'キャラ', value: 'name', sortable: false  },
@@ -90,19 +89,19 @@ const formatBuddy = (value: string) => {
   return value.replace(/UP/g, '');
 };
 
-onMounted(() => {
-  const levelsCache = JSON.parse(localStorage.getItem('characterLevels') || '{}');
-  characters.value.forEach(async character => {
-    if (levelsCache[character.name]) {
-      character.level = levelsCache[character.name];
-    }
-    try {
-      const module = await import(`@/assets/img/${character.name}.png`);
-      character.imgUrl = module.default;
-    } catch {
-      character.imgUrl = '';
-    }
+onBeforeMount(() => {
+  const promises = characters.value.map(character => {
+    return import(`@/assets/img/${character.name}.png`)
+      .then(module => {
+        character.imgUrl = module.default;
+      })
+      .catch(() => {
+        character.imgUrl = ''; // 画像の読み込みに失敗した場合
+      });
+  });
 
+  Promise.all(promises).then(() => {
+    loadingImgUrl.value = false; // すべての画像のロードが完了
   });
 });
 </script>

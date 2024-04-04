@@ -1,64 +1,56 @@
 <template>
   <v-app>
     <v-container>
-      <div class="controls-container">
-        <div class="level-controls">
-          <v-text-field
-            type="number"
-            v-model="bulkLevel"
-            class="level-input"
-            label="Lv"
-            hide-details="auto"
-            :min="0"
-            :max="110"
-          ></v-text-field>
-          <v-btn @click="applyBulkLevel">表示キャラレベル一括設定</v-btn>
-        </div>
-        <v-btn @click="saveLevels" class="save-levels-btn">レベルをキャッシュに保存</v-btn>
+      <!-- ロード中に表示するロードスクリーン -->
+      <div v-if="loadingImgUrl" class="text-center">
+        <v-progress-circular indeterminate></v-progress-circular>
+        <p>キャラクター情報を読み込んでいます...</p>
       </div>
 
+      <!-- ロード完了後に表示するメインコンテンツ -->
+      <div v-else>
+        <div class="controls-container">
+          <div class="level-controls">
+            <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0"
+              :max="110"></v-text-field>
+            <v-btn @click="applyBulkLevel">表示キャラレベル一括設定</v-btn>
+          </div>
+          <v-btn @click="saveLevels" class="save-levels-btn">レベルをキャッシュに保存</v-btn>
+        </div>
 
-      <v-data-table
-        :headers="headers"
-        :items="visibleCharacters"
-        class="elevation-1"
-        :items-per-page="-1"
-      >
-        <!-- level列のカスタムテンプレート定義 -->
-        <template v-slot:[`item.level`]="{ item }">
-          <v-text-field
-            type="number"
-            v-model="item.level"
-            class="mt-0 pt-0 level-input"
-            hide-details="auto"
-            dense
-            solo
-            :min="0"
-            :max="110"
-          />
-        </template>
-        <template v-slot:[`item.required`]="{ item }">
-          <v-checkbox v-model="item.required" hide-details></v-checkbox>
-        </template>
-        <template v-slot:[`item.name`]="{ item }">
-          <img :src="item.imgUrl" :alt="item.name" class="character-image" />
-        </template>
+        <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
+          <!-- level列のカスタムテンプレート定義 -->
+          <template v-slot:[`item.level`]="{ item }">
+            <v-text-field type="number" v-model="item.level" class="mt-0 pt-0 level-input" hide-details="auto" dense
+              solo :min="0" :max="110" />
+          </template>
+          <template v-slot:[`item.required`]="{ item }">
+            <v-checkbox v-model="item.required" hide-details></v-checkbox>
+          </template>
+          <template v-slot:[`item.name`]="{ item }">
+            <img :src="item.imgUrl" :alt="item.name" class="character-image" />
+          </template>
 
-      </v-data-table>
+        </v-data-table>
+
+      </div>
     </v-container>
   </v-app>
 </template>
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref, onBeforeMount } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const bulkLevel = ref(110);
-// visibleプロパティがtrueのキャラクターだけを表示
-const visibleCharacters = computed(() => 
-  characters.value.filter(character => character.visible && character.imgUrl )
-);
+const loadingImgUrl = ref(true);
+const visibleCharacters = computed(() => {
+  if (loadingImgUrl.value) {
+    return []; // 画像URLの読み込み中は空の配列を返す
+  }
+  return characters.value.filter(character => character.visible && character.imgUrl);
+});
 const headers = [
   { title: 'Lv', value: 'level', sortable: false },
   // { title: '必須', value: 'required', sortable: false  },
@@ -97,18 +89,19 @@ function saveLevels() {
   });
   localStorage.setItem('characterLevels', JSON.stringify(levelsCache));
 }
-onMounted(() => {
-  const levelsCache = JSON.parse(localStorage.getItem('characterLevels') || '{}');
-  characters.value.forEach(async character => {
-    if (levelsCache[character.name]) {
-      character.level = levelsCache[character.name];
-    }
-    try {
-      const module = await import(`@/assets/img/${character.name}.png`);
-      character.imgUrl = module.default;
-    } catch {
-      character.imgUrl = '';
-    }
+onBeforeMount(() => {
+  const promises = characters.value.map(character => {
+    return import(`@/assets/img/${character.name}.png`)
+      .then(module => {
+        character.imgUrl = module.default;
+      })
+      .catch(() => {
+        character.imgUrl = ''; // 画像の読み込みに失敗した場合
+      });
+  });
+
+  Promise.all(promises).then(() => {
+    loadingImgUrl.value = false; // すべての画像のロードが完了
   });
 });
 

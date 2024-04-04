@@ -1,39 +1,46 @@
 <template>
   <v-app>
     <v-container>
-      <div class="controls-container">
+
+      <!-- ロード中に表示するロードスクリーン -->
+      <div v-if="loadingImgUrl" class="text-center">
+        <v-progress-circular indeterminate></v-progress-circular>
+        <p>キャラクター情報を読み込んでいます...</p>
       </div>
 
+      <!-- ロード完了後に表示するメインコンテンツ -->
+      <div v-else>
 
-      <v-data-table
-        :headers="headers"
-        :items="visibleCharacters"
-        class="elevation-1"
-        :items-per-page="-1"
-      >
-        <!-- level列のカスタムテンプレート定義 -->
-        <template v-slot:[`item.level`]="{ item }">
-          <v-btn color="primary" @click="onAddClick(item)">追加</v-btn>
-        </template>
-        <template v-slot:[`item.name`]="{ item }">
-          <img :src="item.imgUrl" :alt="item.name" class="character-image" />
-        </template>
-      </v-data-table>
+        <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
+          <!-- level列のカスタムテンプレート定義 -->
+          <template v-slot:[`item.level`]="{ item }">
+            <v-btn color="primary" @click="onAddClick(item)">追加</v-btn>
+          </template>
+          <template v-slot:[`item.name`]="{ item }">
+            <img :src="item.imgUrl" :alt="item.name" class="character-image" />
+          </template>
+        </v-data-table>
+
+      </div>
     </v-container>
+
   </v-app>
 </template>
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 import { useDeckStore } from '@/store/deckStore';
 const deckStore = useDeckStore();
-// visibleプロパティがtrueのキャラクターだけを表示
-const visibleCharacters = computed(() => 
-  characters.value.filter(character => character.visible && character.imgUrl )
-);
+const loadingImgUrl = ref(true);
+const visibleCharacters = computed(() => {
+  if (loadingImgUrl.value) {
+    return []; // 画像URLの読み込み中は空の配列を返す
+  }
+  return characters.value.filter(character => character.visible && character.imgUrl);
+});
 const headers = [
   { title: '追加', value: 'level', sortable: false },
   { title: 'キャラ', value: 'name', sortable: false  },
@@ -46,18 +53,19 @@ const headers = [
 const onAddClick = (item:any) => {
   deckStore.addToDeck(item);
 };
-onMounted(() => {
-  const levelsCache = JSON.parse(localStorage.getItem('characterLevels') || '{}');
-  characters.value.forEach(async character => {
-    if (levelsCache[character.name]) {
-      character.level = levelsCache[character.name];
-    }
-    try {
-      const module = await import(`@/assets/img/${character.name}.png`);
-      character.imgUrl = module.default;
-    } catch {
-      character.imgUrl = '';
-    }
+onBeforeMount(() => {
+  const promises = characters.value.map(character => {
+    return import(`@/assets/img/${character.name}.png`)
+      .then(module => {
+        character.imgUrl = module.default;
+      })
+      .catch(() => {
+        character.imgUrl = ''; // 画像の読み込みに失敗した場合
+      });
+  });
+
+  Promise.all(promises).then(() => {
+    loadingImgUrl.value = false; // すべての画像のロードが完了
   });
 });
 </script>
