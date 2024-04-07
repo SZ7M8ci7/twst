@@ -170,8 +170,18 @@ function dynamicSortMultiple(criteria: SortCriterion[]) {
       return 0; // すべてのキーで比較しても差がない場合
   };
 }
-
+function factorialize(num:number) :number {
+  if (num <= 0) { return 1; }
+  return num * factorialize(num-1);
+}
 export async function calcDecks() {
+ 
+  for (const i of characters.value){
+    if (i.required && i.level == 0) {
+      errorMessage.value = '必須キャラのレベルは1以上にして下さい';
+      return
+    }
+  }
   const nonZeroLevelCharacters = characters.value.filter(character => character.level > 0);
   const listLength = nonZeroLevelCharacters.length;
   if (listLength < 5) {
@@ -179,15 +189,29 @@ export async function calcDecks() {
     return;
   }
   nowResults.value = 0;
-  const sortCriteria = [];
+  const sortCriteria: SortCriterion[] = [];
   for (const key of sortOptions.value) {
     for (let i = 0; i < availableSortProps.length; i++) {
       if (availableSortProps[i] == key.prop) {
-        sortCriteria.push({key:availableSortkeys[i], order: key.order});
+        sortCriteria.push({key: availableSortkeys[i] as string, order: key.order as '昇順' | '降順'});
       }
     }
   }
+  // requiredがtrueの順、HPの降順でソート
+  nonZeroLevelCharacters.sort((a, b) => {
+    if (a.required && !b.required) return -1;
+    if (!a.required && b.required) return 1;
+    return b.hp - a.hp;
+  });
+
+  // requiredがtrueの数を数える
+  const requiredCount = nonZeroLevelCharacters.filter(character => character.required).length;
+  if (requiredCount > 5) {
+    errorMessage.value = '必須設定されたキャラが多すぎます';
+    return;
+  }
   results.value = [];
+  let currentLimit = sortCriteria[0].order === '昇順' ? Infinity : -Infinity;  // 現在の上限値を保持する変数を追加
   const processCombination = async (i: number, j: number, k: number, l: number, m: number) => {
     return new Promise<void>(resolve => {
       const combination = [
@@ -212,31 +236,54 @@ export async function calcDecks() {
           chara4: ret[9],
           chara5: ret[10],
         };
-        results.value.push(transformedRet);
+
+        // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする
+        if (
+          sortCriteria[0].order === "昇順" &&
+          (transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number) < currentLimit
+        ) {
+          results.value.push(transformedRet);
+        }
+        // sortCriteriaの0件目の順序が降順の場合、現在の上限値よりも大きい場合のみpushする
+        else if (
+          sortCriteria[0].order === "降順" &&
+          (transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number) > currentLimit
+        ) {
+          results.value.push(transformedRet);
+        }
       }
       nowResults.value += 1;
       resolve();
     });
   };
+  const lengthes: number[] = new Array(5).fill(listLength);
+  for(let i = 0; i < requiredCount; i++) {
+    lengthes[i] = i+1;
+  }
   // 同キャラ編成有り
   if (allowSameCharacter.value) {
-    const beforeLastLoops = (listLength * (listLength - 1) * (listLength - 2) * (listLength - 3));
-    totalResults.value = (beforeLastLoops*(listLength-4)/120)+beforeLastLoops*4/24;
-    
     let lastRenderTime = Date.now();
-
-    for (let i = 0; i < listLength; i++) {
-      for (let j = i + 1; j < listLength; j++) {
-        for (let k = j + 1; k < listLength; k++) {
-          for (let l = k + 1; l < listLength; l++) {
-            for (let m = l + 1; m < listLength; m++) {
+    
+    const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
+    totalResults.value = (beforeLastLoops*(lengthes[4]-4)/factorialize(5-requiredCount))+beforeLastLoops*4/factorialize(4-requiredCount);
+    if (requiredCount == 5) {
+      totalResults.value = 1;
+      await processCombination(0, 1, 2, 3, 4);
+      
+      await new Promise(requestAnimationFrame);
+      return
+    }
+    for (let i = 0; i < lengthes[0]; i++) {
+      for (let j = i + 1; j < lengthes[1]; j++) {
+        for (let k = j + 1; k < lengthes[2]; k++) {
+          for (let l = k + 1; l < lengthes[3]; l++) {
+            for (let m = l + 1; m < lengthes[4]; m++) {
               if (!isSearching.value) {
                 return;
               }
 
               await processCombination(i, j, k, l, m);
 
-              // 5秒に1回だけ描画を更新
               if (Date.now() - lastRenderTime > 500) {
                 lastRenderTime = Date.now();
                 
@@ -248,7 +295,9 @@ export async function calcDecks() {
 
                 // リアクティブな状態を更新
                 results.value = [...topResults];
-
+                if (results.value.length > 0) {
+                  currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
+                }
                 await new Promise(requestAnimationFrame);
               }
             }
@@ -256,7 +305,6 @@ export async function calcDecks() {
 
               await processCombination(i, j, k, l, m);
 
-              // 5秒に1回だけ描画を更新
               if (Date.now() - lastRenderTime > 500) {
                 lastRenderTime = Date.now();
                 
@@ -268,7 +316,9 @@ export async function calcDecks() {
 
                 // リアクティブな状態を更新
                 results.value = [...topResults];
-
+                if (results.value.length > 0) {
+                  currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
+                }
                 await new Promise(requestAnimationFrame);
               }
             }
@@ -277,16 +327,22 @@ export async function calcDecks() {
       }
     }
   } else {
-    const beforeLastLoops = (listLength * (listLength - 1) * (listLength - 2) * (listLength - 3));
-    totalResults.value = (beforeLastLoops*(listLength-4)/120);
-    
+    const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
+    totalResults.value = (beforeLastLoops*(lengthes[4]-4)/factorialize(5-requiredCount));
+    if (requiredCount == 5) {
+      totalResults.value = 1;
+      await processCombination(0, 1, 2, 3, 4);
+      
+      await new Promise(requestAnimationFrame);
+      return
+    }
     let lastRenderTime = Date.now();
 
-    for (let i = 0; i < listLength; i++) {
-      for (let j = i + 1; j < listLength; j++) {
-        for (let k = j + 1; k < listLength; k++) {
-          for (let l = k + 1; l < listLength; l++) {
-            for (let m = l + 1; m < listLength; m++) {
+    for (let i = 0; i < lengthes[0]; i++) {
+      for (let j = i + 1; j < lengthes[1]; j++) {
+        for (let k = j + 1; k < lengthes[2]; k++) {
+          for (let l = k + 1; l < lengthes[3]; l++) {
+            for (let m = l + 1; m < lengthes[4]; m++) {
               if (!isSearching.value) {
                 return;
               }
@@ -305,7 +361,9 @@ export async function calcDecks() {
 
                 // リアクティブな状態を更新
                 results.value = [...topResults];
-
+                if (results.value.length > 0) {
+                  currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
+                }
                 await new Promise(requestAnimationFrame);
               }
             }
@@ -322,4 +380,7 @@ export async function calcDecks() {
 
   // リアクティブな状態を更新
   results.value = [...topResults];
+  if (results.value.length > 0) {
+    currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
+  }
 }

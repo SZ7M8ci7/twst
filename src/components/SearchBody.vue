@@ -38,7 +38,7 @@
   </v-app>
 </template>
 <script setup lang="ts">
-import { computed, ref, onBeforeMount } from 'vue';
+import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 const characterStore = useCharacterStore();
@@ -53,7 +53,7 @@ const visibleCharacters = computed(() => {
 });
 const headers = [
   { title: 'Lv', value: 'level', sortable: false },
-  // { title: '必須', value: 'required', sortable: false  },
+  { title: '必須', value: 'required', sortable: false  },
   { title: 'キャラ', value: 'name', sortable: false  },
   { title: 'レア', value: 'rare', sortable: false  },
   { title: 'HP', value: 'hp', sortable: true  },
@@ -89,6 +89,18 @@ function saveLevels() {
   });
   localStorage.setItem('characterLevels', JSON.stringify(levelsCache));
 }
+
+function loadLevels() {
+  const levelsCache = localStorage.getItem('characterLevels');
+  if (levelsCache) {
+    const levels = JSON.parse(levelsCache);
+    characters.value.forEach(character => {
+      if (levels[character.name]) {
+        character.level = levels[character.name];
+      }
+    });
+  }
+}
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
     return import(`@/assets/img/${character.name}.png`)
@@ -104,7 +116,9 @@ onBeforeMount(() => {
     loadingImgUrl.value = false; // すべての画像のロードが完了
   });
 });
-
+onMounted(() => {
+  loadLevels(); // 画面を開いた時にlocalStorageからレベルを復元
+});
 </script>
 <style scoped>
 .table-top {
