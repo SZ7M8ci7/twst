@@ -32,3 +32,5 @@ jobs:
         git config --global user.name "${GITHUB_ACTOR}"
         git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
         npm run deploy-github
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
