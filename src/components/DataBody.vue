@@ -8,8 +8,25 @@
   <!-- ロード完了後に表示するメインコンテンツ -->
   <div v-else>
     <v-container class="container">
-      <v-text-field v-model="search" label="Search" prepend-inner-icon="mdi-magnify" variant="outlined" hide-details
-        single-line style="max-height: 60px"></v-text-field>
+      <v-row class="controls-container" no-gutters>
+  <v-col cols="12" md="8">
+    <v-text-field
+      v-model="search"
+      label="Search"
+      prepend-inner-icon="mdi-magnify"
+      variant="outlined"
+      hide-details
+      single-line
+      style="max-height: 60px">
+    </v-text-field>
+  </v-col>
+  <v-col cols="12" md="3" class="d-flex justify-end">
+    <v-btn color="green" @click="exportToExcel">Excelでダウンロード</v-btn>
+  </v-col>
+</v-row>
+
+
+
       <v-card style="overflow-x: auto;">
         <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1"
           :search="search" style="max-height: calc(100vh - 250px); overflow-y: auto;" :hide-default-footer="true"
@@ -82,7 +99,44 @@ const headers = [
   { title: 'バディ3', value: 'buddy3s', sortable: true  },
   { title: 'その他', value: 'etc', sortable: false  },
 ];
+import * as XLSX from 'xlsx';
 
+const exportToExcel = () => {
+  const data = visibleCharacters.value.map(character => ({
+    名前: character.chara,
+    衣装: character.costume,
+    レア: character.rare,
+    タイプ: character.growtype.slice(-3),
+    非公式タイプ: character.growtype,
+    HP: character.hp,
+    ATK: character.atk,
+    デュオ: character.duo,
+    M1属性: character.magic1atr,
+    M1種: character.magic1pow,
+    M1バフ: character.magic1buf,
+    M1回復: character.magic1heal,
+    M2属性: character.magic2atr,
+    M2種: character.magic2pow,
+    M2バフ: character.magic2buf,
+    M2回復: character.magic2heal,
+    M3属性: character.magic3atr,
+    M3種: character.magic3pow,
+    M3バフ: character.magic3buf,
+    M3回復: character.magic3heal,
+    バディ1: character.buddy1c,
+    バディ1スキル: character.buddy1s,
+    バディ2: character.buddy2c,
+    バディ2スキル: character.buddy2s,
+    バディ3: character.buddy3c,
+    バディ3スキル: character.buddy3s,
+    その他: character.etc
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Characters');
+  XLSX.writeFile(workbook, 'characters_data.xlsx');
+};
 
 // Method to replace "UP" with an empty string for display purposes
 const formatBuddy = (value: string) => {

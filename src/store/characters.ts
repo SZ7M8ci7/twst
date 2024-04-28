@@ -8,6 +8,7 @@ export interface Character {
   name: string;
   rare: string;
   atk: number;
+  costume: string;
   base_atk: number;
   hp: number;
   base_hp: number;
