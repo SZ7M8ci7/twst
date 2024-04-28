@@ -37,6 +37,11 @@
         title="デッキ探索ツール"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'relation'}">
+      <v-list-item
+        title="相互・３デュオ一覧"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'hand'}">
       <v-list-item
         title="手札ガチャ"

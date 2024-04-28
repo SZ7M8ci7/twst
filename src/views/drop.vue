@@ -14,8 +14,6 @@
         </div>
       </v-col>
     </v-row>
-  </v-container>
-  <v-container>
     <v-row>
       <v-col class="d-inline-flex justify-center">
         <div>
@@ -28,8 +26,6 @@
         </div>
       </v-col>
     </v-row>
-  </v-container>
-  <v-container>
     <v-row>
       <v-col class="d-flex justify-center">
         <div>
@@ -41,8 +37,6 @@
         </div>
       </v-col>
     </v-row>
-  </v-container>
-  <v-container>
     <v-row>
       <v-col class="d-flex justify-center">
         <div>

@@ -32,8 +32,6 @@
       </div>
       </v-col>
     </v-row>
-  </v-container>
-  <v-container>
     <v-row>
       <v-col cols="12" class="d-flex justify-center">
         <div>

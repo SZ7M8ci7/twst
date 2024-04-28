@@ -53,6 +53,11 @@ const routes = [
     component: () => import('@/views/hand.vue'),
   },
   {
+    path: '/twst/relation',
+    name: 'relation',
+    component: () => import('@/views/relation.vue'),
+  },
+  {
     path: '/twst/data',
     name: 'data',
     component: () => import('@/views/data.vue'),
