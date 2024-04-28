@@ -6,12 +6,17 @@
   </div>
   <!-- ロード完了後に表示するメインコンテンツ -->
   <div v-else>
-    <v-container class="container">
+    <v-container class="container" style="width: 95%;">
       <v-row>
-        <v-col cols="1" v-for="character in filteredCharacters" :key="character.name" @click="openModal(character)" style="padding: 1px;">
-          <img :src="character.imgUrl" :alt="character.name" class="character-image" />
-        </v-col>
-      </v-row>
+  <v-col cols="12" v-for="rowIndex in Math.ceil(filteredCharacters.length / 10)" :key="rowIndex">
+    <v-row>
+      <v-col cols="1"></v-col>
+      <v-col cols="1" v-for="(character) in filteredCharacters.slice((rowIndex - 1) * 11, rowIndex * 11)" :key="character.name" @click="openModal(character)" style="padding: 1px;">
+        <img :src="character.imgUrl" :alt="character.name" class="character-image" />
+      </v-col>
+    </v-row>
+  </v-col>
+</v-row>
     </v-container>
 
     <!-- モーダル -->
@@ -154,4 +159,9 @@ onBeforeMount(() => {
   cursor: pointer;
   padding: 0;
 }
+
+.new-row {
+  flex-basis: 100%;
+}
+
 </style>
