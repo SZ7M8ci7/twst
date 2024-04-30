@@ -43,3 +43,16 @@ jobs:
           git push origin HEAD:master; \
         fi
 
+    - name: Trigger deploy workflow
+      if: success()
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'deploy.yml',
+            ref: 'master'
+          });
+
