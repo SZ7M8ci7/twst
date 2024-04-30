@@ -40,6 +40,6 @@ jobs:
           echo "No changes to commit."
         else
           git commit -m "Automated update: img folder and chara.json from simulator repository"
-          git push origin HEAD:${GITHUB_REF}; \
+          git push origin HEAD:master; \
         fi
 
