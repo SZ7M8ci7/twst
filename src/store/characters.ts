@@ -37,6 +37,7 @@ export interface Character {
   visible?: boolean;
   level: number;
   imgUrl: Ref;
+  wikiURL: string;
   required: boolean;
   evasion: number;
   selections: any;
@@ -82,6 +83,7 @@ export const useCharacterStore = defineStore('characters', {
       magic3buf: character.magic3buf || '',
       magic3heal: character.magic3heal || '',
       imgUrl: ref(''),
+      wikiURL:character.wikiURL || '',
       evasion: countEvasion(character.etc),
       selections:[],
     })) as Character[],

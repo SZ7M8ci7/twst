@@ -8,15 +8,16 @@
   <div v-else>
     <v-container class="container" style="width: 95%;">
       <v-row>
-  <v-col cols="12" v-for="rowIndex in Math.ceil(filteredCharacters.length / 10)" :key="rowIndex">
-    <v-row>
-      <v-col cols="1"></v-col>
-      <v-col cols="1" v-for="(character) in filteredCharacters.slice((rowIndex - 1) * 11, rowIndex * 11)" :key="character.name" @click="openModal(character)" style="padding: 1px;">
-        <img :src="character.imgUrl" :alt="character.name" class="character-image" />
-      </v-col>
-    </v-row>
-  </v-col>
-</v-row>
+        <v-col cols="12" v-for="rowIndex in Math.ceil(filteredCharacters.length / 10)" :key="rowIndex">
+          <v-row>
+            <v-col cols="1"></v-col>
+            <v-col cols="1" v-for="(character) in filteredCharacters.slice((rowIndex - 1) * 11, rowIndex * 11)"
+              :key="character.name" @click="openModal(character)" style="padding: 1px;">
+              <img :src="character.imgUrl" :alt="character.name" class="character-image" />
+            </v-col>
+          </v-row>
+        </v-col>
+      </v-row>
     </v-container>
 
     <!-- モーダル -->
@@ -25,9 +26,13 @@
         <v-card-text>
           <v-simple-table style="display: flex;justify-content: center;">
             <template v-slot:default>
-              <tbody >
+              <tbody>
                 <tr v-for="(value, key) in selectedCharacter" :key="key">
-                  <td v-for="tmp in value" :key="tmp"><img :src=tmp class="character-image" /></td>
+                  <td v-for="tmp in value" :key="tmp">
+                    <a :href="imgUrl2wikiUrl[tmp]" target="_blank" rel="noopener noreferrer">
+                      <img :src=tmp class="character-image" />
+                    </a>
+                  </td>
                 </tr>
               </tbody>
             </template>
@@ -54,15 +59,17 @@ const selectedCharacter: Ref<string[][]> = ref([]);
 const chara2name = ref<Record<string, string[]>>({});
 const duo2name = ref<Record<string, string[]>>({});
 const name2data = ref<Record<string, Character>>({});
+const imgUrl2wikiUrl = ref<Record<string, string>>({});
 const filteredCharacters = computed(() => {
   if (loadingImgUrl.value) {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
-  
+
   const visibleCharacters = characters.value.filter(character => character.visible && character.imgUrl && character.rare == "SSR");
-  
+
   visibleCharacters.forEach(character => {
     name2data.value[character.name] = character;
+    imgUrl2wikiUrl.value[character.imgUrl] = character.wikiURL;
     if (character.chara in chara2name.value) {
       chara2name.value[character.chara].push(character.name);
     } else {
@@ -74,7 +81,7 @@ const filteredCharacters = computed(() => {
       duo2name.value[character.duo] = [character.name];
     }
   });
-  
+
   return visibleCharacters;
 });
 
@@ -91,24 +98,24 @@ function computeDuo(character: Character) {
       selectedCharacter.value.push([character.imgUrl as any, character1.imgUrl]);
       for (let name2 of duo2name.value[character.chara]) {
         let character2 = name2data.value[name2];
-        if (character2.duo == character.chara){
+        if (character2.duo == character.chara) {
           selectedCharacter.value.push([character.imgUrl as any, character1.imgUrl, character2.imgUrl])
         }
-        if (character2.duo == character1.chara){
+        if (character2.duo == character1.chara) {
           selectedCharacter.value.push([character.imgUrl as any, character1.imgUrl, character2.imgUrl])
         }
       }
       for (let name2 of duo2name.value[character1.chara]) {
         let character2 = name2data.value[name2];
-        if (character2.duo == character.chara){
+        if (character2.duo == character.chara) {
           selectedCharacter.value.push([character.imgUrl as any, character1.imgUrl, character2.imgUrl])
         }
-        if (character2.duo == character1.chara){
+        if (character2.duo == character1.chara) {
           selectedCharacter.value.push([character.imgUrl as any, character1.imgUrl, character2.imgUrl])
         }
       }
     } else {
-      for (let name2 of chara2name.value[character1.duo]){
+      for (let name2 of chara2name.value[character1.duo]) {
         let character2 = name2data.value[name2];
         if (character2.duo == character1.chara) {
           selectedCharacter.value.push([character.imgUrl as any, character1.imgUrl, character2.imgUrl])
@@ -163,5 +170,4 @@ onBeforeMount(() => {
 .new-row {
   flex-basis: 100%;
 }
-
 </style>
