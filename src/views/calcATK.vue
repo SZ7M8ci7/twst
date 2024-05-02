@@ -5,8 +5,7 @@
       <v-col cols="11">
         <v-row align="center">
           <v-col cols="3" class="pa-1 text-center">
-            <v-card-text class="d-flex align-center justify-center pa-1"><span
-                class="min-label mr-4">難易度</span></v-card-text>
+              <span class="ma-1">難易度</span>
           </v-col>
           <v-col cols="9" class="pa-1">
             <v-radio-group v-model="difficulty" hide-details inline>
@@ -17,41 +16,34 @@
             </v-radio-group>
           </v-col>
         </v-row>
-        <v-row>
-          <v-card-text class="d-flex align-center pa-0">
+        <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="min-label mr-4">敵HP</span>
+              <span class="ma-1 align-center pa-0">敵HP</span>
             </v-col>
             <v-col cols="9" class="pa-1">
               <v-text-field type="number" v-model="enemyHP" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
-          </v-card-text>
         </v-row>
-        <v-row>
-          <v-card-text class="d-flex align-center pa-0">
+        <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="min-label mr-4 ">与ダメージ</span>
+              <span class="ma-1 ">与ダメージ</span>
             </v-col>
             <v-col cols="9" class="pa-1">
               <v-text-field type="number" v-model="damage" class="mt-0 pt-0" hide-details="auto" dense solo
                 :min="enemyHP" />
             </v-col>
-          </v-card-text>
         </v-row>
-        <v-row>
-          <v-card-text class="d-flex align-center pa-0">
+        <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="min-label mr-4">バフ数</span>
+              <span class="ma-1">バフ数</span>
             </v-col>
             <v-col cols="9" class="pa-1">
               <v-text-field type="number" v-model="buff" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
-          </v-card-text>
         </v-row>
-        <v-row>
-          <v-card-text class="d-flex align-center pa-0">
+        <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class=" mr-4">回復阻害数
+              <span class="ma-1">回復阻害数
                 <span class="mdi mdi-help-circle-outline">
                   <v-tooltip activator="parent" open-on-click>最大1回</v-tooltip>
                 </span>
@@ -61,7 +53,6 @@
               <v-text-field type="number" v-model="blockHeal" class="mt-0 pt-0" hide-details="auto" dense solo :min="0"
                 :max="1" />
             </v-col>
-          </v-card-text>
         </v-row>
         <v-row>
           <v-col class="pa-1">
@@ -296,9 +287,6 @@ const doughnutLabel = {
 };
 </script>
 <style scoped>
-.min-label {
-  white-space: nowrap;
-}
 
 .no-break {
   white-space: nowrap;
