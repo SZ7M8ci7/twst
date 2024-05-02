@@ -58,6 +58,11 @@ const routes = [
     component: () => import('@/views/relation.vue'),
   },
   {
+    path: '/twst/calc-atk-exam',
+    name: 'calcATK',
+    component: () => import('@/views/calcATK.vue'),
+  },
+  {
     path: '/twst/data',
     name: 'data',
     component: () => import('@/views/data.vue'),

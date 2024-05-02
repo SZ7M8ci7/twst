@@ -17,6 +17,11 @@
         title="必要育成アイテム数計算"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'calcATK'}">
+      <v-list-item
+        title="アタック試験スコア計算"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'comfort'}">
       <v-list-item
         title="いごこち度検討ツール"
