@@ -63,6 +63,16 @@ const routes = [
     component: () => import('@/views/calcATK.vue'),
   },
   {
+    path: '/twst/calc-def-exam',
+    name: 'calcDEF',
+    component: () => import('@/views/calcDEF.vue'),
+  },
+  {
+    path: '/twst/calc-basic-exam',
+    name: 'calcBASIC',
+    component: () => import('@/views/calcBASIC.vue'),
+  },
+  {
     path: '/twst/data',
     name: 'data',
     component: () => import('@/views/data.vue'),

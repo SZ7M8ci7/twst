@@ -17,9 +17,19 @@
         title="必要育成アイテム数計算"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'calcBASIC'}">
+      <v-list-item
+        title="ベーシック試験スコア計算"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'calcATK'}">
       <v-list-item
         title="アタック試験スコア計算"
+        @click="drawer = false;"
+      /></RouterLink>
+      <RouterLink :to="{name:'calcDEF'}">
+      <v-list-item
+        title="ディフェンス試験スコア計算"
         @click="drawer = false;"
       /></RouterLink>
       <RouterLink :to="{name:'comfort'}">
