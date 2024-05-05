@@ -17,6 +17,12 @@
             <td>{{ item.hpBuudy }}</td>
             <td>{{ item.buddy }}</td>
             <td>{{ item.noHpBuddy }}</td>
+            <td>{{ item.duo }}</td>
+            <td>{{ item.referenceDamage }}</td>
+            <td>{{ item.referenceAdvantageDamage }}</td>
+            <td>{{ item.referenceVsHiDamage }}</td>
+            <td>{{ item.referenceVsMizuDamage }}</td>
+            <td>{{ item.referenceVsKiDamage }}</td>
             <!-- キャラ1～5の画像を表示 -->
             <td v-for="n in 5" :key="`chara${n}`">
               <v-img :src="item[`chara${n}`]" max-width="50"></v-img>
@@ -40,6 +46,12 @@ const headers = [
   { title: 'HPバディ', value: 'hpBuudy', sortable: false },
   { title: 'バディ', value: 'buddy', sortable: false },
   { title: '無バディ', value: 'noHPBuudy', sortable: false },
+  { title: 'デュオ', value: 'duo', sortable: false },
+  { title: '等倍与ダメ', value: 'referenceDamage', sortable: false },
+  { title: '有利与ダメ', value: 'referenceAdvantageDamage', sortable: false },
+  { title: '対火与ダメ', value: 'referenceVsHiDamage', sortable: false },
+  { title: '対水与ダメ', value: 'referenceVsMizuDamage', sortable: false },
+  { title: '対木与ダメ', value: 'referenceVsKiDamage', sortable: false },
   { title: 'キャラ1', value: 'chara1', sortable: false  },
   { title: 'キャラ2', value: 'chara2', sortable: false  },
   { title: 'キャラ3', value: 'chara3', sortable: false  },
@@ -66,5 +78,6 @@ const headers = [
 }
 ::v-deep .v-data-table td {
   padding: 1px 4px !important;
+  text-align: center;
 }
 </style>

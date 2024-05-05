@@ -10,8 +10,10 @@ export interface Character {
   atk: number;
   costume: string;
   base_atk: number;
+  calcBaseATK: number;
   hp: number;
   base_hp: number;
+  calcBaseHP: number;
   buddy1c: string;
   buddy1s: string;
   buddy2c: string;
@@ -63,8 +65,10 @@ export const useCharacterStore = defineStore('characters', {
       ...character,
       atk: Number(character.atk),
       base_atk: Number(character.base_atk),
+      calcBaseATK: Number(character.base_atk),
       hp: Number(character.hp),
       base_hp: Number(character.base_hp),
+      calcBaseHP: Number(character.base_hp),
       visible: true,
       required: false,
       level: 0,

@@ -7,6 +7,8 @@ export interface result {
   totalEvasion: number;
   totalHPBuddy: number;
   totalBuddy: number;
+  totalDuo: number;
+  totalReferenceDamage: number;
   noHPBuddy: number;
   chara1: string;
   chara2: string;

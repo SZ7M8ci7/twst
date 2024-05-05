@@ -1,8 +1,8 @@
 <template>
   <div class="modal-background">
     <v-card-title>ソート設定</v-card-title>
-      <v-card-text>
-        <div v-for="(option, index) in sortOptions" :key="index" class="my-2 sort-option">
+      <v-card-text class="ma-0 pa-0">
+        <div v-for="(option, index) in sortOptions" :key="index" class="ma-0 pa-0 sort-option">
           <span class="sort-rank">{{ index + 1 }}.</span>
           <v-select
             v-model="option.prop"
@@ -10,6 +10,7 @@
             label="ソートキー"
             item-text="prop"
             item-value="value"
+            class="ma-0 pa-0"
             hide-details
             dense
           ></v-select>
@@ -17,6 +18,7 @@
             v-model="option.order"
             :items="['昇順', '降順']"
             label="順序"
+            class="ma-0 pa-0"
             hide-details
             dense
             style="max-width: 130px;"
@@ -30,8 +32,8 @@
         </div>
 
       </v-card-text>
-      <v-card-title>最低値設定</v-card-title>
-      <v-card-text class="sort-option">
+      <v-card-title class="mt-0 pt-0">最低値設定</v-card-title>
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">最低実質HP</span>
         <v-text-field
             type="number"
@@ -43,7 +45,7 @@
             :min="0"
           />
       </v-card-text>
-      <v-card-text class="sort-option">
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">最低実HP</span>
         <v-text-field
             type="number"
@@ -55,7 +57,7 @@
             :min="0"
           />
       </v-card-text>
-      <v-card-text class="sort-option">
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">最低HPバディ数</span>
         <v-text-field
             type="number"
@@ -67,7 +69,7 @@
             :min="0"
           />
       </v-card-text>
-      <v-card-text class="sort-option">
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">最低回避数</span>
         <v-text-field
             type="number"
@@ -79,8 +81,80 @@
             :min="0"
           />
       </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">最低デュオ数</span>
+        <v-text-field
+            type="number"
+            v-model="minDuo"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">最低等倍ダメージ</span>
+        <v-text-field
+            type="number"
+            v-model="minReferenceDamage"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">最低有利ダメージ</span>
+        <v-text-field
+            type="number"
+            v-model="minReferenceAdvantageDamage"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">最低対火ダメージ</span>
+        <v-text-field
+            type="number"
+            v-model="minReferenceVsHiDamage"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">最低対水ダメージ</span>
+        <v-text-field
+            type="number"
+            v-model="minReferenceVsMizuDamage"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">最低対木ダメージ</span>
+        <v-text-field
+            type="number"
+            v-model="minReferenceVsKiDamage"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
     <v-card-title>検索設定</v-card-title>
-      <v-card-text class="sort-option">
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">結果上限数</span>
         <v-text-field
             type="number"
@@ -92,10 +166,10 @@
             :min="0"
           />
       </v-card-text>
-      <v-card-text class="sort-option">
-        <span class="min-label">同キャラを許可</span>
-        <v-radio-group v-model="allowSameCharacter" class="mt-0 pt-0" inline>
-          <v-radio label="はい" :value="true"></v-radio>
+      <v-card-text class="sort-option mt-2 mb-2 pa-0">
+        <span class="min-label mt-0 pa-0">同キャラを許可</span>
+        <v-radio-group v-model="allowSameCharacter" class="ma-0 pa-0" inline hide-details>
+          <v-radio label="はい" :value="true" ></v-radio>
           <v-radio label="いいえ" :value="false"></v-radio>
         </v-radio-group>
       </v-card-text>
@@ -117,6 +191,12 @@ const minEHP = ref(searchSettingsStore.minEHP);
 const minHP = ref(searchSettingsStore.minHP);
 const minHPBuddy = ref(searchSettingsStore.minHPBuddy);
 const minEvasion = ref(searchSettingsStore.minEvasion);
+const minDuo = ref(searchSettingsStore.minDuo);
+const minReferenceDamage = ref(searchSettingsStore.minReferenceDamage);
+const minReferenceAdvantageDamage = ref(searchSettingsStore.minReferenceAdvantageDamage);
+const minReferenceVsHiDamage = ref(searchSettingsStore.minReferenceVsHiDamage);
+const minReferenceVsMizuDamage = ref(searchSettingsStore.minReferenceVsMizuDamage);
+const minReferenceVsKiDamage = ref(searchSettingsStore.minReferenceVsKiDamage);
 const maxResult = ref(searchSettingsStore.maxResult)
 let initialSortOptions: any = undefined;
 let sortOptions = ref();
@@ -146,6 +226,12 @@ function applyFilter() {
     minHP: minHP.value,
     minHPBuddy: minHPBuddy.value,
     minEvasion: minEvasion.value,
+    minDuo: minDuo.value,
+    minReferenceDamage: minReferenceDamage.value,
+    minReferenceAdvantageDamage: minReferenceAdvantageDamage.value,
+    minReferenceVsHiDamage: minReferenceVsHiDamage.value,
+    minReferenceVsMizuDamage: minReferenceVsMizuDamage.value,
+    minReferenceVsKiDamage: minReferenceVsKiDamage.value,
     sortOptions: sortOptions.value,
     maxResult: maxResult.value,
     allowSameCharacter: allowSameCharacter.value,

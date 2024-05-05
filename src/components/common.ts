@@ -2,8 +2,9 @@ import { Character, useCharacterStore} from '@/store/characters'
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
+import { Ref } from 'vue';
 const searchSettingStore = useSearchSettingsStore();
-const { minEHP, minHP, minHPBuddy, minEvasion, maxResult, sortOptions, allowSameCharacter } = storeToRefs(searchSettingStore);
+const { minEHP, minHP, minHPBuddy, minEvasion, minDuo, minReferenceDamage, minReferenceAdvantageDamage, minReferenceVsHiDamage,minReferenceVsKiDamage,minReferenceVsMizuDamage, maxResult, sortOptions, allowSameCharacter } = storeToRefs(searchSettingStore);
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
@@ -28,6 +29,12 @@ export const availableSortProps = [
   'HPバディが存在しないキャラ数',
   'バディ数',
   '回避数',
+  'デュオ数',
+  '等倍与ダメージ',
+  '有利与ダメージ',
+  '対火与ダメージ',
+  '対水与ダメージ',
+  '対木与ダメージ',
 ];
 
 export const availableSortkeys = [
@@ -37,6 +44,12 @@ export const availableSortkeys = [
   'noHpBuddy',
   'buddy',
   'evasion',
+  'duo',
+  'referenceDamage',
+  'referenceAdvantageDamage',
+  'referenceVsHiDamage',
+  'referenceVsMizuDamage',
+  'referenceVsKiDamage',
 ];
 function calcHPBuddyRate(status:string){
   if ((status == 'HPUP(小)') || (status == 'HP&ATKUP(小)')){
@@ -44,6 +57,15 @@ function calcHPBuddyRate(status:string){
   }
   if ((status == 'HPUP(中)') || (status == 'HP&ATKUP(中)')){
     return 0.3;
+  }
+  return 0;
+}
+function calcATKBuddyRate(status:string){
+  if ((status == 'ATKUP(小)') || (status == 'HP&ATKUP(小)')){
+    return 0.2;
+  }
+  if ((status == 'ATKUP(中)') || (status == 'HP&ATKUP(中)')){
+    return 0.35;
   }
   return 0;
 }
@@ -65,7 +87,63 @@ function calcConHealRate(status: string) {
   }
   return 0;
 }
+function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: number, atkBuddyRate: number) {
+  if (magicBuff == "ATKUP(極小)") {
+    atk = atk*1.1+atk*atkBuddyRate;
+  } else if (magicBuff == "ATKUP(小)") {
+    atk = atk*1.2+atk*atkBuddyRate;
+  } else if (magicBuff == "ATKUP(中)") {
+    atk = atk*1.35+atk*atkBuddyRate;
+  } else if (magicBuff == "ATKUP(大)") {
+    atk = atk*1.5+atk*atkBuddyRate;
+  } else if (magicBuff == "ATKUP(極大)") {
+    atk = atk*2+atk*atkBuddyRate;
+  } else {
+    atk = atk+atk*atkBuddyRate;
+  }
+  let atkRate = 1;
+  if (magicPow.includes("弱")) {
+    atkRate = 0.75;
+  }
+  if (magicAtr == '無') {
+    atkRate *= 1.1;
+  }
+  if (magicBuff == "ダメUP(極小)") {
+    atkRate += 0.025;
+  } else if (magicBuff == "ダメUP(小)") {
+    atkRate += 0.05;
+  } else if (magicBuff == "ダメUP(中)") {
+    atkRate += 0.0875;
+  } else if (magicBuff == "ダメUP(大)") {
+    atkRate += 0.125;
+  } else if (magicBuff == "ダメUP(極大)") {
+    atkRate += 0.25;
+  } 
+  if (magicBuff == "属性ダメUP(極小)") {
+    atkRate += 0.03;
+  } else if (magicBuff == "属性ダメUP(小)") {
+    atkRate += 0.06;
+  } else if (magicBuff == "属性ダメUP(中)") {
+    atkRate += 0.1005;
+  } else if (magicBuff == "属性ダメUP(大)") {
+    atkRate += 0.15;
+  } else if (magicBuff == "属性ダメUP(極大)") {
+    atkRate += 0.30;
+  } 
+  let comboRate = 1;
+  if (magicPow.includes("連撃")) {
+    comboRate = 0.9 * 2;
+  } else if (magicPow.includes("デュオ")) {
+    comboRate = 0.8 * 3;
+  }
+  return atk*atkRate*comboRate;
+}
+function calcTopDamage(damage1: number,damage2: number,damage3: number,){
 
+  const damages = [damage1, damage2, damage3];
+  damages.sort((a, b) => b - a);
+  return damages[0] + damages[1];
+}
 export function calcDeckStatus(characters:Character[]) : Array<number | string| any> | undefined {
   const memberNameSet: Set<string> = new Set();
   for (const chara of characters){
@@ -77,70 +155,232 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   let deckTotalHPBuddy = 0;
   let deckTotalBuddy = 0;
   let deckNoHPBuddy = 0;
-  const deckList = [];
-  for (const chara of characters){
-    deckList.push(chara.imgUrl);
-    let maxLevel = 110;
-    if (chara.rare == 'SR'){
-      maxLevel = 90;
-    } else if (chara.rare == 'R'){
-      maxLevel = 70;
-    } 
-    const growPercentage = chara.level / maxLevel;
-    const calcBaseHP = (chara.hp - chara.base_hp)*growPercentage+chara.base_hp;
-    const calcBaseATK = (chara.atk - chara.base_atk)*growPercentage+chara.base_atk;
+  let deckDuo = 0;
+  let deckReferenceDamage = 0;
+  let deckReferenceAdvantageDamage = 0;
+  let deckReferenceVsHiDamage = 0;
+  let deckReferenceVsMizuDamage = 0;
+  let deckReferenceVsKiDamage = 0;
+  const name2M2Used:Record<number, boolean> = {};
+  const name2MotherUsed:Record<number, boolean> = {};
+  const name2DuoUsed:Record<number, boolean> = {};
+  const deckList: Ref<any>[] = [];
+  characters.forEach((chara) => {
+    let maxLevel = 110;  // Default max level for SSR
+    if (chara.rare == 'SR') {
+      maxLevel = 90;     // Max level for SR
+    } else if (chara.rare == 'R') {
+      maxLevel = 70;     // Max level for R
+    }
     
+    const growPercentage = chara.level / maxLevel;
+    chara.calcBaseHP = (chara.hp - chara.base_hp) * growPercentage + chara.base_hp;
+    chara.calcBaseATK = (chara.atk - chara.base_atk) * growPercentage + chara.base_atk;
+  })
+  characters.sort((a, b) => b.calcBaseATK - a.calcBaseATK);
+  characters.forEach((chara, index) => {
+    name2M2Used[index] = false;
+    name2MotherUsed[index] = false;
+    name2DuoUsed[index] = false;
+  })
+  characters.forEach((chara, index) => {
+    deckList.push(chara.imgUrl);
 
-    deckTotalHP += calcBaseHP;
+    deckTotalHP += chara.calcBaseHP;
     let hasHpBuddy = false;
+    let atkBuddyRate = 0;
     // バディHP増加分加算
     if (memberNameSet.has(chara.buddy1c)){
       deckTotalBuddy+=1;
       const hpRate = calcHPBuddyRate(chara.buddy1s);
+      atkBuddyRate += calcATKBuddyRate(chara.buddy1s);
       if (hpRate != 0){
        deckTotalHPBuddy+=1;
        hasHpBuddy = true;
-       deckTotalHP+=calcBaseHP*hpRate;
+       deckTotalHP+=chara.calcBaseHP*hpRate;
       }
     }
     if (memberNameSet.has(chara.buddy2c)){
       deckTotalBuddy+=1;
       const hpRate = calcHPBuddyRate(chara.buddy2s);
+      atkBuddyRate += calcATKBuddyRate(chara.buddy2s);
       if (hpRate != 0){
        deckTotalHPBuddy+=1;
        hasHpBuddy = true;
-       deckTotalHP+=calcBaseHP*hpRate;
+       deckTotalHP+=chara.calcBaseHP*hpRate;
       }
     }
     if (memberNameSet.has(chara.buddy3c)){
       deckTotalBuddy+=1;
       const hpRate = calcHPBuddyRate(chara.buddy3s);
+      atkBuddyRate += calcATKBuddyRate(chara.buddy3s);
       if (hpRate != 0){
        deckTotalHPBuddy+=1;
        hasHpBuddy = true;
-       deckTotalHP+=calcBaseHP*hpRate;
+       deckTotalHP+=chara.calcBaseHP*hpRate;
       }
     }
     // HP回復分加算
-    deckTotalHeal+=calcHealRate(chara.magic1heal)*calcBaseATK;
-    deckTotalHeal+=calcHealRate(chara.magic2heal)*calcBaseATK;
-    deckTotalHeal+=calcHealRate(chara.magic3heal)*calcBaseATK;
+    deckTotalHeal+=calcHealRate(chara.magic1heal)*chara.calcBaseATK;
+    deckTotalHeal+=calcHealRate(chara.magic2heal)*chara.calcBaseATK;
+    deckTotalHeal+=calcHealRate(chara.magic3heal)*chara.calcBaseATK;
     // HP継続回復分加算
-    deckTotalHeal+=calcConHealRate(chara.magic1heal)*calcBaseHP;
-    deckTotalHeal+=calcConHealRate(chara.magic2heal)*calcBaseHP;
-    deckTotalHeal+=calcConHealRate(chara.magic3heal)*calcBaseHP;
+    deckTotalHeal+=calcConHealRate(chara.magic1heal)*chara.calcBaseHP;
+    deckTotalHeal+=calcConHealRate(chara.magic2heal)*chara.calcBaseHP;
+    deckTotalHeal+=calcConHealRate(chara.magic3heal)*chara.calcBaseHP;
     // 回避数加算
     deckTotalEvasion+=chara.evasion;
     if (!hasHpBuddy){
       deckNoHPBuddy+=1;
     }
-  }
+    let magic2pow = chara.magic2pow;
+    if (name2DuoUsed[index]){
+      magic2pow = 'デュオ';
+      deckDuo += 1;
+    } else {
+      // 相互デュオチェック
+      characters.forEach((pair, index2) => {
+        if ((pair.duo == chara.chara) && (chara.duo == pair.chara)) {
+          if (!name2DuoUsed[index] && !name2DuoUsed[index2]) {
+            name2DuoUsed[index] = true;
+            name2DuoUsed[index2] = true;
+            name2M2Used[index] = true;
+            name2M2Used[index2] = true;
+          }
+        }
+      });
+      // Motherデュオチェック
+      characters.forEach((pair, index2) => {
+        if (chara.duo == pair.chara) {
+          if (!name2DuoUsed[index] && !name2M2Used[index] && !name2MotherUsed[index2]) {
+            name2DuoUsed[index] = true;
+            name2M2Used[index] = true;
+            name2MotherUsed[index2] = true;
+          }
+        }
+      });
+      // M2デュオチェック
+      characters.forEach((pair, index2) => {
+        if (chara.duo == pair.chara) {
+          if (!name2DuoUsed[index] && !name2M2Used[index] && !name2M2Used[index2]) {
+            name2DuoUsed[index] = true;
+            name2M2Used[index] = true;
+            name2M2Used[index2] = true;
+          }
+        }
+      });
+      if (name2DuoUsed[index]) {
+        magic2pow = "デュオ";
+        deckDuo+=1;
+      }
+    }
+    // 等倍ダメージ加算
+    const magic1Damage = calcDamage(chara.magic1buf, chara.magic1pow, chara.magic1atr, chara.calcBaseATK,atkBuddyRate);
+    const magic2Damage = calcDamage(chara.magic2buf, magic2pow, chara.magic2atr, chara.calcBaseATK,atkBuddyRate);
+    const magic3Damage = calcDamage(chara.magic3buf, chara.magic3pow, chara.magic3atr, chara.calcBaseATK,atkBuddyRate);
+
+    deckReferenceDamage += calcTopDamage(magic1Damage,magic2Damage,magic3Damage);
+
+    // 有利ダメージ
+    const magic1AdvantageDamage = chara.magic1atr == '無' ? magic1Damage : magic1Damage * 1.5;
+    const magic2AdvantageDamage = chara.magic2atr == '無' ? magic2Damage : magic2Damage * 1.5;
+    const magic3AdvantageDamage = chara.magic3atr == '無' ? magic3Damage : magic3Damage * 1.5;
+
+    deckReferenceAdvantageDamage += calcTopDamage(magic1AdvantageDamage,magic2AdvantageDamage,magic3AdvantageDamage);
+
+    // 対火ダメージ
+    let magic1vsHiDamage = magic1Damage;
+    if (chara.magic1atr == '水') {
+      magic1vsHiDamage = magic1Damage*1.5;
+    } else if (chara.magic1atr == '木') {
+      magic1vsHiDamage = magic1Damage/2;
+    }
+    let magic2vsHiDamage = magic2Damage;
+    if (chara.magic2atr == '水') {
+      magic2vsHiDamage = magic2Damage*1.5;
+    } else if (chara.magic2atr == '木') {
+      magic2vsHiDamage = magic2Damage/2;
+    }
+    let magic3vsHiDamage = magic3Damage;
+    if (chara.magic3atr == '水') {
+      magic3vsHiDamage = magic3Damage*1.5;
+    } else if (chara.magic3atr == '木') {
+      magic3vsHiDamage = magic3Damage/2;
+    }
+
+    deckReferenceVsHiDamage += calcTopDamage(magic1vsHiDamage,magic2vsHiDamage,magic3vsHiDamage);
+
+    // 対水ダメージ
+    let magic1vsMizuDamage = magic1Damage;
+    if (chara.magic1atr == '木') {
+      magic1vsMizuDamage = magic1Damage*1.5;
+    } else if (chara.magic1atr == '火') {
+      magic1vsMizuDamage = magic1Damage/2;
+    }
+    let magic2vsMizuDamage = magic2Damage;
+    if (chara.magic2atr == '木') {
+      magic2vsMizuDamage = magic2Damage*1.5;
+    } else if (chara.magic2atr == '火') {
+      magic2vsMizuDamage = magic2Damage/2;
+    }
+    let magic3vsMizuDamage = magic3Damage;
+    if (chara.magic3atr == '木') {
+      magic3vsMizuDamage = magic3Damage*1.5;
+    } else if (chara.magic3atr == '火') {
+      magic3vsMizuDamage = magic3Damage/2;
+    }
+    deckReferenceVsMizuDamage += calcTopDamage(magic1vsMizuDamage,magic2vsMizuDamage,magic3vsMizuDamage);
+
+    // 対木ダメージ
+    let magic1vsKiDamage = magic1Damage;
+    if (chara.magic1atr == '火') {
+      magic1vsKiDamage = magic1Damage*1.5;
+    } else if (chara.magic1atr == '水') {
+      magic1vsKiDamage = magic1Damage/2;
+    }
+    let magic2vsKiDamage = magic2Damage;
+    if (chara.magic2atr == '火') {
+      magic2vsKiDamage = magic2Damage*1.5;
+    } else if (chara.magic2atr == '水') {
+      magic2vsKiDamage = magic2Damage/2;
+    }
+    let magic3vsKiDamage = magic3Damage;
+    if (chara.magic3atr == '火') {
+      magic3vsKiDamage = magic3Damage*1.5;
+    } else if (chara.magic3atr == '水') {
+      magic3vsKiDamage = magic3Damage/2;
+    }
+    deckReferenceVsKiDamage += calcTopDamage(magic1vsKiDamage,magic2vsKiDamage,magic3vsKiDamage);
+  })
   if (deckTotalHP < minHP.value) { return; }
   if (deckTotalHP + deckTotalHeal < minEHP.value) { return; }
   if (deckTotalHPBuddy < minHPBuddy.value) { return; }
   if (deckTotalEvasion < minEvasion.value) { return; }
+  if (deckDuo < minDuo.value) { return; }
+  if (deckReferenceDamage < minReferenceDamage.value) { return; }
+  if (deckReferenceAdvantageDamage < minReferenceAdvantageDamage.value) { return; }
+  if (deckReferenceVsHiDamage < minReferenceVsHiDamage.value) { return; }
+  if (deckReferenceVsMizuDamage < minReferenceVsMizuDamage.value) { return; }
+  if (deckReferenceVsKiDamage < minReferenceVsKiDamage.value) { return; }
+  deckReferenceDamage = Math.floor(deckReferenceDamage);
+  deckReferenceAdvantageDamage = Math.floor(deckReferenceAdvantageDamage);
+  deckReferenceVsHiDamage = Math.floor(deckReferenceVsHiDamage);
+  deckReferenceVsMizuDamage = Math.floor(deckReferenceVsMizuDamage);
+  deckReferenceVsKiDamage = Math.floor(deckReferenceVsKiDamage);
   deckList.sort();
-  return [deckTotalHP, deckTotalHP+deckTotalHeal, deckTotalEvasion, deckTotalHPBuddy, deckTotalBuddy, deckNoHPBuddy, ...deckList];
+  return [deckTotalHP
+    , deckTotalHP+deckTotalHeal
+    , deckTotalEvasion
+    , deckTotalHPBuddy
+    , deckTotalBuddy
+    , deckNoHPBuddy
+    , deckDuo
+    , deckReferenceDamage
+    , deckReferenceAdvantageDamage
+    , deckReferenceVsHiDamage
+    , deckReferenceVsMizuDamage
+    , deckReferenceVsKiDamage
+    , ...deckList];
 }
 
 
@@ -197,13 +437,27 @@ export async function calcDecks() {
       }
     }
   }
-  // requiredがtrueの順、HPの降順でソート
-  nonZeroLevelCharacters.sort((a, b) => {
-    if (a.required && !b.required) return -1;
-    if (!a.required && b.required) return 1;
-    return b.hp - a.hp;
-  });
-
+  const atkSortKey = new Set([
+    'referenceDamage',
+    'referenceAdvantageDamage',
+    'referenceVsHiDamage',
+    'referenceVsMizuDamage',
+    'referenceVsKiDamage']);
+  if (sortCriteria[0]['key'] in atkSortKey) {
+    // requiredがtrueの順、ATKの降順でソート
+    nonZeroLevelCharacters.sort((a, b) => {
+      if (a.required && !b.required) return -1;
+      if (!a.required && b.required) return 1;
+      return b.atk - a.atk;
+    });
+  } else {
+    // requiredがtrueの順、HPの降順でソート
+    nonZeroLevelCharacters.sort((a, b) => {
+      if (a.required && !b.required) return -1;
+      if (!a.required && b.required) return 1;
+      return b.hp - a.hp;
+    });
+  }
   // requiredがtrueの数を数える
   const requiredCount = nonZeroLevelCharacters.filter(character => character.required).length;
   if (requiredCount > 5) {
@@ -230,11 +484,17 @@ export async function calcDecks() {
           hpBuudy: ret[3],
           buddy: ret[4],
           noHpBuddy: ret[5],
-          chara1: ret[6],
-          chara2: ret[7],
-          chara3: ret[8],
-          chara4: ret[9],
-          chara5: ret[10],
+          duo: ret[6],
+          referenceDamage: ret[7],
+          referenceAdvantageDamage: ret[8],
+          referenceVsHiDamage: ret[9],
+          referenceVsMizuDamage: ret[10],
+          referenceVsKiDamage: ret[11],
+          chara1: ret[12],
+          chara2: ret[13],
+          chara3: ret[14],
+          chara4: ret[15],
+          chara5: ret[16],
         };
 
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする
