@@ -24,8 +24,8 @@ export interface SearchSettingsState {
 
 export const useSearchSettingsStore = defineStore('searchSettings', {
   state: (): SearchSettingsState => ({
-    minEHP: 60000,
-    minHP: 50000,
+    minEHP: 30000,
+    minHP: 30000,
     minHPBuddy: 0,
     minEvasion: 0,
     minDuo: 0,

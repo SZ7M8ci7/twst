@@ -51,92 +51,83 @@ export const availableSortkeys = [
   'referenceVsMizuDamage',
   'referenceVsKiDamage',
 ];
-function calcHPBuddyRate(status:string){
-  if ((status == 'HPUP(小)') || (status == 'HP&ATKUP(小)')){
-    return 0.2;
-  }
-  if ((status == 'HPUP(中)') || (status == 'HP&ATKUP(中)')){
-    return 0.3;
-  }
-  return 0;
+
+const buddyRateMap: { [key: string]: { hp: number; atk: number; heal: number; conHeal: number } } = {
+  'HPUP(小)': { hp: 0.2, atk: 0, heal: 0, conHeal: 0 },
+  'HP&ATKUP(小)': { hp: 0.2, atk: 0.2, heal: 0, conHeal: 0 },
+  'HPUP(中)': { hp: 0.3, atk: 0, heal: 0, conHeal: 0 },
+  'HP&ATKUP(中)': { hp: 0.3, atk: 0.35, heal: 0, conHeal: 0 },
+  'ATKUP(小)': { hp: 0, atk: 0.2, heal: 0, conHeal: 0 },
+  'ATKUP(中)': { hp: 0, atk: 0.35, heal: 0, conHeal: 0 },
+  '回復(小)': { hp: 0, atk: 0, heal: 1.1, conHeal: 0 },
+  '回復&継続回復(小)': { hp: 0, atk: 0, heal: 1.1, conHeal: 0.15 * 3 },
+  '回復(中)': { hp: 0, atk: 0, heal: 1.7, conHeal: 0 },
+  '回復&継続回復(中)': { hp: 0, atk: 0, heal: 1.7, conHeal: 0.25 * 3 },
+  '継続回復(小)': { hp: 0, atk: 0, heal: 0, conHeal: 0.15 * 3 },
+  '継続回復(中)': { hp: 0, atk: 0, heal: 0, conHeal: 0.25 * 3 },
+};
+
+function calcHPBuddyRate(status: string): number {
+  return buddyRateMap[status]?.hp || 0;
 }
-function calcATKBuddyRate(status:string){
-  if ((status == 'ATKUP(小)') || (status == 'HP&ATKUP(小)')){
-    return 0.2;
-  }
-  if ((status == 'ATKUP(中)') || (status == 'HP&ATKUP(中)')){
-    return 0.35;
-  }
-  return 0;
+
+function calcATKBuddyRate(status: string): number {
+  return buddyRateMap[status]?.atk || 0;
 }
-function calcHealRate(status: string) {
-  if ((status=='回復(小)') || (status=='回復&継続回復(小)')){
-    return 1.1;
-  }
-  if ((status=='回復(中)') || (status=='回復&継続回復(中)')){
-    return 1.7;
-  }
-  return 0;
+
+function calcHealRate(status: string): number {
+  return buddyRateMap[status]?.heal || 0;
 }
-function calcConHealRate(status: string) {
-  if ((status=='継続回復(小)') || (status=='回復&継続回復(小)')){
-    return 0.15*3;
-  }
-  if ((status=='継続回復(中)') || (status=='回復&継続回復(中)')){
-    return 0.25*3;
-  }
-  return 0;
+
+function calcConHealRate(status: string): number {
+  return buddyRateMap[status]?.conHeal || 0;
 }
-function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: number, atkBuddyRate: number) {
-  if (magicBuff == "ATKUP(極小)") {
-    atk = atk*1.1+atk*atkBuddyRate;
-  } else if (magicBuff == "ATKUP(小)") {
-    atk = atk*1.2+atk*atkBuddyRate;
-  } else if (magicBuff == "ATKUP(中)") {
-    atk = atk*1.35+atk*atkBuddyRate;
-  } else if (magicBuff == "ATKUP(大)") {
-    atk = atk*1.5+atk*atkBuddyRate;
-  } else if (magicBuff == "ATKUP(極大)") {
-    atk = atk*2+atk*atkBuddyRate;
-  } else {
-    atk = atk+atk*atkBuddyRate;
+const atkBuffMap: { [key: string]: number } = {
+  "ATKUP(極小)": 1.1,
+  "ATKUP(小)": 1.2,
+  "ATKUP(中)": 1.35,
+  "ATKUP(大)": 1.5,
+  "ATKUP(極大)": 2,
+};
+
+const damageBuffMap: { [key: string]: number } = {
+  "ダメUP(極小)": 0.025,
+  "ダメUP(小)": 0.05,
+  "ダメUP(中)": 0.0875,
+  "ダメUP(大)": 0.125,
+  "ダメUP(極大)": 0.25,
+  "属性ダメUP(極小)": 0.03,
+  "属性ダメUP(小)": 0.06,
+  "属性ダメUP(中)": 0.1005,
+  "属性ダメUP(大)": 0.15,
+  "属性ダメUP(極大)": 0.30,
+};
+
+const damageCache: Record<string, number> = {};
+function calcDamageAfterCalcAtk(magicBuff: string, magicPow: string, magicAtr: string, atk: number): number {
+  const cacheKey = `${magicBuff},${magicPow},${magicAtr},${atk}`;
+  
+  if (cacheKey in damageCache) {
+    return damageCache[cacheKey];
   }
-  let atkRate = 1;
-  if (magicPow.includes("弱")) {
-    atkRate = 0.75;
-  }
-  if (magicAtr == '無') {
-    atkRate *= 1.1;
-  }
-  if (magicBuff == "ダメUP(極小)") {
-    atkRate += 0.025;
-  } else if (magicBuff == "ダメUP(小)") {
-    atkRate += 0.05;
-  } else if (magicBuff == "ダメUP(中)") {
-    atkRate += 0.0875;
-  } else if (magicBuff == "ダメUP(大)") {
-    atkRate += 0.125;
-  } else if (magicBuff == "ダメUP(極大)") {
-    atkRate += 0.25;
-  } 
-  if (magicBuff == "属性ダメUP(極小)") {
-    atkRate += 0.03;
-  } else if (magicBuff == "属性ダメUP(小)") {
-    atkRate += 0.06;
-  } else if (magicBuff == "属性ダメUP(中)") {
-    atkRate += 0.1005;
-  } else if (magicBuff == "属性ダメUP(大)") {
-    atkRate += 0.15;
-  } else if (magicBuff == "属性ダメUP(極大)") {
-    atkRate += 0.30;
-  } 
+  let atkRate = magicPow.includes("弱") ? 0.75 : 1;
+  atkRate *= magicAtr === '無' ? 1.1 : 1;
+  atkRate += damageBuffMap[magicBuff] || 0;
+
   let comboRate = 1;
   if (magicPow.includes("連撃")) {
-    comboRate = 0.9 * 2;
+    comboRate = 1.8;
   } else if (magicPow.includes("デュオ")) {
-    comboRate = 0.8 * 3;
+    comboRate = 2.4;
   }
-  return atk*atkRate*comboRate;
+
+  const damage = atk * atkRate * comboRate;
+  damageCache[cacheKey] = damage;
+  return damage;
+}
+function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: number, atkBuddyRate: number): number {
+  atk = (atkBuffMap[magicBuff] || 1) * atk + atk * atkBuddyRate;  
+  return calcDamageAfterCalcAtk(magicBuff, magicPow, magicAtr=='無' ? '無':'無以外', atk);
 }
 function calcTopDamage(damage1: number,damage2: number,damage3: number,){
 
@@ -165,18 +156,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const name2MotherUsed:Record<number, boolean> = {};
   const name2DuoUsed:Record<number, boolean> = {};
   const deckList: Ref<any>[] = [];
-  characters.forEach((chara) => {
-    let maxLevel = 110;  // Default max level for SSR
-    if (chara.rare == 'SR') {
-      maxLevel = 90;     // Max level for SR
-    } else if (chara.rare == 'R') {
-      maxLevel = 70;     // Max level for R
-    }
-    
-    const growPercentage = chara.level / maxLevel;
-    chara.calcBaseHP = (chara.hp - chara.base_hp) * growPercentage + chara.base_hp;
-    chara.calcBaseATK = (chara.atk - chara.base_atk) * growPercentage + chara.base_atk;
-  })
+
   characters.sort((a, b) => b.calcBaseATK - a.calcBaseATK);
   characters.forEach((chara, index) => {
     name2M2Used[index] = false;
@@ -221,13 +201,9 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       }
     }
     // HP回復分加算
-    deckTotalHeal+=calcHealRate(chara.magic1heal)*chara.calcBaseATK;
-    deckTotalHeal+=calcHealRate(chara.magic2heal)*chara.calcBaseATK;
-    deckTotalHeal+=calcHealRate(chara.magic3heal)*chara.calcBaseATK;
+    deckTotalHeal+=(calcHealRate(chara.magic1heal)+calcHealRate(chara.magic2heal)+calcHealRate(chara.magic3heal))*chara.calcBaseATK;
     // HP継続回復分加算
-    deckTotalHeal+=calcConHealRate(chara.magic1heal)*chara.calcBaseHP;
-    deckTotalHeal+=calcConHealRate(chara.magic2heal)*chara.calcBaseHP;
-    deckTotalHeal+=calcConHealRate(chara.magic3heal)*chara.calcBaseHP;
+    deckTotalHeal+=(calcConHealRate(chara.magic1heal)+calcConHealRate(chara.magic2heal)+calcConHealRate(chara.magic3heal))*chara.calcBaseHP;
     // 回避数加算
     deckTotalEvasion+=chara.evasion;
     if (!hasHpBuddy){
@@ -237,38 +213,50 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     if (name2DuoUsed[index]){
       magic2pow = 'デュオ';
       deckDuo += 1;
-    } else {
-      // 相互デュオチェック
-      characters.forEach((pair, index2) => {
-        if ((pair.duo == chara.chara) && (chara.duo == pair.chara)) {
-          if (!name2DuoUsed[index] && !name2DuoUsed[index2]) {
-            name2DuoUsed[index] = true;
-            name2DuoUsed[index2] = true;
-            name2M2Used[index] = true;
-            name2M2Used[index2] = true;
+    } else {      
+      if (!name2DuoUsed[index]) {
+        // 相互デュオチェック
+        for (const [index2, pair] of characters.entries()) {
+          if ((pair.duo == chara.chara) && (chara.duo == pair.chara)) {
+            if (!name2DuoUsed[index] && !name2DuoUsed[index2]) {
+              name2DuoUsed[index] = true;
+              name2DuoUsed[index2] = true;
+              name2M2Used[index] = true;
+              name2M2Used[index2] = true;
+              break;
+            }
           }
         }
-      });
-      // Motherデュオチェック
-      characters.forEach((pair, index2) => {
-        if (chara.duo == pair.chara) {
-          if (!name2DuoUsed[index] && !name2M2Used[index] && !name2MotherUsed[index2]) {
-            name2DuoUsed[index] = true;
-            name2M2Used[index] = true;
-            name2MotherUsed[index2] = true;
+      
+        if (!name2M2Used[index]) {
+          // Motherデュオチェック
+          for (const [index2, pair] of characters.entries()) {
+            if (chara.duo == pair.chara) {
+              if (!name2DuoUsed[index] && !name2M2Used[index] && !name2MotherUsed[index2]) {
+                name2DuoUsed[index] = true;
+                name2M2Used[index] = true;
+                name2MotherUsed[index2] = true;
+                break;
+              }
+            }
           }
         }
-      });
-      // M2デュオチェック
-      characters.forEach((pair, index2) => {
-        if (chara.duo == pair.chara) {
-          if (!name2DuoUsed[index] && !name2M2Used[index] && !name2M2Used[index2]) {
-            name2DuoUsed[index] = true;
-            name2M2Used[index] = true;
-            name2M2Used[index2] = true;
+        
+        if (!name2M2Used[index]) {
+          // M2デュオチェック
+          for (const [index2, pair] of characters.entries()) {
+            if (chara.duo == pair.chara) {
+              if (!name2DuoUsed[index] && !name2M2Used[index] && !name2M2Used[index2]) {
+                name2DuoUsed[index] = true;
+                name2M2Used[index] = true;
+                name2M2Used[index2] = true;
+                break;
+              }
+            }
           }
         }
-      });
+      }
+
       if (name2DuoUsed[index]) {
         magic2pow = "デュオ";
         deckDuo+=1;
@@ -289,69 +277,23 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     deckReferenceAdvantageDamage += calcTopDamage(magic1AdvantageDamage,magic2AdvantageDamage,magic3AdvantageDamage);
 
     // 対火ダメージ
-    let magic1vsHiDamage = magic1Damage;
-    if (chara.magic1atr == '水') {
-      magic1vsHiDamage = magic1Damage*1.5;
-    } else if (chara.magic1atr == '木') {
-      magic1vsHiDamage = magic1Damage/2;
-    }
-    let magic2vsHiDamage = magic2Damage;
-    if (chara.magic2atr == '水') {
-      magic2vsHiDamage = magic2Damage*1.5;
-    } else if (chara.magic2atr == '木') {
-      magic2vsHiDamage = magic2Damage/2;
-    }
-    let magic3vsHiDamage = magic3Damage;
-    if (chara.magic3atr == '水') {
-      magic3vsHiDamage = magic3Damage*1.5;
-    } else if (chara.magic3atr == '木') {
-      magic3vsHiDamage = magic3Damage/2;
-    }
-
-    deckReferenceVsHiDamage += calcTopDamage(magic1vsHiDamage,magic2vsHiDamage,magic3vsHiDamage);
+    const magic1vsHiDamage = calcAttributeDamage(chara.magic1atr, '火', magic1Damage);
+    const magic2vsHiDamage = calcAttributeDamage(chara.magic2atr, '火', magic2Damage);
+    const magic3vsHiDamage = calcAttributeDamage(chara.magic3atr, '火', magic3Damage);
+    deckReferenceVsHiDamage += calcTopDamage(magic1vsHiDamage, magic2vsHiDamage, magic3vsHiDamage);
 
     // 対水ダメージ
-    let magic1vsMizuDamage = magic1Damage;
-    if (chara.magic1atr == '木') {
-      magic1vsMizuDamage = magic1Damage*1.5;
-    } else if (chara.magic1atr == '火') {
-      magic1vsMizuDamage = magic1Damage/2;
-    }
-    let magic2vsMizuDamage = magic2Damage;
-    if (chara.magic2atr == '木') {
-      magic2vsMizuDamage = magic2Damage*1.5;
-    } else if (chara.magic2atr == '火') {
-      magic2vsMizuDamage = magic2Damage/2;
-    }
-    let magic3vsMizuDamage = magic3Damage;
-    if (chara.magic3atr == '木') {
-      magic3vsMizuDamage = magic3Damage*1.5;
-    } else if (chara.magic3atr == '火') {
-      magic3vsMizuDamage = magic3Damage/2;
-    }
-    deckReferenceVsMizuDamage += calcTopDamage(magic1vsMizuDamage,magic2vsMizuDamage,magic3vsMizuDamage);
+    const magic1vsMizuDamage = calcAttributeDamage(chara.magic1atr, '水', magic1Damage);
+    const magic2vsMizuDamage = calcAttributeDamage(chara.magic2atr, '水', magic2Damage);
+    const magic3vsMizuDamage = calcAttributeDamage(chara.magic3atr, '水', magic3Damage);
+    deckReferenceVsMizuDamage += calcTopDamage(magic1vsMizuDamage, magic2vsMizuDamage, magic3vsMizuDamage);
 
     // 対木ダメージ
-    let magic1vsKiDamage = magic1Damage;
-    if (chara.magic1atr == '火') {
-      magic1vsKiDamage = magic1Damage*1.5;
-    } else if (chara.magic1atr == '水') {
-      magic1vsKiDamage = magic1Damage/2;
-    }
-    let magic2vsKiDamage = magic2Damage;
-    if (chara.magic2atr == '火') {
-      magic2vsKiDamage = magic2Damage*1.5;
-    } else if (chara.magic2atr == '水') {
-      magic2vsKiDamage = magic2Damage/2;
-    }
-    let magic3vsKiDamage = magic3Damage;
-    if (chara.magic3atr == '火') {
-      magic3vsKiDamage = magic3Damage*1.5;
-    } else if (chara.magic3atr == '水') {
-      magic3vsKiDamage = magic3Damage/2;
-    }
-    deckReferenceVsKiDamage += calcTopDamage(magic1vsKiDamage,magic2vsKiDamage,magic3vsKiDamage);
-  })
+    const magic1vsKiDamage = calcAttributeDamage(chara.magic1atr, '木', magic1Damage);
+    const magic2vsKiDamage = calcAttributeDamage(chara.magic2atr, '木', magic2Damage);
+    const magic3vsKiDamage = calcAttributeDamage(chara.magic3atr, '木', magic3Damage);
+    deckReferenceVsKiDamage += calcTopDamage(magic1vsKiDamage, magic2vsKiDamage, magic3vsKiDamage);
+  });
   if (deckTotalHP < minHP.value) { return; }
   if (deckTotalHP + deckTotalHeal < minEHP.value) { return; }
   if (deckTotalHPBuddy < minHPBuddy.value) { return; }
@@ -367,7 +309,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   deckReferenceVsHiDamage = Math.floor(deckReferenceVsHiDamage);
   deckReferenceVsMizuDamage = Math.floor(deckReferenceVsMizuDamage);
   deckReferenceVsKiDamage = Math.floor(deckReferenceVsKiDamage);
-  deckList.sort();
+
   return [deckTotalHP
     , deckTotalHP+deckTotalHeal
     , deckTotalEvasion
@@ -382,7 +324,15 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckReferenceVsKiDamage
     , ...deckList];
 }
-
+const attributeEffectiveness: Record<string, Record<string, number>> = {
+  '水': { '火': 1.5, '木': 0.5 },
+  '木': { '水': 1.5, '火': 0.5 },
+  '火': { '木': 1.5, '水': 0.5 },
+};
+function calcAttributeDamage(magicAtr: string, targetAtr: string, damage: number): number {
+  const effectiveness = attributeEffectiveness[magicAtr]?.[targetAtr];
+  return effectiveness ? damage * effectiveness : damage;
+}
 
 interface SortCriterion {
   key: string;
@@ -415,7 +365,6 @@ function factorialize(num:number) :number {
   return num * factorialize(num-1);
 }
 export async function calcDecks() {
- 
   for (const i of characters.value){
     if (i.required && i.level == 0) {
       errorMessage.value = '必須キャラのレベルは1以上にして下さい';
@@ -436,6 +385,21 @@ export async function calcDecks() {
         sortCriteria.push({key: availableSortkeys[i] as string, order: key.order as '昇順' | '降順'});
       }
     }
+  }
+  const firstSortCriteria = sortCriteria[0].order === "昇順";
+  async function appendResult(){
+    // ソート基準と方向に基づいてソート
+    results.value.sort(dynamicSortMultiple(sortCriteria));
+
+    // 上位のみを保持
+    const topResults = results.value.slice(0, maxResult.value);
+
+    // リアクティブな状態を更新
+    results.value = [...topResults];
+    if (results.value.length > 0) {
+      currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
+    }
+    await new Promise(requestAnimationFrame);
   }
   const atkSortKey = new Set([
     'referenceDamage',
@@ -465,6 +429,18 @@ export async function calcDecks() {
     return;
   }
   results.value = [];
+  nonZeroLevelCharacters.forEach((chara) => {
+    let maxLevel = 110;  // Default max level for SSR
+    if (chara.rare == 'SR') {
+      maxLevel = 90;     // Max level for SR
+    } else if (chara.rare == 'R') {
+      maxLevel = 70;     // Max level for R
+    }
+    
+    const growPercentage = chara.level / maxLevel;
+    chara.calcBaseHP = (chara.hp - chara.base_hp) * growPercentage + chara.base_hp;
+    chara.calcBaseATK = (chara.atk - chara.base_atk) * growPercentage + chara.base_atk;
+  })
   let currentLimit = sortCriteria[0].order === '昇順' ? Infinity : -Infinity;  // 現在の上限値を保持する変数を追加
   const processCombination = async (i: number, j: number, k: number, l: number, m: number) => {
     return new Promise<void>(resolve => {
@@ -496,19 +472,13 @@ export async function calcDecks() {
           chara4: ret[15],
           chara5: ret[16],
         };
-
+        const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする
-        if (
-          sortCriteria[0].order === "昇順" &&
-          (transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number) < currentLimit
-        ) {
+        if (firstSortCriteria && score < currentLimit) {
           results.value.push(transformedRet);
         }
         // sortCriteriaの0件目の順序が降順の場合、現在の上限値よりも大きい場合のみpushする
-        else if (
-          sortCriteria[0].order === "降順" &&
-          (transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number) > currentLimit
-        ) {
+        else if ((!firstSortCriteria) && score > currentLimit ) {
           results.value.push(transformedRet);
         }
       }
@@ -533,53 +503,30 @@ export async function calcDecks() {
       await new Promise(requestAnimationFrame);
       return
     }
+
     for (let i = 0; i < lengthes[0]; i++) {
       for (let j = i + 1; j < lengthes[1]; j++) {
         for (let k = j + 1; k < lengthes[2]; k++) {
+          if (!isSearching.value) {
+            return;
+          }
           for (let l = k + 1; l < lengthes[3]; l++) {
             for (let m = l + 1; m < lengthes[4]; m++) {
-              if (!isSearching.value) {
-                return;
-              }
 
               await processCombination(i, j, k, l, m);
 
-              if (Date.now() - lastRenderTime > 500) {
+              if (Date.now() - lastRenderTime > 2000) {
                 lastRenderTime = Date.now();
-                
-                // ソート基準と方向に基づいてソート
-                results.value.sort(dynamicSortMultiple(sortCriteria));
-
-                // 上位のみを保持
-                const topResults = results.value.slice(0, maxResult.value);
-
-                // リアクティブな状態を更新
-                results.value = [...topResults];
-                if (results.value.length > 0) {
-                  currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
-                }
-                await new Promise(requestAnimationFrame);
+                await appendResult();
               }
             }
             for (const m of [i,j,k,l]) {
 
               await processCombination(i, j, k, l, m);
 
-              if (Date.now() - lastRenderTime > 500) {
+              if (Date.now() - lastRenderTime > 2000) {
                 lastRenderTime = Date.now();
-                
-                // ソート基準と方向に基づいてソート
-                results.value.sort(dynamicSortMultiple(sortCriteria));
-
-                // 上位のみを保持
-                const topResults = results.value.slice(0, maxResult.value);
-
-                // リアクティブな状態を更新
-                results.value = [...topResults];
-                if (results.value.length > 0) {
-                  currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
-                }
-                await new Promise(requestAnimationFrame);
+                await appendResult();
               }
             }
           }
@@ -601,30 +548,18 @@ export async function calcDecks() {
     for (let i = 0; i < lengthes[0]; i++) {
       for (let j = i + 1; j < lengthes[1]; j++) {
         for (let k = j + 1; k < lengthes[2]; k++) {
+          if (!isSearching.value) {
+            return;
+          }
           for (let l = k + 1; l < lengthes[3]; l++) {
             for (let m = l + 1; m < lengthes[4]; m++) {
-              if (!isSearching.value) {
-                return;
-              }
 
               await processCombination(i, j, k, l, m);
 
               // 1秒に1回だけ描画を更新
-              if (Date.now() - lastRenderTime > 1000) {
+              if (Date.now() - lastRenderTime > 2000) {
                 lastRenderTime = Date.now();
-                
-                // ソート基準と方向に基づいてソート
-                results.value.sort(dynamicSortMultiple(sortCriteria));
-
-                // 上位100件のみを保持
-                const topResults = results.value.slice(0, maxResult.value);
-
-                // リアクティブな状態を更新
-                results.value = [...topResults];
-                if (results.value.length > 0) {
-                  currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
-                }
-                await new Promise(requestAnimationFrame);
+                await appendResult();
               }
             }
           }
@@ -643,4 +578,5 @@ export async function calcDecks() {
   if (results.value.length > 0) {
     currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
   }
+
 }
