@@ -37,11 +37,12 @@
 <script setup lang="ts">
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
+import { computed } from 'vue';
 const searchResultStore = useSearchResultStore();
 const { results } = storeToRefs(searchResultStore);
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
-const headers = [
+const headers = computed(() => [
 
   { title: t('resultBody.HP'), value: 'hp', sortable: false },
   { title: t('resultBody.effectiveHP'), value: 'ehp', sortable: false },
@@ -60,7 +61,7 @@ const headers = [
   { title: '3', value: 'chara3', sortable: false  },
   { title: '4', value: 'chara4', sortable: false  },
   { title: '5', value: 'chara5', sortable: false  },
-];
+]);
 
 </script>
 <style scoped>
