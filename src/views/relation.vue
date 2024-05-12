@@ -2,7 +2,7 @@
   <!-- ロード中に表示するロードスクリーン -->
   <div v-if="loadingImgUrl" class="text-center">
     <v-progress-circular indeterminate></v-progress-circular>
-    <p>キャラクター情報を読み込んでいます...</p>
+    <p>Loading...</p>
   </div>
   <!-- ロード完了後に表示するメインコンテンツ -->
   <div v-else>

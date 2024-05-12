@@ -3,13 +3,13 @@
   <v-row class="mb-1"> <!-- marginBottomを追加して下段との間隔を空けます -->
     <v-col cols="12" sm="3"/>
     <v-col cols="12" sm="2">
-      <v-btn block @click="isFilterModalVisible = true">フィルター</v-btn>
+      <v-btn block @click="isFilterModalVisible = true">{{ $t('search.filter') }}</v-btn>
     </v-col>
     <v-col cols="12" sm="2">
-      <v-btn block @click="isSettingModalVisible = true">検索設定</v-btn>
+      <v-btn block @click="isSettingModalVisible = true">{{ $t('search.settings') }}</v-btn>
     </v-col>
     <v-col cols="12" sm="2">
-      <v-btn block @click="isInfoModalVisible = true">使い方</v-btn>
+      <v-btn block @click="isInfoModalVisible = true">{{ $t('search.howToUse') }}</v-btn>
     </v-col>
     <v-col cols="12" sm="3"/>
     </v-row>
@@ -18,10 +18,10 @@
     <v-row class="mb-1">
       <v-col cols="12" sm="3"/>
       <v-col cols="12" sm="2">
-        <v-btn block color="red" @click="stopSearch">探索中止</v-btn>
+        <v-btn block color="red" @click="stopSearch">{{ $t('search.cancelSearch') }}</v-btn>
       </v-col>
       <v-col cols="12" sm="2">
-        <v-btn block color="green" @click="startSearch">探索開始</v-btn>
+        <v-btn block color="green" @click="startSearch">{{ $t('search.startSearch') }}</v-btn>
       </v-col>
       <v-col cols="12" sm="2">
         <span v-if="totalResults && nowResults">{{ nowResults }}/{{ totalResults }} ({{ searchPercentage }}%)</span>
@@ -54,6 +54,8 @@ import { storeToRefs } from "pinia";
 import { calcDecks } from "./common";
 import { useSearchResultStore } from '@/store/searchResult';
 import { event } from 'vue-gtag'
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, isSearching, errorMessage } = storeToRefs(searchResultStore);
@@ -80,12 +82,13 @@ function startSearch(){
   emit('search-started',)
   event('search start')
   setTimeout(() => {
-    calcDecks();
+    calcDecks(t);
   }, 300); // 300 ミリ秒の遅延
 }
 function stopSearch(){
   isSearching.value = false; // 検索中状態をfalseに設定してループを中止
 }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 watch(errorMessage, (newVal, oldVal) => {
   if(newVal !== '') { // errorMessageが空でない場合
     isErrorModalVisible.value = true; // エラーモーダルを表示する

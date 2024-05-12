@@ -4,7 +4,7 @@
       <!-- ロード中に表示するロードスクリーン -->
       <div v-if="loadingImgUrl" class="text-center">
         <v-progress-circular indeterminate></v-progress-circular>
-        <p>キャラクター情報を読み込んでいます...</p>
+        <p>Loading...</p>
       </div>
 
       <!-- ロード完了後に表示するメインコンテンツ -->
@@ -13,9 +13,9 @@
           <div class="level-controls">
             <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0"
               :max="110"></v-text-field>
-            <v-btn @click="applyBulkLevel">表示キャラレベル一括設定</v-btn>
+            <v-btn @click="applyBulkLevel">{{ $t('search.batchSetting') }}</v-btn>
           </div>
-          <v-btn @click="saveLevels" class="save-levels-btn">レベルをキャッシュに保存</v-btn>
+          <v-btn @click="saveLevels" class="save-levels-btn">{{ $t('search.saveLevels') }}</v-btn>
         </div>
 
         <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
@@ -41,6 +41,8 @@
 import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const bulkLevel = ref(110);
@@ -51,15 +53,15 @@ const visibleCharacters = computed(() => {
   }
   return characters.value.filter(character => character.visible && character.imgUrl);
 });
-const headers = [
+const headers = computed(() =>[
   { title: 'Lv', value: 'level', sortable: false },
-  { title: '必須', value: 'required', sortable: false  },
-  { title: 'キャラ', value: 'name', sortable: false  },
-  { title: 'レア', value: 'rare', sortable: false  },
+  { title: t('search.required'), value: 'required', sortable: false  },
+  { title: t('search.character'), value: 'name', sortable: false  },
+  { title: t('search.rarity'), value: 'rare', sortable: false  },
   { title: 'HP', value: 'hp', sortable: true  },
   { title: 'ATK', value: 'atk', sortable: true  },
-  { title: 'その他', value: 'etc', sortable: false  },
-];
+  { title: t('search.other'), value: 'etc', sortable: false  },
+]);
 function applyBulkLevel() {
   visibleCharacters.value.forEach(character => {
     let maxLevel;

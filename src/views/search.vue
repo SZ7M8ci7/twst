@@ -6,8 +6,8 @@
     <v-tabs v-model="tab" color="indigo-darken-2" fixed-tabs 
       :show-arrows="false"
       :mobile-breakpoint="Infinity">
-      <v-tab value="search">キャラ一覧</v-tab>
-      <v-tab value="result">検索結果</v-tab>
+      <v-tab value="search">{{ $t('search.characterList') }}</v-tab>
+      <v-tab value="result">{{ $t('search.result') }}</v-tab>
     </v-tabs>
     <v-card-text>
       <v-window v-model="tab" disabled >

@@ -22,24 +22,25 @@ export interface deckStatus{
   buddyNum:number;
   HPBuddyNum:number;
 }
-export const availableSortProps = [
-  '実質HP',
-  '実HP',
-  'HPバディ数',
-  'HPバディが存在しないキャラ数',
-  'バディ数',
-  '回避数',
-  'デュオ数',
-  '等倍与ダメージ',
-  '有利与ダメージ',
-  '対火与ダメージ',
-  '対水与ダメージ',
-  '対木与ダメージ',
-];
+export function getAvailableSortProps(t: (key: string) => string) {
+  return [  
+  t('commonts.HP'),
+  t('commonts.effectiveHP'),
+  t('commonts.HPBuddy'),
+  t('commonts.noHPBuddy'),
+  t('commonts.buddy'),
+  t('commonts.evasion'),
+  t('commonts.duo'),
+  t('commonts.neutralDamage'),
+  t('commonts.advantageDamage'),
+  t('commonts.damageAgainstFire'),
+  t('commonts.damageAgainstWater'),
+  t('commonts.damageAgainstFlora')];
+}
 
 export const availableSortkeys = [
-  'ehp',
   'hp',
+  'ehp',
   'hpBuudy',
   'noHpBuddy',
   'buddy',
@@ -336,7 +337,7 @@ function calcAttributeDamage(magicAtr: string, targetAtr: string, damage: number
 
 interface SortCriterion {
   key: string;
-  order: '昇順' | '降順';
+  order: '昇順' | '降順'|'ASC' | 'DESC';
 }
 
 function dynamicSortMultiple(criteria: SortCriterion[]) {
@@ -364,28 +365,45 @@ function factorialize(num:number) :number {
   if (num <= 0) { return 1; }
   return num * factorialize(num-1);
 }
-export async function calcDecks() {
+export async function calcDecks(t: (key: string) => string) {
   for (const i of characters.value){
     if (i.required && i.level == 0) {
-      errorMessage.value = '必須キャラのレベルは1以上にして下さい';
+      errorMessage.value = t('error.requiredCharacter');
       return
     }
   }
   const nonZeroLevelCharacters = characters.value.filter(character => character.level > 0);
   const listLength = nonZeroLevelCharacters.length;
   if (listLength < 5) {
-    errorMessage.value = 'レベル設定されたキャラが少なすぎます';
+    errorMessage.value = t('error.fewCharacter');
     return;
   }
   nowResults.value = 0;
+  const availableSortProps = getAvailableSortProps(t);
   const sortCriteria: SortCriterion[] = [];
   for (const key of sortOptions.value) {
     for (let i = 0; i < availableSortProps.length; i++) {
       if (availableSortProps[i] == key.prop) {
-        sortCriteria.push({key: availableSortkeys[i] as string, order: key.order as '昇順' | '降順'});
+        let order = '降順';
+        switch (key.order) {
+          case 'ASC':
+            order = '昇順';
+            break;
+          case 'DESC':
+            order = '降順';
+            break;
+          case '昇順':
+          case '降順':
+            order = key.order;
+            break;
+          default:
+            continue; // 不明な順序値は無視
+        }
+        sortCriteria.push({key: availableSortkeys[i] as string, order: order as '昇順' | '降順'});
       }
     }
   }
+  
   const firstSortCriteria = sortCriteria[0].order === "昇順";
   async function appendResult(){
     // ソート基準と方向に基づいてソート

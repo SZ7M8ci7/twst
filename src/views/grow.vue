@@ -7,12 +7,12 @@
           <thead>
             <tr>
               <th>No</th>
-              <th>レア度</th>
-              <th>属性</th>
+              <th>{{ $t('grow.rarity') }}</th>
+              <th>{{ $t('grow.element') }}</th>
               <th>Fr</th>
               <th>To</th>
-              <th>数</th>
-              <th>削除</th>
+              <th>{{ $t('grow.quantity') }}</th>
+              <th>{{ $t('grow.delete') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -39,46 +39,46 @@
           <thead>
             <tr>
               <th class="text-left">
-                属性
+                {{ $t('grow.element') }}
               </th>
               <th class="text-left">
-                メモ帳
+                {{ $t('grow.notepad') }}
               </th>
               <th class="text-left">
-                教科書
+                {{ $t('grow.textbook') }}
               </th>
               <th class="text-left">
-                魔導書
+                {{ $t('grow.grimoire') }}
               </th>
             </tr>
           </thead>
           <tbody>
             <tr style="background-color: #EAAABD;">
-              <td class="text-center">火</td>
+              <td class="text-center">{{ $t('grow.fire') }}</td>
               <td class="text-right">{{ fire.memo }}</td>
               <td class="text-right">{{ fire.textbook }}</td>
               <td class="text-right">{{ fire.grimoire }}</td>
             </tr>
             <tr style="background-color: #B2DFEB;">
-              <td class="text-center">水</td>
+              <td class="text-center">{{ $t('grow.water') }}</td>
               <td class="text-right">{{ water.memo }}</td>
               <td class="text-right">{{ water.textbook }}</td>
               <td class="text-right">{{ water.grimoire }}</td>
             </tr>
             <tr style="background-color: #B5EBBB;">
-              <td class="text-center">木</td>
+              <td class="text-center">{{ $t('grow.flora') }}</td>
               <td class="text-right">{{ tree.memo }}</td>
               <td class="text-right">{{ tree.textbook }}</td>
               <td class="text-right">{{ tree.grimoire }}</td>
             </tr>
             <tr style="background-color: #F6F7FA;">
-              <td class="text-center">無</td>
+              <td class="text-center">{{ $t('grow.cosmic') }}</td>
               <td class="text-right">{{ none.memo }}</td>
               <td class="text-right">{{ none.textbook }}</td>
               <td class="text-right">{{ none.grimoire }}</td>
             </tr>
             <tr>
-              <td colspan="2" class="text-center">マドル</td>
+              <td colspan="2" class="text-center">{{ $t('grow.madol') }}</td>
               <td colspan="2" class="text-center">{{ madol.toLocaleString() }}</td>
             </tr>
           </tbody>
@@ -90,9 +90,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { watchEffect } from "vue";
 import { checkNumber } from "@/components/common";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 class need_item {
   grimoire: number;
@@ -119,9 +122,9 @@ class grow_member {
   }
 }
 const grow_members = ref(Array<grow_member>());
-grow_members.value.push(new grow_member('SSR', '火'));
+grow_members.value.push(new grow_member('SSR', t('grow.fire')));
 const rare = ['SSR', 'SR', 'R',];
-const type = ['火', '水', '木', '無'];
+const type = computed(() => ([t('grow.fire'), t('grow.water'), t('grow.flora'), t('grow.cosmic')]));
 const level = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const fire = ref(new need_item());
 const water = ref(new need_item());
@@ -132,7 +135,7 @@ function deleteRow(index: number) {
   grow_members.value.splice(index, 1);
 }
 function addRow() {
-  grow_members.value.push(new grow_member('SSR', '火'));
+  grow_members.value.push(new grow_member('SSR', t('grow.fire')));
 }
 const ssr: Array<Array<number>> = [];
 ssr.push([6, 2, 0, 1000]);
@@ -187,19 +190,19 @@ watchEffect((): void => {
       tmp.grimoire += counters[i][2] * now_member.num;
       tmp_madol += counters[i][3] * now_member.num;
     }
-    if (now_member.type == '火') {
+    if (now_member.type == t('grow.fire')) {
       tmp_fire.memo += tmp.memo;
       tmp_fire.textbook += tmp.textbook;
       tmp_fire.grimoire += tmp.grimoire;
-    } else if (now_member.type == '水') {
+    } else if (now_member.type == t('grow.water')) {
       tmp_water.memo += tmp.memo;
       tmp_water.textbook += tmp.textbook;
       tmp_water.grimoire += tmp.grimoire;
-    } else if (now_member.type == '木') {
+    } else if (now_member.type == t('grow.flora')) {
       tmp_tree.memo += tmp.memo;
       tmp_tree.textbook += tmp.textbook;
       tmp_tree.grimoire += tmp.grimoire;
-    } else {
+    } else if (now_member.type == t('grow.cosmic')){
       tmp_none.memo += tmp.memo;
       tmp_none.textbook += tmp.textbook;
       tmp_none.grimoire += tmp.grimoire;

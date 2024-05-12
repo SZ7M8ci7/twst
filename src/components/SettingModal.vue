@@ -1,13 +1,13 @@
 <template>
   <div class="modal-background">
-    <v-card-title>ソート設定</v-card-title>
+    <v-card-title>{{ $t('settingModal.sortSettings') }}</v-card-title>
       <v-card-text class="ma-0 pa-0">
         <div v-for="(option, index) in sortOptions" :key="index" class="ma-0 pa-0 sort-option">
           <span class="sort-rank">{{ index + 1 }}.</span>
           <v-select
             v-model="option.prop"
             :items="availableSortProps"
-            label="ソートキー"
+            :label="$t('settingModal.sortKey')"
             item-text="prop"
             item-value="value"
             class="ma-0 pa-0"
@@ -16,8 +16,8 @@
           ></v-select>
           <v-select
             v-model="option.order"
-            :items="['昇順', '降順']"
-            label="順序"
+            :items="[$t('settingModal.asc'), $t('settingModal.desc')]"
+            :label="$t('settingModal.order')"
             class="ma-0 pa-0"
             hide-details
             dense
@@ -32,9 +32,9 @@
         </div>
 
       </v-card-text>
-      <v-card-title class="mt-0 pt-0">最低値設定</v-card-title>
+      <v-card-title class="mt-0 pt-0">{{ $t('settingModal.minimumValueSetting') }}</v-card-title>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低実質HP</span>
+        <span class="min-label">{{ $t('settingModal.minimumEHP') }}</span>
         <v-text-field
             type="number"
             v-model="minEHP"
@@ -46,7 +46,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低実HP</span>
+        <span class="min-label">{{ $t('settingModal.minimumHP') }}</span>
         <v-text-field
             type="number"
             v-model="minHP"
@@ -58,7 +58,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低HPバディ数</span>
+        <span class="min-label">{{ $t('settingModal.minimumHPBuddy') }}</span>
         <v-text-field
             type="number"
             v-model="minHPBuddy"
@@ -70,7 +70,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低回避数</span>
+        <span class="min-label">{{ $t('settingModal.minimumEvasion') }}</span>
         <v-text-field
             type="number"
             v-model="minEvasion"
@@ -82,7 +82,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低デュオ数</span>
+        <span class="min-label">{{ $t('settingModal.minimumDuo') }}</span>
         <v-text-field
             type="number"
             v-model="minDuo"
@@ -94,7 +94,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低等倍ダメージ</span>
+        <span class="min-label">{{ $t('settingModal.minimumNeutralDamage') }}</span>
         <v-text-field
             type="number"
             v-model="minReferenceDamage"
@@ -106,7 +106,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低有利ダメージ</span>
+        <span class="min-label">{{ $t('settingModal.minimumAdvantageDamage') }}</span>
         <v-text-field
             type="number"
             v-model="minReferenceAdvantageDamage"
@@ -118,7 +118,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低対火ダメージ</span>
+        <span class="min-label">{{ $t('settingModal.minimumAgainstFireDamage') }}</span>
         <v-text-field
             type="number"
             v-model="minReferenceVsHiDamage"
@@ -130,7 +130,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低対水ダメージ</span>
+        <span class="min-label">{{ $t('settingModal.minimumAgainstWaterDamage') }}</span>
         <v-text-field
             type="number"
             v-model="minReferenceVsMizuDamage"
@@ -142,7 +142,7 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">最低対木ダメージ</span>
+        <span class="min-label">{{ $t('settingModal.minimumAgainstFloraDamage') }}</span>
         <v-text-field
             type="number"
             v-model="minReferenceVsKiDamage"
@@ -153,9 +153,9 @@
             :min="0"
           />
       </v-card-text>
-    <v-card-title>検索設定</v-card-title>
+    <v-card-title>{{ $t('settingModal.searchSettings') }}</v-card-title>
       <v-card-text class="sort-option ma-0 pa-0">
-        <span class="min-label">結果上限数</span>
+        <span class="min-label">{{ $t('settingModal.maximumResult') }}</span>
         <v-text-field
             type="number"
             v-model="maxResult"
@@ -167,15 +167,15 @@
           />
       </v-card-text>
       <v-card-text class="sort-option mt-2 mb-2 pa-0">
-        <span class="min-label mt-0 pa-0">同キャラを許可</span>
+        <span class="min-label mt-0 pa-0">{{ $t('settingModal.allowSameCharacter') }}</span>
         <v-radio-group v-model="allowSameCharacter" class="ma-0 pa-0" inline hide-details>
-          <v-radio label="はい" :value="true" ></v-radio>
-          <v-radio label="いいえ" :value="false"></v-radio>
+          <v-radio :label="$t('settingModal.yes')" :value="true" ></v-radio>
+          <v-radio :label="$t('settingModal.no')" :value="false"></v-radio>
         </v-radio-group>
       </v-card-text>
     <div class="button-container">
-      <v-btn class="button" @click="cancel">キャンセル</v-btn>
-      <v-btn class="button apply-button" @click="applyFilter" :disabled="sortOptions.length==0">決定</v-btn>
+      <v-btn class="button" @click="cancel">{{ $t('settingModal.cancel') }}</v-btn>
+      <v-btn class="button apply-button" @click="applyFilter" :disabled="sortOptions.length==0">{{ $t('settingModal.ok') }}</v-btn>
     </div>
   </div>
 </template>
@@ -185,7 +185,9 @@ import { ref } from 'vue';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { onBeforeMount } from 'vue';
 import { cloneDeep } from 'lodash';
-import { availableSortProps } from '@/components/common'
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
+import { getAvailableSortProps } from '@/components/common'
 const searchSettingsStore = useSearchSettingsStore();
 const minEHP = ref(searchSettingsStore.minEHP);
 const minHP = ref(searchSettingsStore.minHP);
@@ -201,6 +203,7 @@ const maxResult = ref(searchSettingsStore.maxResult)
 let initialSortOptions: any = undefined;
 let sortOptions = ref();
 
+const availableSortProps = getAvailableSortProps(t);
 onBeforeMount(()=>{
   // sortOptionsの初期状態を保持するためのリアクティブな参照
   initialSortOptions = cloneDeep(searchSettingsStore.sortOptions);
@@ -212,7 +215,7 @@ const allowSameCharacter = ref(searchSettingsStore.allowSameCharacter);
 
 
 function addSortOption() {
-  sortOptions.value.push({ prop: '', order: '降順' });
+  sortOptions.value.push({ prop: '', order: t('settingModal.desc') });
 }
 
 function removeSortOption(index:number) {

@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 // types/searchSettingsTypes.ts
 export interface SortOption {
   prop: string;
-  order: '昇順' | '降順';
+  order: '昇順' | '降順'|'ASC' | 'DESC';
 }
 
 export interface SearchSettingsState {
@@ -36,7 +36,7 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     minReferenceVsKiDamage: 0,
     maxResult: 10,
     sortOptions: [
-      { prop: '実質HP', order: '降順' }
+      { prop: 'HP', order: '降順' }
     ],
     allowSameCharacter: true,
   }),

@@ -5,7 +5,7 @@
     </div>
     <!-- ボタンのコンテナ -->
     <div class="button-container">
-      <v-btn class="button" @click="close">閉じる</v-btn>
+      <v-btn class="button" @click="close">Close</v-btn>
     </div>
   </div>
 </template>

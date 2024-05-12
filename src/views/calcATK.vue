@@ -5,7 +5,7 @@
       <v-col cols="11">
         <v-row align="center">
           <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">難易度</span>
+              <span class="ma-1">{{ $t('attack.difficulty') }}</span>
           </v-col>
           <v-col cols="9" class="pa-1">
             <v-radio-group v-model="difficulty" hide-details inline>
@@ -18,7 +18,7 @@
         </v-row>
         <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 align-center pa-0">敵HP</span>
+              <span class="ma-1 align-center pa-0">{{ $t('attack.enemyHP') }}</span>
             </v-col>
             <v-col cols="9" class="pa-1">
               <v-text-field type="number" v-model="enemyHP" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
@@ -26,7 +26,7 @@
         </v-row>
         <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 ">与ダメージ</span>
+              <span class="ma-1 ">{{ $t('attack.totalDamageDealt') }}</span>
             </v-col>
             <v-col cols="9" class="pa-1">
               <v-text-field type="number" v-model="damage" class="mt-0 pt-0" hide-details="auto" dense solo
@@ -35,7 +35,7 @@
         </v-row>
         <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">バフ数</span>
+              <span class="ma-1">{{ $t('attack.buff') }}</span>
             </v-col>
             <v-col cols="9" class="pa-1">
               <v-text-field type="number" v-model="buff" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
@@ -43,9 +43,9 @@
         </v-row>
         <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">回復阻害数
+              <span class="ma-1">{{ $t('attack.nullifingHPRestoration') }}
                 <span class="mdi mdi-help-circle-outline">
-                  <v-tooltip activator="parent" open-on-click>最大1回</v-tooltip>
+                  <v-tooltip activator="parent" open-on-click>{{ $t('attack.maxNum') }}</v-tooltip>
                 </span>
               </span>
             </v-col>
@@ -60,18 +60,18 @@
               <thead>
                 <tr>
                   <th></th>
-                  <th class="pa-1">有利</th>
-                  <th class="pa-1">等倍</th>
-                  <th class="pa-1">不利</th>
+                  <th class="pa-1">{{ $t('attack.advantage') }}</th>
+                  <th class="pa-1">{{ $t('attack.neutral') }}</th>
+                  <th class="pa-1">{{ $t('attack.disadvantage') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <th class="text-nowrap wide-cell">連撃数
+                  <th class="text-nowrap wide-cell">{{ $t('attack.numberOfMultihit') }}
                     <span class="mdi mdi-help-circle-outline">
 
                       <v-tooltip style="white-space: nowrap;" activator="parent"
-                        open-on-click>2連撃、3連撃どちらでも1回とカウント</v-tooltip>
+                        open-on-click>{{ $t('attack.attackDetail') }}</v-tooltip>
                     </span>
                   </th>
                   <td class="pa-1"><v-text-field type="number" v-model="table.advantageCombo" hide-details dense solo />
@@ -82,7 +82,7 @@
                       solo /></td>
                 </tr>
                 <tr>
-                  <th class="text-nowrap">単発数</th>
+                  <th class="text-nowrap">{{ $t('attack.numberOfSingleHit') }}</th>
                   <td class="pa-1"><v-text-field type="number" v-model="table.advantageSingle" hide-details dense
                       solo /></td>
                   <td class="pa-1"><v-text-field type="number" v-model="table.equalSingle" hide-details dense solo />
@@ -105,7 +105,10 @@
 import { computed, ref } from 'vue';
 import { Chart, registerables } from 'chart.js';
 import DoughnutGraph from '@/components/DoughnutGraph.vue';
+import { useI18n } from 'vue-i18n';
 Chart.register(...registerables);
+
+const { t } = useI18n();
 const enemyHP = ref(0);
 const damage = ref(0);
 const buff = ref(0);
@@ -164,16 +167,16 @@ const colors = [
   '#F2C8FA', // 不利単発
 ];
 const scores = computed(() => [
-  { label: '行動回数', value: Number(((basicScore.value - moveMinusScore.value * totalTable.value) * difficulty.value).toFixed()), color: colors[0] },
-  { label: '有利連撃', value: advantageComboScore.value * difficulty.value, color: colors[1] },
-  { label: 'ダメージ', value: damageScore.value * difficulty.value, color: colors[2] },
-  { label: '回復阻害', value: blockHealScore.value * difficulty.value, color: colors[3] },
-  { label: '等倍連撃', value: equalComboScore.value * difficulty.value, color: colors[4] },
-  { label: 'バフ', value: buffScore.value * difficulty.value, color: colors[5] },
-  { label: '有利単発', value: advantageSingleScore.value * difficulty.value, color: colors[6] },
-  { label: '不利連撃', value: disadvantageComboScore.value * difficulty.value, color: colors[7] },
-  { label: '等倍単発', value: equalSingleScore.value * difficulty.value, color: colors[8] },
-  { label: '不利単発', value: disadvantageSingleScore.value * difficulty.value, color: colors[9] },
+  { label: t('attack.numberOfActions'), value: Number(((basicScore.value - moveMinusScore.value * totalTable.value) * difficulty.value).toFixed()), color: colors[0] },
+  { label: t('attack.numberOfAdvantage2'), value: advantageComboScore.value * difficulty.value, color: colors[1] },
+  { label: t('attack.damage'), value: damageScore.value * difficulty.value, color: colors[2] },
+  { label: t('attack.nullifingHPRestoration'), value: blockHealScore.value * difficulty.value, color: colors[3] },
+  { label: t('attack.numberOfDisadvantage2'), value: equalComboScore.value * difficulty.value, color: colors[4] },
+  { label: t('attack.buff'), value: buffScore.value * difficulty.value, color: colors[5] },
+  { label: t('attack.numberOfAdvantage1'), value: advantageSingleScore.value * difficulty.value, color: colors[6] },
+  { label: t('attack.numberOfNeutral2'), value: disadvantageComboScore.value * difficulty.value, color: colors[7] },
+  { label: t('attack.numberOfDisadvantage1'), value: equalSingleScore.value * difficulty.value, color: colors[8] },
+  { label: t('attack.numberOfNeutral1'), value: disadvantageSingleScore.value * difficulty.value, color: colors[9] },
 ].sort((a, b) => b.value - a.value));
 // チャート用のデータ
 const data = computed(() => {

@@ -30,7 +30,7 @@ const options = {
   plugins: {
     title: {
       display: true,
-      text: 'スコア',
+      text: 'Score',
       font: {
         weight: 'bold',
         size: 30

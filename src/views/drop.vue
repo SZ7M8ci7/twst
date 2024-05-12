@@ -6,8 +6,8 @@
           <v-row>
             <v-col cols="12">
               <v-radio-group v-model="radios" inline>
-                <v-radio label="通常" value="normal"></v-radio>
-                <v-radio label="ドロップ率アップ" value="up"></v-radio>
+                <v-radio :label="$t('drop.normal')" value="normal"></v-radio>
+                <v-radio :label="$t('drop.dropIncreasedRate')" value="up"></v-radio>
               </v-radio-group>
             </v-col>
           </v-row>
@@ -17,11 +17,11 @@
     <v-row>
       <v-col class="d-inline-flex justify-center">
         <div>
-          <v-text-field v-model="piece_s" label="かけらS" type="number" @keydown="checkNumber"
+          <v-text-field v-model="piece_s" :label="$t('drop.kakeraS')" type="number" @keydown="checkNumber"
             hide-details/>
-          <v-text-field v-model="piece_l" label="かけらL" type="number" @keydown="checkNumber"
+          <v-text-field v-model="piece_l" :label="$t('drop.kakeraL')" type="number" @keydown="checkNumber"
             hide-details/>
-          <v-text-field v-model="addition" label="AP調整" type="number" @keydown="checkNumber"
+          <v-text-field v-model="addition" :label="$t('drop.addition')" type="number" @keydown="checkNumber"
             hide-details/>
         </div>
       </v-col>
@@ -31,7 +31,7 @@
         <div>
           <v-row>
             <v-col cols="12">
-              <p class="text-h6">合計AP: {{ total_ap.toLocaleString() }}</p>
+              <p class="text-h6">{{ $t('drop.totalAP') }}: {{ total_ap.toLocaleString() }}</p>
             </v-col>
           </v-row>
         </div>
@@ -46,44 +46,44 @@
                 <thead>
                   <tr>
                     <th class="text-left">
-                      アイテム
+                      {{ $t('drop.item') }}
                     </th>
                     <th class="text-left">
-                      ドロップ数
+                      {{ $t('drop.drop') }}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>魔導書</td>
+                    <td>{{ $t('drop.grimoire') }}</td>
                     <td class="text-right">{{ grimoire.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
-                    <td>教科書</td>
+                    <td>{{ $t('drop.textbook') }}</td>
                     <td class="text-right">{{ textbook.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
-                    <td>メモ帳</td>
+                    <td>{{ $t('drop.notepad') }}</td>
                     <td class="text-right">{{ memo.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
-                    <td>キャンディ</td>
+                    <td>{{ $t('drop.candy') }}</td>
                     <td class="text-right">{{ candy.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
-                    <td>ハーブティーS</td>
+                    <td>{{ $t('drop.herbTeaS') }}</td>
                     <td class="text-right">{{ tea_s.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
-                    <td>ハーブティーM</td>
+                    <td>{{ $t('drop.herbTeaM') }}</td>
                     <td class="text-right">{{ tea_m.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
-                    <td>ハーブティーL</td>
+                    <td>{{ $t('drop.herbTeaL') }}</td>
                     <td class="text-right">{{ tea_l.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                   <tr>
-                    <td>マドル</td>
+                    <td>{{ $t('drop.madol') }}</td>
                     <td class="text-right">{{ madol.toLocaleString(undefined, { maximumFractionDigits: 2 }) }}</td>
                   </tr>
                 </tbody>

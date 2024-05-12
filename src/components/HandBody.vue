@@ -5,7 +5,7 @@
       <!-- ロード中に表示するロードスクリーン -->
       <div v-if="loadingImgUrl" class="text-center">
         <v-progress-circular indeterminate></v-progress-circular>
-        <p>キャラクター情報を読み込んでいます...</p>
+        <p>Loading...</p>
       </div>
 
       <!-- ロード完了後に表示するメインコンテンツ -->
@@ -14,7 +14,7 @@
         <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
           <!-- level列のカスタムテンプレート定義 -->
           <template v-slot:[`item.level`]="{ item }">
-            <v-btn color="primary" @click="onAddClick(item)">追加</v-btn>
+            <v-btn color="primary" @click="onAddClick(item)">{{ $t('hand.add') }}</v-btn>
           </template>
           <template v-slot:[`item.name`]="{ item }">
             <img :src="item.imgUrl" :alt="item.name" class="character-image" />
@@ -30,6 +30,8 @@
 import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 import { useDeckStore } from '@/store/deckStore';
@@ -41,14 +43,14 @@ const visibleCharacters = computed(() => {
   }
   return characters.value.filter(character => character.visible && character.imgUrl);
 });
-const headers = [
-  { title: '追加', value: 'level', sortable: false },
-  { title: 'キャラ', value: 'name', sortable: false  },
-  { title: 'レア', value: 'rare', sortable: false  },
+const headers = computed(() =>[
+  { title: t('hand.add'), value: 'level', sortable: false },
+  { title: t('hand.character'), value: 'name', sortable: false  },
+  { title: t('hand.rarity'), value: 'rare', sortable: false  },
   { title: 'HP', value: 'hp', sortable: true  },
   { title: 'ATK', value: 'atk', sortable: true  },
-  { title: 'その他', value: 'etc', sortable: false  },
-];
+  { title: t('hand.other'), value: 'etc', sortable: false  },
+]);
 // onAddClick メソッドの追加
 const onAddClick = (item:any) => {
   deckStore.addToDeck(item);

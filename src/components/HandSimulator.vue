@@ -2,10 +2,10 @@
   <v-row class="mb-1">
     <v-col cols="12" sm="4" />
     <v-col cols="12" sm="2">
-      <v-btn block @click="resetDeck">リセット</v-btn>
+      <v-btn block @click="resetDeck">{{ $t('hand.reset') }}</v-btn>
     </v-col>
     <v-col cols="12" sm="2">
-      <v-btn :disabled="selectedCount !== 2" block color="green" @click="nextTurn">次のターン</v-btn>
+      <v-btn :disabled="selectedCount !== 2" block color="green" @click="nextTurn">{{ $t('hand.next') }}</v-btn>
     </v-col>
     <v-col cols="12" sm="4" />
   </v-row>

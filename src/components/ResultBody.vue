@@ -39,24 +39,27 @@ import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 const searchResultStore = useSearchResultStore();
 const { results } = storeToRefs(searchResultStore);
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
 const headers = [
-  { title: '実HP', value: 'hp', sortable: false },
-  { title: '実質HP', value: 'ehp', sortable: false },
-  { title: '回避', value: 'evasion', sortable: false },
-  { title: 'HPバディ', value: 'hpBuudy', sortable: false },
-  { title: 'バディ', value: 'buddy', sortable: false },
-  { title: '無バディ', value: 'noHPBuudy', sortable: false },
-  { title: 'デュオ', value: 'duo', sortable: false },
-  { title: '等倍与ダメ', value: 'referenceDamage', sortable: false },
-  { title: '有利与ダメ', value: 'referenceAdvantageDamage', sortable: false },
-  { title: '対火与ダメ', value: 'referenceVsHiDamage', sortable: false },
-  { title: '対水与ダメ', value: 'referenceVsMizuDamage', sortable: false },
-  { title: '対木与ダメ', value: 'referenceVsKiDamage', sortable: false },
-  { title: 'キャラ1', value: 'chara1', sortable: false  },
-  { title: 'キャラ2', value: 'chara2', sortable: false  },
-  { title: 'キャラ3', value: 'chara3', sortable: false  },
-  { title: 'キャラ4', value: 'chara4', sortable: false  },
-  { title: 'キャラ5', value: 'chara5', sortable: false  },
+
+  { title: t('resultBody.HP'), value: 'hp', sortable: false },
+  { title: t('resultBody.effectiveHP'), value: 'ehp', sortable: false },
+  { title: t('resultBody.evasion'), value: 'evasion', sortable: false },
+  { title: t('resultBody.HPBuddy'), value: 'hpBuudy', sortable: false },
+  { title: t('resultBody.buddy'), value: 'buddy', sortable: false },
+  { title: t('resultBody.noHPBuddy'), value: 'noHPBuudy', sortable: false },
+  { title: t('resultBody.duo'), value: 'duo', sortable: false },
+  { title: t('resultBody.neutralDamage'), value: 'referenceDamage', sortable: false },
+  { title: t('resultBody.neutralDamage'), value: 'referenceAdvantageDamage', sortable: false },
+  { title: t('resultBody.advantageDamage'), value: 'referenceVsHiDamage', sortable: false },
+  { title: t('resultBody.damageAgainstWater'), value: 'referenceVsMizuDamage', sortable: false },
+  { title: t('resultBody.damageAgainstFlora'), value: 'referenceVsKiDamage', sortable: false },
+  { title: '1', value: 'chara1', sortable: false  },
+  { title: '2', value: 'chara2', sortable: false  },
+  { title: '3', value: 'chara3', sortable: false  },
+  { title: '4', value: 'chara4', sortable: false  },
+  { title: '5', value: 'chara5', sortable: false  },
 ];
 
 </script>

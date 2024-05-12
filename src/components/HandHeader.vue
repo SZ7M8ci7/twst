@@ -1,5 +1,5 @@
 <template>
-  <v-btn block @click="isFilterModalVisible = true">フィルター</v-btn>
+  <v-btn block @click="isFilterModalVisible = true">{{ $t('hand.filter') }}</v-btn>
   <!-- フィルターモーダル -->
   <v-dialog v-model="isFilterModalVisible" persistent :max-width="dialogWidth">
     <filter-modal @close="isFilterModalVisible = false" />
