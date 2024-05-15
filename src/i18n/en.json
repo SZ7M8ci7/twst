@@ -133,7 +133,7 @@
     "text2": "Based on the input levels, it exhaustively searches all possible decks and displays the optimal results.",
     "text3": "As all processing is done on the device,",
     "text4": "it can be very time-consuming.Characters that are unlikely to be used (such as SR or R) should have their level set to 0 to exclude them from the search.",
-    "text5": "Since all cards are calculated with maximum enhancement and having M3, please consider the results as a rough estimate.",
+    "text5": "Since all cards are calculated with maximum enhancement, please consider the results as a rough estimate.",
     "text6": "Also, the damage dealt is selected from the highest two among M1, M2, and M3; therefore, it is often not possible to achieve both healing or evasion and high damage.",
     "text7": "Self 3T buffs and ally buffs are not considered, so you can deal more damage in some combinations.",
     "text8": "The sort setting sorts the results by the specified key. ",
