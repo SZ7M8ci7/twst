@@ -41,6 +41,7 @@ export interface Character {
   imgUrl: Ref;
   wikiURL: string;
   required: boolean;
+  hasM3: boolean;
   evasion: number;
   selections: any;
 }
@@ -71,6 +72,7 @@ export const useCharacterStore = defineStore('characters', {
       calcBaseHP: Number(character.base_hp),
       visible: true,
       required: false,
+      hasM3: true,
       level: 0,
       chara: character.chara || '',
       buddy1c: character.buddy1c || '',

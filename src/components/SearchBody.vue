@@ -27,6 +27,9 @@
           <template v-slot:[`item.required`]="{ item }">
             <v-checkbox v-model="item.required" hide-details></v-checkbox>
           </template>
+          <template v-slot:[`item.hasM3`]="{ item }">
+            <v-checkbox v-model="item.hasM3" hide-details></v-checkbox>
+          </template>
           <template v-slot:[`item.name`]="{ item }">
             <img :src="item.imgUrl" :alt="item.name" class="character-image" />
           </template>
@@ -37,11 +40,13 @@
     </v-container>
   </v-app>
 </template>
+
 <script setup lang="ts">
 import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
+
 const { t } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
@@ -53,15 +58,17 @@ const visibleCharacters = computed(() => {
   }
   return characters.value.filter(character => character.visible && character.imgUrl);
 });
-const headers = computed(() =>[
+const headers = computed(() => [
   { title: 'Lv', value: 'level', sortable: false },
-  { title: t('search.required'), value: 'required', sortable: false  },
-  { title: t('search.character'), value: 'name', sortable: false  },
-  { title: t('search.rarity'), value: 'rare', sortable: false  },
-  { title: 'HP', value: 'hp', sortable: true  },
-  { title: 'ATK', value: 'atk', sortable: true  },
-  { title: t('search.other'), value: 'etc', sortable: false  },
+  { title: t('search.required'), value: 'required', sortable: false },
+  { title: 'M3', value: 'hasM3', sortable: false },
+  { title: t('search.character'), value: 'name', sortable: false },
+  { title: t('search.rarity'), value: 'rare', sortable: false },
+  { title: 'HP', value: 'hp', sortable: true },
+  { title: 'ATK', value: 'atk', sortable: true },
+  { title: t('search.other'), value: 'etc', sortable: false },
 ]);
+
 function applyBulkLevel() {
   visibleCharacters.value.forEach(character => {
     let maxLevel;
@@ -84,16 +91,21 @@ function applyBulkLevel() {
     character.level = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
   });
 }
+
 function saveLevels() {
-  const levelsCache:{ [name: string]: number } = {};
+  const levelsCache: { [name: string]: number } = {};
+  const hasM3Cache: { [name: string]: boolean } = {};
   characters.value.forEach(character => {
     levelsCache[character.name] = character.level;
+    hasM3Cache[character.name] = character.hasM3;
   });
   localStorage.setItem('characterLevels', JSON.stringify(levelsCache));
+  localStorage.setItem('characterM3', JSON.stringify(hasM3Cache));
 }
 
 function loadLevels() {
   const levelsCache = localStorage.getItem('characterLevels');
+  const hasM3Cache = localStorage.getItem('characterM3');
   if (levelsCache) {
     const levels = JSON.parse(levelsCache);
     characters.value.forEach(character => {
@@ -102,7 +114,16 @@ function loadLevels() {
       }
     });
   }
+  if (hasM3Cache) {
+    const hasM3 = JSON.parse(hasM3Cache);
+    characters.value.forEach(character => {
+      if (hasM3[character.name] !== undefined) {
+        character.hasM3 = hasM3[character.name];
+      }
+    });
+  }
 }
+
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
     return import(`@/assets/img/${character.name}.png`)
@@ -118,10 +139,15 @@ onBeforeMount(() => {
     loadingImgUrl.value = false; // すべての画像のロードが完了
   });
 });
+
 onMounted(() => {
+  characters.value.forEach(character => {
+    character.hasM3 = true; // M3をデフォルトでチェック
+  });
   loadLevels(); // 画面を開いた時にlocalStorageからレベルを復元
 });
 </script>
+
 <style scoped>
 .table-top {
   display: flex;
@@ -163,6 +189,4 @@ onMounted(() => {
     width: 100%;
   }
 }
-
-
 </style>
