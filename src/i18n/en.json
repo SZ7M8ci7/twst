@@ -140,7 +140,8 @@
     "text9": "The minimum value setting will not add decks with values below the specified value to the search results. Since this leads to improved processing speed, please set a value that can eliminate values that are not considered.",
     "text10": "The maximum number of results sets the display limit, which affects the sorting speed of the search results, so it is better not to increase it unnecessarily for faster processing.",
     "text11": "The 'No Buddy' result indicates the number of characters without an HP buddy.",
-    "text12": "If you want to create a deck with an HP buddy for everyone in magical assault practice, it is recommended to set the sort order to ascending for sort key 1."
+    "text12": "If you want to create a deck with an HP buddy for everyone in magical assault practice, it is recommended to set the sort order to ascending for sort key 1.",
+    "text13": "The Edit button is used when you want to temporarily change a character's stats. After making changes, the calculations will use the new values when starting an exploration, but the original values will be restored upon refreshing the screen."
   },
   "filterModal": {
     "select": "Select",

@@ -8,6 +8,7 @@
       <p>{{ $t('infoModal.text5') }}</p>
       <p>{{ $t('infoModal.text6') }}</p>
       <p>{{ $t('infoModal.text7') }}</p>
+      <p>{{ $t('infoModal.text13') }}</p>
     </div>
     <div class="section">
       <h3>{{ $t('infoModal.setting') }}</h3>
