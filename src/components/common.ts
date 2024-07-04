@@ -88,7 +88,7 @@ const atkBuffMap: { [key: string]: number } = {
   "ATKUP(小)": 1.2,
   "ATKUP(中)": 1.35,
   "ATKUP(大)": 1.5,
-  "ATKUP(極大)": 2,
+  "ATKUP(極大)": 1.75,
 };
 
 const damageBuffMap: { [key: string]: number } = {
@@ -96,12 +96,12 @@ const damageBuffMap: { [key: string]: number } = {
   "ダメUP(小)": 0.05,
   "ダメUP(中)": 0.0875,
   "ダメUP(大)": 0.125,
-  "ダメUP(極大)": 0.25,
+  "ダメUP(極大)": 0.1875,
   "属性ダメUP(極小)": 0.03,
   "属性ダメUP(小)": 0.06,
   "属性ダメUP(中)": 0.1005,
   "属性ダメUP(大)": 0.15,
-  "属性ダメUP(極大)": 0.30,
+  "属性ダメUP(極大)": 0.225,
 };
 
 const damageCache: Record<string, number> = {};
