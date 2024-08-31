@@ -192,6 +192,7 @@
     "minimumAgainstFloraDamage":"最低対木ダメージ",
     "searchSettings":"検索設定",
     "maximumResult":"結果上限数",
+    "attackNum":"攻撃回数",
     "allowSameCharacter":"同キャラを許可",
     "cancel":"キャンセル",
     "ok":"決定",

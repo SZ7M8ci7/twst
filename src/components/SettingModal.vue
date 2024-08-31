@@ -166,6 +166,19 @@
             :min="0"
           />
       </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.attackNum') }}</span>
+        <v-text-field
+            type="number"
+            v-model="attackNum"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="1"
+            :max="10"
+          />
+      </v-card-text>
       <v-card-text class="sort-option mt-2 mb-2 pa-0">
         <span class="min-label mt-0 pa-0">{{ $t('settingModal.allowSameCharacter') }}</span>
         <v-radio-group v-model="allowSameCharacter" class="ma-0 pa-0" inline hide-details>
@@ -200,6 +213,7 @@ const minReferenceVsHiDamage = ref(searchSettingsStore.minReferenceVsHiDamage);
 const minReferenceVsMizuDamage = ref(searchSettingsStore.minReferenceVsMizuDamage);
 const minReferenceVsKiDamage = ref(searchSettingsStore.minReferenceVsKiDamage);
 const maxResult = ref(searchSettingsStore.maxResult)
+const attackNum = ref(searchSettingsStore.attackNum)
 let initialSortOptions: any = undefined;
 let sortOptions = ref();
 
@@ -237,6 +251,7 @@ function applyFilter() {
     minReferenceVsKiDamage: minReferenceVsKiDamage.value,
     sortOptions: sortOptions.value,
     maxResult: maxResult.value,
+    attackNum: attackNum.value,
     allowSameCharacter: allowSameCharacter.value,
   });
   emit('close'); // モーダルを閉じる

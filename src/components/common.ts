@@ -4,7 +4,7 @@ import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 import { Ref } from 'vue';
 const searchSettingStore = useSearchSettingsStore();
-const { minEHP, minHP, minHPBuddy, minEvasion, minDuo, minReferenceDamage, minReferenceAdvantageDamage, minReferenceVsHiDamage,minReferenceVsKiDamage,minReferenceVsMizuDamage, maxResult, sortOptions, allowSameCharacter } = storeToRefs(searchSettingStore);
+const { minEHP, minHP, minHPBuddy, minEvasion, minDuo, minReferenceDamage, minReferenceAdvantageDamage, minReferenceVsHiDamage,minReferenceVsKiDamage,minReferenceVsMizuDamage, maxResult, sortOptions, allowSameCharacter, attackNum } = storeToRefs(searchSettingStore);
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
@@ -130,11 +130,10 @@ function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: 
   atk = (atkBuffMap[magicBuff] || 1) * atk + atk * atkBuddyRate;  
   return calcDamageAfterCalcAtk(magicBuff, magicPow, magicAtr=='無' ? '無':'無以外', atk);
 }
-function calcTopDamage(damage1: number,damage2: number,damage3: number,){
-
+function calcTopDamage(damage1: number, damage2: number, damage3: number): number[] {
   const damages = [damage1, damage2, damage3];
   damages.sort((a, b) => b - a);
-  return damages[0] + damages[1];
+  return [damages[0], damages[1]];
 }
 export function calcDeckStatus(characters:Character[]) : Array<number | string| any> | undefined {
   const memberNameSet: Set<string> = new Set();
@@ -148,6 +147,11 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   let deckTotalBuddy = 0;
   let deckNoHPBuddy = 0;
   let deckDuo = 0;
+  const deckReferenceDamageList: number[] = [];
+  const deckReferenceAdvantageDamageList: number[] = [];
+  const deckReferenceVsHiDamageList: number[] = [];
+  const deckReferenceVsMizuDamageList: number[] = [];
+  const deckReferenceVsKiDamageList: number[] = [];
   let deckReferenceDamage = 0;
   let deckReferenceAdvantageDamage = 0;
   let deckReferenceVsHiDamage = 0;
@@ -302,12 +306,6 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       atkBuddyRate
     ) : 0;
 
-    deckReferenceDamage += calcTopDamage(
-      magic1Damage,
-      magic2Damage,
-      magic3Damage
-    );
-
     // 有利ダメージ
     const magic1AdvantageDamage =
       chara.magic1atr == "無" ? magic1Damage : magic1Damage * 1.5;
@@ -315,12 +313,6 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       chara.magic2atr == "無" ? magic2Damage : magic2Damage * 1.5;
     const magic3AdvantageDamage =
       chara.magic3atr == "無" ? magic3Damage : magic3Damage * 1.5;
-
-    deckReferenceAdvantageDamage += calcTopDamage(
-      magic1AdvantageDamage,
-      magic2AdvantageDamage,
-      magic3AdvantageDamage
-    );
 
     // 対火ダメージ
     const magic1vsHiDamage = calcAttributeDamage(
@@ -338,12 +330,6 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       "火",
       magic3Damage
     );
-    deckReferenceVsHiDamage += calcTopDamage(
-      magic1vsHiDamage,
-      magic2vsHiDamage,
-      magic3vsHiDamage
-    );
-
     // 対水ダメージ
     const magic1vsMizuDamage = calcAttributeDamage(
       chara.magic1atr,
@@ -360,12 +346,6 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       "水",
       magic3Damage
     );
-    deckReferenceVsMizuDamage += calcTopDamage(
-      magic1vsMizuDamage,
-      magic2vsMizuDamage,
-      magic3vsMizuDamage
-    );
-
     // 対木ダメージ
     const magic1vsKiDamage = calcAttributeDamage(
       chara.magic1atr,
@@ -382,12 +362,20 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       "木",
       magic3Damage
     );
-    deckReferenceVsKiDamage += calcTopDamage(
-      magic1vsKiDamage,
-      magic2vsKiDamage,
-      magic3vsKiDamage
-    );
+    deckReferenceDamageList.push(...calcTopDamage(magic1Damage, magic2Damage, magic3Damage));
+    deckReferenceAdvantageDamageList.push(...calcTopDamage(magic1AdvantageDamage, magic2AdvantageDamage, magic3AdvantageDamage));
+    deckReferenceVsHiDamageList.push(...calcTopDamage(magic1vsHiDamage, magic2vsHiDamage, magic3vsHiDamage));
+    deckReferenceVsMizuDamageList.push(...calcTopDamage(magic1vsMizuDamage, magic2vsMizuDamage, magic3vsMizuDamage));
+    deckReferenceVsKiDamageList.push(...calcTopDamage(magic1vsKiDamage, magic2vsKiDamage, magic3vsKiDamage));
+
   });
+
+  deckReferenceDamage = deckReferenceDamageList.sort((a, b) => b - a).slice(0, attackNum.value).reduce((acc, curr) => acc + curr, 0);
+  deckReferenceAdvantageDamage = deckReferenceAdvantageDamageList.sort((a, b) => b - a).slice(0, attackNum.value).reduce((acc, curr) => acc + curr, 0);
+  deckReferenceVsHiDamage = deckReferenceVsHiDamageList.sort((a, b) => b - a).slice(0, attackNum.value).reduce((acc, curr) => acc + curr, 0);
+  deckReferenceVsMizuDamage = deckReferenceVsMizuDamageList.sort((a, b) => b - a).slice(0, attackNum.value).reduce((acc, curr) => acc + curr, 0);
+  deckReferenceVsKiDamage = deckReferenceVsKiDamageList.sort((a, b) => b - a).slice(0, attackNum.value).reduce((acc, curr) => acc + curr, 0);
+
   if (deckTotalHP < minHP.value) { return; }
   if (deckTotalHP + deckTotalHeal < minEHP.value) { return; }
   if (deckTotalHPBuddy < minHPBuddy.value) { return; }

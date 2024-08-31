@@ -192,6 +192,7 @@
     "minimumAgainstFloraDamage":"Minimum damage against flora",
     "searchSettings":"Search settings",
     "maximumResult":"Maximum number of result",
+    "attackNum":"Number of attacks",
     "allowSameCharacter":"Allow same character",
     "cancel":"Cancel",
     "ok":"OK",

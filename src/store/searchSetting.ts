@@ -18,6 +18,7 @@ export interface SearchSettingsState {
   minReferenceVsMizuDamage: number;
   minReferenceVsKiDamage: number;
   maxResult: number;
+  attackNum: number;
   sortOptions: SortOption[];
   allowSameCharacter: boolean;
 }
@@ -35,6 +36,7 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     minReferenceVsMizuDamage: 0,
     minReferenceVsKiDamage: 0,
     maxResult: 10,
+    attackNum: 10,
     sortOptions: [
       { prop: 'HP', order: '降順' }
     ],
