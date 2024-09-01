@@ -8,6 +8,8 @@ export interface result {
   totalHPBuddy: number;
   totalBuddy: number;
   totalDuo: number;
+  totalBuff: number;
+  totalDebuff: number;
   totalReferenceDamage: number;
   noHPBuddy: number;
   chara1: string;

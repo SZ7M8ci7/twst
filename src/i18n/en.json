@@ -185,6 +185,8 @@
     "minimumHPBuddy":"Minimum HP buddy",
     "minimumEvasion":"Minimum Evasion",
     "minimumDuo":"Minimum duo",
+    "minimumBuff":"Minimum Buff",
+    "minimumDebuff":"Minimum Debuff",
     "minimumNeutralDamage":"Minimum neutral damage",
     "minimumAdvantageDamage":"Minimum advantage damage",
     "minimumAgainstFireDamage":"Minimum damage against fire",
@@ -199,7 +201,7 @@
     "yes":"Yes",
     "no":"No"
   },
-  "commonts": {
+  "comments": {
     "effectiveHP": "Effective HP",
     "HP": "HP",
     "HPBuddy": "HP buddy",
@@ -207,6 +209,8 @@
     "buddy": "Buddy",
     "evasion": "Evasion",
     "duo": "Duo",
+    "buff": "Buff",
+    "debuff": "Debuff",
     "neutralDamage": "Neutral damage",
     "advantageDamage": "Advantage damage",
     "damageAgainstFire": "Damage against fire",
@@ -221,6 +225,8 @@
     "buddy": "Buddy",
     "evasion": "Evasion",
     "duo": "Duo",
+    "buff": "Buff",
+    "debuff": "Debuff",
     "neutralDamage": "Neutral damage",
     "advantageDamage": "Advantage damage",
     "damageAgainstFire": "Damage against fire",

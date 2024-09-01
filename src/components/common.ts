@@ -4,7 +4,7 @@ import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 import { Ref } from 'vue';
 const searchSettingStore = useSearchSettingsStore();
-const { minEHP, minHP, minHPBuddy, minEvasion, minDuo, minReferenceDamage, minReferenceAdvantageDamage, minReferenceVsHiDamage,minReferenceVsKiDamage,minReferenceVsMizuDamage, maxResult, sortOptions, allowSameCharacter, attackNum } = storeToRefs(searchSettingStore);
+const { minEHP, minHP, minDebuff, minBuff, minHPBuddy, minEvasion, minDuo, minReferenceDamage, minReferenceAdvantageDamage, minReferenceVsHiDamage,minReferenceVsKiDamage,minReferenceVsMizuDamage, maxResult, sortOptions, allowSameCharacter, attackNum } = storeToRefs(searchSettingStore);
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
@@ -24,18 +24,20 @@ export interface deckStatus{
 }
 export function getAvailableSortProps(t: (key: string) => string) {
   return [  
-  t('commonts.HP'),
-  t('commonts.effectiveHP'),
-  t('commonts.HPBuddy'),
-  t('commonts.noHPBuddy'),
-  t('commonts.buddy'),
-  t('commonts.evasion'),
-  t('commonts.duo'),
-  t('commonts.neutralDamage'),
-  t('commonts.advantageDamage'),
-  t('commonts.damageAgainstFire'),
-  t('commonts.damageAgainstWater'),
-  t('commonts.damageAgainstFlora')];
+  t('comments.HP'),
+  t('comments.effectiveHP'),
+  t('comments.HPBuddy'),
+  t('comments.noHPBuddy'),
+  t('comments.buddy'),
+  t('comments.evasion'),
+  t('comments.duo'),
+  t('comments.buff'),
+  t('comments.debuff'),
+  t('comments.neutralDamage'),
+  t('comments.advantageDamage'),
+  t('comments.damageAgainstFire'),
+  t('comments.damageAgainstWater'),
+  t('comments.damageAgainstFlora')];
 }
 
 export const availableSortkeys = [
@@ -146,6 +148,8 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   let deckTotalHPBuddy = 0;
   let deckTotalBuddy = 0;
   let deckNoHPBuddy = 0;
+  let deckTotalBuff = 0;
+  let deckTotalDebuff = 0;
   let deckDuo = 0;
   const deckReferenceDamageList: number[] = [];
   const deckReferenceAdvantageDamageList: number[] = [];
@@ -172,6 +176,8 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     deckList.push(chara.imgUrl);
 
     deckTotalHP += chara.calcBaseHP;
+    deckTotalBuff += chara.buff_count;
+    deckTotalDebuff += chara.debuff_count;
     let hasHpBuddy = false;
     let atkBuddyRate = 0;
     // バディHP増加分加算
@@ -381,6 +387,8 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   if (deckTotalHPBuddy < minHPBuddy.value) { return; }
   if (deckTotalEvasion < minEvasion.value) { return; }
   if (deckDuo < minDuo.value) { return; }
+  if (deckTotalBuff < minBuff.value) { return; }
+  if (deckTotalDebuff < minDebuff.value) { return; }
   if (deckReferenceDamage < minReferenceDamage.value) { return; }
   if (deckReferenceAdvantageDamage < minReferenceAdvantageDamage.value) { return; }
   if (deckReferenceVsHiDamage < minReferenceVsHiDamage.value) { return; }
@@ -399,6 +407,8 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckTotalBuddy
     , deckNoHPBuddy
     , deckDuo
+    , deckTotalBuff
+    , deckTotalDebuff
     , deckReferenceDamage
     , deckReferenceAdvantageDamage
     , deckReferenceVsHiDamage
@@ -560,16 +570,18 @@ export async function calcDecks(t: (key: string) => string) {
           buddy: ret[4],
           noHpBuddy: ret[5],
           duo: ret[6],
-          referenceDamage: ret[7],
-          referenceAdvantageDamage: ret[8],
-          referenceVsHiDamage: ret[9],
-          referenceVsMizuDamage: ret[10],
-          referenceVsKiDamage: ret[11],
-          chara1: ret[12],
-          chara2: ret[13],
-          chara3: ret[14],
-          chara4: ret[15],
-          chara5: ret[16],
+          buff: ret[7],
+          debuff: ret[8],
+          referenceDamage: ret[9],
+          referenceAdvantageDamage: ret[10],
+          referenceVsHiDamage: ret[11],
+          referenceVsMizuDamage: ret[12],
+          referenceVsKiDamage: ret[13],
+          chara1: ret[14],
+          chara2: ret[15],
+          chara3: ret[16],
+          chara4: ret[17],
+          chara5: ret[18],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする

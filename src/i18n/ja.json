@@ -185,6 +185,8 @@
     "minimumHPBuddy":"最低HPバディ数",
     "minimumEvasion":"最低回避数",
     "minimumDuo":"最低デュオ数",
+    "minimumBuff":"最低バフ数",
+    "minimumDebuff":"最低デバフ数",
     "minimumNeutralDamage":"最低等倍ダメージ",
     "minimumAdvantageDamage":"最低有利ダメージ",
     "minimumAgainstFireDamage":"最低対火ダメージ",
@@ -199,7 +201,7 @@
     "yes":"はい",
     "no":"いいえ"
   },
-  "commonts": {
+  "comments": {
     "effectiveHP": "実質HP",
     "HP": "HP",
     "HPBuddy": "HPバディ数",
@@ -207,6 +209,8 @@
     "buddy": "バディ数",
     "evasion": "回避数",
     "duo": "デュオ数",
+    "buff": "バフ数",
+    "debuff": "デバフ数",
     "neutralDamage": "等倍与ダメージ",
     "advantageDamage": "有利与ダメージ",
     "damageAgainstFire": "対火与ダメージ",
@@ -221,6 +225,8 @@
     "buddy": "バディ",
     "evasion": "回避",
     "duo": "デュオ",
+    "buff": "バフ",
+    "debuff": "デバフ",
     "neutralDamage": "等倍与ダメ",
     "advantageDamage": "有利与ダメ",
     "damageAgainstFire": "対火与ダメ",

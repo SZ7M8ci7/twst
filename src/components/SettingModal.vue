@@ -94,6 +94,30 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumBuff') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minBuff"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumDebuff') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minDebuff"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">{{ $t('settingModal.minimumNeutralDamage') }}</span>
         <v-text-field
             type="number"
@@ -207,6 +231,8 @@ const minHP = ref(searchSettingsStore.minHP);
 const minHPBuddy = ref(searchSettingsStore.minHPBuddy);
 const minEvasion = ref(searchSettingsStore.minEvasion);
 const minDuo = ref(searchSettingsStore.minDuo);
+const minBuff = ref(searchSettingsStore.minBuff);
+const minDebuff = ref(searchSettingsStore.minDebuff);
 const minReferenceDamage = ref(searchSettingsStore.minReferenceDamage);
 const minReferenceAdvantageDamage = ref(searchSettingsStore.minReferenceAdvantageDamage);
 const minReferenceVsHiDamage = ref(searchSettingsStore.minReferenceVsHiDamage);
@@ -244,6 +270,8 @@ function applyFilter() {
     minHPBuddy: minHPBuddy.value,
     minEvasion: minEvasion.value,
     minDuo: minDuo.value,
+    minBuff: minBuff.value,
+    minDebuff: minDebuff.value,
     minReferenceDamage: minReferenceDamage.value,
     minReferenceAdvantageDamage: minReferenceAdvantageDamage.value,
     minReferenceVsHiDamage: minReferenceVsHiDamage.value,

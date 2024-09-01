@@ -18,6 +18,8 @@
             <td>{{ item.buddy }}</td>
             <td>{{ item.noHpBuddy }}</td>
             <td>{{ item.duo }}</td>
+            <td>{{ item.buff }}</td>
+            <td>{{ item.debuff }}</td>
             <td>{{ item.referenceDamage }}</td>
             <td>{{ item.referenceAdvantageDamage }}</td>
             <td>{{ item.referenceVsHiDamage }}</td>
@@ -51,6 +53,8 @@ const headers = computed(() => [
   { title: t('resultBody.buddy'), value: 'buddy', sortable: false },
   { title: t('resultBody.noHPBuddy'), value: 'noHPBuudy', sortable: false },
   { title: t('resultBody.duo'), value: 'duo', sortable: false },
+  { title: t('resultBody.buff'), value: 'buff', sortable: false },
+  { title: t('resultBody.debuff'), value: 'debuff', sortable: false },
   { title: t('resultBody.neutralDamage'), value: 'referenceDamage', sortable: false },
   { title: t('resultBody.advantageDamage'), value: 'referenceAdvantageDamage', sortable: false },
   { title: t('resultBody.damageAgainstFire'), value: 'referenceVsHiDamage', sortable: false },

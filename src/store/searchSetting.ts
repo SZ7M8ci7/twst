@@ -12,6 +12,8 @@ export interface SearchSettingsState {
   minHPBuddy: number;
   minEvasion: number;
   minDuo: number;
+  minBuff: number;
+  minDebuff: number;
   minReferenceDamage: number;
   minReferenceAdvantageDamage: number;
   minReferenceVsHiDamage: number;
@@ -30,6 +32,8 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     minHPBuddy: 0,
     minEvasion: 0,
     minDuo: 0,
+    minBuff: 0,
+    minDebuff: 0,
     minReferenceDamage: 0,
     minReferenceAdvantageDamage: 0,
     minReferenceVsHiDamage: 0,

@@ -23,6 +23,8 @@ export interface Character {
   chara: string;
   duo: string;
   etc: string;
+  buff_count: number;
+  debuff_count: number;
   growtype: string;
   magic1atr: string;
   magic1buf: string;
@@ -82,6 +84,8 @@ export const useCharacterStore = defineStore('characters', {
       buddy3c: character.buddy3c || '',
       buddy3s: character.buddy3s || '',
       etc: formatEtc(character.etc) || '',
+      buff_count: Number(character.buff_count),
+      debuff_count: Number(character.debuff_count),
       magic1buf: character.magic1buf || '',
       magic1heal: character.magic1heal || '',
       magic2buf: character.magic2buf || '',
