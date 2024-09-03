@@ -48,6 +48,8 @@ export const availableSortkeys = [
   'buddy',
   'evasion',
   'duo',
+  'buff',
+  'debuff',
   'referenceDamage',
   'referenceAdvantageDamage',
   'referenceVsHiDamage',
