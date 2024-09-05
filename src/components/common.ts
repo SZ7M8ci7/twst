@@ -167,6 +167,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const name2MotherUsed:Record<number, boolean> = {};
   const name2DuoUsed:Record<number, boolean> = {};
   const deckList: Ref<any>[] = [];
+  let simuURL = '';
 
   characters.sort((a, b) => b.calcBaseATK - a.calcBaseATK);
   characters.forEach((chara, index) => {
@@ -176,7 +177,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   })
   characters.forEach((chara, index) => {
     deckList.push(chara.imgUrl);
-
+    simuURL += '&name'+(index+1) + '=' + chara.name;
     deckTotalHP += chara.calcBaseHP;
     deckTotalBuff += chara.buff_count;
     deckTotalDebuff += chara.debuff_count;
@@ -416,7 +417,8 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckReferenceVsHiDamage
     , deckReferenceVsMizuDamage
     , deckReferenceVsKiDamage
-    , ...deckList];
+    , ...deckList
+    , simuURL];
 }
 const attributeEffectiveness: Record<string, Record<string, number>> = {
   '水': { '火': 1.5, '木': 0.5 },
@@ -584,6 +586,7 @@ export async function calcDecks(t: (key: string) => string) {
           chara3: ret[16],
           chara4: ret[17],
           chara5: ret[18],
+          simuURL: ret[19],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする
