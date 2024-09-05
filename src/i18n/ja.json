@@ -214,6 +214,7 @@
     "evasion": "回避数",
     "duo": "デュオ数",
     "buff": "バフ数",
+    "debuff": "デバフ数",
     "maxCosmic": "無属性数",
     "maxFire": "火属性数",
     "maxWater": "水属性数",
