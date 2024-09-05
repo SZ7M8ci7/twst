@@ -118,6 +118,54 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumCosmic') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minCosmic"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumFire') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minFire"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumWater') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minWater"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumFlora') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minFlora"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">{{ $t('settingModal.minimumNeutralDamage') }}</span>
         <v-text-field
             type="number"
@@ -233,6 +281,10 @@ const minEvasion = ref(searchSettingsStore.minEvasion);
 const minDuo = ref(searchSettingsStore.minDuo);
 const minBuff = ref(searchSettingsStore.minBuff);
 const minDebuff = ref(searchSettingsStore.minDebuff);
+const minCosmic = ref(searchSettingsStore.minCosmic);
+const minFire = ref(searchSettingsStore.minFire);
+const minWater = ref(searchSettingsStore.minWater);
+const minFlora = ref(searchSettingsStore.minFlora);
 const minReferenceDamage = ref(searchSettingsStore.minReferenceDamage);
 const minReferenceAdvantageDamage = ref(searchSettingsStore.minReferenceAdvantageDamage);
 const minReferenceVsHiDamage = ref(searchSettingsStore.minReferenceVsHiDamage);
@@ -272,6 +324,10 @@ function applyFilter() {
     minDuo: minDuo.value,
     minBuff: minBuff.value,
     minDebuff: minDebuff.value,
+    minCosmic: minCosmic.value,
+    minFire: minFire.value,
+    minWater: minWater.value,
+    minFlora: minFlora.value,
     minReferenceDamage: minReferenceDamage.value,
     minReferenceAdvantageDamage: minReferenceAdvantageDamage.value,
     minReferenceVsHiDamage: minReferenceVsHiDamage.value,

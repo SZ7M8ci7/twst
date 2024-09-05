@@ -4,7 +4,28 @@ import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 import { Ref } from 'vue';
 const searchSettingStore = useSearchSettingsStore();
-const { minEHP, minHP, minDebuff, minBuff, minHPBuddy, minEvasion, minDuo, minReferenceDamage, minReferenceAdvantageDamage, minReferenceVsHiDamage,minReferenceVsKiDamage,minReferenceVsMizuDamage, maxResult, sortOptions, allowSameCharacter, attackNum } = storeToRefs(searchSettingStore);
+const {
+  minEHP,
+  minHP,
+  minDebuff,
+  minBuff,
+  minHPBuddy,
+  minEvasion,
+  minDuo,
+  minCosmic,
+  minFire,
+  minWater,
+  minFlora,
+  minReferenceDamage,
+  minReferenceAdvantageDamage,
+  minReferenceVsHiDamage,
+  minReferenceVsKiDamage,
+  minReferenceVsMizuDamage,
+  maxResult,
+  sortOptions,
+  allowSameCharacter,
+  attackNum,
+} = storeToRefs(searchSettingStore);
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
@@ -33,6 +54,10 @@ export function getAvailableSortProps(t: (key: string) => string) {
   t('comments.duo'),
   t('comments.buff'),
   t('comments.debuff'),
+  t('comments.maxCosmic'),
+  t('comments.maxFire'),
+  t('comments.maxWater'),
+  t('comments.maxFlora'),
   t('comments.neutralDamage'),
   t('comments.advantageDamage'),
   t('comments.damageAgainstFire'),
@@ -50,6 +75,10 @@ export const availableSortkeys = [
   'duo',
   'buff',
   'debuff',
+  'maxCosmic',
+  'maxFire',
+  'maxWater',
+  'maxFlora',
   'referenceDamage',
   'referenceAdvantageDamage',
   'referenceVsHiDamage',
@@ -153,6 +182,10 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   let deckTotalBuff = 0;
   let deckTotalDebuff = 0;
   let deckDuo = 0;
+  let deckCosmic = 0;
+  let deckFire = 0;
+  let deckWater = 0;
+  let deckFlora = 0;
   const deckReferenceDamageList: number[] = [];
   const deckReferenceAdvantageDamageList: number[] = [];
   const deckReferenceVsHiDamageList: number[] = [];
@@ -175,12 +208,29 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     name2MotherUsed[index] = false;
     name2DuoUsed[index] = false;
   })
+  function count_attr(chara:Character, attr: string){
+    let count = 0;
+    if (chara.magic1atr == attr) {
+      count+=1;
+    }
+    if (chara.magic2atr == attr) {
+      count+=1;
+    }
+    if (chara.magic3atr == attr && chara.hasM3) {
+      count+=1;
+    }
+    return Math.min(count, 2);
+  }
   characters.forEach((chara, index) => {
     deckList.push(chara.imgUrl);
     simuURL += '&name'+(index+1) + '=' + chara.name;
     deckTotalHP += chara.calcBaseHP;
     deckTotalBuff += chara.buff_count;
     deckTotalDebuff += chara.debuff_count;
+    deckCosmic += count_attr(chara, '無');
+    deckFire += count_attr(chara, '火');
+    deckWater += count_attr(chara, '水');
+    deckFlora += count_attr(chara, '木');
     let hasHpBuddy = false;
     let atkBuddyRate = 0;
     // バディHP増加分加算
@@ -392,6 +442,10 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   if (deckDuo < minDuo.value) { return; }
   if (deckTotalBuff < minBuff.value) { return; }
   if (deckTotalDebuff < minDebuff.value) { return; }
+  if (deckCosmic < minCosmic.value) { return; }
+  if (deckFire < minFire.value) { return; }
+  if (deckWater < minWater.value) { return; }
+  if (deckFlora < minFlora.value) { return; }
   if (deckReferenceDamage < minReferenceDamage.value) { return; }
   if (deckReferenceAdvantageDamage < minReferenceAdvantageDamage.value) { return; }
   if (deckReferenceVsHiDamage < minReferenceVsHiDamage.value) { return; }
@@ -412,6 +466,10 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckDuo
     , deckTotalBuff
     , deckTotalDebuff
+    , deckCosmic
+    , deckFire
+    , deckWater
+    , deckFlora
     , deckReferenceDamage
     , deckReferenceAdvantageDamage
     , deckReferenceVsHiDamage
@@ -576,17 +634,21 @@ export async function calcDecks(t: (key: string) => string) {
           duo: ret[6],
           buff: ret[7],
           debuff: ret[8],
-          referenceDamage: ret[9],
-          referenceAdvantageDamage: ret[10],
-          referenceVsHiDamage: ret[11],
-          referenceVsMizuDamage: ret[12],
-          referenceVsKiDamage: ret[13],
-          chara1: ret[14],
-          chara2: ret[15],
-          chara3: ret[16],
-          chara4: ret[17],
-          chara5: ret[18],
-          simuURL: ret[19],
+          maxCosmic: ret[9],
+          maxFire: ret[10],
+          maxWater: ret[11],
+          maxFlora: ret[12],
+          referenceDamage: ret[13],
+          referenceAdvantageDamage: ret[14],
+          referenceVsHiDamage: ret[15],
+          referenceVsMizuDamage: ret[16],
+          referenceVsKiDamage: ret[17],
+          chara1: ret[18],
+          chara2: ret[19],
+          chara3: ret[20],
+          chara4: ret[21],
+          chara5: ret[22],
+          simuURL: ret[23],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする

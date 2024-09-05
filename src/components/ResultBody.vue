@@ -14,6 +14,10 @@
             <td>{{ item.duo }}</td>
             <td>{{ item.buff }}</td>
             <td>{{ item.debuff }}</td>
+            <td>{{ item.maxCosmic }}</td>
+            <td>{{ item.maxFire }}</td>
+            <td>{{ item.maxWater }}</td>
+            <td>{{ item.maxFlora }}</td>
             <td>{{ item.referenceDamage }}</td>
             <td>{{ item.referenceAdvantageDamage }}</td>
             <td>{{ item.referenceVsHiDamage }}</td>
@@ -50,6 +54,10 @@ const headers = computed(() => [
   { title: t('resultBody.duo'), value: 'duo', sortable: false },
   { title: t('resultBody.buff'), value: 'buff', sortable: false },
   { title: t('resultBody.debuff'), value: 'debuff', sortable: false },
+  { title: t('resultBody.maxCosmic'), value: 'maxCosmic', sortable: false },
+  { title: t('resultBody.maxFire'), value: 'maxFire', sortable: false },
+  { title: t('resultBody.maxWater'), value: 'maxWater', sortable: false },
+  { title: t('resultBody.maxFlora'), value: 'maxFlora', sortable: false },
   { title: t('resultBody.neutralDamage'), value: 'referenceDamage', sortable: false },
   { title: t('resultBody.advantageDamage'), value: 'referenceAdvantageDamage', sortable: false },
   { title: t('resultBody.damageAgainstFire'), value: 'referenceVsHiDamage', sortable: false },

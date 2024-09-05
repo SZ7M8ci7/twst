@@ -14,6 +14,10 @@ export interface SearchSettingsState {
   minDuo: number;
   minBuff: number;
   minDebuff: number;
+  minCosmic: number;
+  minFire: number;
+  minWater: number;
+  minFlora: number;
   minReferenceDamage: number;
   minReferenceAdvantageDamage: number;
   minReferenceVsHiDamage: number;
@@ -34,6 +38,10 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     minDuo: 0,
     minBuff: 0,
     minDebuff: 0,
+    minCosmic: 0,
+    minFire: 0,
+    minWater: 0,
+    minFlora: 0,
     minReferenceDamage: 0,
     minReferenceAdvantageDamage: 0,
     minReferenceVsHiDamage: 0,
