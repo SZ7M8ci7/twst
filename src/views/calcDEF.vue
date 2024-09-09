@@ -26,10 +26,10 @@
         </v-row>
         <v-row align="center">
             <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 align-center pa-0">{{ $t('deffence.initialAllyHP') }}</span>
+              <span class="ma-1 align-center pa-0">{{ $t('deffence.totalAllyHP') }}</span>
             </v-col>
             <v-col cols="9" class="pa-1">
-              <v-text-field type="number" v-model="allyInitialHP" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
+              <v-text-field type="number" v-model="allyTotalHP" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
         <v-row align="center">
@@ -47,14 +47,6 @@
             <v-col cols="9" class="pa-1">
               <v-text-field type="number" v-model="damage" class="mt-0 pt-0" hide-details="auto" dense solo
                 :min="0" />
-            </v-col>
-        </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 align-center pa-0">{{ $t('deffence.allyHealAmount') }}</span>
-            </v-col>
-            <v-col cols="9" class="pa-1">
-              <v-text-field type="number" v-model="allyHeal" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
         <v-row align="center">
@@ -115,10 +107,9 @@ Chart.register(...registerables);
 const { t } = useI18n();
 const turn = ref(5);
 const turns = [0.8,0.85,0.9,0.95,1]
-const allyInitialHP = ref(0);
+const allyTotalHP = ref(0);
 const allyRemainHP = ref(0);
 const damage = ref(0);
-const allyHeal = ref(0);
 const evasion = ref(0);
 const debuff = ref(0);
 const difficulty = ref(1.5);
@@ -127,7 +118,7 @@ const table = ref({
   disadvantageDamaged: 0,
 });
 const allyRemainHPScore = computed(() => allyRemainHP.value * 0.1275);
-const allyInitialHPScore = computed(() => (Number(allyInitialHP.value)+Number(allyHeal.value)) * 0.0625);
+const allyTotalHPScore = computed(() => Number(allyTotalHP.value) * 0.0625);
 const damageScore = computed(() => Number(damage.value * 0.05));
 const advantageDamagedScore = computed(() => table.value.advantageDamaged * 2 * 0.05208);
 const disadvantageDamagedScore = computed(() => -table.value.disadvantageDamaged / 1.5 * 0.05208);
@@ -135,7 +126,7 @@ const evasionScore = computed(() => evasion.value * 600);
 const debuffScore = computed(() => debuff.value * 300);
 const baseScore = computed(() =>
    allyRemainHPScore.value
-  + allyInitialHPScore.value
+  + allyTotalHPScore.value
   + damageScore.value
   + advantageDamagedScore.value
   + disadvantageDamagedScore.value
@@ -156,7 +147,7 @@ const colors = [
 ];
 const scores = computed(() => [
   { label: t('deffence.remainHP'), value: Math.floor(allyRemainHPScore.value * difficulty.value * turns[turn.value-1]), color: colors[0] },
-  { label: t('deffence.totalHP'), value: Math.floor(allyInitialHPScore.value * difficulty.value * turns[turn.value-1]), color: colors[1] },
+  { label: t('deffence.totalHP'), value: Math.floor(allyTotalHPScore.value * difficulty.value * turns[turn.value-1]), color: colors[1] },
   { label: t('deffence.damage'), value: Math.floor(damageScore.value * difficulty.value * turns[turn.value-1]), color: colors[2] },
   { label: t('deffence.advantageDamageTaken'), value: Math.floor(advantageDamagedScore.value * difficulty.value * turns[turn.value-1]), color: colors[3] },
   { label: t('deffence.disadvantageDamageTaken'), value: Math.floor(disadvantageDamagedScore.value * difficulty.value * turns[turn.value-1]), color: colors[4] },

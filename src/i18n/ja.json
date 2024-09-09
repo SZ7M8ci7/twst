@@ -94,7 +94,7 @@
   "deffence": {
     "difficulty": "難易度",
     "finishTurn": "終了ターン",
-    "initialAllyHP": "開始時味方HP",
+    "totalAllyHP": "総HP（回復込み）",
     "remainAllyHP": "味方残HP",
     "totalDamageDealt": "与ダメージ",
     "allyHealAmount": "味方回復量",

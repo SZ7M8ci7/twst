@@ -94,7 +94,7 @@
   "deffence": {
     "difficulty": "Difficulty",
     "finishTurn": "End turn",
-    "initialAllyHP": "Ally HP at start",
+    "totalAllyHP": "Effective HP",
     "remainAllyHP": "Ally HP at end",
     "totalDamageDealt": "Damage dealt",
     "allyHealAmount": "Ally heal amount",
