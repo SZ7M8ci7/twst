@@ -8,6 +8,7 @@ export interface Character {
   name: string;
   rare: string;
   atk: number;
+  attr: string;
   costume: string;
   base_atk: number;
   calcBaseATK: number;
@@ -77,6 +78,7 @@ export const useCharacterStore = defineStore('characters', {
       hasM3: true,
       level: 0,
       chara: character.chara || '',
+      attr: character.attr || '',
       buddy1c: character.buddy1c || '',
       buddy1s: character.buddy1s || '',
       buddy2c: character.buddy2c || '',

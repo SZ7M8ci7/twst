@@ -16,7 +16,7 @@ const isFilterModalVisible = ref(false);
 const dialogWidth = computed(() => {
   const screenWidth = window.innerWidth;
   const maxWidth = screenWidth * 0.8;
-  return maxWidth < 600 ? `${maxWidth}px` : "600px";
+  return maxWidth < 600 ? `${maxWidth}px` : "1200px";
 });
 </script>
 
