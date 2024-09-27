@@ -251,6 +251,28 @@
             :max="10"
           />
       </v-card-text>
+      <v-card-title>{{ $t('settingModal.mustCharacter') }}</v-card-title>
+      <v-card-text class="ma-0 pa-0">
+        <div v-for="(option, index) in mustCharacters" :key="index" class="ma-0 pa-0 sort-option">
+          <span class="sort-rank">{{ index + 1 }}.</span>
+          <v-select
+            v-model="option.prop"
+            :items="availableCharacterProps"
+            item-text="prop"
+            item-value="value"
+            class="ma-0 pa-0"
+            hide-details
+            dense
+          ></v-select>
+          <v-btn icon @click="removeCharacterOption(index)" size="x-small">
+            <v-icon>mdi-minus</v-icon>
+          </v-btn>
+        </div>
+        <div class="add-button-container">
+          <v-btn icon fab @click="addCharacterOption" size="x-small"><v-icon>mdi-plus</v-icon></v-btn>
+        </div>
+
+      </v-card-text>
       <v-card-text class="sort-option mt-2 mb-2 pa-0">
         <span class="min-label mt-0 pa-0">{{ $t('settingModal.allowSameCharacter') }}</span>
         <v-radio-group v-model="allowSameCharacter" class="ma-0 pa-0" inline hide-details>
@@ -272,7 +294,7 @@ import { onBeforeMount } from 'vue';
 import { cloneDeep } from 'lodash';
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
-import { getAvailableSortProps } from '@/components/common'
+import { enName2jpName, getAvailableCharacterProps, getAvailableSortProps } from '@/components/common'
 const searchSettingsStore = useSearchSettingsStore();
 const minEHP = ref(searchSettingsStore.minEHP);
 const minHP = ref(searchSettingsStore.minHP);
@@ -294,13 +316,18 @@ const maxResult = ref(searchSettingsStore.maxResult)
 const attackNum = ref(searchSettingsStore.attackNum)
 let initialSortOptions: any = undefined;
 let sortOptions = ref();
+let initialMustCharacters: any = undefined;
+let mustCharacters = ref([] as any);
 
 const availableSortProps = getAvailableSortProps(t);
+const availableCharacterProps = getAvailableCharacterProps(t);
 onBeforeMount(()=>{
   // sortOptionsの初期状態を保持するためのリアクティブな参照
   initialSortOptions = cloneDeep(searchSettingsStore.sortOptions);
   // ユーザーによる変更を保持するためのリアクティブな参照
   sortOptions = ref(cloneDeep(initialSortOptions));
+  initialMustCharacters = cloneDeep(searchSettingsStore.mustCharacters);
+  mustCharacters = ref(cloneDeep(initialMustCharacters));
 })
 
 const allowSameCharacter = ref(searchSettingsStore.allowSameCharacter);
@@ -309,13 +336,24 @@ const allowSameCharacter = ref(searchSettingsStore.allowSameCharacter);
 function addSortOption() {
   sortOptions.value.push({ prop: '', order: t('settingModal.desc') });
 }
-
+function addCharacterOption() {
+  mustCharacters.value.push({ prop: ''});
+}
 function removeSortOption(index:number) {
   sortOptions.value.splice(index, 1);
+}
+function removeCharacterOption(index:number) {
+  mustCharacters.value.splice(index, 1);
 }
 const emit = defineEmits(['close']);
 
 function applyFilter() {
+  const convertedMustCharacters = mustCharacters.value
+    .filter((mustCharacter: any) => mustCharacter.prop && mustCharacter.prop.trim() !== '') // propが空文字でないものだけを残す
+    .map((mustCharacter: any) => {
+      return enName2jpName[mustCharacter.prop] || mustCharacter.prop;
+    });
+
   searchSettingsStore.updateSearchSettings({
     minEHP: minEHP.value,
     minHP: minHP.value,
@@ -337,6 +375,8 @@ function applyFilter() {
     maxResult: maxResult.value,
     attackNum: attackNum.value,
     allowSameCharacter: allowSameCharacter.value,
+    mustCharacters: mustCharacters.value,
+    convertedMustCharacters: convertedMustCharacters,  // 変換した値を設定
   });
   emit('close'); // モーダルを閉じる
 }

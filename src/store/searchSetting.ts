@@ -26,6 +26,8 @@ export interface SearchSettingsState {
   maxResult: number;
   attackNum: number;
   sortOptions: SortOption[];
+  mustCharacters: [];
+  convertedMustCharacters: [];
   allowSameCharacter: boolean;
 }
 
@@ -52,6 +54,8 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     sortOptions: [
       { prop: 'HP', order: '降順' }
     ],
+    mustCharacters: [],
+    convertedMustCharacters: [],
     allowSameCharacter: true,
   }),
   actions: {

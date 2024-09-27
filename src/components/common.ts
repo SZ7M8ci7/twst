@@ -23,6 +23,7 @@ const {
   minReferenceVsMizuDamage,
   maxResult,
   sortOptions,
+  convertedMustCharacters,
   allowSameCharacter,
   attackNum,
 } = storeToRefs(searchSettingStore);
@@ -64,7 +65,36 @@ export function getAvailableSortProps(t: (key: string) => string) {
   t('comments.damageAgainstWater'),
   t('comments.damageAgainstFlora')];
 }
-
+export function getAvailableCharacterProps(t: (key: string) => string) {
+  return [  
+  t('comments.riddle'),
+  t('comments.ace'),
+  t('comments.deuce'),
+  t('comments.cater'),
+  t('comments.trey'),
+  t('comments.leona'),
+  t('comments.jack'),
+  t('comments.ruggie'),
+  t('comments.azul'),
+  t('comments.jade'),
+  t('comments.floyd'),
+  t('comments.kalim'),
+  t('comments.jamil'),
+  t('comments.vil'),
+  t('comments.epel'),
+  t('comments.rook'),
+  t('comments.idia'),
+  t('comments.ortho'),
+  t('comments.malleus'),
+  t('comments.silver'),
+  t('comments.sebek'),
+  t('comments.lilia'),
+  t('comments.grim'),
+  t('comments.lolo'),
+  t('comments.crowley'),
+  t('comments.crewel'),
+  t('comments.fellow')];
+}
 export const availableSortkeys = [
   'hp',
   'ehp',
@@ -85,6 +115,35 @@ export const availableSortkeys = [
   'referenceVsMizuDamage',
   'referenceVsKiDamage',
 ];
+export const enName2jpName: { [key: string]: string } = {
+  "Riddle": "リドル",
+  "Ace": "エース",
+  "Deuce": "デュース",
+  "Cater": "ケイト",
+  "Trey": "トレイ",
+  "Leona": "レオナ",
+  "Jack": "ジャック",
+  "Ruggie": "ラギー",
+  "Azul": "アズール", 
+  "Jade": "ジェイド",
+  "Floyd": "フロイド", 
+  "Kalim": "カリム",
+  "Jamil": "ジャミル",
+  "Vil": "ヴィル",
+  "Epel": "エペル",
+  "Rook": "ルーク",
+  "Idia": "イデア",
+  "Ortho": "オルト",
+  "Malleus": "マレウス",
+  "Silver": "シルバー",
+  "Sebek": "セベク",
+  "Lilia": "リリア",
+  "Grim": "グリム",
+  "Lolo": "ロロ",
+  "Crowley": "クロウリー",
+  "Crewel": "クルーウェル",
+  "Fellow": "フェロー"
+};
 
 const buddyRateMap: { [key: string]: { hp: number; atk: number; heal: number; conHeal: number } } = {
   'HPUP(小)': { hp: 0.2, atk: 0, heal: 0, conHeal: 0 },
@@ -172,6 +231,12 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const memberNameSet: Set<string> = new Set();
   for (const chara of characters){
     memberNameSet.add(chara.chara);
+  }
+  const allMustCharactersIncluded = Array.from(convertedMustCharacters.value).every(character => memberNameSet.has(character as string));
+
+  if (!allMustCharactersIncluded) {
+    // もし mustCharactersSet に存在するすべての名前が memberNameSet にない場合、undefined を返す
+    return ;
   }
   let deckTotalHP = 0;
   let deckTotalHeal = 0;
