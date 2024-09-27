@@ -201,6 +201,13 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const name2DuoUsed:Record<number, boolean> = {};
   const deckList: Ref<any>[] = [];
   let simuURL = '';
+  const detailList = [];
+  const healList: number[] = [];
+  const damageList: number[] = [];
+  const advantageDamageList: number[] = [];
+  const hiDamageList: number[] = [];
+  const mizuDamageList: number[] = [];
+  const kiDamageList: number[] = [];
 
   characters.sort((a, b) => b.calcBaseATK - a.calcBaseATK);
   characters.forEach((chara, index) => {
@@ -265,17 +272,19 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       }
     }
     // HP回復分加算
-    deckTotalHeal +=
+    const hpHeal =
       (calcHealRate(chara.magic1heal) +
         calcHealRate(chara.magic2heal) +
         (chara.hasM3 ? calcHealRate(chara.magic3heal) : 0)) *
       chara.calcBaseATK;
-    // HP継続回復分加算
-    deckTotalHeal +=
+    const hpConHeal =
       (calcConHealRate(chara.magic1heal) +
         calcConHealRate(chara.magic2heal) +
         (chara.hasM3 ? calcConHealRate(chara.magic3heal) : 0)) *
       chara.calcBaseHP;
+    deckTotalHeal += hpHeal + hpConHeal
+    healList.push(hpHeal + hpConHeal);
+      
     // 回避数加算
     deckTotalEvasion += chara.evasion;
     if (!hasHpBuddy) {
@@ -426,7 +435,11 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     deckReferenceVsHiDamageList.push(...calcTopDamage(magic1vsHiDamage, magic2vsHiDamage, magic3vsHiDamage));
     deckReferenceVsMizuDamageList.push(...calcTopDamage(magic1vsMizuDamage, magic2vsMizuDamage, magic3vsMizuDamage));
     deckReferenceVsKiDamageList.push(...calcTopDamage(magic1vsKiDamage, magic2vsKiDamage, magic3vsKiDamage));
-
+    damageList.push((deckReferenceDamageList.at(-1) as number) + (deckReferenceDamageList.at(-2) as number));
+    advantageDamageList.push((deckReferenceAdvantageDamageList.at(-1) as number) + (deckReferenceAdvantageDamageList.at(-2) as number));
+    hiDamageList.push((deckReferenceVsHiDamageList.at(-1) as number) + (deckReferenceVsHiDamageList.at(-2) as number));
+    mizuDamageList.push((deckReferenceVsMizuDamageList.at(-1) as number) + (deckReferenceVsMizuDamageList.at(-2) as number));
+    kiDamageList.push((deckReferenceVsKiDamageList.at(-1) as number) + (deckReferenceVsKiDamageList.at(-2) as number));
   });
 
   deckReferenceDamage = deckReferenceDamageList.sort((a, b) => b - a).slice(0, attackNum.value).reduce((acc, curr) => acc + curr, 0);
@@ -456,7 +469,12 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   deckReferenceVsHiDamage = Math.floor(deckReferenceVsHiDamage);
   deckReferenceVsMizuDamage = Math.floor(deckReferenceVsMizuDamage);
   deckReferenceVsKiDamage = Math.floor(deckReferenceVsKiDamage);
-
+  detailList.push(healList);
+  detailList.push(damageList);
+  detailList.push(advantageDamageList);
+  detailList.push(hiDamageList);
+  detailList.push(mizuDamageList);
+  detailList.push(kiDamageList);
   return [deckTotalHP
     , deckTotalHP+deckTotalHeal
     , deckTotalEvasion
@@ -476,7 +494,8 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckReferenceVsMizuDamage
     , deckReferenceVsKiDamage
     , ...deckList
-    , simuURL];
+    , simuURL
+    , detailList];
 }
 const attributeEffectiveness: Record<string, Record<string, number>> = {
   '水': { '火': 1.5, '木': 0.5 },
@@ -649,6 +668,7 @@ export async function calcDecks(t: (key: string) => string) {
           chara4: ret[21],
           chara5: ret[22],
           simuURL: ret[23],
+          detailList: ret[24],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする

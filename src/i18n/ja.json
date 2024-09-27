@@ -272,7 +272,9 @@
     "advantageDamage": "有利与ダメ",
     "damageAgainstFire": "対火与ダメ",
     "damageAgainstWater": "対水与ダメ",
-    "damageAgainstFlora": "対木与ダメ"
+    "damageAgainstFlora": "対木与ダメ",
+    "healDetail": "キャラ別回復内訳",
+    "damageDetail": "キャラ別与ダメ内訳"
   },
   "error": {
     "requiredCharacter": "必須キャラのレベルは1以上にして下さい",

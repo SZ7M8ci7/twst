@@ -273,7 +273,9 @@
     "advantageDamage": "Advantage damage",
     "damageAgainstFire": "Damage against fire",
     "damageAgainstWater": "Damage against water",
-    "damageAgainstFlora": "Damage against flora"
+    "damageAgainstFlora": "Damage against flora",
+    "healDetail": "Heal Detail",
+    "damageDetail": "Damage Detail"
   },
   "error": {
     "requiredCharacter": "Required character level must be at least 1",
