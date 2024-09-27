@@ -107,6 +107,11 @@ const routes = [
     name: 'retire',
     component: () => import('@/views/retire.vue'),
   },
+  {
+    path: '/twst/sim',
+    name: 'sim',
+    component: () => import('@/views/sim.vue'),
+  },
   { path: '/twst/', component: () => import('@/views/top.vue') }
 ]
 
