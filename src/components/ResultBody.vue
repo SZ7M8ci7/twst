@@ -6,7 +6,17 @@
         <template v-slot:item="{ item }">
           <tr>
             <td>{{ item.hp }}</td>
-            <td>{{ item.ehp }}</td>
+            <td style="position: relative;">
+              <div class="css-fukidashi">
+                <div class="text">{{ item.ehp }}</div>
+                <div class="fukidashi">
+                  <div>{{ $t('resultBody.healDetail') }}</div>
+                  <div v-for="(detail, index) in item.detailList[0]" :key="index">
+                    {{ index + 1 }}: {{ Math.round(detail) }}
+                  </div>
+                </div>
+              </div>
+            </td>
             <td>{{ item.evasion }}</td>
             <td>{{ item.hpBuudy }}</td>
             <td>{{ item.buddy }}</td>
@@ -18,11 +28,61 @@
             <td>{{ item.maxFire }}</td>
             <td>{{ item.maxWater }}</td>
             <td>{{ item.maxFlora }}</td>
-            <td>{{ item.referenceDamage }}</td>
-            <td>{{ item.referenceAdvantageDamage }}</td>
-            <td>{{ item.referenceVsHiDamage }}</td>
-            <td>{{ item.referenceVsMizuDamage }}</td>
-            <td>{{ item.referenceVsKiDamage }}</td>
+            <td style="position: relative;">
+              <div class="css-fukidashi">
+                <div class="text">{{ item.referenceDamage }}</div>
+                <div class="fukidashi">
+                  <div>{{ $t('resultBody.damageDetail') }}</div>
+                  <div v-for="(detail, index) in item.detailList[1]" :key="index">
+                    {{ index + 1 }}: {{ Math.round(detail) }}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td style="position: relative;">
+              <div class="css-fukidashi">
+                <div class="text">{{ item.referenceAdvantageDamage }}</div>
+                <div class="fukidashi">
+                  <div>{{ $t('resultBody.damageDetail') }}</div>
+                  <div v-for="(detail, index) in item.detailList[2]" :key="index">
+                    {{ index + 1 }}: {{ Math.round(detail) }}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td style="position: relative;">
+              <div class="css-fukidashi">
+                <div class="text">{{ item.referenceVsHiDamage }}</div>
+                <div class="fukidashi">
+                  <div>{{ $t('resultBody.damageDetail') }}</div>
+                  <div v-for="(detail, index) in item.detailList[3]" :key="index">
+                    {{ index + 1 }}: {{ Math.round(detail) }}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td style="position: relative;">
+              <div class="css-fukidashi">
+                <div class="text">{{ item.referenceVsMizuDamage }}</div>
+                <div class="fukidashi">
+                  <div>{{ $t('resultBody.damageDetail') }}</div>
+                  <div v-for="(detail, index) in item.detailList[4]" :key="index">
+                    {{ index + 1 }}: {{ Math.round(detail) }}
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td style="position: relative;">
+              <div class="css-fukidashi">
+                <div class="text">{{ item.referenceVsKiDamage }}</div>
+                <div class="fukidashi">
+                  <div>{{ $t('resultBody.damageDetail') }}</div>
+                  <div v-for="(detail, index) in item.detailList[5]" :key="index">
+                    {{ index + 1 }}: {{ Math.round(detail) }}
+                  </div>
+                </div>
+              </div>
+            </td>
             <!-- キャラ1～5の画像を表示 -->
             <td v-for="n in 5" :key="`chara${n}`">
               <v-img :src="item[`chara${n}`]" max-width="50"></v-img>
@@ -74,6 +134,7 @@ function openInNewTab(url: string){
   window.open('https://sz7m8ci7.github.io/simulator/?restoreURL=true' + url, '_blank');
 }
 </script>
+
 <style scoped>
 .table-top {
   display: flex;
@@ -101,5 +162,33 @@ function openInNewTab(url: string){
 ::v-deep .v-data-table td {
   padding: 1px 4px !important;
   text-align: center;
+}
+.css-fukidashi {
+  padding: 0;
+  margin: 0;
+  position: relative;
+}
+.text {
+  display: inline-block;
+  position: relative;
+  z-index: 1;
+}
+.fukidashi {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(30%, -50%);
+  margin-top: 5px;
+  padding: 5px;
+  border-radius: 5px;
+  background: #c9c9c9;
+  color: #fff;
+  font-weight: bold;
+  white-space: nowrap;
+  z-index: 2;
+}
+.text:hover + .fukidashi {
+  display: block;
 }
 </style>

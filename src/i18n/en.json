@@ -233,7 +233,8 @@
     "cancel":"Cancel",
     "ok":"OK",
     "yes":"Yes",
-    "no":"No"
+    "no":"No",
+    "mustCharacter":"Required Character"
   },
   "comments": {
     "effectiveHP": "Effective HP",
@@ -253,7 +254,34 @@
     "advantageDamage": "Advantage damage",
     "damageAgainstFire": "Damage against fire",
     "damageAgainstWater": "Damage against water",
-    "damageAgainstFlora": "Damage against flora"
+    "damageAgainstFlora": "Damage against flora",
+    "riddle": "Riddle",
+    "ace": "Ace",
+    "deuce": "Deuce",
+    "cater": "Cater",
+    "trey": "Trey",
+    "leona": "Leona",
+    "jack": "Jack",
+    "ruggie": "Ruggie",
+    "azul": "Azul",
+    "jade": "Jade",
+    "floyd": "Floyd",
+    "kalim": "Kalim",
+    "jamil": "Jamil",
+    "vil": "Vil",
+    "epel": "Epel",
+    "rook": "Rook",
+    "idia": "Idia",
+    "ortho": "Ortho",
+    "malleus": "Malleus",
+    "silver": "Silver",
+    "sebek": "Sebek",
+    "lilia": "Lilia",
+    "grim": "Grim",
+    "lolo": "Lolo",
+    "crowley": "Crowley",
+    "crewel": "Crewel",
+    "fellow": "Fellow"
   },
   "resultBody": {
     "effectiveHP": "Effective HP",
@@ -273,7 +301,9 @@
     "advantageDamage": "Advantage damage",
     "damageAgainstFire": "Damage against fire",
     "damageAgainstWater": "Damage against water",
-    "damageAgainstFlora": "Damage against flora"
+    "damageAgainstFlora": "Damage against flora",
+    "healDetail": "Heal Detail",
+    "damageDetail": "Damage Detail"
   },
   "error": {
     "requiredCharacter": "Required character level must be at least 1",

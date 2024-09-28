@@ -232,7 +232,8 @@
     "cancel":"キャンセル",
     "ok":"決定",
     "yes":"はい",
-    "no":"いいえ"
+    "no":"いいえ",
+    "mustCharacter":"必須キャラクター"
   },
   "comments": {
     "effectiveHP": "実質HP",
@@ -252,7 +253,34 @@
     "advantageDamage": "有利与ダメージ",
     "damageAgainstFire": "対火与ダメージ",
     "damageAgainstWater": "対水与ダメージ",
-    "damageAgainstFlora": "対木与ダメージ"
+    "damageAgainstFlora": "対木与ダメージ",
+    "riddle": "リドル",
+    "ace": "エース",
+    "deuce": "デュース",
+    "cater": "ケイト",
+    "trey": "トレイ",
+    "leona": "レオナ",
+    "jack": "ジャック",
+    "ruggie": "ラギー",
+    "azul": "アズール", 
+    "jade": "ジェイド",
+    "floyd": "フロイド", 
+    "kalim": "カリム",
+    "jamil": "ジャミル",
+    "vil": "ヴィル",
+    "epel": "エペル",
+    "rook": "ルーク",
+    "idia": "イデア",
+    "ortho": "オルト",
+    "malleus": "マレウス",
+    "silver": "シルバー",
+    "sebek": "セベク",
+    "lilia": "リリア",
+    "grim": "グリム",
+    "lolo": "ロロ",
+    "crowley": "クロウリー",
+    "crewel": "クルーウェル",
+    "fellow": "フェロー"
   },
   "resultBody": {
     "effectiveHP": "実質HP",
@@ -272,7 +300,9 @@
     "advantageDamage": "有利与ダメ",
     "damageAgainstFire": "対火与ダメ",
     "damageAgainstWater": "対水与ダメ",
-    "damageAgainstFlora": "対木与ダメ"
+    "damageAgainstFlora": "対木与ダメ",
+    "healDetail": "キャラ別回復内訳",
+    "damageDetail": "キャラ別与ダメ内訳"
   },
   "error": {
     "requiredCharacter": "必須キャラのレベルは1以上にして下さい",
