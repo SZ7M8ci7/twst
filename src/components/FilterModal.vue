@@ -6,15 +6,14 @@
         {{ isGroupFullySelected('cardAttributes') ? t('filterModal.release') : t('filterModal.select') }}
       </v-btn>
       <div class="feature-items">
-        <!-- 簡略化されたループ部分 -->
         <div class="feature-item" v-for="(rare, index) in rareOptions" :key="`rare-${index}`">
           <v-checkbox v-model="selectedRare" :value="rare" :label="rare" hide-details />
         </div>
         <div class="feature-item" v-for="(type, index) in typeOptions" :key="`type-${index}`">
-          <v-checkbox v-model="selectedType" :value="type" :label="type" hide-details />
+          <v-checkbox v-model="selectedType" :value="type.value" :label="type.name" hide-details />
         </div>
         <div class="feature-item" v-for="(attr, index) in attrOptions" :key="`attr-${index}`">
-          <v-checkbox v-model="selectedAttr" :value="attr" :label="attr" hide-details />
+          <v-checkbox v-model="selectedAttr" :value="attr.value" :label="attr.name" hide-details />
         </div>
       </div>
     </div>
@@ -92,7 +91,7 @@ const emit = defineEmits(['close']);
 const displayBlockWidth = ref(0);
 
 // アイコンのサイズと間隔を共通化したい
-const iconSize = 60;
+const iconSize = 50;
 const gapSize = 10;
 
 const iconStyle = ref({
@@ -101,8 +100,19 @@ const iconStyle = ref({
 });
 
 const rareOptions = ['SSR', 'SR', 'R'];
-const typeOptions = ['バランス', 'ディフェンス', 'アタック'];
-const attrOptions = ['火', '水', '木', '無'];
+
+const typeOptions = computed(() => [
+  { name: t('filterModal.balance'), value: 'バランス' },
+  { name: t('filterModal.defence'), value: 'ディフェンス' },
+  { name: t('filterModal.attack'), value: 'アタック' },
+]);
+
+const attrOptions = computed(() => [
+  { name: t('filterModal.fire'), value: '火' },
+  { name: t('filterModal.water'), value: '水' },
+  { name: t('filterModal.flora'), value: '木' },
+  { name: t('filterModal.cosmic'), value: '無' },
+]);
 
 const effects = [
 { name: t('filterModal.power_boost'), value: 'ATKUP' },
@@ -124,7 +134,15 @@ const effects = [
   { name: t('filterModal.curse'), value: '呪い' }
 ];
 
-const characterGroups = characterData.reduce((groups, character) => {
+interface Character {
+  name_ja: string;
+  name_en: string;
+  dorm: string;
+  theme_1: string;
+  theme_2: string;
+}
+
+const characterGroups = characterData.reduce<Record<string, Character[]>>((groups, character) => {
   const dorm = character.dorm;
   if (!groups[dorm]) {
     groups[dorm] = [];
@@ -149,7 +167,7 @@ const resizeListener = () => {
 onMounted(() => {
   // 初期化処理
   if (isFirst.value) {
-    selectedCharacters.value = Object.values(characterGroups).flat().map(student => student.name_en);
+    selectedCharacters.value = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
     selectedRare.value = ['SSR', 'SR', 'R'];
     selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
     selectedAttr.value = ['火', '水', '木', '無'];
@@ -261,8 +279,8 @@ function toggleSelectAll(groupName: string) {
     }
   } else {
     // キャラクターグループの全選択/解除を処理
-    const group = characterGroups[groupName];
-    const allSelected = group.every(characterInfo => selectedCharacters.value.includes(characterInfo.name_en));
+    const group: Character[] = characterGroups[groupName] || [];
+    const allSelected = group.every((characterInfo: Character) => selectedCharacters.value.includes(characterInfo.name_en));
 
     if (allSelected) {
       selectedCharacters.value = selectedCharacters.value.filter(c => !group.some(student => student.name_en === c));
@@ -275,8 +293,8 @@ function toggleSelectAll(groupName: string) {
 function isGroupFullySelected(groupName: string): boolean {
   if (groupName === 'cardAttributes') {
     return rareOptions.every(rare => selectedRare.value.includes(rare)) &&
-           typeOptions.every(type => selectedType.value.includes(type)) &&
-           attrOptions.every(attr => selectedAttr.value.includes(attr));
+           typeOptions.value.every(type => selectedType.value.includes(type.value)) &&
+          attrOptions.value.every(attr => selectedAttr.value.includes(attr.value));
   } else if (groupName === 'statusEffects') {
     return effects.every(effect => selectedEffects.value.includes(effect.value));
   }
@@ -293,11 +311,16 @@ function toggleCharacterSelection(characterValue: string) {
 }
 
 function getCharacterImagePath(characterValue: string): string {
-  return `/src/assets/img/icon/${characterValue}.png`;
+  console.log(characterValue)
+  console.log('Current URL:', import.meta.url);
+  const imageUrl = new URL(`./src/assets/img/icon/${characterValue}.png`, import.meta.url).href;
+  console.log('Resolved Image URL:', imageUrl);
+  return imageUrl;
+  // return new URL(`/src/assets/img/icon/${characterValue}.png`, import.meta.url).href; //これは表示される
 }
 
 // 各寮の幅を取得
-const calculateGroupWidth = (group) => {
+const calculateGroupWidth = (group: Character[]) => {
   const buttonWidth = 64; // 選択ボタンの幅
   const gapBetweenButtonAndFirstIcon = 10; // 選択ボタンとアイコンの間のスペース
   const iconTotalWidth = iconSize + (2 * 5) + gapSize;
@@ -317,7 +340,7 @@ const getContainerStyle = (numberOfGroupsInRow: number) => {
 // 寮の並べ方
 const determineLayout = () => {
   const layout = [];
-  let currentRow = [];
+  let currentRow: string[] = [];
   let currentRowWidth = 0;
   const maxWidth = displayBlockWidth.value;
   const maxGroupsPerRow = 2;
@@ -416,6 +439,7 @@ const determineLayout = () => {
   margin: 5px;
   width: var(--icon-size); /* JavaScriptから渡された変数を使う */
   height: var(--icon-size); /* JavaScriptから渡された変数を使う */
+  transition: border 0.3s ease;
 }
 
 .character-item img {
@@ -424,10 +448,26 @@ const determineLayout = () => {
   object-fit: cover; /* 親要素内に画像を収める */
   border-radius: 8px;
   cursor: pointer;
+  z-index: 1;
+  position: relative;
 }
 
 .character-item.selected {
-  opacity: 1.0;
+  position: relative; /* 親要素にpositionを指定 */
+  border-radius: 8px; /* アイコン自体の角を丸める */
+}
+
+.character-item.selected::before {
+  content: '';
+  position: absolute;
+  top: -4px; /* アイコンの外側に縁取りを作るための余白 */
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 10px; /* 縁取りもアイコンに合わせて丸める */
+  border: 2px solid transparent; /* 実際のボーダーの太さを定義 */
+  background: linear-gradient(to right, gold, black) border-box; /* グラデーションの縁取りを定義 */
+  z-index: 0; /* アイコンより後ろに表示されるように設定 */
 }
 
 .character-item:not(.selected) {
