@@ -38,7 +38,7 @@
                   @click="toggleCharacterSelection(characterInfo.name_en)"
                   :class="{ selected: selectedCharacters.includes(characterInfo.name_en) }"
                   :style="{ ...iconStyle, opacity: selectedCharacters.includes(characterInfo.name_en) ? 1 : 0.5 }">
-                  <img :src="getCharacterImagePath(characterInfo.name_en)" :alt="characterInfo.name_en" class="character-image" />
+                  <img :src="imgUrlDictionary[characterInfo.name_en]" :alt="characterInfo.name_en" class="character-image" />
                 </div>
               </div>
             </div>
@@ -71,7 +71,7 @@
 import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
-import { onMounted, onBeforeUnmount, ref, computed} from 'vue';
+import { onMounted, onBeforeMount, onBeforeUnmount, ref, computed} from 'vue';
 import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';  // JSONをインポート
 
@@ -195,6 +195,21 @@ onMounted(() => {
   updateDisplayBlockWidth();
   window.addEventListener('resize', resizeListener);
 });
+const imgUrlDictionary = ref<{ [key: string]: string }>({});  // 画像パスの辞書
+
+onBeforeMount(() => {
+  const characterArray = Array.from(characterData);  // ArrayIteratorを配列に変換
+
+  characterArray.map(character => {
+    return import(`@/assets/img/icon/${character.name_en}.png`)
+      .then(module => {
+        imgUrlDictionary.value[character.name_en] = module.default;  // 画像パスを辞書に追加
+      })
+      .catch(() => {
+        imgUrlDictionary.value[character.name_en] = '';  // 画像の読み込みに失敗した場合
+      });
+  });
+});
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeListener);
@@ -308,15 +323,6 @@ function toggleCharacterSelection(characterValue: string) {
   selectedCharacters.value = selectedCharacters.value.includes(characterValue)
     ? selectedCharacters.value.filter(c => c !== characterValue)
     : [...selectedCharacters.value, characterValue];
-}
-
-function getCharacterImagePath(characterValue: string): string {
-  console.log(characterValue)
-  console.log('Current URL:', import.meta.url);
-  const imageUrl = new URL(`./src/assets/img/icon/${characterValue}.png`, import.meta.url).href;
-  console.log('Resolved Image URL:', imageUrl);
-  return imageUrl;
-  // return new URL(`/src/assets/img/icon/${characterValue}.png`, import.meta.url).href; //これは表示される
 }
 
 // 各寮の幅を取得
@@ -460,13 +466,13 @@ const determineLayout = () => {
 .character-item.selected::before {
   content: '';
   position: absolute;
-  top: -4px; /* アイコンの外側に縁取りを作るための余白 */
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
-  border-radius: 10px; /* 縁取りもアイコンに合わせて丸める */
+  top: -2px; /* アイコンの外側に縁取りを作るための余白 */
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 8px; /* 縁取りもアイコンに合わせて丸める */
   border: 2px solid transparent; /* 実際のボーダーの太さを定義 */
-  background: linear-gradient(to right, gold, black) border-box; /* グラデーションの縁取りを定義 */
+  background: #ff0fff;
   z-index: 0; /* アイコンより後ろに表示されるように設定 */
 }
 
