@@ -23,4 +23,12 @@ import HandHeader from '@/components/HandHeader.vue';
 import HandBody from '@/components/HandBody.vue';
 import HandSimulator from '@/components/HandSimulator.vue';
 
+import {useCharacterStore} from '@/store/characters';
+import {onMounted} from "vue";
+
+const characterStore = useCharacterStore();
+
+onMounted(() => {
+  characterStore.handlePageChange('handPage');
+});
 </script>

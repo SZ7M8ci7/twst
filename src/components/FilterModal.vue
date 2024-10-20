@@ -1,134 +1,60 @@
 <template>
-  <div class="modal-background">
-    <div class="character-list">
-      <div class="character-item">
-        <v-checkbox v-model="selectedRare" value="SSR" label="SSR" hide-details />
-      </div>
-      <div class="character-item">
-        <v-checkbox v-model="selectedRare" value="SR" label="SR" hide-details />
-      </div>
-      <div class="character-item">
-        <v-checkbox v-model="selectedRare" value="R" label="R" hide-details />
-      </div>
-      <div class="character-item">
-      <v-checkbox v-model="selectedType" value="バランス" :label="t('filterModal.balance')" hide-details />
-      </div>
-      <div class="character-item">
-        <v-checkbox v-model="selectedType" value="ディフェンス" :label="t('filterModal.defence')" hide-details />
-      </div>
-      <div class="character-item">
-        <v-checkbox v-model="selectedType" value="アタック" :label="t('filterModal.attack')" hide-details />
-      </div>
-      <div class="character-item">
-      <v-checkbox v-model="selectedAttr" value="火" :label="t('filterModal.fire')" hide-details />
-      </div>
-      <div class="character-item">
-        <v-checkbox v-model="selectedAttr" value="水" :label="t('filterModal.water')" hide-details />
-      </div>
-      <div class="character-item">
-        <v-checkbox v-model="selectedAttr" value="木" :label="t('filterModal.flora')" hide-details />
-      </div>
-      <div class="character-item">
-        <v-checkbox v-model="selectedAttr" value="無" :label="t('filterModal.cosmic')" hide-details />
+  <div class="modal-background" ref="modalContainer">
+    <!-- Card Attributesセクション -->
+    <div class="feature-select-all-container">
+      <v-btn small @click="toggleSelectAll('cardAttributes')">
+        {{ isGroupFullySelected('cardAttributes') ? t('filterModal.release') : t('filterModal.select') }}
+      </v-btn>
+      <div class="feature-items">
+        <div class="feature-item" v-for="(rare, index) in rareOptions" :key="`rare-${index}`">
+          <v-checkbox v-model="selectedRare" :value="rare" :label="rare" hide-details />
+        </div>
+        <div class="feature-item" v-for="(type, index) in typeOptions" :key="`type-${index}`">
+          <v-checkbox v-model="selectedType" :value="type.value" :label="type.name" hide-details />
+        </div>
+        <div class="feature-item" v-for="(attr, index) in attrOptions" :key="`attr-${index}`">
+          <v-checkbox v-model="selectedAttr" :value="attr.value" :label="attr.name" hide-details />
+        </div>
       </div>
     </div>
     <hr class="rare-divider" />
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('heartslabyuls')">{{ isGroupFullySelected('heartslabyuls') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in heartslabyuls" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('savanaclaws')">{{ isGroupFullySelected('savanaclaws') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in savanaclaws" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('octavinelles')">{{ isGroupFullySelected('octavinelles') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in octavinelles" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('scarabias')">{{ isGroupFullySelected('scarabias') ? t('filterModal.release') : t('filterModal.select') }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in scarabias" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('pomefiores')">{{ isGroupFullySelected('pomefiores') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in pomefiores" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('ignihydese')">{{ isGroupFullySelected('ignihydese') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in ignihydese" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('diasomnias')">{{ isGroupFullySelected('diasomnias') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in diasomnias" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('others')">{{ isGroupFullySelected('others') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="character in others" :key="character.name" class="character-item">
-            <v-checkbox v-model="selectedCharacters" :value="character.value" :label="character.name" hide-details />
+    <!-- キャラクタリスト -->
+     <div class="display-block">
+      <div class="character-list-wrapper">
+        <div v-for="(row, rowIndex) in determineLayout()" :key="rowIndex" class="row">
+          <!-- 各行に表示する寮ごとのキャラクターを表示 -->
+          <div
+            v-for="groupName in row"
+            :key="groupName"
+            :style="getContainerStyle(row.length)"
+            class="character-list"
+          >
+            <div class="character-select-all-container">
+              <v-btn small @click="toggleSelectAll(groupName)">
+                {{ isGroupFullySelected(groupName) ? t('filterModal.release') : t('filterModal.select') }}
+              </v-btn>
+              <div class="character-items">
+                <div v-for="characterInfo in characterGroups[groupName]" :key="characterInfo.name_en" class="character-item"
+                  @click="toggleCharacterSelection(characterInfo.name_en)"
+                  :class="{ selected: selectedCharacters.includes(characterInfo.name_en) }"
+                  :style="{ ...iconStyle, opacity: selectedCharacters.includes(characterInfo.name_en) ? 1 : 0.5 }">
+                  <img :src="imgUrlDictionary[characterInfo.name_en]" :alt="characterInfo.name_en" class="character-image" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
     <hr class="rare-divider" />
-    <div class="character-list">
-      <div class="select-all-container">
-        <v-btn small @click="toggleSelectAll('effects')">{{ isGroupFullySelected('effects') ? t('filterModal.release') : t('filterModal.select')
-          }}</v-btn>
-        <div class="character-items">
-          <div v-for="effect in effects" :key="effect.name" class="character-item">
-            <v-checkbox v-model="selectedEffects" :value="effect.value" :label="effect.name" hide-details />
-          </div>
+    <!-- Status Effectsセクション -->
+    <div class="feature-select-all-container">
+      <v-btn small @click="toggleSelectAll('statusEffects')">
+        {{ isGroupFullySelected('statusEffects') ? t('filterModal.release') : t('filterModal.select') }}
+      </v-btn>
+      <div class="feature-items">
+        <div v-for="effect in effects" :key="effect.name" class="feature-item">
+          <v-checkbox v-model="selectedEffects" :value="effect.value" :label="effect.name" hide-details />
         </div>
       </div>
     </div>
@@ -145,8 +71,10 @@
 import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
-import { onMounted, ref } from 'vue';
+import { onMounted, onBeforeMount, onBeforeUnmount, ref, computed} from 'vue';
 import { useI18n } from 'vue-i18n';
+import characterData from '@/assets/characters_info.json';  // JSONをインポート
+
 const { t } = useI18n();
 
 const characterStore = useCharacterStore();
@@ -154,67 +82,38 @@ const { characters } = storeToRefs(characterStore);
 const filterdStore = useFilterdStore();
 const { tempSelectedCharacters, tempSelectedRare, tempSelectedType, tempSelectedAttr, tempSelectedEffects ,isFirst } = storeToRefs(filterdStore);
 
-
 const selectedCharacters = ref<string[]>([]);
 const selectedRare = ref<string[]>([]);
 const selectedType = ref<string[]>([]);
 const selectedAttr = ref<string[]>([]);
 const selectedEffects = ref<string[]>([]);
 const emit = defineEmits(['close']);
+const displayBlockWidth = ref(0);
 
-const heartslabyulsButtonLabel = ref(t('filterModal.select'));
-const savanaclawsButtonLabel = ref(t('filterModal.select'));
-const octavinellesButtonLabel = ref(t('filterModal.select'));
-const scarabiasButtonLabel = ref(t('filterModal.select'));
-const pomefioresButtonLabel = ref(t('filterModal.select'));
-const ignihydeseButtonLabel = ref(t('filterModal.select'));
-const diasomniasButtonLabel = ref(t('filterModal.select'));
-const othersButtonLabel = ref(t('filterModal.select'));
-const effectsButtonLabel = ref(t('filterModal.select'));
-// 選択可能なキャラクターのリスト
-const heartslabyuls = [
-  { name: t('filterModal.riddle'), value: 'リドル' },
-  { name: t('filterModal.ace'), value: 'エース' },
-  { name: t('filterModal.deuce'), value: 'デュース' },
-  { name: t('filterModal.cater'), value: 'ケイト' },
-  { name: t('filterModal.trey'), value: 'トレイ' }
-];
-const savanaclaws = [
-  { name: t('filterModal.leona'), value: 'レオナ' },
-  { name: t('filterModal.jack'), value: 'ジャック' },
-  { name: t('filterModal.ruggie'), value: 'ラギー' }
-];
-const octavinelles = [
-  { name: t('filterModal.azul'), value: 'アズール' },
-  { name: t('filterModal.jade'), value: 'ジェイド' },
-  { name: t('filterModal.floyd'), value: 'フロイド' }
-];
-const scarabias = [
-  { name: t('filterModal.kalim'), value: 'カリム' },
-  { name: t('filterModal.jamil'), value: 'ジャミル' }
-];
-const pomefiores = [
-  { name: t('filterModal.vil'), value: 'ヴィル' },
-  { name: t('filterModal.epel'), value: 'エペル' },
-  { name: t('filterModal.rook'), value: 'ルーク' }
-];
-const ignihydese = [
-  { name: t('filterModal.idia'), value: 'イデア' },
-  { name: t('filterModal.ortho'), value: 'オルト' }
-];
-const diasomnias = [
-  { name: t('filterModal.malleus'), value: 'マレウス' },
-  { name: t('filterModal.silver'), value: 'シルバー' },
-  { name: t('filterModal.sebek'), value: 'セベク' },
-  { name: t('filterModal.lilia'), value: 'リリア' }
-];
-const others = [
-  { name: t('filterModal.grim'), value: 'グリム' },
-  { name: t('filterModal.lolo'), value: 'ロロ' },
-  { name: t('filterModal.crowley'), value: 'クロウリー' },
-  { name: t('filterModal.crewel'), value: 'クルーウェル' },
-  { name: t('filterModal.fellow'), value: 'フェロー' },
-];
+// アイコンのサイズと間隔を共通化したい
+const iconSize = 50;
+const gapSize = 10;
+
+const iconStyle = ref({
+  '--icon-size': `${iconSize}px`,
+  '--gap-size': `${gapSize}px`
+});
+
+const rareOptions = ['SSR', 'SR', 'R'];
+
+const typeOptions = computed(() => [
+  { name: t('filterModal.balance'), value: 'バランス' },
+  { name: t('filterModal.defence'), value: 'ディフェンス' },
+  { name: t('filterModal.attack'), value: 'アタック' },
+]);
+
+const attrOptions = computed(() => [
+  { name: t('filterModal.fire'), value: '火' },
+  { name: t('filterModal.water'), value: '水' },
+  { name: t('filterModal.flora'), value: '木' },
+  { name: t('filterModal.cosmic'), value: '無' },
+]);
+
 const effects = [
 { name: t('filterModal.power_boost'), value: 'ATKUP' },
   { name: t('filterModal.damage_boost'), value: 'ダメージUP' },
@@ -234,50 +133,87 @@ const effects = [
   { name: t('filterModal.debuff_removal'), value: 'デバフ解除' },
   { name: t('filterModal.curse'), value: '呪い' }
 ];
-const students = [...heartslabyuls, ...savanaclaws, ...octavinelles, ...scarabias, ...pomefiores, ...ignihydese, ...diasomnias, ...others];
+
+interface Character {
+  name_ja: string;
+  name_en: string;
+  dorm: string;
+  theme_1: string;
+  theme_2: string;
+}
+
+const characterGroups = characterData.reduce<Record<string, Character[]>>((groups, character) => {
+  const dorm = character.dorm;
+  if (!groups[dorm]) {
+    groups[dorm] = [];
+  }
+  groups[dorm].push(character);
+  return groups;
+}, {});
+
+// display-block幅の更新を行う関数
+const updateDisplayBlockWidth = () => {
+  const displayBlock = document.querySelector('.display-block');
+  if (displayBlock) {
+    displayBlockWidth.value = displayBlock.clientWidth;
+  }
+};
+
+// resize イベント用のリスナー関数
+const resizeListener = () => {
+  updateDisplayBlockWidth();
+};
 
 onMounted(() => {
+  // 初期化処理
   if (isFirst.value) {
-    selectedCharacters.value = students.map(student => student.value).concat('その他').concat('Other');
-    selectedRare.value = ['SSR','SR','R'];
-    selectedType.value = ['バランス','ディフェンス','アタック'];
-    selectedAttr.value = ['火','水','木','無'];
-    selectedEffects.value = ['ATKUP','ダメージUP','クリティカル','属性ダメージUP','被ダメージUP','ATKDOWN','ダメージDOWN','回避','属性ダメージDOWN','被ダメージDOWN','HP回復','HP継続回復','暗闇無効','呪い無効','凍結無効','デバフ解除','呪い'];
+    selectedCharacters.value = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
+    selectedRare.value = ['SSR', 'SR', 'R'];
+    selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
+    selectedAttr.value = ['火', '水', '木', '無'];
+    selectedEffects.value = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
   } else {
-    // 一時保存されている選択状態を使用して復元
     if (tempSelectedCharacters.value.length > 0) {
       selectedCharacters.value = [...tempSelectedCharacters.value];
-    } else {
-      selectedCharacters.value = [];
     }
-
     if (tempSelectedRare.value.length > 0) {
       selectedRare.value = [...tempSelectedRare.value];
-    } else {
-      selectedRare.value = [];
     }
-
     if (tempSelectedType.value.length > 0) {
       selectedType.value = [...tempSelectedType.value];
-    } else {
-      selectedType.value = [];
     }
-
     if (tempSelectedAttr.value.length > 0) {
       selectedAttr.value = [...tempSelectedAttr.value];
-    } else {
-      selectedAttr.value = [];
     }
-
     if (tempSelectedEffects.value.length > 0) {
       selectedEffects.value = [...tempSelectedEffects.value];
-    } else {
-      selectedEffects.value = [];
     }
   }
   isFirst.value = false;
+
+  // display-block幅の更新
+  updateDisplayBlockWidth();
+  window.addEventListener('resize', resizeListener);
+});
+const imgUrlDictionary = ref<{ [key: string]: string }>({});  // 画像パスの辞書
+
+onBeforeMount(() => {
+  const characterArray = Array.from(characterData);  // ArrayIteratorを配列に変換
+
+  characterArray.map(character => {
+    return import(`@/assets/img/icon/${character.name_en}.png`)
+      .then(module => {
+        imgUrlDictionary.value[character.name_en] = module.default;  // 画像パスを辞書に追加
+      })
+      .catch(() => {
+        imgUrlDictionary.value[character.name_en] = '';  // 画像の読み込みに失敗した場合
+      });
+  });
 });
 
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeListener);
+});
 
 function applyFilter() {
   // 選択された項目を一時保存
@@ -287,17 +223,6 @@ function applyFilter() {
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
 
-  const unselectedCharactersSet = new Set<string>();
-  students.forEach(student => unselectedCharactersSet.add(student.value));
-
-  students.forEach(student => {
-    if (unselectedCharactersSet.has(student.value)) {
-      if (selectedCharacters.value.includes(student.value)) {
-        unselectedCharactersSet.delete(student.value);
-      }
-    }
-  });
-
   characters.value.forEach(character => {
     // レア度チェック
     if (!selectedRare.value.includes(character.rare)) {
@@ -305,16 +230,10 @@ function applyFilter() {
       return
     }
     // キャラチェック
-    if (selectedCharacters.value.includes(character.chara)) {
-      character.visible = true;
-    } else if (unselectedCharactersSet.has(character.chara)) {
+    const characterInfo = characterData.find(char => char.name_ja === character.chara || char.name_en === character.chara);
+    if (!characterInfo || !selectedCharacters.value.includes(characterInfo.name_en)) {
       character.visible = false;
-      return
-    } else if (selectedCharacters.value.includes('その他')) {
-      character.visible = true;
-    } else {
-      character.visible = false;
-      return
+      return;
     }
     // タイプチェック
     if (!selectedType.value.includes(character.attr)) {
@@ -341,94 +260,228 @@ function applyFilter() {
       }
     }
   });
+
   emit('close'); // モーダルを閉じる
 }
 
+function toggleSelectAll(groupName: string) {
+  if (groupName === 'statusEffects') {
+    // ステータス効果の全選択/解除を処理
+    const allSelected = effects.every(effect => selectedEffects.value.includes(effect.value));
+    if (allSelected) {
+      // すべて選択されている場合は解除
+      selectedEffects.value = [];
+    } else {
+      // すべてのエフェクトを選択
+      selectedEffects.value = effects.map(effect => effect.value);
+    }
+  } else if (groupName === 'cardAttributes') {
+    // カード属性の全選択/解除を処理
+    const allRaresSelected = ['SSR', 'SR', 'R'].every(rare => selectedRare.value.includes(rare));
+    const allTypesSelected = ['バランス', 'ディフェンス', 'アタック'].every(type => selectedType.value.includes(type));
+    const allAttrsSelected = ['火', '水', '木', '無'].every(attr => selectedAttr.value.includes(attr));
 
-function toggleSelectAll(group: string) {
-  if (group === 'heartslabyuls') {
-    toggleGroupSelection(heartslabyuls, heartslabyulsButtonLabel);
-  } else if (group === 'savanaclaws') {
-    toggleGroupSelection(savanaclaws, savanaclawsButtonLabel);
-  } else if (group === 'octavinelles') {
-    toggleGroupSelection(octavinelles, octavinellesButtonLabel);
-  } else if (group === 'scarabias') {
-    toggleGroupSelection(scarabias, scarabiasButtonLabel);
-  } else if (group === 'pomefiores') {
-    toggleGroupSelection(pomefiores, pomefioresButtonLabel);
-  } else if (group === 'ignihydese') {
-    toggleGroupSelection(ignihydese, ignihydeseButtonLabel);
-  } else if (group === 'diasomnias') {
-    toggleGroupSelection(diasomnias, diasomniasButtonLabel);
-  } else if (group === 'others') {
-    toggleGroupSelection(others, othersButtonLabel);
-  } else if (group === 'effects') {
-    toggleEffectSelection(effects, effectsButtonLabel);
-  }
-}
-
-function toggleGroupSelection(group: { name: string; value: string }[], buttonLabel: any) {
-  const allSelected = group.every(character => selectedCharacters.value.includes(character.value));
-  if (allSelected) {
-    selectedCharacters.value = selectedCharacters.value.filter(character => !group.some(c => c.value === character));
-    buttonLabel.value = t('filterModal.select');
+    if (allRaresSelected && allTypesSelected && allAttrsSelected) {
+      // すべて選択されている場合は解除
+      selectedRare.value = [];
+      selectedType.value = [];
+      selectedAttr.value = [];
+    } else {
+      // すべてのカード属性を選択
+      selectedRare.value = ['SSR', 'SR', 'R'];
+      selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
+      selectedAttr.value = ['火', '水', '木', '無'];
+    }
   } else {
-    selectedCharacters.value = [...new Set([...selectedCharacters.value, ...group.map(c => c.value)])];
-    buttonLabel.value = t('filterModal.release');
-  }
-}
-function toggleEffectSelection(group: { name: string; value: string }[], buttonLabel: any) {
-  const allSelected = group.every(effect => selectedEffects.value.includes(effect.value));
-  if (allSelected) {
-    selectedEffects.value = selectedEffects.value.filter(effect => !group.some(c => c.value === effect));
-    buttonLabel.value = t('filterModal.select');
-  } else {
-    selectedEffects.value = [...new Set([...selectedEffects.value, ...group.map(c => c.value)])];
-    buttonLabel.value = t('filterModal.release');
-  }
-}
-function isGroupFullySelected(group: string): boolean {
-  let characters: { name: string; value: string }[] = [];
+    // キャラクターグループの全選択/解除を処理
+    const group: Character[] = characterGroups[groupName] || [];
+    const allSelected = group.every((characterInfo: Character) => selectedCharacters.value.includes(characterInfo.name_en));
 
-  if (group === 'heartslabyuls') {
-    characters = heartslabyuls;
-  } else if (group === 'savanaclaws') {
-    characters = savanaclaws;
-  } else if (group === 'octavinelles') {
-    characters = octavinelles;
-  } else if (group === 'scarabias') {
-    characters = scarabias;
-  } else if (group === 'pomefiores') {
-    characters = pomefiores;
-  } else if (group === 'ignihydese') {
-    characters = ignihydese;
-  } else if (group === 'diasomnias') {
-    characters = diasomnias;
-  } else if (group === 'effects') {
-    characters = effects;
-    return characters.every(character => selectedEffects.value.includes(character.value));
+    if (allSelected) {
+      selectedCharacters.value = selectedCharacters.value.filter(c => !group.some(student => student.name_en === c));
+    } else {
+      selectedCharacters.value = [...new Set([...selectedCharacters.value, ...group.map(student => student.name_en)])];
+    }
+  }
+}
+
+function isGroupFullySelected(groupName: string): boolean {
+  if (groupName === 'cardAttributes') {
+    return rareOptions.every(rare => selectedRare.value.includes(rare)) &&
+           typeOptions.value.every(type => selectedType.value.includes(type.value)) &&
+          attrOptions.value.every(attr => selectedAttr.value.includes(attr.value));
+  } else if (groupName === 'statusEffects') {
+    return effects.every(effect => selectedEffects.value.includes(effect.value));
   }
 
-  return characters.every(character => selectedCharacters.value.includes(character.value));
+  const group = characterGroups[groupName];
+  return group.every(character => selectedCharacters.value.includes(character.name_en));
 }
+
+// キャラクター選択の切り替え処理
+function toggleCharacterSelection(characterValue: string) {
+  selectedCharacters.value = selectedCharacters.value.includes(characterValue)
+    ? selectedCharacters.value.filter(c => c !== characterValue)
+    : [...selectedCharacters.value, characterValue];
+}
+
+// 各寮の幅を取得
+const calculateGroupWidth = (group: Character[]) => {
+  const buttonWidth = 64; // 選択ボタンの幅
+  const gapBetweenButtonAndFirstIcon = 10; // 選択ボタンとアイコンの間のスペース
+  const iconTotalWidth = iconSize + (2 * 5) + gapSize;
+
+  const totalGroupWidth = buttonWidth + iconTotalWidth * group.length + gapBetweenButtonAndFirstIcon;
+
+  return totalGroupWidth;
+};
+
+const getContainerStyle = (numberOfGroupsInRow: number) => {
+  // 寮の数に応じて幅を調整（1行に複数の寮がある場合は50%）
+  return {
+    width: numberOfGroupsInRow === 1 ? '100%' : '50%',
+  };
+};
+
+// 寮の並べ方
+const determineLayout = () => {
+  const layout = [];
+  let currentRow: string[] = [];
+  let currentRowWidth = 0;
+  const maxWidth = displayBlockWidth.value;
+  const maxGroupsPerRow = 2;
+
+  Object.entries(characterGroups).forEach(([groupName, group]) => {
+    const groupWidth = calculateGroupWidth(group);
+
+    // 寮の幅が display-block の幅の半分を超える場合、その寮は単独で1行にする
+    if (groupWidth >= maxWidth / maxGroupsPerRow) {
+      if (currentRow.length > 0) {
+        layout.push(currentRow);
+        currentRow = [];
+        currentRowWidth = 0;
+      }
+      layout.push([groupName]);
+    } else {
+      if (currentRowWidth + groupWidth <= maxWidth && currentRow.length < maxGroupsPerRow) {
+        currentRow.push(groupName);
+        currentRowWidth += groupWidth;
+      } else {
+        layout.push(currentRow);
+        currentRow = [groupName];
+        currentRowWidth = groupWidth;
+      }
+    }
+  });
+
+  // 最後に残った行を追加
+  if (currentRow.length > 0) {
+    layout.push(currentRow);
+  }
+
+  return layout;
+};
 </script>
 
 <style scoped>
-.select-all-container {
+
+.feature-select-all-container {
   display: flex;
   align-items: center;
   margin-bottom: 0px;
 }
 
-.character-items {
+.feature-items {
   display: flex;
   flex-wrap: wrap;
 }
 
-.character-list > .character-item {
+.feature-list > .feature-item {
   display: inline-flex;
   align-items: center;
   text-align: left;
+}
+
+.display-block {
+  margin: 0 auto; /* コンテナを中央揃え */
+  margin-top: 20px;
+  margin-bottom: 20px;
+  width: 100%; /* 画面全体に広がるコンテナ */
+  max-width: 1200px; /* コンテナの最大幅を設定 */
+}
+
+.character-list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 20px;  /* 寮ごとの間隔 */
+  margin-bottom: 20px;
+}
+
+.character-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.character-select-all-container {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* 選択ボタンとアイコンの間隔 */
+}
+
+.character-items {
+  display: flex;
+  gap: 10px;  /* キャラクター間の間隔 */
+  flex-wrap: wrap;  /* 必要に応じて改行 */
+}
+
+.character-item {
+  margin: 5px;
+  width: var(--icon-size); /* JavaScriptから渡された変数を使う */
+  height: var(--icon-size); /* JavaScriptから渡された変数を使う */
+  transition: border 0.3s ease;
+}
+
+.character-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* 親要素内に画像を収める */
+  border-radius: 8px;
+  cursor: pointer;
+  z-index: 1;
+  position: relative;
+}
+
+.character-item.selected {
+  position: relative; /* 親要素にpositionを指定 */
+  border-radius: 8px; /* アイコン自体の角を丸める */
+}
+
+.character-item.selected::before {
+  content: '';
+  position: absolute;
+  top: -2px; /* アイコンの外側に縁取りを作るための余白 */
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border-radius: 8px; /* 縁取りもアイコンに合わせて丸める */
+  border: 2px solid transparent; /* 実際のボーダーの太さを定義 */
+  background: #ff0fff;
+  z-index: 0; /* アイコンより後ろに表示されるように設定 */
+}
+
+.character-item:not(.selected) {
+  opacity: 0.5;
+}
+
+.character-item:hover {
+  opacity: 1.0;
 }
 
 .modal-background {

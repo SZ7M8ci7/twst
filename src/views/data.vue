@@ -12,6 +12,15 @@
 <script setup lang="ts">
 import DataHeader from '@/components/DataHeader.vue';
 import DataBody from '@/components/DataBody.vue';
+
+import {useCharacterStore} from '@/store/characters';
+import {onMounted} from "vue";
+
+const characterStore = useCharacterStore();
+
+onMounted(() => {
+  characterStore.handlePageChange('dataPage');
+});
 </script>
 
 <style scoped>

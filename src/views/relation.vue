@@ -47,7 +47,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, onBeforeMount, Ref, ref } from 'vue';
+import { computed, onBeforeMount, onMounted, Ref, ref } from 'vue';
 import { Character, useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 
@@ -60,6 +60,7 @@ const chara2name = ref<Record<string, string[]>>({});
 const duo2name = ref<Record<string, string[]>>({});
 const name2data = ref<Record<string, Character>>({});
 const imgUrl2wikiUrl = ref<Record<string, string>>({});
+
 const filteredCharacters = computed(() => {
   if (loadingImgUrl.value) {
     return []; // 画像URLの読み込み中は空の配列を返す
@@ -142,6 +143,10 @@ onBeforeMount(() => {
   Promise.all(promises).then(() => {
     loadingImgUrl.value = false; // すべての画像のロードが完了
   });
+});
+
+onMounted(() => {
+  characterStore.handlePageChange('relationPage');
 });
 </script>
 <style scoped>
