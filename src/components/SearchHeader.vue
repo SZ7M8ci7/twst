@@ -24,6 +24,9 @@
         <v-btn block color="green" @click="startSearch">{{ $t('search.startSearch') }}</v-btn>
       </v-col>
       <v-col cols="12" sm="2">
+        <div>
+        {{ $t('カード数') }}: {{ levelSetCardsCount }} <!-- レベル設定されているカードの枚数 -->
+        </div>
         <span v-if="totalResults && nowResults">{{ nowResults }}/{{ totalResults }} ({{ searchPercentage }}%)</span>
       </v-col>
       <v-col cols="12" sm="3"/>
@@ -53,9 +56,18 @@ import ErrorModal from "@/components/ErrorModal.vue";
 import { storeToRefs } from "pinia";
 import { calcDecks } from "./common";
 import { useSearchResultStore } from '@/store/searchResult';
+import { useCharacterStore } from '@/store/characters';
 import { event } from 'vue-gtag'
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
+
+const characterStore = useCharacterStore();
+const { characters } = storeToRefs(characterStore);
+
+// レベルが設定されているカードの枚数を計算する
+const levelSetCardsCount = computed(() => {
+  return characters.value.filter(character => character.level > 0).length;
+});
 
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, isSearching, errorMessage } = storeToRefs(searchResultStore);
