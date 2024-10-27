@@ -193,6 +193,7 @@ td {
 }
 .mode-toggle-button {
   background-color: #5de459; /* Choose a color */
+  box-shadow: 0 2px 2px rgba(0, 0, 0, .3);
   color: #3b4b27;
   border: none;
   padding: 1px 5px;
