@@ -39,7 +39,7 @@
     </div>
   </v-container>
   <!-- モーダル -->
-  <v-dialog v-model="showModal" max-width="30%">
+  <v-dialog v-model="showModal" max-width="50%">
     <v-card>
       <v-card-text>
         <v-simple-table style="display: flex; justify-content: center;">
