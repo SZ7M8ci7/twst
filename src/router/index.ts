@@ -77,6 +77,11 @@ const routes = [
     name: 'data',
     component: () => import('@/views/data.vue'),
   },
+  {
+    path: '/twst/buddyDuo',
+    name: 'buddyDuo',
+    component: () => import('@/views/buddyDuo.vue'),
+  },
   { path: '/twst/', component: () => import('@/views/top.vue') }
 ]
 

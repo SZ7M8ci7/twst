@@ -71,9 +71,10 @@
 import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
-import { onMounted, onBeforeMount, onBeforeUnmount, ref, computed} from 'vue';
+import { onMounted, onBeforeUnmount, ref, computed, Ref} from 'vue';
 import { useI18n } from 'vue-i18n';
-import characterData from '@/assets/characters_info.json';  // JSONをインポート
+import characterData from '@/assets/characters_info.json';
+import { useImageUrlDictionary } from '@/components/common';
 
 const { t } = useI18n();
 
@@ -89,6 +90,7 @@ const selectedAttr = ref<string[]>([]);
 const selectedEffects = ref<string[]>([]);
 const emit = defineEmits(['close']);
 const displayBlockWidth = ref(0);
+const imgUrlDictionary: Ref<Record<string, string>> = ref({});
 
 // アイコンのサイズと間隔を共通化したい
 const iconSize = 50;
@@ -164,7 +166,7 @@ const resizeListener = () => {
   updateDisplayBlockWidth();
 };
 
-onMounted(() => {
+onMounted(async () => {
   // 初期化処理
   if (isFirst.value) {
     selectedCharacters.value = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
@@ -194,21 +196,7 @@ onMounted(() => {
   // display-block幅の更新
   updateDisplayBlockWidth();
   window.addEventListener('resize', resizeListener);
-});
-const imgUrlDictionary = ref<{ [key: string]: string }>({});  // 画像パスの辞書
-
-onBeforeMount(() => {
-  const characterArray = Array.from(characterData);  // ArrayIteratorを配列に変換
-
-  characterArray.map(character => {
-    return import(`@/assets/img/icon/${character.name_en}.png`)
-      .then(module => {
-        imgUrlDictionary.value[character.name_en] = module.default;  // 画像パスを辞書に追加
-      })
-      .catch(() => {
-        imgUrlDictionary.value[character.name_en] = '';  // 画像の読み込みに失敗した場合
-      });
-  });
+  imgUrlDictionary.value = await useImageUrlDictionary(characterData);
 });
 
 onBeforeUnmount(() => {

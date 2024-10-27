@@ -64,6 +64,11 @@
         :title="$t('tool.mutualDuo')"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'buddyDuo'}">
+      <v-list-item
+        :title="$t('tool.buddyDuo')"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'hand'}">
       <v-list-item
         :title="$t('tool.handGacha')"
