@@ -15,7 +15,7 @@
 
         <tbody>
           <tr v-for="(row, rowIndex) in matrix" :key="rowIndex">
-            <th><img :src="headerImgs[rowIndex]" :alt="row" class="img" /></th>
+            <th><img :src="headerImgs[rowIndex]" class="img" /></th>
             <td v-for="(cell, cellIndex) in row" :key="cellIndex">
               <button
                 v-if="cell !== null"
@@ -24,7 +24,7 @@
               >
                 {{ cell }}
               </button>
-              <span v-else></span> <!-- Keeps cell empty if no number -->
+              <span v-else></span> 
             </td>
 
           </tr>
@@ -79,7 +79,7 @@ const duoRelations: Ref<Record<string, Record<string, any>>> = ref({});
 const showModal = ref(false);
 const mode = ref('DUO');
 // Matrix data
-const matrix: Ref<(number | null)[][]> = ref([]);
+const matrix: Ref<(number|undefined)[][]> = ref([]);
 const currentRelations = computed(() => {
   return mode.value === 'DUO' ? duoRelations.value : buddyRelations.value;
 });
@@ -108,7 +108,7 @@ const updateMatrix = (relations: Record<string, Record<string, any[]>>) => {
     headers.value.map((otherChar) =>
       relations[char][otherChar] && relations[char][otherChar].length > 0
         ? relations[char][otherChar].length
-        : null // Replace null with 0 to match number[][] type
+        : undefined // Replace null with 0 to match number[][] type
     )
   );
 };
