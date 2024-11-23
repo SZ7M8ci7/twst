@@ -88,7 +88,7 @@ const table = ref({
 });
 const moveNum = computed(() => Number(table.value.advantage)+Number(table.value.equal)+Number(table.value.disadvantage));
 const turnNum = computed(() => Math.max(0, Number((Math.floor(((moveNum.value-1)/2)+0.001)).toFixed())));
-const damageScore = computed(() => Number(damage.value));
+const damageScore = computed(() => Number(damage.value) - moveNum.value*4.5);
 const duoScore = computed(() => duo.value * 3000);
 const advantageScore = computed(() => Number(table.value.advantage) * 2000);
 const equalScore = computed(() => Number(table.value.equal) * 500);
