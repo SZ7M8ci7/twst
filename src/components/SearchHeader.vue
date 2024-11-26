@@ -24,10 +24,8 @@
         <v-btn block color="green" @click="startSearch">{{ $t('search.startSearch') }}</v-btn>
       </v-col>
       <v-col cols="12" sm="2">
-        <div>
-        {{ $t('カード数') }}: {{ levelSetCardsCount }} <!-- レベル設定されているカードの枚数 -->
-        </div>
-        <span v-if="totalResults && nowResults">{{ nowResults }}/{{ totalResults }} ({{ searchPercentage }}%)</span>
+        <div>{{ t('search.cardCount') }}: {{ levelStore.levelchanged }}</div>
+        <div v-if="totalResults && nowResults">{{ nowResults }}/{{ totalResults }} ({{ searchPercentage }}%)</div>
       </v-col>
       <v-col cols="12" sm="3"/>
     </v-row>
@@ -48,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted, onBeforeUnmount, defineProps } from "vue";
 import InfoModal from "@/components/InfoModal.vue";
 import FilterModal from "@/components/FilterModal.vue";
 import SettingModal from "@/components/SettingModal.vue";
@@ -57,17 +55,14 @@ import { storeToRefs } from "pinia";
 import { calcDecks } from "./common";
 import { useSearchResultStore } from '@/store/searchResult';
 import { useCharacterStore } from '@/store/characters';
+import { useLevelStore } from "@/store/app";
 import { event } from 'vue-gtag'
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
-
-// レベルが設定されているカードの枚数を計算する
-const levelSetCardsCount = computed(() => {
-  return characters.value.filter(character => character.level > 0).length;
-});
+const levelStore = useLevelStore();
 
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, isSearching, errorMessage } = storeToRefs(searchResultStore);

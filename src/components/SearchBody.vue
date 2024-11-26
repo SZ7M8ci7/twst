@@ -20,7 +20,17 @@
         <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
           <!-- level列のカスタムテンプレート定義 -->
           <template v-slot:[`item.level`]="{ item }">
-            <v-text-field type="number" v-model="item.level" class="mt-0 pt-0 level-input" hide-details="auto" dense solo :min="0" :max="110" />
+            <v-text-field
+              type="number"
+              v-model="item.level"
+              class="mt-0 pt-0 level-input"
+              hide-details="auto"
+              dense
+              solo
+              :min="0"
+              :max="110"
+              @input="handleLevelChange(item)"
+            />
           </template>
           <template v-slot:[`item.required`]="{ item }">
             <v-checkbox v-model="item.required" hide-details></v-checkbox>
@@ -78,12 +88,14 @@
 <script setup lang="ts">
 import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
+import { useLevelStore } from "@/store/app";
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
+const levelStore = useLevelStore();
 const bulkLevel = ref(110);
 const loadingImgUrl = ref(true);
 const editModal = ref(false);
@@ -139,6 +151,8 @@ function applyBulkLevel() {
     // bulkLevelの値と最大レベルの小さい方をキャラクターのレベルに設定
     character.level = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
   });
+  const levelchanged = characters.value.filter(character => character.level > 0).length;
+  levelStore.setNumofCard(levelchanged);
 }
 
 function saveLevels() {
@@ -162,6 +176,8 @@ function loadLevels() {
         character.level = levels[character.name];
       }
     });
+    const levelchanged = characters.value.filter(character => character.level > 0).length;
+    levelStore.setNumofCard(levelchanged);
   }
   if (hasM3Cache) {
     const hasM3 = JSON.parse(hasM3Cache);
@@ -190,6 +206,17 @@ function saveCharacter() {
   closeEditModal();
 }
 
+function handleLevelChange(character) {
+  const oldLevel = character.oldlevel;
+
+  if (oldLevel == 0 && character.level != 0) {
+    levelStore.setNumofCard(levelStore.levelchanged+1);
+  } else if (oldLevel != 0 && character.level == 0) {
+    levelStore.setNumofCard(levelStore.levelchanged-1);
+  }
+  character.oldlevel = character.level; // 更新後のレベルをoldlevelとして保持
+}
+
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
     return import(`@/assets/img/${character.name}.png`)
@@ -211,6 +238,12 @@ onMounted(() => {
     character.hasM3 = true; // M3をデフォルトでチェック
   });
   loadLevels(); // 画面を開いた時にlocalStorageからレベルを復元
+
+  // 復元されたレベルから、oldlevelを初期化
+  characters.value.forEach(character => {
+    character.oldlevel = character.level
+  })
+
 });
 </script>
 
@@ -243,7 +276,7 @@ onMounted(() => {
   gap: 10px;
 }
 .save-levels-btn {
-  margin-left: auto; 
+  margin-left: auto;
 }
 @media (max-width: 600px) {
   .controls-container {
