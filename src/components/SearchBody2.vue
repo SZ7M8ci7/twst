@@ -20,7 +20,17 @@
         <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
           <!-- level列のカスタムテンプレート定義 -->
           <template v-slot:[`item.level`]="{ item }">
-            <v-text-field type="number" v-model="item.level" class="mt-0 pt-0 level-input" hide-details="auto" dense solo :min="0" :max="110" />
+            <v-text-field
+              type="number"
+              v-model="item.level"
+              class="mt-0 pt-0 level-input"
+              hide-details="auto"
+              dense
+              solo
+              :min="0"
+              :max="110"
+              @input="handleLevelChange(item)"
+            />
           </template>
           <template v-slot:[`item.required`]="{ item }">
             <v-checkbox v-model="item.required" hide-details></v-checkbox>
@@ -188,6 +198,14 @@ function saveCharacter() {
     characters.value[index] = { ...selectedCharacter.value };
   }
   closeEditModal();
+}
+
+function handleLevelChange(character) {
+  const oldLevel = character.oldlevel;
+
+  this.$emit("levelchange-event", this.levelchanged);
+  
+  character.oldlevel = character.level; // 更新後のレベルをoldlevelとして保持
 }
 
 onBeforeMount(() => {

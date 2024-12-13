@@ -1,7 +1,7 @@
 <template>
   <v-container style="min-width: 80%;">
     <div>
-      <SearchHeader1 @search-started="handleSearchStarted" />
+      <SearchHeader2 @search-started="handleSearchStarted" />
     </div>
     <v-tabs v-model="tab" color="indigo-darken-2" fixed-tabs
       :show-arrows="false"
@@ -12,7 +12,7 @@
     <v-card-text>
       <v-window v-model="tab" disabled >
         <v-window-item value="search">
-          <SearchBody1 />
+          <SearchBody2 @levelchange-event="handleLevelChange" />
         </v-window-item>
         <v-window-item value="result">
           <ResultBody/>
@@ -24,8 +24,8 @@
 
 <script setup lang="ts">
 import {onMounted, ref} from 'vue';
-import SearchHeader1 from '@/components/SearchHeader1.vue';
-import SearchBody1 from '@/components/SearchBody1.vue';
+import SearchHeader2 from '@/components/SearchHeader2.vue';
+import SearchBody2 from '@/components/SearchBody2.vue';
 import ResultBody from '@/components/ResultBody.vue';
 import {useCharacterStore} from '@/store/characters';
 
@@ -42,4 +42,12 @@ const handleSearchStarted = () => {
 onMounted(() => {
   characterStore.handlePageChange('searchPage');
 });
+
+props: {
+  greet: {
+    type: String,
+    default: 'hogehoge'
+    }
+}
+
 </script>

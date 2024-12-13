@@ -48,6 +48,16 @@ const routes = [
     component: () => import('@/views/search.vue'),
   },
   {
+    path: '/twst/search1',
+    name: 'search1',
+    component: () => import('@/views/search1.vue'),
+  },
+  {
+    path: '/twst/search2',
+    name: 'search2',
+    component: () => import('@/views/search2.vue'),
+  },
+  {
     path: '/twst/hand',
     name: 'hand',
     component: () => import('@/views/hand.vue'),
@@ -77,7 +87,7 @@ const routes = [
     name: 'data',
     component: () => import('@/views/data.vue'),
   },
-  { path: '/twst/', component: () => import('@/views/top.vue') }
+  { path: '/twst/', component: () => import('@/views/top.vue')}
 ]
 
 const router = createRouter({

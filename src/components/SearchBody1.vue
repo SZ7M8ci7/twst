@@ -150,6 +150,7 @@ function applyBulkLevel() {
 
     // bulkLevelの値と最大レベルの小さい方をキャラクターのレベルに設定
     character.level = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
+    character.oldlevel = character.level; // 更新後のレベルをoldlevelとして保持
   });
   const levelchanged = characters.value.filter(character => character.level > 0).length;
   levelStore.setNumofCard(levelchanged);
