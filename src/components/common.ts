@@ -843,3 +843,19 @@ export async function calcDecks(t: (key: string) => string) {
   }
 
 }
+export async function useImageUrlDictionary(characterData: Array<{ name_en: string }>) {
+  const imgUrlDictionary = <{ [key: string]: string }>({});  // 画像パスの辞書
+
+  await Promise.all(
+    characterData.map((character) =>
+      import(`@/assets/img/icon/${character.name_en}.png`)
+        .then((module) => {
+          imgUrlDictionary[character.name_en] = module.default;  // 画像パスを辞書に追加
+        })
+        .catch(() => {
+          imgUrlDictionary[character.name_en] = '';  // 画像の読み込みに失敗した場合
+        })
+    )
+  );
+  return imgUrlDictionary;
+}
