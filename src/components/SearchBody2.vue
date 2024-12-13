@@ -200,8 +200,7 @@ function saveCharacter() {
   closeEditModal();
 }
 
-function handleLevelChange(character) {
-  const oldLevel = character.oldlevel;
+function handleLevelChange(this: any, character: { oldlevel: any; level: any; }) {
 
   this.$emit("levelchange-event", this.levelchanged);
   
