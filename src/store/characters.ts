@@ -41,6 +41,7 @@ export interface Character {
   magic3pow: string;
   visible?: boolean;
   level: number;
+  oldlevel: number;
   imgUrl: Ref;
   wikiURL: string;
   required: boolean;
@@ -77,6 +78,7 @@ export const useCharacterStore = defineStore('characters', {
       required: false,
       hasM3: true,
       level: 0,
+      oldlevel: 0,
       chara: character.chara || '',
       attr: character.attr || '',
       buddy1c: character.buddy1c || '',

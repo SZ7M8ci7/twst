@@ -124,7 +124,8 @@
     "required": "Required",
     "character": "Character",
     "rarity": "Rarity",
-    "other": "Other"
+    "other": "Other",
+    "cardCount": "Number of cards"
   },
   "infoModal": {
     "about": "About this tool",
