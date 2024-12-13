@@ -12,7 +12,7 @@
     <v-card-text>
       <v-window v-model="tab" disabled >
         <v-window-item value="search">
-          <SearchBody2 @levelchange-event="handleLevelChange" />
+          <!-- <SearchBody2 @levelchange-event="handleLevelChange" /> -->
         </v-window-item>
         <v-window-item value="result">
           <ResultBody/>
@@ -25,7 +25,7 @@
 <script setup lang="ts">
 import {onMounted, ref} from 'vue';
 import SearchHeader2 from '@/components/SearchHeader2.vue';
-import SearchBody2 from '@/components/SearchBody2.vue';
+// import SearchBody2 from '@/components/SearchBody2.vue';
 import ResultBody from '@/components/ResultBody.vue';
 import {useCharacterStore} from '@/store/characters';
 
@@ -43,11 +43,11 @@ onMounted(() => {
   characterStore.handlePageChange('searchPage');
 });
 
-props: {
-  greet: {
-    type: String,
-    default: 'hogehoge'
-    }
-}
+// props: {
+//   greet: {
+//     type: String,
+//     default: 'hogehoge'
+//     }
+// }
 
 </script>
