@@ -104,7 +104,7 @@
     "damage": "Damage",
     "damageTaken": "Damage taken",
     "remainHP": "HP at end",
-    "totalHP": "Total HP(Including heal)",
+    "totalHP": "Total HP(Including heal & burn)",
     "countIf": "Failed evasion still counts.",
     "advantageDamageTaken": "Advantage damage taken",
     "disadvantageDamageTaken": "Disadvantade damage taken",
