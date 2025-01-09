@@ -3,7 +3,7 @@ name: Update twst repository with content from simulator
 on:
   schedule:
     # Runs at 01:00 UTC every day
-    - cron: '0 1 * * *'
+    - cron: '10 9,21 * * *'
   workflow_dispatch:
 
 jobs:
