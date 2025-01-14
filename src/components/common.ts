@@ -736,12 +736,12 @@ export async function calcDecks(t: (key: string) => string) {
           detailList: ret[24],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
-        // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする
-        if (firstSortCriteria && score < currentLimit) {
+        // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さいか同じ場合のみpushする
+        if (firstSortCriteria && score <= currentLimit) {
           results.value.push(transformedRet);
         }
-        // sortCriteriaの0件目の順序が降順の場合、現在の上限値よりも大きい場合のみpushする
-        else if ((!firstSortCriteria) && score > currentLimit ) {
+        // sortCriteriaの0件目の順序が降順の場合、現在の上限値よりも大きいか同じ場合のみpushする
+        else if ((!firstSortCriteria) && score >= currentLimit ) {
           results.value.push(transformedRet);
         }
       }
