@@ -10,6 +10,7 @@ export interface SearchSettingsState {
   minEHP: number;
   minHP: number;
   minHPBuddy: number;
+  minIncreasedHPBuddy: number;
   minEvasion: number;
   minDuo: number;
   minBuff: number;
@@ -36,6 +37,7 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     minEHP: 30000,
     minHP: 30000,
     minHPBuddy: 0,
+    minIncreasedHPBuddy: 0,
     minEvasion: 0,
     minDuo: 0,
     minBuff: 0,

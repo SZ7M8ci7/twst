@@ -70,6 +70,18 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumIncreasedHPBuddy') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minIncreasedHPBuddy"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">{{ $t('settingModal.minimumEvasion') }}</span>
         <v-text-field
             type="number"
@@ -299,6 +311,7 @@ const searchSettingsStore = useSearchSettingsStore();
 const minEHP = ref(searchSettingsStore.minEHP);
 const minHP = ref(searchSettingsStore.minHP);
 const minHPBuddy = ref(searchSettingsStore.minHPBuddy);
+const minIncreasedHPBuddy = ref(searchSettingsStore.minIncreasedHPBuddy);
 const minEvasion = ref(searchSettingsStore.minEvasion);
 const minDuo = ref(searchSettingsStore.minDuo);
 const minBuff = ref(searchSettingsStore.minBuff);
@@ -358,6 +371,7 @@ function applyFilter() {
     minEHP: minEHP.value,
     minHP: minHP.value,
     minHPBuddy: minHPBuddy.value,
+    minIncreasedHPBuddy: minIncreasedHPBuddy.value,
     minEvasion: minEvasion.value,
     minDuo: minDuo.value,
     minBuff: minBuff.value,
