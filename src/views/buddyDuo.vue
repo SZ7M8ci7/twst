@@ -145,7 +145,12 @@ onMounted(async () => {
       buddyRelations.value[char][otherChar] = 0;
     });
   });
-
+  duoRelations.value['トレイン'] = {};
+    buddyRelations.value['トレイン'] = {};
+    headers.value.forEach((otherChar) => {
+      duoRelations.value['トレイン'][otherChar] = 0;
+      buddyRelations.value['トレイン'][otherChar] = 0;
+    });
   // Add character information to duoRelations instead of counting
   characters.value.forEach((character) => {
       if (!duoRelations.value[character.chara][character.duo]) {
