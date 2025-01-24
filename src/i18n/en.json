@@ -177,6 +177,7 @@
     "crowley": "Crowley",
     "crewel": "Crewel",
     "fellow": "Fellow",
+    "train": "Train",
     "other": "Other",
     "balance": "Balanced",
     "defence": "Defence",
@@ -285,7 +286,8 @@
     "lolo": "Lolo",
     "crowley": "Crowley",
     "crewel": "Crewel",
-    "fellow": "Fellow"
+    "fellow": "Fellow",
+    "train": "Train"
   },
   "resultBody": {
     "effectiveHP": "Effective HP",

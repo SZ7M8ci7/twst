@@ -177,6 +177,7 @@
     "crowley": "クロウリー",
     "crewel": "クルーウェル",
     "fellow": "フェロー",
+    "train": "トレイン",
     "other": "その他",
     "balance": "バランス",
     "defence": "ディフェンス",
@@ -284,7 +285,8 @@
     "lolo": "ロロ",
     "crowley": "クロウリー",
     "crewel": "クルーウェル",
-    "fellow": "フェロー"
+    "fellow": "フェロー",
+    "train": "トレイン"
   },
   "resultBody": {
     "effectiveHP": "実質HP",

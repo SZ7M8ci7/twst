@@ -95,7 +95,8 @@ export function getAvailableCharacterProps(t: (key: string) => string) {
   t('comments.lolo'),
   t('comments.crowley'),
   t('comments.crewel'),
-  t('comments.fellow')];
+  t('comments.fellow'),
+  t('comments.train')];
 }
 export const availableSortkeys = [
   'hp',
@@ -145,7 +146,8 @@ export const enName2jpName: { [key: string]: string } = {
   "Lolo": "ロロ",
   "Crowley": "クロウリー",
   "Crewel": "クルーウェル",
-  "Fellow": "フェロー"
+  "Fellow": "フェロー",
+  "Train": "トレイン"
 };
 
 const buddyRateMap: { [key: string]: { hp: number; atk: number; heal: number; conHeal: number } } = {
