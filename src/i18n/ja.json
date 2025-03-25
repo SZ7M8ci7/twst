@@ -324,6 +324,15 @@
     "rarity": "レア",
     "other": "その他"
   },
+  "relation": {
+    "all": "全属性",
+    "fire": "火属性",
+    "water": "水属性",
+    "flora": "木属性",
+    "duo": "相互デュオ",
+    "duo3": "3デュオ",
+    "allowEqual": "等倍を1つ許容する"
+  },
   "other": {
     "text": "その他作ったもの",
     "masterChef": "マスターシェフ計算機",

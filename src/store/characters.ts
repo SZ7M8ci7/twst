@@ -48,6 +48,7 @@ export interface Character {
   hasM3: boolean;
   evasion: number;
   selections: any;
+  hasDuo: any;
 }
 function formatEtc(etc:string) {
   // <br>をカンマに置換

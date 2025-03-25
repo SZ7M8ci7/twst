@@ -325,6 +325,15 @@
     "rarity": "Rarity",
     "other": "Other"
   },
+  "relation": {
+    "all": "All Attributes",
+    "fire": "Fire",
+    "water": "Water",
+    "flora": "Flora",
+    "duo": "Mutual Duo",
+    "duo3": "Triple Duo",
+    "allowEqual": "Allow One Neutral Attribute"
+  },
   "other": {
     "text": "Other tools i made",
     "masterChef": "The Culinary Crucible Calculator",
