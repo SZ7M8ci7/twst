@@ -18,6 +18,11 @@ const routes = [
     component: () => import('@/views/drop.vue'),
   },
   {
+    path: '/twst/sam',
+    name: 'sam',
+    component: () => import('@/views/sam.vue'),
+  },
+  {
     path: '/twst/grow',
     name: 'grow',
     component: () => import('@/views/grow.vue'),

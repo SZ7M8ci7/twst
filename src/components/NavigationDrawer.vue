@@ -19,6 +19,11 @@
         :title="$t('tool.alchemyDropCountCalculator')"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'sam'}">
+      <v-list-item
+        :title="$t('tool.sam')"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'grow'}">
       <v-list-item
         :title="$t('tool.requiredUpgradeItemCalculator')"
