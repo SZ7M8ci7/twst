@@ -213,9 +213,10 @@ function calcDamageAfterCalcAtk(magicBuff: string, magicPow: string, magicAtr: s
   atkRate += damageBuffMap[magicBuff] || 0;
 
   let comboRate = 1;
-  if (magicPow.includes("連撃")) {
+  if (magicPow == "連撃(弱)" || magicPow == "連撃(強)") {
     comboRate = 1.8;
-  } else if (magicPow.includes("デュオ")) {
+  }
+  if (magicPow == "デュオ魔法" || magicPow == "3連撃(弱)") {
     comboRate = 2.4;
   }
 
