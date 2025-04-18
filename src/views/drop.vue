@@ -117,19 +117,20 @@ const tea_l = ref(0);
 
 watchEffect((): void => {
   if (radios.value == "normal") {
-    grimoire.value = total_ap.value * 0.05;
-    textbook.value = total_ap.value * 0.28;
-    memo.value = total_ap.value * 0.84;
-    medal.value = total_ap.value * 0.66;
-    candy.value = total_ap.value * 0.10;
-    tea_s.value = total_ap.value * 0;
-    tea_m.value = total_ap.value * 0;
-    tea_l.value = total_ap.value * 0;
+    grimoire.value = total_ap.value * 0.11;
+    textbook.value = total_ap.value * 0.37;
+    memo.value = total_ap.value * 0.93;
+    medal.value = total_ap.value * 0.78;
+    candy.value = total_ap.value * 0.11;
+    tea_s.value = total_ap.value * 0.39;
+    tea_m.value = total_ap.value * 0.10;
+    tea_l.value = total_ap.value * 0.04;
   } else {
-    grimoire.value = total_ap.value * 0.62;
-    textbook.value = total_ap.value * 0.54;
-    memo.value = total_ap.value * 0.17;
-    medal.value = total_ap.value * 1.3;
+    grimoire.value = total_ap.value * 0.20;
+    textbook.value = total_ap.value * 0.60;
+    memo.value = total_ap.value * 0.68;
+    medal.value = total_ap.value * 0.111;
+    candy.value = total_ap.value * 0.09;
     candy.value = total_ap.value * 0.09;
     tea_s.value = total_ap.value * 0.10;
     tea_m.value = total_ap.value * 0.20;
