@@ -6,6 +6,7 @@ export interface result {
   totalEHP: number;
   totalEvasion: number;
   totalHPBuddy: number;
+  increasedHPBuddy: number;
   totalBuddy: number;
   totalDuo: number;
   totalBuff: number;

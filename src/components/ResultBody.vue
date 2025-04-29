@@ -18,7 +18,8 @@
               </div>
             </td>
             <td>{{ item.evasion }}</td>
-            <td>{{ item.hpBuudy }}</td>
+            <td>{{ item.hpBuddy }}</td>
+            <td>{{ item.increasedHpBuddy }}</td>
             <td>{{ item.buddy }}</td>
             <td>{{ item.noHpBuddy }}</td>
             <td>{{ item.duo }}</td>
@@ -108,9 +109,10 @@ const headers = computed(() => [
   { title: t('resultBody.HP'), value: 'hp', sortable: false },
   { title: t('resultBody.effectiveHP'), value: 'ehp', sortable: false },
   { title: t('resultBody.evasion'), value: 'evasion', sortable: false },
-  { title: t('resultBody.HPBuddy'), value: 'hpBuudy', sortable: false },
+  { title: t('resultBody.HPBuddy'), value: 'hpBuddy', sortable: false },
+  { title: t('resultBody.increasedHPBuddy'), value: 'increasedHpBuddy', sortable: false },
   { title: t('resultBody.buddy'), value: 'buddy', sortable: false },
-  { title: t('resultBody.noHPBuddy'), value: 'noHPBuudy', sortable: false },
+  { title: t('resultBody.noHPBuddy'), value: 'noHPBuddy', sortable: false },
   { title: t('resultBody.duo'), value: 'duo', sortable: false },
   { title: t('resultBody.buff'), value: 'buff', sortable: false },
   { title: t('resultBody.debuff'), value: 'debuff', sortable: false },
@@ -160,7 +162,7 @@ function openInNewTab(url: string){
 }
 
 ::v-deep .v-data-table td {
-  padding: 1px 4px !important;
+  padding: 1px 1px !important;
   text-align: center;
 }
 .css-fukidashi {

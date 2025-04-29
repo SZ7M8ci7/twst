@@ -19,6 +19,11 @@
         :title="$t('tool.alchemyDropCountCalculator')"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'sam'}">
+      <v-list-item
+        :title="$t('tool.sam')"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'grow'}">
       <v-list-item
         :title="$t('tool.requiredUpgradeItemCalculator')"
@@ -62,6 +67,11 @@
       <RouterLink :to="{name:'relation'}">
       <v-list-item
         :title="$t('tool.mutualDuo')"
+        @click="drawer = false;"
+      /></RouterLink>
+      <RouterLink :to="{name:'buddyDuo'}">
+      <v-list-item
+        :title="$t('tool.buddyDuo')"
         @click="drawer = false;"
       /></RouterLink>
       <RouterLink :to="{name:'hand'}">

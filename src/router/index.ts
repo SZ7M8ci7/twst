@@ -18,6 +18,11 @@ const routes = [
     component: () => import('@/views/drop.vue'),
   },
   {
+    path: '/twst/sam',
+    name: 'sam',
+    component: () => import('@/views/sam.vue'),
+  },
+  {
     path: '/twst/grow',
     name: 'grow',
     component: () => import('@/views/grow.vue'),
@@ -46,6 +51,16 @@ const routes = [
     path: '/twst/search',
     name: 'search',
     component: () => import('@/views/search.vue'),
+  },
+  {
+    path: '/twst/search1',
+    name: 'search1',
+    component: () => import('@/views/search1.vue'),
+  },
+  {
+    path: '/twst/search2',
+    name: 'search2',
+    component: () => import('@/views/search2.vue'),
   },
   {
     path: '/twst/hand',
@@ -81,6 +96,9 @@ const routes = [
     path: '/twst/sim',
     name: 'sim',
     component: () => import('@/views/sim.vue'),
+    path: '/twst/buddyDuo',
+    name: 'buddyDuo',
+    component: () => import('@/views/buddyDuo.vue'),
   },
   { path: '/twst/', component: () => import('@/views/top.vue') }
 ]

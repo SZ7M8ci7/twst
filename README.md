@@ -2,7 +2,7 @@
 
 https://qiita.com/akipon0821/items/eaeffe79221cfcd4d258
 
-このリポジトリをgit cloneした後、npm installし（--forceつけろみたいなエラーが出たら付けてください）、npm run devコマンドでローカルにサーバーが起動します。
+このリポジトリをgit cloneした後、npm install --force、npm run devコマンドでローカルにサーバーが起動します。
 
 Typescript,Vue,Vuetify,pinia,viteあたりの技術を使ってます。
 

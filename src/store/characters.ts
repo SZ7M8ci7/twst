@@ -41,17 +41,19 @@ export interface Character {
   magic3pow: string;
   visible?: boolean;
   level: number;
+  oldlevel: number;
   imgUrl: Ref;
   wikiURL: string;
   required: boolean;
   hasM3: boolean;
   evasion: number;
   selections: any;
+  hasDuo: any;
 }
 function formatEtc(etc:string) {
   // <br>をカンマに置換
   let formattedEtc = etc.replaceAll('<br>', ', ');
-  
+
   // 最後がカンマで終わる場合は取り除く
   if (formattedEtc.endsWith(', ')) {
     formattedEtc = formattedEtc.slice(0, -2);
@@ -77,6 +79,7 @@ export const useCharacterStore = defineStore('characters', {
       required: false,
       hasM3: true,
       level: 0,
+      oldlevel: 0,
       chara: character.chara || '',
       attr: character.attr || '',
       buddy1c: character.buddy1c || '',
@@ -99,5 +102,26 @@ export const useCharacterStore = defineStore('characters', {
       evasion: countEvasion(character.etc),
       selections:[],
     })) as Character[],
+    currentPage: '',  // 現在のページ名を保存
+    lastPage: '',     // 最後にアクセスしたページ名を保存
   }),
+
+  actions: {
+    // visibleをリセットするアクション
+    resetVisible() {
+      this.characters.forEach(character => {
+        character.visible = true;
+      });
+    },
+
+    // ページ変更時に状態をチェックし、前回アクセスしたページと異なる場合のみリセットするアクション
+    handlePageChange(newPage: string) {
+      this.lastPage = this.currentPage;
+      this.currentPage = newPage;
+
+      if (this.currentPage !== this.lastPage) {
+        this.resetVisible();
+      }
+    },
+  },
 });

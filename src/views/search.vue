@@ -3,7 +3,7 @@
     <div>
       <SearchHeader @search-started="handleSearchStarted" />
     </div>
-    <v-tabs v-model="tab" color="indigo-darken-2" fixed-tabs 
+    <v-tabs v-model="tab" color="indigo-darken-2" fixed-tabs
       :show-arrows="false"
       :mobile-breakpoint="Infinity">
       <v-tab value="search">{{ $t('search.characterList') }}</v-tab>
@@ -23,10 +23,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import {onMounted, ref} from 'vue';
 import SearchHeader from '@/components/SearchHeader.vue';
 import SearchBody from '@/components/SearchBody.vue';
 import ResultBody from '@/components/ResultBody.vue';
+import {useCharacterStore} from '@/store/characters';
+
+const characterStore = useCharacterStore();
 
 const tab = ref('search');
 const searchStarted = ref(false);
@@ -35,4 +38,8 @@ const handleSearchStarted = () => {
   tab.value = 'result'; // タブを検索結果に切り替える
   searchStarted.value = true; // 検索が開始されたことを示す
 };
+
+onMounted(() => {
+  characterStore.handlePageChange('searchPage');
+});
 </script>

@@ -1,6 +1,14 @@
 <template>
   <v-app>
     <v-container>
+      <div class="controls-container">
+        <div class="level-controls">
+          <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0" :max="110"></v-text-field>
+          <v-btn @click="applyBulkLevel">{{ $t('search.batchSetting') }}</v-btn>
+          <v-btn color="primary" @click="openDataModal">{{ $t('search.dataManagement') }}</v-btn>
+        </div>
+        <v-btn @click="saveLevels" class="save-levels-btn">{{ $t('search.saveLevels') }}</v-btn>
+      </div>
       <!-- ロード中に表示するロードスクリーン -->
       <div v-if="loadingImgUrl" class="text-center">
         <v-progress-circular indeterminate></v-progress-circular>
@@ -9,14 +17,6 @@
 
       <!-- ロード完了後に表示するメインコンテンツ -->
       <div v-else>
-        <div class="controls-container">
-          <div class="level-controls">
-            <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0" :max="110"></v-text-field>
-            <v-btn @click="applyBulkLevel">{{ $t('search.batchSetting') }}</v-btn>
-          </div>
-          <v-btn @click="saveLevels" class="save-levels-btn">{{ $t('search.saveLevels') }}</v-btn>
-        </div>
-
         <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
           <!-- level列のカスタムテンプレート定義 -->
           <template v-slot:[`item.level`]="{ item }">
@@ -70,6 +70,43 @@
             </v-card-actions>
           </v-card>
         </v-dialog>
+
+        <!-- エクスポート/インポートモーダル -->
+        <v-dialog v-model="dataModal" max-width="800px">
+          <v-card>
+            <v-card-title>{{ $t('search.dataManagement') }}</v-card-title>
+            <v-card-text>
+              <div class="data-actions mb-4">
+                <v-btn color="primary" @click="copyToClipboard" class="action-btn">
+                  <v-icon>mdi-content-copy</v-icon>
+                  <span class="ml-2">{{ $t('search.copy') }}</span>
+                </v-btn>
+                <v-btn color="primary" @click="importFromText" class="action-btn">
+                  <v-icon>mdi-database-import</v-icon>
+                  <span class="ml-2">{{ $t('search.import') }}</span>
+                </v-btn>
+                <v-btn color="grey" @click="closeDataModal" class="action-btn">
+                  <v-icon>mdi-close</v-icon>
+                  <span class="ml-2">{{ $t('search.close') }}</span>
+                </v-btn>
+              </div>
+              <v-textarea
+                v-model="dataText"
+                outlined
+                auto-grow
+                rows="10"
+                class="mt-4"
+              ></v-textarea>
+            </v-card-text>
+          </v-card>
+        </v-dialog>
+        <v-snackbar
+          v-model="snackbar.show"
+          :color="snackbar.color"
+          :timeout="3000"
+        >
+          {{ snackbar.text }}
+        </v-snackbar>
       </div>
     </v-container>
   </v-app>
@@ -98,6 +135,13 @@ const buff = [
 ];
 const heal = ['回復&継続回復(中)','回復&継続回復(小)', '回復(中)', '回復(小)', '回復(極小)', '継続回復(中)', '継続回復(小)'];
 const pow = ['単発(弱)', '単発(強)','連撃(弱)', '連撃(強)'];
+const dataModal = ref(false);
+const dataText = ref('');
+const snackbar = ref({
+  show: false,
+  text: '',
+  color: 'success'
+});
 
 const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
@@ -190,6 +234,60 @@ function saveCharacter() {
   closeEditModal();
 }
 
+function openDataModal() {
+  dataModal.value = true;
+  dataText.value = characters.value
+    .map(char => `${char.chara}\t${char.costume}\t${char.level}\t${char.required}\t${char.hasM3}`)
+    .join('\n');
+}
+
+function closeDataModal() {
+  dataModal.value = false;
+  dataText.value = '';
+}
+
+function showSnackbar(text: string, color: 'success' | 'error' = 'success') {
+  snackbar.value.text = text;
+  snackbar.value.color = color;
+  snackbar.value.show = true;
+}
+
+function copyToClipboard() {
+  navigator.clipboard.writeText(dataText.value)
+    .then(() => {
+      showSnackbar(t('search.copySuccess'));
+    })
+    .catch(err => {
+      console.error('クリップボードへのコピーに失敗しました:', err);
+      showSnackbar(t('search.copyError'), 'error');
+    });
+}
+
+function importFromText() {
+  try {
+    const lines = dataText.value.split('\n').filter(line => line.trim());
+    let importedCount = 0;
+    lines.forEach(line => {
+      const [chara, costume, level, required, hasM3] = line.split('\t');
+      const character = characters.value.find(
+        char => char.chara === chara && char.costume === costume
+      );
+      if (character) {
+        character.level = parseInt(level) || 0;
+        character.required = required.toLowerCase() === 'true';
+        character.hasM3 = hasM3.toLowerCase() === 'true';
+        importedCount++;
+      }
+    });
+    saveLevels();
+    closeDataModal();
+    showSnackbar(t('search.importSuccess', { count: importedCount }));
+  } catch (error) {
+    console.error('インポートエラー:', error);
+    showSnackbar(t('search.importError'), 'error');
+  }
+}
+
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
     return import(`@/assets/img/${character.name}.png`)
@@ -215,44 +313,70 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.table-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.level-input {
-  max-width: 80px;
-  min-width: 70px;
-}
-.v-data-table :deep(.v-data-table-footer) {
-   display: none; /* NOTE: フッタを非表示にする為 */
-}
-.right-align {
-  margin-left: auto;
-}
 .controls-container {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  align-items: center; /* Align items vertically */
+  align-items: center;
 }
 
 .level-controls {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
+
 .save-levels-btn {
-  margin-left: auto; 
+  margin-left: auto;
 }
+
 @media (max-width: 600px) {
   .controls-container {
     flex-direction: column;
     align-items: center;
   }
 
+  .level-controls {
+    width: 100%;
+    justify-content: center;
+  }
+
   .save-levels-btn {
     width: 100%;
+  }
+}
+
+.level-input {
+  max-width: 80px !important;
+  min-width: 80px !important;
+}
+
+.v-data-table :deep(.v-field__input) {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+.v-data-table :deep(.v-text-field) {
+  width: 80px !important;
+}
+
+.data-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-btn {
+  flex: 1;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+@media (max-width: 600px) {
+  .action-btn {
+    flex: 1 1 100%;
+    max-width: none;
   }
 }
 </style>

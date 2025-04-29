@@ -10,6 +10,7 @@ const {
   minDebuff,
   minBuff,
   minHPBuddy,
+  minIncreasedHPBuddy,
   minEvasion,
   minDuo,
   minCosmic,
@@ -49,6 +50,7 @@ export function getAvailableSortProps(t: (key: string) => string) {
   t('comments.HP'),
   t('comments.effectiveHP'),
   t('comments.HPBuddy'),
+  t('comments.increasedHPBuddy'),
   t('comments.noHPBuddy'),
   t('comments.buddy'),
   t('comments.evasion'),
@@ -93,12 +95,14 @@ export function getAvailableCharacterProps(t: (key: string) => string) {
   t('comments.lolo'),
   t('comments.crowley'),
   t('comments.crewel'),
-  t('comments.fellow')];
+  t('comments.fellow'),
+  t('comments.train')];
 }
 export const availableSortkeys = [
   'hp',
   'ehp',
-  'hpBuudy',
+  'hpBuddy',
+  'increasedHpBuddy',
   'noHpBuddy',
   'buddy',
   'evasion',
@@ -142,7 +146,8 @@ export const enName2jpName: { [key: string]: string } = {
   "Lolo": "ロロ",
   "Crowley": "クロウリー",
   "Crewel": "クルーウェル",
-  "Fellow": "フェロー"
+  "Fellow": "フェロー",
+  "Train": "トレイン"
 };
 
 const buddyRateMap: { [key: string]: { hp: number; atk: number; heal: number; conHeal: number } } = {
@@ -208,9 +213,10 @@ function calcDamageAfterCalcAtk(magicBuff: string, magicPow: string, magicAtr: s
   atkRate += damageBuffMap[magicBuff] || 0;
 
   let comboRate = 1;
-  if (magicPow.includes("連撃")) {
+  if (magicPow == "連撃(弱)" || magicPow == "連撃(強)") {
     comboRate = 1.8;
-  } else if (magicPow.includes("デュオ")) {
+  }
+  if (magicPow == "デュオ魔法" || magicPow == "3連撃(弱)") {
     comboRate = 2.4;
   }
 
@@ -251,6 +257,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   let deckFire = 0;
   let deckWater = 0;
   let deckFlora = 0;
+  let deckMinIncreasedHPBuddy = 99999;
   const deckReferenceDamageList: number[] = [];
   const deckReferenceAdvantageDamageList: number[] = [];
   const deckReferenceVsHiDamageList: number[] = [];
@@ -306,6 +313,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     let hasHpBuddy = false;
     let atkBuddyRate = 0;
     // バディHP増加分加算
+    let increasedHP = 0;
     if (memberNameSet.has(chara.buddy1c)) {
       deckTotalBuddy += 1;
       const hpRate = calcHPBuddyRate(chara.buddy1s);
@@ -314,6 +322,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
         deckTotalHPBuddy += 1;
         hasHpBuddy = true;
         deckTotalHP += chara.calcBaseHP * hpRate;
+        increasedHP += chara.calcBaseHP * hpRate;
       }
     }
     if (memberNameSet.has(chara.buddy2c)) {
@@ -324,6 +333,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
         deckTotalHPBuddy += 1;
         hasHpBuddy = true;
         deckTotalHP += chara.calcBaseHP * hpRate;
+        increasedHP += chara.calcBaseHP * hpRate;
       }
     }
     if (memberNameSet.has(chara.buddy3c)) {
@@ -334,8 +344,10 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
         deckTotalHPBuddy += 1;
         hasHpBuddy = true;
         deckTotalHP += chara.calcBaseHP * hpRate;
+        increasedHP += chara.calcBaseHP * hpRate;
       }
     }
+    deckMinIncreasedHPBuddy = Math.min(deckMinIncreasedHPBuddy, increasedHP);
     // HP回復分加算
     const hpHeal =
       (calcHealRate(chara.magic1heal) +
@@ -516,6 +528,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   if (deckTotalHP < minHP.value) { return; }
   if (deckTotalHP + deckTotalHeal < minEHP.value) { return; }
   if (deckTotalHPBuddy < minHPBuddy.value) { return; }
+  if (deckMinIncreasedHPBuddy < minIncreasedHPBuddy.value) { return; }
   if (deckTotalEvasion < minEvasion.value) { return; }
   if (deckDuo < minDuo.value) { return; }
   if (deckTotalBuff < minBuff.value) { return; }
@@ -534,6 +547,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   deckReferenceVsHiDamage = Math.floor(deckReferenceVsHiDamage);
   deckReferenceVsMizuDamage = Math.floor(deckReferenceVsMizuDamage);
   deckReferenceVsKiDamage = Math.floor(deckReferenceVsKiDamage);
+  deckMinIncreasedHPBuddy = Math.floor(deckMinIncreasedHPBuddy);
   detailList.push(healList);
   detailList.push(damageList);
   detailList.push(advantageDamageList);
@@ -544,6 +558,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckTotalHP+deckTotalHeal
     , deckTotalEvasion
     , deckTotalHPBuddy
+    , deckMinIncreasedHPBuddy
     , deckTotalBuddy
     , deckNoHPBuddy
     , deckDuo
@@ -712,36 +727,37 @@ export async function calcDecks(t: (key: string) => string) {
           hp: Math.round(ret[0] as number),
           ehp: Math.round(ret[1] as number),
           evasion: ret[2],
-          hpBuudy: ret[3],
-          buddy: ret[4],
-          noHpBuddy: ret[5],
-          duo: ret[6],
-          buff: ret[7],
-          debuff: ret[8],
-          maxCosmic: ret[9],
-          maxFire: ret[10],
-          maxWater: ret[11],
-          maxFlora: ret[12],
-          referenceDamage: ret[13],
-          referenceAdvantageDamage: ret[14],
-          referenceVsHiDamage: ret[15],
-          referenceVsMizuDamage: ret[16],
-          referenceVsKiDamage: ret[17],
-          chara1: ret[18],
-          chara2: ret[19],
-          chara3: ret[20],
-          chara4: ret[21],
-          chara5: ret[22],
-          simuURL: ret[23],
-          detailList: ret[24],
+          hpBuddy: ret[3],
+          increasedHpBuddy: ret[4],
+          buddy: ret[5],
+          noHpBuddy: ret[6],
+          duo: ret[7],
+          buff: ret[8],
+          debuff: ret[9],
+          maxCosmic: ret[10],
+          maxFire: ret[11],
+          maxWater: ret[12],
+          maxFlora: ret[13],
+          referenceDamage: ret[14],
+          referenceAdvantageDamage: ret[15],
+          referenceVsHiDamage: ret[16],
+          referenceVsMizuDamage: ret[17],
+          referenceVsKiDamage: ret[18],
+          chara1: ret[19],
+          chara2: ret[20],
+          chara3: ret[21],
+          chara4: ret[22],
+          chara5: ret[23],
+          simuURL: ret[24],
+          detailList: ret[25],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
-        // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さい場合のみpushする
-        if (firstSortCriteria && score < currentLimit) {
+        // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さいか同じ場合のみpushする
+        if (firstSortCriteria && score <= currentLimit) {
           results.value.push(transformedRet);
         }
-        // sortCriteriaの0件目の順序が降順の場合、現在の上限値よりも大きい場合のみpushする
-        else if ((!firstSortCriteria) && score > currentLimit ) {
+        // sortCriteriaの0件目の順序が降順の場合、現在の上限値よりも大きいか同じ場合のみpushする
+        else if ((!firstSortCriteria) && score >= currentLimit ) {
           results.value.push(transformedRet);
         }
       }
@@ -842,4 +858,20 @@ export async function calcDecks(t: (key: string) => string) {
     currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
   }
 
+}
+export async function useImageUrlDictionary(characterData: Array<{ name_en: string }>) {
+  const imgUrlDictionary = <{ [key: string]: string }>({});  // 画像パスの辞書
+
+  await Promise.all(
+    characterData.map((character) =>
+      import(`@/assets/img/icon/${character.name_en}.png`)
+        .then((module) => {
+          imgUrlDictionary[character.name_en] = module.default;  // 画像パスを辞書に追加
+        })
+        .catch(() => {
+          imgUrlDictionary[character.name_en] = '';  // 画像の読み込みに失敗した場合
+        })
+    )
+  );
+  return imgUrlDictionary;
 }
