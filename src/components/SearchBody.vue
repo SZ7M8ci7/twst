@@ -274,8 +274,8 @@ function importFromText() {
       );
       if (character) {
         character.level = parseInt(level) || 0;
-        character.required = required === 'true';
-        character.hasM3 = hasM3 === 'true';
+        character.required = required.toLowerCase() === 'true';
+        character.hasM3 = hasM3.toLowerCase() === 'true';
         importedCount++;
       }
     });
