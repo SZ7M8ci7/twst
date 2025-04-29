@@ -96,6 +96,8 @@ const routes = [
     path: '/twst/sim',
     name: 'sim',
     component: () => import('@/views/sim.vue'),
+  },
+  {
     path: '/twst/buddyDuo',
     name: 'buddyDuo',
     component: () => import('@/views/buddyDuo.vue'),
