@@ -166,7 +166,15 @@
     "character": "キャラ",
     "rarity": "レアリティ",
     "other": "その他",
-    "cardCount": "カード数"
+    "cardCount": "カード数",
+    "dataManagement": "データ管理",
+    "copy": "コピー",
+    "import": "インポート",
+    "close": "閉じる",
+    "copySuccess": "クリップボードにコピーしました",
+    "copyError": "クリップボードへのコピーに失敗しました",
+    "importSuccess": "{count}件のデータをインポートしました",
+    "importError": "インポートに失敗しました。データ形式が正しくありません。"
   },
   "infoModal": {
     "about": "ツール全体について",

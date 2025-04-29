@@ -160,13 +160,21 @@
     "howToUse": "How to use",
     "cancelSearch": "Cancel Search",
     "startSearch": "Start Search",
-    "batchSetting": "Batch setting of displayed character levels",
+    "batchSetting": "Batch setting levels",
     "saveLevels": "Save levels to cache",
     "required": "Required",
     "character": "Character",
     "rarity": "Rarity",
     "other": "Other",
-    "cardCount": "Number of cards"
+    "cardCount": "Number of cards",
+    "dataManagement": "Data",
+    "copy": "Copy",
+    "import": "Import",
+    "close": "Close",
+    "copySuccess": "Copied to clipboard",
+    "copyError": "Failed to copy to clipboard",
+    "importSuccess": "Imported {count} items",
+    "importError": "Import failed. Invalid data format."
   },
   "infoModal": {
     "about": "About this tool",
