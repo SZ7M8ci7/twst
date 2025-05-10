@@ -624,7 +624,42 @@ export async function calcDecks(t: (key: string) => string) {
       return
     }
   }
-  const nonZeroLevelCharacters = characters.value.filter(character => character.level > 0);
+  const nonZeroLevelCharacters = characters.value
+    .filter(character => character.level > 0)
+    .map(chara => ({
+      ...chara,
+      calcBaseHP: 0,
+      calcBaseATK: 0
+    }));
+  const maxLevelCharacters = characters.value
+    .filter(character => character.rare == 'SSR')
+    .map(chara => ({
+      ...chara,
+      calcBaseHP: 0,
+      calcBaseATK: 0
+    }));
+
+  nonZeroLevelCharacters.forEach((chara) => {
+    let maxLevel = 110;  // Default max level for SSR
+    if (chara.rare == 'SR') {
+      maxLevel = 90;     // Max level for SR
+    } else if (chara.rare == 'R') {
+      maxLevel = 70;     // Max level for R
+    }
+    const bonusHP = chara.base_hp*0.2;
+    const bonusATK = chara.base_atk*0.2;
+    const HPperLv = (chara.hp - 2*bonusHP - chara.base_hp) / (maxLevel - 1);
+    const ATKperLv = (chara.atk - 2*bonusATK - chara.base_atk) / (maxLevel - 1);
+    const leveldiff = maxLevel - chara.level;
+    chara.calcBaseHP = chara.hp - HPperLv * leveldiff;
+    chara.calcBaseATK = chara.atk - ATKperLv * leveldiff;
+  });
+
+  maxLevelCharacters.forEach((chara) => {
+    chara.calcBaseHP = chara.hp;
+    chara.calcBaseATK = chara.atk;
+  });
+
   const listLength = nonZeroLevelCharacters.length;
   if (listLength < 5) {
     errorMessage.value = t('error.fewCharacter');
@@ -682,14 +717,14 @@ export async function calcDecks(t: (key: string) => string) {
     nonZeroLevelCharacters.sort((a, b) => {
       if (a.required && !b.required) return -1;
       if (!a.required && b.required) return 1;
-      return b.atk - a.atk;
+      return b.calcBaseATK - a.calcBaseATK;
     });
   } else {
     // requiredがtrueの順、HPの降順でソート
     nonZeroLevelCharacters.sort((a, b) => {
       if (a.required && !b.required) return -1;
       if (!a.required && b.required) return 1;
-      return b.hp - a.hp;
+      return b.calcBaseHP - a.calcBaseHP;
     });
   }
   // requiredがtrueの数を数える
@@ -699,28 +734,9 @@ export async function calcDecks(t: (key: string) => string) {
     return;
   }
   results.value = [];
-  nonZeroLevelCharacters.forEach((chara) => {
-    let maxLevel = 110;  // Default max level for SSR
-    if (chara.rare == 'SR') {
-      maxLevel = 90;     // Max level for SR
-    } else if (chara.rare == 'R') {
-      maxLevel = 70;     // Max level for R
-    }
-    
-    const growPercentage = chara.level / maxLevel;
-    chara.calcBaseHP = (chara.hp - chara.base_hp) * growPercentage + chara.base_hp;
-    chara.calcBaseATK = (chara.atk - chara.base_atk) * growPercentage + chara.base_atk;
-  })
   let currentLimit = sortCriteria[0].order === '昇順' ? Infinity : -Infinity;  // 現在の上限値を保持する変数を追加
-  const processCombination = async (i: number, j: number, k: number, l: number, m: number) => {
+  const processCombinationCore = async (combination: Character[]) => {
     return new Promise<void>(resolve => {
-      const combination = [
-        nonZeroLevelCharacters[i],
-        nonZeroLevelCharacters[j],
-        nonZeroLevelCharacters[k],
-        nonZeroLevelCharacters[l],
-        nonZeroLevelCharacters[m],
-      ];
       const ret: (string | number)[] | undefined = calcDeckStatus(combination);
       if (ret) {
         const transformedRet = {
@@ -765,6 +781,29 @@ export async function calcDecks(t: (key: string) => string) {
       resolve();
     });
   };
+
+  const processCombination = async (i: number, j: number, k: number, l: number, m: number) => {
+    const combination = [
+      nonZeroLevelCharacters[i],
+      nonZeroLevelCharacters[j],
+      nonZeroLevelCharacters[k],
+      nonZeroLevelCharacters[l],
+      nonZeroLevelCharacters[m],
+    ];
+    await processCombinationCore(combination);
+  };
+
+  const processCombinationWithSupport = async (i: number, j: number, k: number, l: number, m: number) => {
+    const combination = [
+      nonZeroLevelCharacters[i],
+      nonZeroLevelCharacters[j],
+      nonZeroLevelCharacters[k],
+      nonZeroLevelCharacters[l],
+      maxLevelCharacters[m],
+    ];
+    await processCombinationCore(combination);
+  };
+
   const lengthes: number[] = new Array(5).fill(listLength);
   for(let i = 0; i < requiredCount; i++) {
     lengthes[i] = i+1;
@@ -774,7 +813,7 @@ export async function calcDecks(t: (key: string) => string) {
     let lastRenderTime = Date.now();
     
     const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
-    totalResults.value = (beforeLastLoops*(lengthes[4]-4)/factorialize(5-requiredCount))+beforeLastLoops*4/factorialize(4-requiredCount);
+    totalResults.value = beforeLastLoops*(maxLevelCharacters.length)/factorialize(4-requiredCount);
     if (requiredCount == 5) {
       totalResults.value = 1;
       await processCombination(0, 1, 2, 3, 4);
@@ -790,18 +829,8 @@ export async function calcDecks(t: (key: string) => string) {
             return;
           }
           for (let l = k + 1; l < lengthes[3]; l++) {
-            for (let m = l + 1; m < lengthes[4]; m++) {
-
-              await processCombination(i, j, k, l, m);
-
-              if (Date.now() - lastRenderTime > 2000) {
-                lastRenderTime = Date.now();
-                await appendResult();
-              }
-            }
-            for (const m of [i,j,k,l]) {
-
-              await processCombination(i, j, k, l, m);
+            for (let m = 0; m < maxLevelCharacters.length; m++) {
+              await processCombinationWithSupport(i, j, k, l, m);
 
               if (Date.now() - lastRenderTime > 2000) {
                 lastRenderTime = Date.now();

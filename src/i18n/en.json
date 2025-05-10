@@ -252,7 +252,6 @@
     "nullifies_freeze": "nullifies freeze",
     "debuff_removal": "debuff removal",
     "curse": "curse"
-
   },
   "settingModal": {
     "sortSettings": "Sort settings",
@@ -261,6 +260,7 @@
     "submit": "OK",
     "asc": "ASC",
     "desc": "DESC",
+    "effectiveHP": "Effective HP",
     "minimumValueSetting":"Minimum value settings",
     "minimumEHP":"Minimum Effective HP",
     "minimumHP":"Minimum HP",
@@ -282,7 +282,7 @@
     "searchSettings":"Search settings",
     "maximumResult":"Maximum number of result",
     "attackNum":"Number of attacks",
-    "allowSameCharacter":"Allow same character",
+    "allowSameCharacter":"Allow all SSR characters as support characters",
     "cancel":"Cancel",
     "ok":"OK",
     "yes":"Yes",

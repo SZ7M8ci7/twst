@@ -1,9 +1,9 @@
-
 import { defineStore } from 'pinia';
+
 // types/searchSettingsTypes.ts
 export interface SortOption {
   prop: string;
-  order: '昇順' | '降順'|'ASC' | 'DESC';
+  order: string;
 }
 
 export interface SearchSettingsState {
@@ -54,11 +54,11 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     maxResult: 10,
     attackNum: 10,
     sortOptions: [
-      { prop: 'HP', order: '降順' }
+      { prop: 'settingModal.effectiveHP', order: 'settingModal.desc' }
     ],
     mustCharacters: [],
     convertedMustCharacters: [],
-    allowSameCharacter: true,
+    allowSameCharacter: false,
   }),
   actions: {
     updateSearchSettings(newSettings: Partial<SearchSettingsState>) {

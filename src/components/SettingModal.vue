@@ -307,6 +307,12 @@ import { cloneDeep } from 'lodash';
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 import { enName2jpName, getAvailableCharacterProps, getAvailableSortProps } from '@/components/common'
+
+interface SortOption {
+  prop: string;
+  order: string;
+}
+
 const searchSettingsStore = useSearchSettingsStore();
 const minEHP = ref(searchSettingsStore.minEHP);
 const minHP = ref(searchSettingsStore.minHP);
@@ -338,7 +344,11 @@ onBeforeMount(()=>{
   // sortOptionsの初期状態を保持するためのリアクティブな参照
   initialSortOptions = cloneDeep(searchSettingsStore.sortOptions);
   // ユーザーによる変更を保持するためのリアクティブな参照
-  sortOptions = ref(cloneDeep(initialSortOptions));
+  sortOptions = ref(cloneDeep(initialSortOptions).map((option: SortOption) => ({
+    ...option,
+    prop: t('settingModal.effectiveHP'),
+    order: t('settingModal.desc')
+  })));
   initialMustCharacters = cloneDeep(searchSettingsStore.mustCharacters);
   mustCharacters = ref(cloneDeep(initialMustCharacters));
 })
