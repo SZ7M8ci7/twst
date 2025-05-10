@@ -119,19 +119,19 @@ function createChart() {
 
 
   // 属性ダメージのデータを追加
-  if (props.filterAttribute !== '対全') {
-    const element = props.filterAttribute.replace('対', '');
-    const magicTypes = ['M1', 'M2', 'M3'];
-
-    magicTypes.forEach((magicType, index) => {
-      datasets.push({
-        label: `対${element}(${magicType})`,
-        stack: `Stack ${index + 1}`,
-        backgroundColor: stackColors[element],
-        data: simulatorStore.getDamageByAttribute(element)
-      });
+  const elements = ['火', '水', '木', '無'];
+  
+  // 選択された属性のみ表示するか、全属性を表示するか
+  const elementsToShow = props.filterAttribute === '対全' ? elements : [props.filterAttribute.replace('対', '')];
+  
+  elementsToShow.forEach((element, elementIndex) => {
+    datasets.push({
+      label: `対${element}ダメージ`,
+      stack: `Stack ${elementIndex + 1}`,
+      backgroundColor: stackColors[element],
+      data: simulatorStore.getDamageByAttribute(element)
     });
-  }
+  });
 
   chart = new Chart(ctx, {
     type: 'bar',
