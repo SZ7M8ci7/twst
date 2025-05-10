@@ -41,6 +41,66 @@ for (let i = 1; i <= 10; i++) {
   dmgbuffDict[`属性ダメDOWN(極大)${i}`] = (-1*(15 + 1.2 * i) / 100).toString();
 }
 
+export const criticalDict: { [key: string]: number } = {
+  "クリティカル(小)": 1.5,
+  "クリティカル(中)": 2.0,
+  "クリティカル(大)": 2.5,
+  "クリティカル(極大)": 3.0
+};
+
+export const magicDict: { [key: string]: number } = {
+  "通常攻撃Lv1": 1.0,
+  "通常攻撃Lv2": 1.05,
+  "通常攻撃Lv3": 1.1,
+  "通常攻撃Lv4": 1.15,
+  "通常攻撃Lv5": 1.2,
+  "通常攻撃Lv6": 1.25,
+  "通常攻撃Lv7": 1.3,
+  "通常攻撃Lv8": 1.35,
+  "通常攻撃Lv9": 1.4,
+  "通常攻撃Lv10": 1.45,
+  "連撃(弱)Lv1": 0.9,
+  "連撃(弱)Lv2": 0.95,
+  "連撃(弱)Lv3": 1.0,
+  "連撃(弱)Lv4": 1.05,
+  "連撃(弱)Lv5": 1.1,
+  "連撃(弱)Lv6": 1.15,
+  "連撃(弱)Lv7": 1.2,
+  "連撃(弱)Lv8": 1.25,
+  "連撃(弱)Lv9": 1.3,
+  "連撃(弱)Lv10": 1.35,
+  "連撃(強)Lv1": 1.0,
+  "連撃(強)Lv2": 1.05,
+  "連撃(強)Lv3": 1.1,
+  "連撃(強)Lv4": 1.15,
+  "連撃(強)Lv5": 1.2,
+  "連撃(強)Lv6": 1.25,
+  "連撃(強)Lv7": 1.3,
+  "連撃(強)Lv8": 1.35,
+  "連撃(強)Lv9": 1.4,
+  "連撃(強)Lv10": 1.45,
+  "デュオ魔法Lv1": 1.1,
+  "デュオ魔法Lv2": 1.15,
+  "デュオ魔法Lv3": 1.2,
+  "デュオ魔法Lv4": 1.25,
+  "デュオ魔法Lv5": 1.3,
+  "デュオ魔法Lv6": 1.35,
+  "デュオ魔法Lv7": 1.4,
+  "デュオ魔法Lv8": 1.45,
+  "デュオ魔法Lv9": 1.5,
+  "デュオ魔法Lv10": 1.55,
+  "3連撃(弱)Lv1": 0.8,
+  "3連撃(弱)Lv2": 0.85,
+  "3連撃(弱)Lv3": 0.9,
+  "3連撃(弱)Lv4": 0.95,
+  "3連撃(弱)Lv5": 1.0,
+  "3連撃(弱)Lv6": 1.05,
+  "3連撃(弱)Lv7": 1.1,
+  "3連撃(弱)Lv8": 1.15,
+  "3連撃(弱)Lv9": 1.2,
+  "3連撃(弱)Lv10": 1.25
+};
+
 // バディHPの定数
 export const buddyHPDict: { [key: string]: number } = {
   "HPUP(小)1": 0.11,
@@ -324,8 +384,8 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
   const buddy3atkRatio = character.buddy3c && character.buddy3c in charaDict ? 
     (character.buddy3s + character.buddy3Lv in buddyATKDict ? buddyATKDict[character.buddy3s + character.buddy3Lv] : 0) : 0;
 
-  const totalATK = character.atk * (1 + buddy1atkRatio + buddy2atkRatio + buddy3atkRatio);
-
+  const buddyATK = character.atk * (buddy1atkRatio + buddy2atkRatio + buddy3atkRatio);
+  
   // 各魔法のダメージ計算
   for (let i = 1; i <= 3; i++) {
     if (!character.selectedMagic?.includes(i)) continue;
@@ -333,40 +393,87 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
     const magicKey = `magic${i}`;
     const attribute = character[`${magicKey}Attribute`];
     const power = character[`${magicKey}Power`];
-    const level = character[`${magicKey}Lv`];
-
-    // バフの計算
-    let atkBuff = 0;
+    const level = character[`${magicKey}Lv`] || 10;
+    
+    let atkBuffTotal = 0;
+    const atkBuffValues = [];
     for (let j = 1; j <= 6; j++) {
       const buffKey = `${magicKey}Buff${j}`;
-      const buffLv = character[`${magicKey}Buff${j}Lv`];
+      const buffLv = character[`${magicKey}Buff${j}Lv`] || '';
       const buffValue = character[buffKey] + buffLv;
+      
       if (buffValue in atkbuffDict) {
-        atkBuff += Number(atkbuffDict[buffValue]);
+        const buffAmount = Number(atkbuffDict[buffValue]) * character.atk;
+        atkBuffTotal += buffAmount;
+        atkBuffValues.push(buffAmount);
       }
     }
-
+    
+    const baseATK = character.atk + atkBuffTotal + buddyATK;
+    
+    const magicRatioKey = `${power}Lv${level}`;
+    const magicRatio = magicRatioKey in magicDict ? magicDict[magicRatioKey] : 1.0;
+    
+    const attributeAdjust = attribute === '無' ? 1.1 : 1.0;
+    
     // ダメージバフの計算
-    let dmgBuff = 0;
+    let dmgBuffTotal = 0;
     for (let j = 1; j <= 6; j++) {
-      const buffKey = `${magicKey}DmgBuff${j}`;
-      const buffLv = character[`${magicKey}DmgBuff${j}Lv`];
+      const buffKey = `${magicKey}Buff${j}`;
+      const buffLv = character[`${magicKey}Buff${j}Lv`] || '';
       const buffValue = character[buffKey] + buffLv;
+      
       if (buffValue in dmgbuffDict) {
-        dmgBuff += Number(dmgbuffDict[buffValue]);
+        dmgBuffTotal += Number(dmgbuffDict[buffValue]);
       }
     }
-
-    const baseDamage = totalATK * (1 + atkBuff) * (1 + dmgBuff);
     
-    damage[attribute] = baseDamage;
+    let rengekiMultiplier = 1.0;
+    if (power === '連撃(弱)' || power === '連撃(強)') {
+      rengekiMultiplier = 1.8;
+    } else if (power === 'デュオ魔法' || power === '3連撃(弱)') {
+      rengekiMultiplier = 2.4;
+    }
     
-    damage['火'] = calcAttributeDamage(attribute, '火', baseDamage);
-    damage['水'] = calcAttributeDamage(attribute, '水', baseDamage);
-    damage['木'] = calcAttributeDamage(attribute, '木', baseDamage);
-    damage['無'] = attribute === '無' ? baseDamage * 1.1 : baseDamage;
+    let criticalMultiplier = 1.0;
+    for (let j = 1; j <= 6; j++) {
+      const buffKey = `${magicKey}Buff${j}`;
+      const buffValue = character[buffKey];
+      
+      if (buffValue in criticalDict) {
+        criticalMultiplier = Math.max(criticalMultiplier, criticalDict[buffValue]);
+      }
+    }
     
-    damage['対全'] = Math.max(damage['火'], damage['水'], damage['木']);
+    const baseDamage = baseATK * (magicRatio * attributeAdjust + dmgBuffTotal) * rengekiMultiplier * criticalMultiplier;
+    
+    const fireDamage = calcAttributeDamage(attribute, '火', baseDamage);
+    const waterDamage = calcAttributeDamage(attribute, '水', baseDamage);
+    const woodDamage = calcAttributeDamage(attribute, '木', baseDamage);
+    const neutralDamage = attribute === '無' ? baseDamage : baseDamage;
+    
+    character[`magic${i}DamageDetails`] = {
+      attribute,
+      power,
+      baseDamage,
+      fire: fireDamage,
+      water: waterDamage,
+      wood: woodDamage,
+      neutral: neutralDamage,
+      max: Math.max(fireDamage, waterDamage, woodDamage)
+    };
+    
+    if (!damage['火']) damage['火'] = 0;
+    if (!damage['水']) damage['水'] = 0;
+    if (!damage['木']) damage['木'] = 0;
+    if (!damage['無']) damage['無'] = 0;
+    if (!damage['対全']) damage['対全'] = 0;
+    
+    damage['火'] += fireDamage;
+    damage['水'] += waterDamage;
+    damage['木'] += woodDamage;
+    damage['無'] += neutralDamage;
+    damage['対全'] += Math.max(fireDamage, waterDamage, woodDamage);
   }
 
   return damage;

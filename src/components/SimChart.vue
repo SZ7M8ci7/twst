@@ -32,10 +32,17 @@
           
           <div>魔法情報:</div>
           <pre>{{ JSON.stringify({
-            magic1: { level: char.magic1Lv, heal: char.magic1heal },
-            magic2: { level: char.magic2Lv, heal: char.magic2heal },
-            magic3: { level: char.magic3Lv, heal: char.magic3heal },
+            magic1: { level: char.magic1Lv, heal: char.magic1heal, attribute: char.magic1Attribute, power: char.magic1Power },
+            magic2: { level: char.magic2Lv, heal: char.magic2heal, attribute: char.magic2Attribute, power: char.magic2Power },
+            magic3: { level: char.magic3Lv, heal: char.magic3heal, attribute: char.magic3Attribute, power: char.magic3Power },
             selected: char.selectedMagic
+          }, null, 2) }}</pre>
+          
+          <div>ダメージ詳細:</div>
+          <pre>{{ JSON.stringify({
+            magic1Damage: char.magic1DamageDetails,
+            magic2Damage: char.magic2DamageDetails,
+            magic3Damage: char.magic3DamageDetails
           }, null, 2) }}</pre>
         </div>
       </div>
