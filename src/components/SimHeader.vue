@@ -3,7 +3,7 @@
     <v-col cols="9">
       <div class="radio-group">
         <label v-for="option in options" :key="option" class="radio-option">
-          <input type="radio" :value="option" v-model="selectedOption" />
+          <input type="radio" :value="option" v-model="selectedOption" @change="updateFilter" />
           {{ option }}
         </label>
       </div>
@@ -11,14 +11,27 @@
     <v-col cols="3">
       <button class="button">別タブ<span class="dli-external-link"><span></span></span></button>
     </v-col>
-</v-row>
+  </v-row>
 </template>
   
 <script setup>
 import { ref } from 'vue';
 
-const options = ['対全', '対火', '対水', '対無'];
+const options = ['対全', '対火', '対水', '対木', '対無'];
 const selectedOption = ref(options[0]);
+
+const emit = defineEmits(['update:filter']);
+
+const updateFilter = () => {
+  const filterMap = {
+    '対全': '対全',
+    '対火': '対火',
+    '対水': '対水',
+    '対木': '対木',
+    '対無': '対無'
+  };
+  emit('update:filter', filterMap[selectedOption.value]);
+};
 </script>
 
 <style scoped>
