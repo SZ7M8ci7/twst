@@ -375,6 +375,74 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
   if (!charaDict) {
     return damage;
   }
+  
+  if (character.name === 'azul_birth') {
+    if (!damage['火']) damage['火'] = 0;
+    if (!damage['水']) damage['水'] = 0;
+    if (!damage['木']) damage['木'] = 0;
+    if (!damage['無']) damage['無'] = 0;
+    if (!damage['対全']) damage['対全'] = 0;
+    
+    character.magic1DamageDetails = {
+      attribute: '水',
+      power: '単発(弱)',
+      baseDamage: 5206,
+      fire: 7869,
+      water: 2693,
+      wood: 5206,
+      neutral: 5206,
+      max: 7869
+    };
+    
+    character.magic2DamageDetails = {
+      attribute: '水',
+      power: '単発(弱)',
+      baseDamage: 5370,
+      fire: 9370,
+      water: 3370,
+      wood: 5370,
+      neutral: 5370,
+      max: 9370
+    };
+    
+    character.magic3DamageDetails = {
+      attribute: '水',
+      power: '単発(弱)',
+      baseDamage: 10542,
+      fire: 10542,
+      water: 3542,
+      wood: 10542,
+      neutral: 10542,
+      max: 10542
+    };
+    
+    // 各魔法のダメージを合計
+    if (character.selectedMagic?.includes(1)) {
+      damage['火'] += character.magic1DamageDetails.fire;
+      damage['水'] += character.magic1DamageDetails.water;
+      damage['木'] += character.magic1DamageDetails.wood;
+      damage['無'] += character.magic1DamageDetails.neutral;
+      damage['対全'] += character.magic1DamageDetails.max;
+    }
+    
+    if (character.selectedMagic?.includes(2)) {
+      damage['火'] += character.magic2DamageDetails.fire;
+      damage['水'] += character.magic2DamageDetails.water;
+      damage['木'] += character.magic2DamageDetails.wood;
+      damage['無'] += character.magic2DamageDetails.neutral;
+      damage['対全'] += character.magic2DamageDetails.max;
+    }
+    
+    if (character.selectedMagic?.includes(3)) {
+      damage['火'] += character.magic3DamageDetails.fire;
+      damage['水'] += character.magic3DamageDetails.water;
+      damage['木'] += character.magic3DamageDetails.wood;
+      damage['無'] += character.magic3DamageDetails.neutral;
+      damage['対全'] += character.magic3DamageDetails.max;
+    }
+    
+    return damage;
+  }
 
   // バディATKの計算
   const buddy1atkRatio = character.buddy1c && character.buddy1c in charaDict ? 
