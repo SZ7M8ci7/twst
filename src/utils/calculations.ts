@@ -291,6 +291,22 @@ function calculateHeal(character: any) {
   return totalHeal;
 }
 
+const attributeEffectiveness: Record<string, Record<string, number>> = {
+  '水': { '火': 1.5, '木': 0.5 },
+  '木': { '水': 1.5, '火': 0.5 },
+  '火': { '木': 1.5, '水': 0.5 },
+};
+
+// 属性ダメージの計算
+function calcAttributeDamage(magicAtr: string, targetAtr: string, damage: number): number {
+  if (magicAtr === '無') {
+    return damage * 1.1;
+  }
+  
+  const effectiveness = attributeEffectiveness[magicAtr]?.[targetAtr];
+  return effectiveness ? damage * effectiveness : damage;
+}
+
 // ダメージの計算
 function calculateDamage(character: any, charaDict: { [key: string]: string }) {
   const damage: { [key: string]: number } = {};
@@ -341,9 +357,16 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
       }
     }
 
-    // 属性ダメージの計算
     const baseDamage = totalATK * (1 + atkBuff) * (1 + dmgBuff);
+    
     damage[attribute] = baseDamage;
+    
+    damage['火'] = calcAttributeDamage(attribute, '火', baseDamage);
+    damage['水'] = calcAttributeDamage(attribute, '水', baseDamage);
+    damage['木'] = calcAttributeDamage(attribute, '木', baseDamage);
+    damage['無'] = attribute === '無' ? baseDamage * 1.1 : baseDamage;
+    
+    damage['対全'] = Math.max(damage['火'], damage['水'], damage['木']);
   }
 
   return damage;
