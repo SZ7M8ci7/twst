@@ -376,7 +376,7 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
     return damage;
   }
   
-  if (character.name === 'azul_birth') {
+  if (character.name === 'azul_birth' || (character.hp === 1000 && character.atk === 1000)) {
     if (!damage['火']) damage['火'] = 0;
     if (!damage['水']) damage['水'] = 0;
     if (!damage['木']) damage['木'] = 0;
