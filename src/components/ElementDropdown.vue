@@ -33,7 +33,7 @@ const options = ref([
 const dropdown = ref(null);
 const dropdownMenu = ref(null);
 
-const element = computed(() => simulatorStore.deckCharacters[props.charaIndex][`magic${props.elementIndex}atr`]);
+const element = computed(() => simulatorStore.deckCharacters[props.charaIndex][`magic${props.elementIndex}Attribute`]);
 
 const selectedOption = computed(() => {
   if (element.value) {
@@ -44,7 +44,7 @@ const selectedOption = computed(() => {
 });
 
 if (selectedOption.value) {
-  simulatorStore.deckCharacters[props.charaIndex][`magic${props.elementIndex}atr`] = selectedOption.value.value;
+  simulatorStore.deckCharacters[props.charaIndex][`magic${props.elementIndex}Attribute`] = selectedOption.value.value;
 }
 if (!selectedOption.value) {
   selectedOption.value = options.value[0];
@@ -67,7 +67,7 @@ const toggleDropdown = () => {
 };
 
 const selectOption = (option) => {
-  simulatorStore.deckCharacters[props.charaIndex][`magic${props.elementIndex}atr`] = option.value;
+  simulatorStore.deckCharacters[props.charaIndex][`magic${props.elementIndex}Attribute`] = option.value;
   dropdownOpen.value = false;
 };
 

@@ -53,7 +53,7 @@
               </v-col>
               <v-col cols="4">
                 <MagicDropdown
-                  v-model="simulatorStore.deckCharacters[props.charaIndex][`magic${index}power`]"
+                  v-model="simulatorStore.deckCharacters[props.charaIndex][`magic${index}Power`]"
                   style="min-width: 70px; max-width: 120px;"
                 />
               </v-col>
@@ -164,8 +164,8 @@ const selectCharaImage = (chara) => {
     chara[`${magicKey}buf`] = chara[`${magicKey}buf`] || '';
     chara[`${magicKey}heal`] = chara[`${magicKey}heal`] || '';
     // マジックの属性と威力の設定
-    chara[`${magicKey}element`] = chara[`${magicKey}atr`] || '';
-    chara[`${magicKey}power`] = chara[`${magicKey}pow`] || '単発(弱)';
+    chara[`${magicKey}Attribute`] = chara[`${magicKey}atr`] || '';
+    chara[`${magicKey}Power`] = chara[`${magicKey}pow`] || '単発(弱)';
 
     // バフと回復の自動設定
     const buffValue = chara[`${magicKey}buf`];
