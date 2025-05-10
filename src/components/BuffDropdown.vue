@@ -1,21 +1,22 @@
 <template>
   <div class="select-wrapper">
-    <select v-model="magicOption">
+    <select v-model="magicOption" @change="updateValue">
       <option>M1</option>
       <option>M2</option>
       <option>M3</option>
     </select>
   </div>
   <div class="select-wrapper">
-    <select v-model="buffOption">
+    <select v-model="buffOption" @change="updateValue">
       <option>ATKUP</option>
       <option>ダメージUP</option>
+      <option>属性ダメUP</option>
       <option>継続回復</option>
       <option>回復</option>
     </select>
   </div>
   <div class="select-wrapper">
-    <select v-model="powerOption">
+    <select v-model="powerOption" @change="updateValue">
       <option>極小</option>
       <option>小</option>
       <option>中</option>
@@ -23,15 +24,54 @@
       <option>極大</option>
     </select>
   </div>
+  <div class="select-wrapper">
+    <select v-model="levelOption" @change="updateValue">
+      <option disabled value="">Lv</option>
+      <option v-for="n in 10" :key="n" :value="n">Lv{{ n }}</option>
+    </select>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
-const magicOption = ref();
-const buffOption = ref();
-const powerOption = ref();
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    default: () => ({
+      magicOption: '',
+      buffOption: '',
+      powerOption: '',
+      levelOption: 10
+    })
+  }
+});
 
+const emit = defineEmits(['update:modelValue']);
+
+const magicOption = ref(props.modelValue.magicOption || '');
+const buffOption = ref(props.modelValue.buffOption || '');
+const powerOption = ref(props.modelValue.powerOption || '');
+const levelOption = ref(props.modelValue.levelOption || 10);
+
+// 初期値を設定
+watch(() => props.modelValue, (newValue) => {
+  if (newValue) {
+    magicOption.value = newValue.magicOption || '';
+    buffOption.value = newValue.buffOption || '';
+    powerOption.value = newValue.powerOption || '';
+    levelOption.value = newValue.levelOption || 10;
+  }
+}, { immediate: true });
+
+const updateValue = () => {
+  emit('update:modelValue', {
+    magicOption: magicOption.value,
+    buffOption: buffOption.value,
+    powerOption: powerOption.value,
+    levelOption: levelOption.value
+  });
+};
 </script>
 
 <style scoped>

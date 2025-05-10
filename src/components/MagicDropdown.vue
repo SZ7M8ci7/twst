@@ -1,6 +1,6 @@
 <template>
   <div class="select-wrapper">
-    <select v-model="selectedOption">
+    <select v-model="selectedOption" @change="updateValue">
       <option>単発(弱)</option>
       <option>単発(強)</option>
       <option>連撃(弱)</option>
@@ -11,9 +11,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
-const selectedOption = ref('単発(弱)'); // デフォルト値
+const props = defineProps({
+  modelValue: {
+    type: String,
+    default: ''
+  }
+});
+
+const emit = defineEmits(['update:modelValue']);
+
+const selectedOption = ref(props.modelValue || '単発(弱)');
+
+const updateValue = () => {
+  emit('update:modelValue', selectedOption.value);
+};
+
+watch(() => props.modelValue, (newValue) => {
+  selectedOption.value = newValue || '単発(弱)';
+}, { immediate: true });
 </script>
 
 <style scoped>
@@ -24,18 +41,25 @@ const selectedOption = ref('単発(弱)'); // デフォルト値
 
 select {
   appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: none;
+  background-image: none;
   margin-right: 1px;
-  padding: 1px 12px;
+  margin-left: 3px;
+  padding: 2px 12px;
   border-radius: 5px; /* 角丸を適用 */
   border: 1px solid #ccc;
   background-color: white;
   cursor: pointer;
   font-size: 0.8em;
 }
-
-/* ドロップダウンマーク（▼）を表示するためのスタイル */
+select::-ms-expand {
+  display: none;
+}
+/* ドロップダウンマーク（▼）を消す */
 .select-wrapper::after {
-  content: '▼';
+  content: '';
   position: absolute;
   right: 5%;
   top: 50%;
