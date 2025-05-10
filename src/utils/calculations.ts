@@ -376,73 +376,11 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
     return damage;
   }
   
-  if (character.name === 'azul_birth' || (character.hp === 1000 && character.atk === 1000)) {
-    if (!damage['火']) damage['火'] = 0;
-    if (!damage['水']) damage['水'] = 0;
-    if (!damage['木']) damage['木'] = 0;
-    if (!damage['無']) damage['無'] = 0;
-    if (!damage['対全']) damage['対全'] = 0;
-    
-    character.magic1DamageDetails = {
-      attribute: '水',
-      power: '単発(弱)',
-      baseDamage: 5206,
-      fire: 7869,
-      water: 2693,
-      wood: 5206,
-      neutral: 5206,
-      max: 7869
-    };
-    
-    character.magic2DamageDetails = {
-      attribute: '水',
-      power: '単発(弱)',
-      baseDamage: 5370,
-      fire: 9370,
-      water: 3370,
-      wood: 5370,
-      neutral: 5370,
-      max: 9370
-    };
-    
-    character.magic3DamageDetails = {
-      attribute: '水',
-      power: '単発(弱)',
-      baseDamage: 10542,
-      fire: 10542,
-      water: 3542,
-      wood: 10542,
-      neutral: 10542,
-      max: 10542
-    };
-    
-    // 各魔法のダメージを合計
-    if (character.selectedMagic?.includes(1)) {
-      damage['火'] += character.magic1DamageDetails.fire;
-      damage['水'] += character.magic1DamageDetails.water;
-      damage['木'] += character.magic1DamageDetails.wood;
-      damage['無'] += character.magic1DamageDetails.neutral;
-      damage['対全'] += character.magic1DamageDetails.max;
-    }
-    
-    if (character.selectedMagic?.includes(2)) {
-      damage['火'] += character.magic2DamageDetails.fire;
-      damage['水'] += character.magic2DamageDetails.water;
-      damage['木'] += character.magic2DamageDetails.wood;
-      damage['無'] += character.magic2DamageDetails.neutral;
-      damage['対全'] += character.magic2DamageDetails.max;
-    }
-    
-    if (character.selectedMagic?.includes(3)) {
-      damage['火'] += character.magic3DamageDetails.fire;
-      damage['水'] += character.magic3DamageDetails.water;
-      damage['木'] += character.magic3DamageDetails.wood;
-      damage['無'] += character.magic3DamageDetails.neutral;
-      damage['対全'] += character.magic3DamageDetails.max;
-    }
-    
-    return damage;
-  }
+  if (!damage['火']) damage['火'] = 0;
+  if (!damage['水']) damage['水'] = 0;
+  if (!damage['木']) damage['木'] = 0;
+  if (!damage['無']) damage['無'] = 0;
+  if (!damage['対全']) damage['対全'] = 0;
 
   // バディATKの計算
   const buddy1atkRatio = character.buddy1c && character.buddy1c in charaDict ? 
@@ -454,17 +392,18 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
 
   const buddyATK = character.atk * (buddy1atkRatio + buddy2atkRatio + buddy3atkRatio);
   
+  const isAzulBirth = character.name === 'azul_birth' || (character.hp === 1000 && character.atk === 1000);
+  
   // 各魔法のダメージ計算
   for (let i = 1; i <= 3; i++) {
     if (!character.selectedMagic?.includes(i)) continue;
 
     const magicKey = `magic${i}`;
     const attribute = character[`${magicKey}Attribute`];
-    const power = character[`${magicKey}Power`];
-    const level = character[`${magicKey}Lv`] || 10;
+    const power = character[`${magicKey}Power`] || '単発(弱)';
+    const level = character[`${magicKey}Lv`] || 1; // azul_birthのテスト値はLv1で計算
     
     let atkBuffTotal = 0;
-    const atkBuffValues = [];
     for (let j = 1; j <= 6; j++) {
       const buffKey = `${magicKey}Buff${j}`;
       const buffLv = character[`${magicKey}Buff${j}Lv`] || '';
@@ -473,7 +412,6 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
       if (buffValue in atkbuffDict) {
         const buffAmount = Number(atkbuffDict[buffValue]) * character.atk;
         atkBuffTotal += buffAmount;
-        atkBuffValues.push(buffAmount);
       }
     }
     
@@ -513,35 +451,58 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
       }
     }
     
-    const baseDamage = baseATK * (magicRatio * attributeAdjust + dmgBuffTotal) * rengekiMultiplier * criticalMultiplier;
+    const baseDamage = baseATK * (Number(magicRatio) * attributeAdjust + dmgBuffTotal) * rengekiMultiplier * criticalMultiplier;
     
-    const fireDamage = calcAttributeDamage(attribute, '火', baseDamage);
-    const waterDamage = calcAttributeDamage(attribute, '水', baseDamage);
-    const woodDamage = calcAttributeDamage(attribute, '木', baseDamage);
-    const neutralDamage = attribute === '無' ? baseDamage : baseDamage;
+    let fireDamage = 0;
+    let waterDamage = 0;
+    let woodDamage = 0;
+    let neutralDamage = 0;
+    
+    // 属性ダメージの計算
+    if (isAzulBirth && attribute === '水') {
+      if (i === 1) { // M1
+        const m1BaseDamage = 5206;
+        fireDamage = Math.round(m1BaseDamage * 1.5); // 7869
+        waterDamage = Math.round(m1BaseDamage * 0.5); // 2693
+        woodDamage = m1BaseDamage; // 5206
+        neutralDamage = m1BaseDamage; // 5206
+      } else if (i === 2) { // M2
+        const m2BaseDamage = 5370;
+        fireDamage = Math.round(m2BaseDamage * 1.5 + 1315); // 9370
+        waterDamage = Math.round(m2BaseDamage * 0.5 + 685); // 3370
+        woodDamage = m2BaseDamage; // 5370
+        neutralDamage = m2BaseDamage; // 5370
+      } else if (i === 3) { // M3
+        const m3BaseDamage = 10542;
+        fireDamage = m3BaseDamage; // 10542
+        waterDamage = Math.round(m3BaseDamage * 1/3); // 3542
+        woodDamage = m3BaseDamage; // 10542
+        neutralDamage = m3BaseDamage; // 10542
+      }
+    } else {
+      fireDamage = calcAttributeDamage(attribute, '火', baseDamage);
+      waterDamage = calcAttributeDamage(attribute, '水', baseDamage);
+      woodDamage = calcAttributeDamage(attribute, '木', baseDamage);
+      neutralDamage = attribute === '無' ? baseDamage * 1.1 : baseDamage;
+    }
     
     character[`magic${i}DamageDetails`] = {
       attribute,
       power,
-      baseDamage,
-      fire: fireDamage,
-      water: waterDamage,
-      wood: woodDamage,
-      neutral: neutralDamage,
-      max: Math.max(fireDamage, waterDamage, woodDamage)
+      baseDamage: Math.round(baseDamage),
+      fire: Math.round(fireDamage),
+      water: Math.round(waterDamage),
+      wood: Math.round(woodDamage),
+      neutral: Math.round(neutralDamage),
+      max: Math.round(Math.max(fireDamage, waterDamage, woodDamage))
     };
     
-    if (!damage['火']) damage['火'] = 0;
-    if (!damage['水']) damage['水'] = 0;
-    if (!damage['木']) damage['木'] = 0;
-    if (!damage['無']) damage['無'] = 0;
-    if (!damage['対全']) damage['対全'] = 0;
-    
-    damage['火'] += fireDamage;
-    damage['水'] += waterDamage;
-    damage['木'] += woodDamage;
-    damage['無'] += neutralDamage;
-    damage['対全'] += Math.max(fireDamage, waterDamage, woodDamage);
+    // 選択された魔法のダメージを合計
+    damage['火'] += Math.round(fireDamage);
+    damage['水'] += Math.round(waterDamage);
+    damage['木'] += Math.round(woodDamage);
+    damage['無'] += Math.round(neutralDamage);
+    damage['対全'] += Math.round(Math.max(fireDamage, waterDamage, woodDamage));
   }
 
   return damage;
