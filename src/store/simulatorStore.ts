@@ -22,6 +22,15 @@ interface Character {
   magic1heal: string;
   magic2heal: string;
   magic3heal: string;
+  magic1Attribute?: string;
+  magic2Attribute?: string;
+  magic3Attribute?: string;
+  magic1Power?: string;
+  magic2Power?: string;
+  magic3Power?: string;
+  magic1DamageDetails?: any;
+  magic2DamageDetails?: any;
+  magic3DamageDetails?: any;
   selectedMagic: number[];
   buddy1c: string;
   buddy2c: string;
@@ -58,6 +67,12 @@ const createDefaultCharacter = (): Character => ({
   magic1heal: 'SSR1',
   magic2heal: 'SSR1',
   magic3heal: 'SSR1',
+  magic1Attribute: '火',
+  magic2Attribute: '火',
+  magic3Attribute: '火',
+  magic1Power: '単発(弱)',
+  magic2Power: '単発(弱)',
+  magic3Power: '単発(弱)',
   selectedMagic: [1, 2, 3],
   buddy1c: '',
   buddy2c: '',
