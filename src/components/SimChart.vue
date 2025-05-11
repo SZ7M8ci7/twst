@@ -106,24 +106,23 @@ function createChart() {
   const datasets = [
     {
       label: 'HP',
-      stack: 'Stack 0',
+      stack: 'Stack HP',
       backgroundColor: 'rgba(100, 100, 100, 0.6)',
       data: simulatorStore.characterStats.map(stats => stats.hp)
     },
     {
       label: 'バディHP',
-      stack: 'Stack 0',
+      stack: 'Stack HP',
       backgroundColor: 'rgba(100, 100, 100, 0.4)',
       data: simulatorStore.characterStats.map(stats => stats.buddyHP)
     },
     {
       label: '回復',
-      stack: 'Stack 0',
+      stack: 'Stack HP',
       backgroundColor: 'rgba(100, 100, 100, 0.2)',
       data: simulatorStore.characterStats.map(stats => stats.heal)
     }
   ];
-
 
   // 属性ダメージのデータを追加
   const elements = ['火', '水', '木', '無'];
@@ -133,15 +132,15 @@ function createChart() {
   const elementsToShow = props.filterAttribute === '対全' ? elements : [props.filterAttribute.replace('対', '')];
   
   // 各魔法タイプと属性の組み合わせでデータセットを作成
-  elementsToShow.forEach((element, elementIndex) => {
-    magicTypes.forEach((magicType, magicIndex) => {
-      const magicNumber = Number(magicType.replace('M', ''));
+  magicTypes.forEach((magicType) => {
+    const magicNumber = Number(magicType.replace('M', ''));
+    elementsToShow.forEach((element) => {
       datasets.push({
         label: `対${element}(${magicType})`,
-        stack: `Stack ${elementIndex + 1}`,
+        stack: `Stack ${element}${magicType}`,
         backgroundColor: stackColors[element],
         // 各キャラクターの指定された魔法タイプと属性のダメージを取得
-        data: simulatorStore.deckCharacters.map((char, idx) => {
+        data: simulatorStore.deckCharacters.map((char) => {
           const damageDetails = char[`magic${magicNumber}DamageDetails`];
           if (!damageDetails || !char.selectedMagic?.includes(magicNumber)) {
             return 0;
@@ -165,6 +164,7 @@ function createChart() {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       scales: {
         x: {
           stacked: true
@@ -224,6 +224,16 @@ onMounted(createChart);
   width: 100%;
   height: 400px;
   margin-bottom: 20px;
+  position: relative;
+  min-height: 400px;
+}
+
+canvas {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
 .debug-container {

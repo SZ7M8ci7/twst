@@ -439,20 +439,6 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
   if (!charaDict) {
     return damage;
   }
-  
-  const charCacheKey = `${character.chara}|${character.level}|${character.hp}|${character.atk}|${JSON.stringify(character.selectedMagic)}`;
-  
-  if (damageCache.has(charCacheKey)) {
-    const cachedDamage = damageCache.get(charCacheKey);
-    
-    for (let i = 1; i <= 3; i++) {
-      if (character.selectedMagic?.includes(i) && cachedDamage[`magic${i}DamageDetails`]) {
-        character[`magic${i}DamageDetails`] = cachedDamage[`magic${i}DamageDetails`];
-      }
-    }
-    
-    return cachedDamage.damage;
-  }
 
   // バディATKの計算 - 最適化: 一度だけ計算
   const buddyATK = calculateBuddyATK(character, charaDict);
@@ -550,7 +536,6 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
     }
   }
   
-  damageCache.set(charCacheKey, cacheResult);
   manageCacheSize(damageCache);
 
   return damage;
