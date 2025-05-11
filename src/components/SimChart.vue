@@ -127,16 +127,33 @@ function createChart() {
 
   // 属性ダメージのデータを追加
   const elements = ['火', '水', '木', '無'];
+  const magicTypes = ['M1', 'M2', 'M3'];
   
   // 選択された属性のみ表示するか、全属性を表示するか
   const elementsToShow = props.filterAttribute === '対全' ? elements : [props.filterAttribute.replace('対', '')];
   
+  // 各魔法タイプと属性の組み合わせでデータセットを作成
   elementsToShow.forEach((element, elementIndex) => {
-    datasets.push({
-      label: `対${element}ダメージ`,
-      stack: `Stack ${elementIndex + 1}`,
-      backgroundColor: stackColors[element],
-      data: simulatorStore.getDamageByAttribute(element)
+    magicTypes.forEach((magicType, magicIndex) => {
+      const magicNumber = Number(magicType.replace('M', ''));
+      datasets.push({
+        label: `対${element}(${magicType})`,
+        stack: `Stack ${elementIndex + 1}`,
+        backgroundColor: stackColors[element],
+        // 各キャラクターの指定された魔法タイプと属性のダメージを取得
+        data: simulatorStore.deckCharacters.map((char, idx) => {
+          const damageDetails = char[`magic${magicNumber}DamageDetails`];
+          if (!damageDetails || !char.selectedMagic?.includes(magicNumber)) {
+            return 0;
+          }
+          
+          if (element === '火') return damageDetails.fire || 0;
+          if (element === '水') return damageDetails.water || 0;
+          if (element === '木') return damageDetails.wood || 0;
+          if (element === '無') return damageDetails.neutral || 0;
+          return 0;
+        })
+      });
     });
   });
 
