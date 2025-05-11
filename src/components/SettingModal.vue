@@ -346,8 +346,8 @@ onBeforeMount(()=>{
   // ユーザーによる変更を保持するためのリアクティブな参照
   sortOptions = ref(cloneDeep(initialSortOptions).map((option: SortOption) => ({
     ...option,
-    prop: t('settingModal.effectiveHP'),
-    order: t('settingModal.desc')
+    prop: t(option.prop),
+    order: t(option.order)
   })));
   initialMustCharacters = cloneDeep(searchSettingsStore.mustCharacters);
   mustCharacters = ref(cloneDeep(initialMustCharacters));
@@ -372,10 +372,16 @@ const emit = defineEmits(['close']);
 
 function applyFilter() {
   const convertedMustCharacters = mustCharacters.value
-    .filter((mustCharacter: any) => mustCharacter.prop && mustCharacter.prop.trim() !== '') // propが空文字でないものだけを残す
+    .filter((mustCharacter: any) => mustCharacter.prop && mustCharacter.prop.trim() !== '')
     .map((mustCharacter: any) => {
       return enName2jpName[mustCharacter.prop] || mustCharacter.prop;
     });
+
+  // ソートオプションの翻訳キーを元のプロパティ名に戻す
+  const convertedSortOptions = sortOptions.value.map((option: SortOption) => ({
+    ...option,
+    prop: Object.entries(t('settingModal')).find(([, value]) => value === option.prop)?.[0] || option.prop
+  }));
 
   searchSettingsStore.updateSearchSettings({
     minEHP: minEHP.value,
@@ -395,14 +401,14 @@ function applyFilter() {
     minReferenceVsHiDamage: minReferenceVsHiDamage.value,
     minReferenceVsMizuDamage: minReferenceVsMizuDamage.value,
     minReferenceVsKiDamage: minReferenceVsKiDamage.value,
-    sortOptions: sortOptions.value,
+    sortOptions: convertedSortOptions,
     maxResult: maxResult.value,
     attackNum: attackNum.value,
     allowSameCharacter: allowSameCharacter.value,
     mustCharacters: mustCharacters.value,
-    convertedMustCharacters: convertedMustCharacters,  // 変換した値を設定
+    convertedMustCharacters: convertedMustCharacters,
   });
-  emit('close'); // モーダルを閉じる
+  emit('close');
 }
 // キャンセルを押した場合、sortOptionsを元の状態に戻す
 function cancel() {
