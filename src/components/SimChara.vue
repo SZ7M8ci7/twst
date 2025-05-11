@@ -132,6 +132,15 @@ const levelDict = {'R':70,'SR':90,'SSR':110}
 const selectCharaImage = (chara) => {
   console.log('Selected character:', chara);
   
+  // パフォーマンス最適化: 処理開始前に現在のキャラクターを保存
+  const currentChara = simulatorStore.deckCharacters[props.charaIndex].chara;
+  
+  // 同じキャラクターが選択された場合は処理をスキップ
+  if (currentChara === chara.chara) {
+    closeCharaModal();
+    return;
+  }
+  
   // 初期設定の処理
   const initialSettings = {
     chara: chara.chara || '',
@@ -218,8 +227,14 @@ const selectCharaImage = (chara) => {
 
   // キャラクター選択時にselectCharacterを呼び出す
   simulatorStore.selectCharacter(props.charaIndex, chara);
-  // 画像を更新
-  imgpath.value = chara.imgUrl;
+  // 画像を更新 - エラーハンドリングを追加
+  if (chara.imgUrl) {
+    imgpath.value = chara.imgUrl;
+  } else {
+    console.log(`Using default image for ${chara.chara}`);
+    imgpath.value = defaultImg;
+  }
+  
   // ボーナス選択状態を更新
   isBonusSelected.value = chara.isBonusSelected;
   closeCharaModal();

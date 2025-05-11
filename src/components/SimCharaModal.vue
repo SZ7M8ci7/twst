@@ -46,20 +46,46 @@ const closeModal = () => {
 const selectImage = (img) => {
   emit('select', img);
 };
-onBeforeMount(() => {
-  const promises = characters.value.map(character => {
-    return import(`@/assets/img/${character.name}.png`)
-      .then(module => {
-        character.imgUrl = module.default;
-      })
-      .catch(() => {
-        character.imgUrl = ''; // 画像の読み込みに失敗した場合
-      });
-  });
+import defaultImg from '@/assets/img/default.png';
 
-  Promise.all(promises).then(() => {
-    loadingImgUrl.value = false; // すべての画像のロードが完了
-  });
+onBeforeMount(() => {
+  // 画像の読み込みを最適化するために、表示されるキャラクターのみを処理
+  const visibleCharacters = characters.value.filter(character => character.visible);
+  
+  // 画像の読み込みを小さなバッチに分割して処理
+  const batchSize = 10;
+  const batches = [];
+  
+  for (let i = 0; i < visibleCharacters.length; i += batchSize) {
+    batches.push(visibleCharacters.slice(i, i + batchSize));
+  }
+  
+  // バッチごとに順次処理
+  const processBatch = async (index) => {
+    if (index >= batches.length) {
+      loadingImgUrl.value = false; // すべての画像のロードが完了
+      return;
+    }
+    
+    const batch = batches[index];
+    const promises = batch.map(character => {
+      return import(`@/assets/img/${character.name}.png`)
+        .then(module => {
+          character.imgUrl = module.default;
+        })
+        .catch(() => {
+          console.log(`Image not found for ${character.name}, using default`);
+          character.imgUrl = defaultImg; // デフォルト画像を使用
+        });
+    });
+    
+    await Promise.all(promises);
+    // 次のバッチを処理
+    setTimeout(() => processBatch(index + 1), 0);
+  };
+  
+  // 最初のバッチから処理開始
+  processBatch(0);
 });
 </script>
 
