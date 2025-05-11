@@ -1,6 +1,17 @@
 import { defineStore } from 'pinia';
-import { ref, computed, reactive, watch } from 'vue';
+import { ref, computed, reactive, watch, nextTick } from 'vue';
 import { calculateCharacterStats } from '@/utils/calculations';
+
+function debounce(fn: Function, delay: number) {
+  let timer: number | null = null;
+  return function(...args: any[]) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      fn(...args);
+      timer = null;
+    }, delay) as unknown as number;
+  };
+}
 
 
 // キャラクターのインターフェースを定義
@@ -112,6 +123,10 @@ export const useSimulatorStore = defineStore('simulator', () => {
 
   // 計算済みのステータスを保持
   const characterStats = ref(deckCharacters.map(char => calculateCharacterStats(char, charaDict.value)));
+  
+  const isCalculating = ref(false);
+  
+  const needsRecalculation = ref(false);
 
   // デュオの判定と設定を行う関数
   function updateDuoStatus(character: Character, dict: { [key: string]: string }) {
@@ -121,25 +136,76 @@ export const useSimulatorStore = defineStore('simulator', () => {
       character.magic2power = character.magic2pow || '連撃(強)';
     }
   }
+  
+  const recalculateStats = debounce(async () => {
+    if (isCalculating.value) {
+      needsRecalculation.value = true;
+      return;
+    }
+    
+    isCalculating.value = true;
+    
+    await nextTick();
+    
+    try {
+      deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
+      
+      const newStats = [];
+      for (let i = 0; i < deckCharacters.length; i++) {
+        newStats.push(calculateCharacterStats(deckCharacters[i], charaDict.value));
+        if (i < deckCharacters.length - 1) await new Promise(r => setTimeout(r, 0));
+      }
+      
+      characterStats.value = newStats;
+    } finally {
+      isCalculating.value = false;
+      
+      if (needsRecalculation.value) {
+        needsRecalculation.value = false;
+        recalculateStats();
+      }
+    }
+  }, 50);
 
   // charaDictの変更を監視して全キャラクターのステータスを再計算
-  watch(charaDict, (newDict) => {
-    deckCharacters.forEach(character => updateDuoStatus(character, newDict));
-    characterStats.value = deckCharacters.map(char => calculateCharacterStats(char, newDict));
+  watch(charaDict, () => {
+    recalculateStats();
   });
 
-  // デッキのキャラクターの変更を監視
-  watch(deckCharacters, () => {
-    deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
-    characterStats.value = deckCharacters.map(char => calculateCharacterStats(char, charaDict.value));
+  // デッキのキャラクターの変更を監視 - 最適化: 個別のプロパティを監視
+  watch(() => deckCharacters.map(char => ({
+    chara: char.chara,
+    level: char.level,
+    hp: char.hp,
+    atk: char.atk,
+    selectedMagic: [...(char.selectedMagic || [])],
+    magic1Attribute: char.magic1Attribute,
+    magic2Attribute: char.magic2Attribute,
+    magic3Attribute: char.magic3Attribute,
+    magic1Power: char.magic1Power,
+    magic2Power: char.magic2Power,
+    magic3Power: char.magic3Power,
+    magic1Lv: char.magic1Lv,
+    magic2Lv: char.magic2Lv,
+    magic3Lv: char.magic3Lv,
+    buddy1c: char.buddy1c,
+    buddy2c: char.buddy2c,
+    buddy3c: char.buddy3c,
+    buddy1Lv: char.buddy1Lv,
+    buddy2Lv: char.buddy2Lv,
+    buddy3Lv: char.buddy3Lv
+  })), () => {
+    recalculateStats();
   }, { deep: true });
 
-  // バフの変更を監視
-  watch(() => deckCharacters.map(char => char.buffs), () => {
-    characterStats.value = deckCharacters.map(char => calculateCharacterStats(char, charaDict.value));
-  }, { deep: true });
+  // バフの変更を監視 - 最適化: 個別のバフ監視
+  watch(() => deckCharacters.map(char => 
+    char.buffs ? JSON.stringify(char.buffs) : ''
+  ), () => {
+    recalculateStats();
+  });
 
-  // デッキ全体のステータスを計算
+  // デッキ全体のステータスを計算 - 最適化: 型安全性の向上
   const deckStats = computed(() => {
     const stats = {
       totalHP: 0,
@@ -154,9 +220,12 @@ export const useSimulatorStore = defineStore('simulator', () => {
       stats.totalHeal += charStats.heal;
 
       // ダメージの合計を計算
-      Object.entries(charStats.damage).forEach(([attribute, damage]) => {
-        stats.totalDamage[attribute] = (stats.totalDamage[attribute] || 0) + damage;
-      });
+      if (charStats.damage) {
+        Object.entries(charStats.damage).forEach(([attribute, damageValue]) => {
+          const damage = Number(damageValue) || 0;
+          stats.totalDamage[attribute] = (stats.totalDamage[attribute] || 0) + damage;
+        });
+      }
     });
 
     return stats;
@@ -236,39 +305,59 @@ export const useSimulatorStore = defineStore('simulator', () => {
     }
   }
 
-  // キャラクター選択時の処理
+  // キャラクター選択時の処理 - 最適化: 個別キャラクターの更新
   function selectCharacter(index: number, character: any) {
     // 最大HPと最大ATKを保存
     character.max_hp = character.hp;
     character.max_atk = character.atk;
     
+    const oldChara = deckCharacters[index].chara;
     Object.assign(deckCharacters[index], character);
+    
     // バフの初期値を設定
     if (!deckCharacters[index].buffs) {
       deckCharacters[index].buffs = [];
     }
-    characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
+    
+    // キャラクターが変更された場合のみ再計算
+    if (oldChara !== character.chara) {
+      characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
+      
+      if (character.duo || deckCharacters.some(c => c.duo === oldChara || c.duo === character.chara)) {
+        recalculateStats();
+      }
+    }
   }
 
-  // 全キャラクターのステータスを再計算
+  // 全キャラクターのステータスを再計算 - 最適化: デバウンス適用
   function calculateAllStats() {
-    deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
-    characterStats.value = deckCharacters.map(char => calculateCharacterStats(char, charaDict.value));
+    recalculateStats();
   }
 
-  // バフの更新処理
+  // バフの更新処理 - 最適化: 個別バフの更新
   function updateBuff(index: number, buffIndex: number, buff: any) {
     if (!deckCharacters[index].buffs) {
       deckCharacters[index].buffs = [];
     }
-    // バフの初期値を設定
-    const updatedBuff = {
-      ...buff,
-      levelOption: buff.levelOption || '10',
-      powerOption: buff.powerOption || '小'
-    };
-    deckCharacters[index].buffs[buffIndex] = updatedBuff;
-    characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
+    
+    const currentBuff = deckCharacters[index].buffs[buffIndex];
+    const hasChanged = !currentBuff || 
+      currentBuff.buffOption !== buff.buffOption ||
+      currentBuff.powerOption !== buff.powerOption ||
+      currentBuff.levelOption !== buff.levelOption ||
+      currentBuff.magicOption !== buff.magicOption;
+    
+    if (hasChanged) {
+      // バフの初期値を設定
+      const updatedBuff = {
+        ...buff,
+        levelOption: buff.levelOption || '10',
+        powerOption: buff.powerOption || '小'
+      };
+      deckCharacters[index].buffs[buffIndex] = updatedBuff;
+      
+      characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
+    }
   }
 
   return {
