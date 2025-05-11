@@ -132,15 +132,6 @@ const levelDict = {'R':70,'SR':90,'SSR':110}
 const selectCharaImage = (chara) => {
   console.log('Selected character:', chara);
   
-  // パフォーマンス最適化: 処理開始前に現在のキャラクターを保存
-  const currentChara = simulatorStore.deckCharacters[props.charaIndex].chara;
-  
-  // 同じキャラクターが選択された場合は処理をスキップ
-  if (currentChara === chara.chara) {
-    closeCharaModal();
-    return;
-  }
-  
   // 初期設定の処理
   const initialSettings = {
     chara: chara.chara || '',
