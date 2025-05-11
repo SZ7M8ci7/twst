@@ -378,6 +378,10 @@ function calcSelfDamageUp(value: string) {
   if (value.includes('ダメージUP(大)(自/3T)')) {
     return 0.125;
   }
+  // フェロー用
+  if (value.includes('被ダメージUP(中)(相手全体/2T)')) {
+    return 0.0875;
+  }
   return 0;
 }
 
