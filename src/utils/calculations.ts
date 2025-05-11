@@ -456,58 +456,23 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
     const woodDamage = calcAttributeDamage(attribute, '木', baseDamage);
     const neutralDamage = calcAttributeDamage(attribute, '無', baseDamage);
     
-    let adjustedFireDamage = fireDamage;
-    let adjustedWaterDamage = waterDamage;
-    let adjustedWoodDamage = woodDamage;
-    let adjustedNeutralDamage = neutralDamage;
-    
-    if ((character.name === 'azul_birth' || (character.hp === 1000 && character.atk === 1000)) && attribute === '水') {
-      if (i === 1) { // M1
-        const baseM1 = 5206;
-        const fireMultiplier = 7869 / baseM1;
-        const waterMultiplier = 2693 / baseM1;
-        
-        adjustedFireDamage = baseM1 * fireMultiplier;
-        adjustedWaterDamage = baseM1 * waterMultiplier;
-        adjustedWoodDamage = baseM1;
-        adjustedNeutralDamage = baseM1;
-      } else if (i === 2) { // M2
-        const baseM2 = 5370;
-        const fireMultiplier = 9370 / baseM2;
-        const waterMultiplier = 3370 / baseM2;
-        
-        adjustedFireDamage = baseM2 * fireMultiplier;
-        adjustedWaterDamage = baseM2 * waterMultiplier;
-        adjustedWoodDamage = baseM2;
-        adjustedNeutralDamage = baseM2;
-      } else if (i === 3) { // M3
-        const baseM3 = 10542;
-        const waterMultiplier = 3542 / baseM3;
-        
-        adjustedFireDamage = baseM3;
-        adjustedWaterDamage = baseM3 * waterMultiplier;
-        adjustedWoodDamage = baseM3;
-        adjustedNeutralDamage = baseM3;
-      }
-    }
-    
     character[`magic${i}DamageDetails`] = {
       attribute,
       power,
       baseDamage: Math.round(baseDamage),
-      fire: Math.round(adjustedFireDamage),
-      water: Math.round(adjustedWaterDamage),
-      wood: Math.round(adjustedWoodDamage),
-      neutral: Math.round(adjustedNeutralDamage),
-      max: Math.round(Math.max(adjustedFireDamage, adjustedWaterDamage, adjustedWoodDamage))
+      fire: Math.round(fireDamage),
+      water: Math.round(waterDamage),
+      wood: Math.round(woodDamage),
+      neutral: Math.round(neutralDamage),
+      max: Math.round(Math.max(fireDamage, waterDamage, woodDamage))
     };
     
     // 選択された魔法のダメージを合計
-    damage['火'] += Math.round(adjustedFireDamage);
-    damage['水'] += Math.round(adjustedWaterDamage);
-    damage['木'] += Math.round(adjustedWoodDamage);
-    damage['無'] += Math.round(adjustedNeutralDamage);
-    damage['対全'] += Math.round(Math.max(adjustedFireDamage, adjustedWaterDamage, adjustedWoodDamage));
+    damage['火'] += Math.round(fireDamage);
+    damage['水'] += Math.round(waterDamage);
+    damage['木'] += Math.round(woodDamage);
+    damage['無'] += Math.round(neutralDamage);
+    damage['対全'] += Math.round(Math.max(fireDamage, waterDamage, woodDamage));
   }
 
   return damage;
