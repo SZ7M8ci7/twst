@@ -5,7 +5,7 @@
       <v-progress-circular
         indeterminate
         color="primary"
-        size="64"
+        :size="64"
       ></v-progress-circular>
       <p class="loading-text">Loading...</p>
     </div>
@@ -122,9 +122,7 @@ import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 import { useImageUrlDictionary } from '@/components/common';
 import { onMounted, ref, Ref, computed } from 'vue';
-import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
-import { title } from 'process';
 
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
@@ -390,9 +388,6 @@ const cardNameDict: Record<string, string[]> = {}; // キャラ名をキー、�
 // キャラ名をキーとして、カード名を辞書に追加
 characters.value.forEach(character => {
   if (character.rare != 'SSR') return;
-
-  // etcをカンマで分割
-  const etcItems = character.etc.split(',');
 
   // キャラ名をキーとして初期化
   if (!cardNameDict[character.chara]) {
