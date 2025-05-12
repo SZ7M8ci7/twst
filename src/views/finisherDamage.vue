@@ -280,7 +280,9 @@ characters.value.forEach(character => {
       }
     }
 
-
+    if (partnerBuff != '' && atkPartnerBuff == 0 && partnerDamageBuff == 0) {
+      return;
+    }
     // 等倍ダメージ
     const basedamage = Math.floor(atk * (cosmicRatio + selfDamageBuff + partnerDamageBuff) * 2.4);
     if (!fireDamageListByCardDict[character.name]) {
