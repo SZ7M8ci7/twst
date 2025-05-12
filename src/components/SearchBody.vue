@@ -41,8 +41,8 @@
           <v-card>
             <v-card-text>
               <v-select v-model="selectedCharacter.rare" :items="['R', 'SR', 'SSR']"  label="Rare" hide-details></v-select>
-              <v-text-field v-model="selectedCharacter.hp" label="HP" type="number" :min="0" :max="99999" hide-details></v-text-field>
-              <v-text-field v-model="selectedCharacter.atk" label="ATK" type="number" :min="0" :max="99999" hide-details></v-text-field>
+              <v-text-field v-model.number="selectedCharacter.hp" label="HP" type="number" :min="0" :max="99999" hide-details></v-text-field>
+              <v-text-field v-model.number="selectedCharacter.atk" label="ATK" type="number" :min="0" :max="99999" hide-details></v-text-field>
               <v-select v-model="selectedCharacter.duo" :items=buddyCharacter  label="デュオ" hide-details></v-select>
               <v-select v-model="selectedCharacter.buddy1c" :items=buddyCharacter  label="バディ1相手" hide-details></v-select>
               <v-select v-model="selectedCharacter.buddy1s" :items=buddyStatus  label="バディ1" hide-details></v-select>
@@ -230,6 +230,8 @@ function saveCharacter() {
   const index = characters.value.findIndex(c => c.name === selectedCharacter.value.name);
   if (index !== -1) {
     characters.value[index] = { ...selectedCharacter.value };
+  } else {
+    console.error('character not found');
   }
   closeEditModal();
 }
