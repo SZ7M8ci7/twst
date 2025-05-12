@@ -190,7 +190,7 @@ const effectDict: Record<string, Effect[]> = {}; // キャラ名をキー、効�
 
 // バフ値関連定数
 const buffValues = ['(極小)', '(小)', '(中)', '(大)', '(極大)']
-const buffTypes = ['ATKUP', 'ダメージUP', '無属性ダメージUP', '火属性ダメージUP', '水属性ダメージUP', '木属性ダメージUP']
+const buffTypes = ['ATKUP', 'ダメージUP', '無属性ダメージUP', '火属性ダメージUP', '水属性ダメージUP', '木属性ダメージUP', '被ダメージUP']
 const atkBuffDict: { [key: string]: number } = {
   'ATKUP(極小)': 0.1,
   'ATKUP(小)': 0.2,
@@ -224,7 +224,7 @@ characters.value.forEach(character => {
   // 各効果をチェックし、キャラのリストに追加
   etcItems.forEach(item => {
     const trimmedItem = item.trim();
-    if (!trimmedItem.includes('味方')) return;
+    if (!trimmedItem.includes('味方') && !(trimmedItem.includes('被ダメージUP') && trimmedItem.includes('相手'))) return;
     buffTypes.forEach(buffType => {
       // 〇属性ダメージUPとダメージUPを区別するために、バフの種別で文字列が始まっているかチェックする
       if (trimmedItem.startsWith(buffType)) {
@@ -333,7 +333,7 @@ characters.value.forEach(character => {
 });
 
 // 内容確認デバッグ用
-console.log(fireDamageListByCardDict);
+// console.log(fireDamageListByCardDict);
 // console.log(maxFireDamageByCharaDict);
 
 // ATKバディ計算
