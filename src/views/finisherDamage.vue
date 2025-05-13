@@ -158,12 +158,15 @@
                   />
                 </div>
                 <div class="buff-info" v-if="entry.buffName">
-                  <img
-                    :src="getCardImageUrl(entry.buffName)"
-                    :alt="entry.buffName"
-                    class="buff-icon clickable-icon"
-                    @click="openWikiPage(entry.buffName)"
-                  />
+                  <div class="buff-container">
+                    <img
+                      :src="getCardImageUrl(entry.buffName)"
+                      :alt="entry.buffName"
+                      class="buff-icon clickable-icon"
+                      @click="openWikiPage(entry.buffName)"
+                    />
+                    <span class="buff-type" v-if="entry.buffType">{{ entry.buffType }}</span>
+                  </div>
                 </div>
                 <div class="damage-value">
                   {{ Math.floor(entry.damage).toLocaleString() }}
@@ -243,7 +246,11 @@ onMounted(async () => {
 });
 
 // 型宣言
-interface Effect { buff: string; name: string; }
+interface Effect { 
+  buff: string; 
+  name: string;
+  magicType: string;
+}
 interface DamageByCard { 
   damage: number; 
   name: string;
@@ -295,7 +302,17 @@ characters.value.forEach(character => {
         // 効果値毎に区別して辞書に追加
         buffValues.forEach(buffValue => {
           if (trimmedItem.includes(buffValue)) {
-            effectDict[character.chara].push({ buff: buffType + buffValue, name: character.name });
+            // バフの種類を判定
+            let buffMagicType = '';
+            if (trimmedItem.includes('(M1)')) buffMagicType = 'M1';
+            else if (trimmedItem.includes('(M2)')) buffMagicType = 'M2';
+            else if (trimmedItem.includes('(M3)')) buffMagicType = 'M3';
+            
+            effectDict[character.chara].push({ 
+              buff: buffType + buffValue, 
+              name: character.name,
+              magicType: buffMagicType
+            });
           }
         });
       }
@@ -610,7 +627,7 @@ function openWikiPage(cardName: string | undefined) {
 
 // 全キャラクター情報モーダル関連の状態を追加
 const allCharactersDialogVisible = ref(false);
-const allCharactersDamageList = ref<{ cardName: string; damage: number; buffName: string }[]>([]);
+const allCharactersDamageList = ref<{ cardName: string; damage: number; buffName: string; buffType: string }[]>([]);
 const selectedAllCharactersElement = ref<ElementType>('fire');
 
 // 全キャラクター情報モーダルを開く関数
@@ -627,10 +644,19 @@ function openAllCharactersModal(element: ElementType) {
       const maxDamage = Math.max(...damageList.map(d => d.damage), 0);
       // 最大ダメージを持つカードとバフ情報を取得
       const maxDamageEntry = damageList.find(d => d.damage === maxDamage);
+      // バフの種類を取得
+      let buffType = '';
+      if (maxDamageEntry) {
+        const effect = effectDict[character.chara]?.find(e => e.name === maxDamageEntry.name);
+        if (effect) {
+          buffType = effect.magicType;
+        }
+      }
       return {
         cardName: character.name,
         damage: maxDamage,
-        buffName: maxDamageEntry?.name || ''
+        buffName: maxDamageEntry?.name || '',
+        buffType: buffType
       };
     });
 
@@ -925,6 +951,22 @@ const sortedAllCharactersDamageList = computed(() => {
 
 .all-characters-item {
   background-color: #e3f2fd;
+  border: 1px solid #1976d2;
+}
+
+.buff-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.buff-type {
+  font-size: 0.8em;
+  font-weight: bold;
+  color: #1976d2;
+  background-color: #e3f2fd;
+  padding: 2px 6px;
+  border-radius: 4px;
   border: 1px solid #1976d2;
 }
 </style>
