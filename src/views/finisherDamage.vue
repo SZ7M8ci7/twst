@@ -98,7 +98,7 @@
     </template>
 
     <!-- モーダル -->
-    <v-dialog v-model="dialogVisible" max-width="600">
+    <v-dialog v-model="dialogVisible" max-width="450">
       <v-card>
         <v-card-text class="modal-content">
           <v-list class="damage-list">
@@ -115,14 +115,27 @@
                     class="card-icon clickable-icon"
                     @click="openWikiPage(entry.cardName)"
                   />
+                  <div class="buddy-cards" v-if="entry.cardName">
+                    <img
+                      v-for="buddyCard in getBuddyCards(entry.cardName)"
+                      :key="buddyCard"
+                      :src="getCardImageUrl(buddyCard)"
+                      :alt="buddyCard"
+                      class="buddy-icon clickable-icon"
+                      @click="openWikiPage(buddyCard)"
+                    />
+                  </div>
                 </div>
-                <div class="buff-info">
-                  <img
-                    :src="getCardImageUrl(entry.name)"
-                    :alt="entry.name"
-                    class="buff-icon clickable-icon"
-                    @click="openWikiPage(entry.name)"
-                  />
+                <div class="buff-info" v-if="entry.name">
+                  <div class="buff-container">
+                    <img
+                      :src="getCardImageUrl(entry.name)"
+                      :alt="entry.name"
+                      class="buff-icon clickable-icon"
+                      @click="openWikiPage(entry.name)"
+                    />
+                    <span class="buff-source" v-if="entry.buffSource">{{ entry.buffSource }}</span>
+                  </div>
                 </div>
                 <div class="damage-value">
                   {{ Math.floor(entry.damage).toLocaleString() }}
@@ -139,7 +152,7 @@
     </v-dialog>
 
     <!-- 全キャラクター情報モーダル -->
-    <v-dialog v-model="allCharactersDialogVisible" max-width="600">
+    <v-dialog v-model="allCharactersDialogVisible" max-width="450">
       <v-card>
         <v-card-text class="modal-content">
           <v-list class="damage-list">
@@ -156,6 +169,16 @@
                     class="card-icon clickable-icon"
                     @click="openWikiPage(entry.cardName)"
                   />
+                  <div class="buddy-cards" v-if="entry.cardName">
+                    <img
+                      v-for="buddyCard in getBuddyCards(entry.cardName)"
+                      :key="buddyCard"
+                      :src="getCardImageUrl(buddyCard)"
+                      :alt="buddyCard"
+                      class="buddy-icon clickable-icon"
+                      @click="openWikiPage(buddyCard)"
+                    />
+                  </div>
                 </div>
                 <div class="buff-info" v-if="entry.buffName">
                   <div class="buff-container">
@@ -165,7 +188,7 @@
                       class="buff-icon clickable-icon"
                       @click="openWikiPage(entry.buffName)"
                     />
-                    <span class="buff-type" v-if="entry.buffType">{{ entry.buffType }}</span>
+                    <span class="buff-source" v-if="entry.buffSource">{{ entry.buffSource }}</span>
                   </div>
                 </div>
                 <div class="damage-value">
@@ -249,12 +272,13 @@ onMounted(async () => {
 interface Effect { 
   buff: string; 
   name: string;
-  magicType: string;
+  buffSource: string;
 }
 interface DamageByCard { 
   damage: number; 
   name: string;
   cardName?: string;
+  buffSource?: string;
 }
 
 const effectDict: Record<string, Effect[]> = {}; // キャラ名をキー、効果リストを値とする辞書
@@ -301,17 +325,18 @@ characters.value.forEach(character => {
       if (trimmedItem.startsWith(buffType)) {
         // 効果値毎に区別して辞書に追加
         buffValues.forEach(buffValue => {
+          
           if (trimmedItem.includes(buffValue)) {
             // バフの種類を判定
-            let buffMagicType = '';
-            if (trimmedItem.includes('(M1)')) buffMagicType = 'M1';
-            else if (trimmedItem.includes('(M2)')) buffMagicType = 'M2';
-            else if (trimmedItem.includes('(M3)')) buffMagicType = 'M3';
+            let buffbuffSource = '';
+            if (trimmedItem.includes('(M1)')) buffbuffSource = 'M1';
+            else if (trimmedItem.includes('(M2)')) buffbuffSource = 'M2';
+            else if (trimmedItem.includes('(M3)')) buffbuffSource = 'M3';
             
             effectDict[character.chara].push({ 
               buff: buffType + buffValue, 
               name: character.name,
-              magicType: buffMagicType
+              buffSource: buffbuffSource
             });
           }
         });
@@ -319,7 +344,6 @@ characters.value.forEach(character => {
     });
   });
 });
-
 // カード毎のダメージ計算
 characters.value.forEach(character => {
   // SSR以外は計算しない
@@ -338,7 +362,7 @@ characters.value.forEach(character => {
   let maxCosmicDamage = 0;
 
   // ダメージ計算関数
-  function calcDamage(atr: string, partnerBuff: string, partnerName: string) {
+  function calcDamage(atr: string, partnerBuff: string, partnerName: string, buffSource: string) {
     const atkPartnerBuff = atkBuffDict[partnerBuff] || 0;
     // バフ込みのATK値
     const atk = character.atk + character.atk * buddyBonus + character.atk * selfAtkBuff + character.atk * atkPartnerBuff;
@@ -367,12 +391,12 @@ characters.value.forEach(character => {
     // 等倍ダメージ
     const basedamage = Math.floor(atk * (cosmicRatio + selfDamageBuff + partnerDamageBuff) * 2.4);
     if (!fireDamageListByCardDict[character.name]) {
-
       fireDamageListByCardDict[character.name] = [];
       waterDamageListByCardDict[character.name] = [];
       floraDamageListByCardDict[character.name] = [];
       cosmicDamageListByCardDict[character.name] = [];
     }
+
     // 各属性でのダメージ値をキャラクターごとの最大ダメージと、カード毎のダメージ値で保存
     // 属性ごとの係数を辞書で定義
     const attributeModifiers: Record<string, { fire: number; water: number; flora: number; cosmic: number }> = {
@@ -392,16 +416,33 @@ characters.value.forEach(character => {
     maxCosmicDamage = Math.max(basedamage * modifiers.cosmic, maxCosmicDamage);
 
     // ダメージリストを更新
-    fireDamageListByCardDict[character.name].push({ damage: basedamage * modifiers.fire, name: partnerName });
-    waterDamageListByCardDict[character.name].push({ damage: basedamage * modifiers.water, name: partnerName });
-    floraDamageListByCardDict[character.name].push({ damage: basedamage * modifiers.flora, name: partnerName });
-    cosmicDamageListByCardDict[character.name].push({ damage: basedamage * modifiers.cosmic, name: partnerName });
+    console.log(buffSource);
+    fireDamageListByCardDict[character.name].push({ 
+      damage: basedamage * modifiers.fire, 
+      name: partnerName,
+      buffSource: buffSource
+    });
+    waterDamageListByCardDict[character.name].push({ 
+      damage: basedamage * modifiers.water, 
+      name: partnerName,
+      buffSource: buffSource
+    });
+    floraDamageListByCardDict[character.name].push({ 
+      damage: basedamage * modifiers.flora, 
+      name: partnerName,
+      buffSource: buffSource
+    });
+    cosmicDamageListByCardDict[character.name].push({ 
+      damage: basedamage * modifiers.cosmic, 
+      name: partnerName,
+      buffSource: buffSource
+    });
   }
   // 味方バフ無しで計算
-  calcDamage(character.magic2atr, '', getEnglishName(character.duo));
+  calcDamage(character.magic2atr, '', getEnglishName(character.duo), '');
   // 味方バフ有りで計算
   effectDict[character.duo].forEach(duoPartner => {
-    calcDamage(character.magic2atr, duoPartner.buff, duoPartner.name);
+    calcDamage(character.magic2atr, duoPartner.buff, duoPartner.name, duoPartner.buffSource);
   });
   if (!maxFireDamageByCharaDict[character.chara]) {
     maxFireDamageByCharaDict[character.chara] = 0;
@@ -414,10 +455,6 @@ characters.value.forEach(character => {
   maxFloraDamageByCharaDict[character.chara] = Math.max(maxFloraDamageByCharaDict[character.chara], maxFloraDamage);
   maxCosmicDamageByCharaDict[character.chara] = Math.max(maxCosmicDamageByCharaDict[character.chara], maxCosmicDamage);
 });
-
-// 内容確認デバッグ用
-// console.log(fireDamageListByCardDict);
-// console.log(maxFireDamageByCharaDict);
 
 // ATKバディ計算
 function calcBuddy(buddy: string) {
@@ -468,7 +505,6 @@ function calcSelfDamageUp(value: string) {
   return 0;
 }
 
-console.log(effectDict)
 
 const cardNameDict: Record<string, string[]> = {}; // キャラ名をキー、カード名を値とする辞書
 
@@ -627,7 +663,7 @@ function openWikiPage(cardName: string | undefined) {
 
 // 全キャラクター情報モーダル関連の状態を追加
 const allCharactersDialogVisible = ref(false);
-const allCharactersDamageList = ref<{ cardName: string; damage: number; buffName: string; buffType: string }[]>([]);
+const allCharactersDamageList = ref<{ cardName: string; damage: number; buffName: string; buffSource: string }[]>([]);
 const selectedAllCharactersElement = ref<ElementType>('fire');
 
 // 全キャラクター情報モーダルを開く関数
@@ -644,19 +680,11 @@ function openAllCharactersModal(element: ElementType) {
       const maxDamage = Math.max(...damageList.map(d => d.damage), 0);
       // 最大ダメージを持つカードとバフ情報を取得
       const maxDamageEntry = damageList.find(d => d.damage === maxDamage);
-      // バフの種類を取得
-      let buffType = '';
-      if (maxDamageEntry) {
-        const effect = effectDict[character.chara]?.find(e => e.name === maxDamageEntry.name);
-        if (effect) {
-          buffType = effect.magicType;
-        }
-      }
       return {
         cardName: character.name,
         damage: maxDamage,
         buffName: maxDamageEntry?.name || '',
-        buffType: buffType
+        buffSource: maxDamageEntry?.buffSource || ''
       };
     });
 
@@ -667,6 +695,19 @@ function openAllCharactersModal(element: ElementType) {
 const sortedAllCharactersDamageList = computed(() => {
   return [...allCharactersDamageList.value].sort((a, b) => b.damage - a.damage);
 });
+
+// バディーカードの情報を取得する関数を修正
+function getBuddyCards(cardName: string) {
+  const character = characters.value.find(char => char.name === cardName);
+  if (!character) return [];
+  
+  const buddyCards = [];
+  if (character.buddy1c && character.buddy1s.includes('ATK')) buddyCards.push(getEnglishName(character.buddy1c));
+  if (character.buddy2c && character.buddy2s.includes('ATK')) buddyCards.push(getEnglishName(character.buddy2c));
+  if (character.buddy3c && character.buddy3s.includes('ATK')) buddyCards.push(getEnglishName(character.buddy3c));
+  
+  return buddyCards;
+}
 
 </script>
 <style scoped>
@@ -851,29 +892,53 @@ const sortedAllCharactersDamageList = computed(() => {
   .clickable-damage {
     font-size: 0.8em;
   }
+
+  :deep(.v-overlay__content) {
+    margin: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    min-width: 100vw !important;
+    max-width: 100vw !important;
+    padding: 0 !important;
+    position: fixed !important;
+    box-sizing: border-box !important;
+    padding-top: 12px !important;
+  }
+  :deep(.v-dialog .v-card) {
+    width: 100vw !important;
+    min-width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-sizing: border-box !important;
+  }
 }
 
 .modal-content {
-  padding: 16px;
-  max-height: 70vh;
+  padding: 0 !important;
+  max-height: 95vh;
   overflow-y: auto;
 }
 
 .damage-list {
   background: transparent;
+  padding: 0;
+  margin: 0;
 }
 
 .damage-list-item {
-  padding: 8px;
+  padding: 12px 8px;
   border-bottom: 1px solid #eee;
   background: white;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.damage-list-item:last-child {
-  margin-bottom: 0;
+  margin-bottom: 0px;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  min-height: 56px;
+  display: flex;
+  align-items: center;
 }
 
 .damage-item-content {
@@ -882,38 +947,84 @@ const sortedAllCharactersDamageList = computed(() => {
   justify-content: space-between;
   gap: 16px;
   width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
-.card-info, .buff-info {
+.card-info {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  min-width: 125px;
+  flex: 1;
+}
+
+.buff-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 80px;
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.buff-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+  justify-content: flex-start;
+}
+
+.buddy-cards {
+  display: flex;
+  gap: 1px;
+  align-items: center;
+}
+
+.buff-source {
+  font-size: 0.85em;
+  font-weight: bold;
+  color: #6e7072;
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-left: 0px;
+  padding: 0px 0px;
 }
 
 .card-icon, .buff-icon {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 8px;
   object-fit: cover;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
   cursor: pointer;
   transition: transform 0.2s ease;
 }
 
-.clickable-icon:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+.buddy-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: cover;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  transition: transform 0.2s ease;
 }
 
 .damage-value {
   font-weight: bold;
   color: #1976d2;
-  min-width: 120px;
+  min-width: 90px;
   text-align: right;
-  font-size: 1.2em;
-  padding: 8px 16px;
+  font-size: 1em;
+  padding: 0 8px;
   background: #f5f5f5;
   border-radius: 8px;
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .loading-container {
@@ -954,19 +1065,13 @@ const sortedAllCharactersDamageList = computed(() => {
   border: 1px solid #1976d2;
 }
 
-.buff-container {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.v-dialog .v-card {
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
-.buff-type {
-  font-size: 0.8em;
-  font-weight: bold;
-  color: #1976d2;
-  background-color: #e3f2fd;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid #1976d2;
+:deep(.v-card.v-theme--light.v-card--density-default.v-card--variant-elevated) {
+  margin: 7px !important;
+  margin-top: 20px !important;
 }
 </style>
