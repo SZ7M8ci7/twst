@@ -72,6 +72,29 @@
           </div>
         </div>
       </div>
+
+      <!-- 全キャラクター情報表示行を追加 -->
+      <div class="character-row all-characters-row">
+        <div class="character-item" :style="{ ...iconStyle }">
+          <div class="all-characters-label">ALL</div>
+        </div>
+        <div class="damage-row">
+          <div
+            v-for="element in ['Fire', 'Water', 'Flora', 'Cosmic']"
+            :key="element"
+            class="damage-col"
+          >
+            <div class="damage-item all-characters-item">
+              <span
+                class="clickable-damage"
+                @click="openAllCharactersModal(element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic')"
+              >
+                {{ getMaxDamage('全キャラ', element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic') }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- モーダル -->
@@ -114,6 +137,47 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- 全キャラクター情報モーダル -->
+    <v-dialog v-model="allCharactersDialogVisible" max-width="600">
+      <v-card>
+        <v-card-text class="modal-content">
+          <v-list class="damage-list">
+            <v-list-item
+              v-for="(entry, index) in sortedAllCharactersDamageList"
+              :key="index"
+              class="damage-list-item"
+            >
+              <div class="damage-item-content">
+                <div class="card-info">
+                  <img
+                    :src="getCardImageUrl(entry.cardName)"
+                    :alt="entry.cardName"
+                    class="card-icon clickable-icon"
+                    @click="openWikiPage(entry.cardName)"
+                  />
+                </div>
+                <div class="buff-info" v-if="entry.buffName">
+                  <img
+                    :src="getCardImageUrl(entry.buffName)"
+                    :alt="entry.buffName"
+                    class="buff-icon clickable-icon"
+                    @click="openWikiPage(entry.buffName)"
+                  />
+                </div>
+                <div class="damage-value">
+                  {{ Math.floor(entry.damage).toLocaleString() }}
+                </div>
+              </div>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="primary" variant="text" @click="allCharactersDialogVisible = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -123,11 +187,11 @@ import { storeToRefs } from 'pinia';
 import { useImageUrlDictionary } from '@/components/common';
 import { onMounted, ref, Ref, computed } from 'vue';
 import characterData from '@/assets/characters_info.json';
-
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const imgUrlDictionary: Ref<Record<string, string>> = ref({});
 const elementIconDictionary: Ref<Record<string, string>> = ref({});
+
 
 const iconSize = 50;
 const gapSize = 10;
@@ -490,6 +554,18 @@ const sortedCharacterData = computed(() => {
 
 // getMaxDamage関数を修正して小数点を切り捨て
 function getMaxDamage(charaName: string, element: ElementType): number | string {
+  if (charaName === '全キャラ') {
+    const damageDict = getDamageListByElement(element);
+    const maxDamage = characters.value
+      .filter(character => character.rare === 'SSR')
+      .reduce((max, character) => {
+        const damageList = damageDict[character.name] || [];
+        const characterMaxDamage = Math.max(...damageList.map(d => d.damage), 0);
+        return Math.max(max, characterMaxDamage);
+      }, 0);
+    return Math.floor(maxDamage);
+  }
+
   const dict = {
     fire: maxFireDamageByCharaDict,
     water: maxWaterDamageByCharaDict,
@@ -531,6 +607,40 @@ function openWikiPage(cardName: string | undefined) {
     window.open(character.wikiURL, '_blank');
   }
 }
+
+// 全キャラクター情報モーダル関連の状態を追加
+const allCharactersDialogVisible = ref(false);
+const allCharactersDamageList = ref<{ cardName: string; damage: number; buffName: string }[]>([]);
+const selectedAllCharactersElement = ref<ElementType>('fire');
+
+// 全キャラクター情報モーダルを開く関数
+function openAllCharactersModal(element: ElementType) {
+  selectedAllCharactersElement.value = element;
+  const damageDict = getDamageListByElement(element);
+  
+  // 全キャラクターのダメージ情報を結合
+  allCharactersDamageList.value = characters.value
+    .filter(character => character.rare === 'SSR')
+    .map(character => {
+      const damageList = damageDict[character.name] || [];
+      // 各キャラクターの最大ダメージを取得
+      const maxDamage = Math.max(...damageList.map(d => d.damage), 0);
+      // 最大ダメージを持つカードとバフ情報を取得
+      const maxDamageEntry = damageList.find(d => d.damage === maxDamage);
+      return {
+        cardName: character.name,
+        damage: maxDamage,
+        buffName: maxDamageEntry?.name || ''
+      };
+    });
+
+  allCharactersDialogVisible.value = true;
+}
+
+// 全キャラクターのダメージリストを降順でソート
+const sortedAllCharactersDamageList = computed(() => {
+  return [...allCharactersDamageList.value].sort((a, b) => b.damage - a.damage);
+});
 
 </script>
 <style scoped>
@@ -793,5 +903,28 @@ function openWikiPage(cardName: string | undefined) {
   color: #666;
   font-size: 1.2em;
   margin-top: 8px;
+}
+
+.all-characters-row {
+  margin-top: 16px;
+  border-top: 2px solid #e0e0e0;
+  padding-top: 8px;
+}
+
+.all-characters-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-weight: bold;
+  color: #1976d2;
+  background-color: #e3f2fd;
+  border-radius: 8px;
+}
+
+.all-characters-item {
+  background-color: #e3f2fd;
+  border: 1px solid #1976d2;
 }
 </style>
