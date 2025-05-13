@@ -67,41 +67,50 @@ function countEvasion(etc:string) {
 }
 export const useCharacterStore = defineStore('characters', {
   state: () => ({
-    characters: charactersData.map(character => ({
-      ...character,
-      atk: Number(character.atk),
-      base_atk: Number(character.base_atk),
-      calcBaseATK: Number(character.base_atk),
-      hp: Number(character.hp),
-      base_hp: Number(character.base_hp),
-      calcBaseHP: Number(character.base_hp),
-      visible: true,
-      required: false,
-      hasM3: true,
-      level: 0,
-      oldlevel: 0,
-      chara: character.chara || '',
-      attr: character.attr || '',
-      buddy1c: character.buddy1c || '',
-      buddy1s: character.buddy1s || '',
-      buddy2c: character.buddy2c || '',
-      buddy2s: character.buddy2s || '',
-      buddy3c: character.buddy3c || '',
-      buddy3s: character.buddy3s || '',
-      etc: formatEtc(character.etc) || '',
-      buff_count: Number(character.buff_count),
-      debuff_count: Number(character.debuff_count),
-      magic1buf: character.magic1buf || '',
-      magic1heal: character.magic1heal || '',
-      magic2buf: character.magic2buf || '',
-      magic2heal: character.magic2heal || '',
-      magic3buf: character.magic3buf || '',
-      magic3heal: character.magic3heal || '',
-      imgUrl: ref(''),
-      wikiURL:character.wikiURL || '',
-      evasion: countEvasion(character.etc),
-      selections:[],
-    })) as Character[],
+    characters: charactersData
+      .sort((a, b) => {
+        // rareの降順で並び替え
+        if (a.rare !== b.rare) {
+          return b.rare.localeCompare(a.rare);
+        }
+        // rareが同じ場合はcharaの昇順で並び替え
+        return (a.chara || '').localeCompare(b.chara || '');
+      })
+      .map(character => ({
+        ...character,
+        atk: Number(character.atk),
+        base_atk: Number(character.base_atk),
+        calcBaseATK: Number(character.base_atk),
+        hp: Number(character.hp),
+        base_hp: Number(character.base_hp),
+        calcBaseHP: Number(character.base_hp),
+        visible: true,
+        required: false,
+        hasM3: true,
+        level: 0,
+        oldlevel: 0,
+        chara: character.chara || '',
+        attr: character.attr || '',
+        buddy1c: character.buddy1c || '',
+        buddy1s: character.buddy1s || '',
+        buddy2c: character.buddy2c || '',
+        buddy2s: character.buddy2s || '',
+        buddy3c: character.buddy3c || '',
+        buddy3s: character.buddy3s || '',
+        etc: formatEtc(character.etc) || '',
+        buff_count: Number(character.buff_count),
+        debuff_count: Number(character.debuff_count),
+        magic1buf: character.magic1buf || '',
+        magic1heal: character.magic1heal || '',
+        magic2buf: character.magic2buf || '',
+        magic2heal: character.magic2heal || '',
+        magic3buf: character.magic3buf || '',
+        magic3heal: character.magic3heal || '',
+        imgUrl: ref(''),
+        wikiURL:character.wikiURL || '',
+        evasion: countEvasion(character.etc),
+        selections:[],
+      })) as Character[],
     currentPage: '',  // 現在のページ名を保存
     lastPage: '',     // 最後にアクセスしたページ名を保存
   }),
