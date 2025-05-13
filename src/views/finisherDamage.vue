@@ -43,6 +43,28 @@
         </div>
       </div>
 
+      <!-- ALL行を最上部に固定表示 -->
+      <div class="character-row all-characters-row">
+        <div class="character-item" :style="{ ...iconStyle }">
+          <div class="all-characters-label">ALL</div>
+        </div>
+        <div class="damage-row">
+          <div
+            v-for="element in ['Fire', 'Water', 'Flora', 'Cosmic']"
+            :key="element"
+            class="damage-col"
+          >
+            <div class="damage-item all-characters-item">
+              <span
+                class="clickable-damage"
+                @click="openAllCharactersModal(element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic')"
+              >
+                {{ getMaxDamage('全キャラ', element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic') }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
       <div
         v-for="character in sortedCharacterData"
         :key="character.name_en"
@@ -64,32 +86,9 @@
             <div class="damage-item">
               <span
                 class="clickable-damage"
-                @click="openDamageModal(character.name_ja, element.toLowerCase())"
+                @click="openDamageModal(character.name_ja, element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic')"
               >
                 {{ getMaxDamage(character.name_ja, element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic') }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 全キャラクター情報表示行を追加 -->
-      <div class="character-row all-characters-row">
-        <div class="character-item" :style="{ ...iconStyle }">
-          <div class="all-characters-label">ALL</div>
-        </div>
-        <div class="damage-row">
-          <div
-            v-for="element in ['Fire', 'Water', 'Flora', 'Cosmic']"
-            :key="element"
-            class="damage-col"
-          >
-            <div class="damage-item all-characters-item">
-              <span
-                class="clickable-damage"
-                @click="openAllCharactersModal(element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic')"
-              >
-                {{ getMaxDamage('全キャラ', element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic') }}
               </span>
             </div>
           </div>
