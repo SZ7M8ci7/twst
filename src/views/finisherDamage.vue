@@ -670,21 +670,18 @@ function openAllCharactersModal(element: ElementType) {
   selectedAllCharactersElement.value = element;
   const damageDict = getDamageListByElement(element);
   
-  // 全キャラクターのダメージ情報を結合
+  // 全キャラクターの全カード・全バフのダメージ情報を結合
   allCharactersDamageList.value = characters.value
     .filter(character => character.rare === 'SSR')
-    .map(character => {
+    .flatMap(character => {
       const damageList = damageDict[character.name] || [];
-      // 各キャラクターの最大ダメージを取得
-      const maxDamage = Math.max(...damageList.map(d => d.damage), 0);
-      // 最大ダメージを持つカードとバフ情報を取得
-      const maxDamageEntry = damageList.find(d => d.damage === maxDamage);
-      return {
+      // 各カード・バフの全ダメージ情報を取得
+      return damageList.map(d => ({
         cardName: character.name,
-        damage: maxDamage,
-        buffName: maxDamageEntry?.name || '',
-        buffSource: maxDamageEntry?.buffSource || ''
-      };
+        damage: d.damage,
+        buffName: d.name || '',
+        buffSource: d.buffSource || ''
+      }));
     });
 
   allCharactersDialogVisible.value = true;
