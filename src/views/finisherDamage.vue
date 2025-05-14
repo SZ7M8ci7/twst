@@ -254,7 +254,7 @@
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 import { useImageUrlDictionary } from '@/components/common';
-import { onMounted, ref, Ref, computed } from 'vue';
+import { onMounted, ref, Ref, computed, onBeforeUnmount } from 'vue';
 import characterData from '@/assets/characters_info.json';
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
@@ -583,17 +583,17 @@ const selectedDamageList = ref<DamageByCard[]>([]);
 const selectedCardName = ref('');
 const selectedElement = ref('');
 const currentPage = ref(1);
-const itemsPerPage = 20;
+const itemsPerPage = ref(10);
 
 // ページネーション用の計算プロパティを追加
 const paginatedDamageList = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage;
-  const end = start + itemsPerPage;
+  const start = (currentPage.value - 1) * itemsPerPage.value;
+  const end = start + itemsPerPage.value;
   return sortedDamageList.value.slice(start, end);
 });
 
 const totalPages = computed(() => {
-  return Math.ceil(selectedDamageList.value.length / itemsPerPage);
+  return Math.ceil(selectedDamageList.value.length / itemsPerPage.value);
 });
 
 function openDamageModal(charaName: string, element: string) {
@@ -723,17 +723,38 @@ const allCharactersDialogVisible = ref(false);
 const allCharactersDamageList = ref<{ cardName: string; damage: number; buffName: string; buffSource: string }[]>([]);
 const selectedAllCharactersElement = ref<ElementType>('fire');
 const allCharactersCurrentPage = ref(1);
-const allCharactersItemsPerPage = 20;
+const allCharactersItemsPerPage = ref(10);
 
-// 全キャラクター用のページネーション計算プロパティ
+// 1アイテムの高さ（px）
+const LIST_ITEM_HEIGHT = 80; // min-height:56px + padding上下24px
+
+function calcItemsPerPage() {
+  // モーダルの最大高さ: 95vh, ヘッダーや余白を差し引く
+  const modalMaxHeight = window.innerHeight * 0.95;
+  const headerFooterHeight = 60; // ヘッダー・フッター・余白の合計（調整可）
+  const availableHeight = modalMaxHeight - headerFooterHeight;
+  const count = Math.max(1, Math.floor(availableHeight / LIST_ITEM_HEIGHT));
+  itemsPerPage.value = count;
+  allCharactersItemsPerPage.value = count;
+}
+
+onMounted(() => {
+  calcItemsPerPage();
+  window.addEventListener('resize', calcItemsPerPage);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', calcItemsPerPage);
+});
+
+// ページネーション用の計算プロパティを追加
 const paginatedAllCharactersDamageList = computed(() => {
-  const start = (allCharactersCurrentPage.value - 1) * allCharactersItemsPerPage;
-  const end = start + allCharactersItemsPerPage;
+  const start = (allCharactersCurrentPage.value - 1) * allCharactersItemsPerPage.value;
+  const end = start + allCharactersItemsPerPage.value;
   return sortedAllCharactersDamageList.value.slice(start, end);
 });
 
 const allCharactersTotalPages = computed(() => {
-  return Math.ceil(allCharactersDamageList.value.length / allCharactersItemsPerPage);
+  return Math.ceil(allCharactersDamageList.value.length / allCharactersItemsPerPage.value);
 });
 
 // 全キャラクター情報モーダルを開く関数
