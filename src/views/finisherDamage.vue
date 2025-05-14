@@ -102,7 +102,7 @@
         <v-card-text class="modal-content">
           <v-list class="damage-list">
             <v-list-item
-              v-for="(entry, index) in sortedDamageList"
+              v-for="(entry, index) in paginatedDamageList"
               :key="index"
               class="damage-list-item"
             >
@@ -145,7 +145,29 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn color="primary" variant="text" @click="dialogVisible = false">Close</v-btn>
+          <div class="pagination-controls">
+            <v-btn
+              :disabled="currentPage === 1"
+              @click="currentPage--"
+              variant="text"
+              size="small"
+              icon
+            >
+              <v-icon>mdi-chevron-left</v-icon>
+            </v-btn>
+            <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+            <v-btn
+              :disabled="currentPage === totalPages"
+              @click="currentPage++"
+              variant="text"
+              size="small"
+              icon
+            >
+              <v-icon>mdi-chevron-right</v-icon>
+            </v-btn>
+          </div>
+          <v-spacer />
+          <v-btn color="grey" variant="outlined" class="close-btn" @click="dialogVisible = false">CLOSE</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -156,7 +178,7 @@
         <v-card-text class="modal-content">
           <v-list class="damage-list">
             <v-list-item
-              v-for="(entry, index) in sortedAllCharactersDamageList"
+              v-for="(entry, index) in paginatedAllCharactersDamageList"
               :key="index"
               class="damage-list-item"
             >
@@ -199,7 +221,29 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn color="primary" variant="text" @click="allCharactersDialogVisible = false">Close</v-btn>
+          <div class="pagination-controls">
+            <v-btn
+              :disabled="allCharactersCurrentPage === 1"
+              @click="allCharactersCurrentPage--"
+              variant="text"
+              size="small"
+              icon
+            >
+              <v-icon>mdi-chevron-left</v-icon>
+            </v-btn>
+            <span class="page-info">{{ allCharactersCurrentPage }} / {{ allCharactersTotalPages }}</span>
+            <v-btn
+              :disabled="allCharactersCurrentPage === allCharactersTotalPages"
+              @click="allCharactersCurrentPage++"
+              variant="text"
+              size="small"
+              icon
+            >
+              <v-icon>mdi-chevron-right</v-icon>
+            </v-btn>
+          </div>
+          <v-spacer />
+          <v-btn color="grey" variant="outlined" class="close-btn" @click="allCharactersDialogVisible = false">CLOSE</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -538,6 +582,19 @@ const dialogVisible = ref(false);
 const selectedDamageList = ref<DamageByCard[]>([]);
 const selectedCardName = ref('');
 const selectedElement = ref('');
+const currentPage = ref(1);
+const itemsPerPage = 20;
+
+// ページネーション用の計算プロパティを追加
+const paginatedDamageList = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage;
+  const end = start + itemsPerPage;
+  return sortedDamageList.value.slice(start, end);
+});
+
+const totalPages = computed(() => {
+  return Math.ceil(selectedDamageList.value.length / itemsPerPage);
+});
 
 function openDamageModal(charaName: string, element: string) {
   const damageDict = getDamageListByElement(element as 'fire' | 'water' | 'flora' | 'cosmic');
@@ -556,6 +613,7 @@ function openDamageModal(charaName: string, element: string) {
   selectedDamageList.value = allDamageList;
   selectedCardName.value = charaName;
   selectedElement.value = element;
+  currentPage.value = 1; // ページをリセット
   dialogVisible.value = true;
 }
 
@@ -664,6 +722,19 @@ function openWikiPage(cardName: string | undefined) {
 const allCharactersDialogVisible = ref(false);
 const allCharactersDamageList = ref<{ cardName: string; damage: number; buffName: string; buffSource: string }[]>([]);
 const selectedAllCharactersElement = ref<ElementType>('fire');
+const allCharactersCurrentPage = ref(1);
+const allCharactersItemsPerPage = 20;
+
+// 全キャラクター用のページネーション計算プロパティ
+const paginatedAllCharactersDamageList = computed(() => {
+  const start = (allCharactersCurrentPage.value - 1) * allCharactersItemsPerPage;
+  const end = start + allCharactersItemsPerPage;
+  return sortedAllCharactersDamageList.value.slice(start, end);
+});
+
+const allCharactersTotalPages = computed(() => {
+  return Math.ceil(allCharactersDamageList.value.length / allCharactersItemsPerPage);
+});
 
 // 全キャラクター情報モーダルを開く関数
 function openAllCharactersModal(element: ElementType) {
@@ -684,6 +755,7 @@ function openAllCharactersModal(element: ElementType) {
       }));
     });
 
+  allCharactersCurrentPage.value = 1; // ページをリセット
   allCharactersDialogVisible.value = true;
 }
 
@@ -1069,5 +1141,11 @@ function getBuddyCards(cardName: string) {
 :deep(.v-card.v-theme--light.v-card--density-default.v-card--variant-elevated) {
   margin: 7px !important;
   margin-top: 20px !important;
+}
+
+.close-btn {
+  min-width: 80px;
+  font-weight: bold;
+  letter-spacing: 1px;
 }
 </style>
