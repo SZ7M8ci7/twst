@@ -102,6 +102,11 @@ const routes = [
     name: 'finisherDamage',
     component: () => import('@/views/finisherDamage.vue'),
   },
+  {
+    path: '/twst/retire',
+    name: 'retire',
+    component: () => import('@/views/retire.vue'),
+  },
   { path: '/twst/', component: () => import('@/views/top.vue') }
 ]
 

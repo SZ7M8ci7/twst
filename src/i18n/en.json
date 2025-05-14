@@ -15,6 +15,7 @@
     "buddyDuo": "Buddy/Duo Relation",
     "finisherDamage": "Finisher Damage",
     "data": "Data",
+    "retire": "Retire Counter",
     "other": "Other"
   },
   "top": {
@@ -389,5 +390,9 @@
     "masterChef": "The Culinary Crucible Calculator",
     "OCR": "Transcription of owned furniture",
     "defense": "Deck search tool for defensive exam (maintenance stopped)"
+  },
+  "retire": {
+    "reset": "Reset",
+    "num": "times"
   }
 }
