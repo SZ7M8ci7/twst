@@ -394,6 +394,7 @@
   },
   "retire": {
     "reset": "Reset",
-    "num": "times"
+    "num": "times",
+    "clear_content": "Clear"
   }
 }

@@ -1,13 +1,18 @@
 <template>
   <v-container>
     <div class="reset-area">
-      <v-btn
-        class="reset-btn"
-        size="small"
-        @click="resetAllCounters"
-      >
-        {{ $t('retire.reset') }} ({{ resetCount }}{{ $t('retire.num') }})
-      </v-btn>
+      <div class="reset-container">
+        <div class="reset-btn-wrapper">
+          <v-btn
+            class="reset-btn"
+            size="small"
+            @click="resetAllCounters"
+          >
+            {{ $t('retire.reset') }} ({{ resetCount }}{{ $t('retire.num') }})
+          </v-btn>
+        </div>
+        <span class="elapsed-time">{{ elapsedSeconds }}秒</span>
+      </div>
     </div>
 
     <!-- キャラクター選択エリア -->
@@ -59,11 +64,13 @@
                     v-model="inputValues[index].field1"
                     hide-details
                     dense
+                    @update:model-value="saveToLocalStorage"
                   ></v-text-field>
                   <v-btn
                     size="small"
                     class="counter-btn"
                     @click="incrementCounter(index, 'field1')"
+                    @contextmenu.prevent="resetCounter(index, 'field1')"
                   >
                     {{ inputValues[index].field1Count }}
                   </v-btn>
@@ -96,11 +103,13 @@
                     v-model="inputValues[index].field2"
                     hide-details
                     dense
+                    @update:model-value="saveToLocalStorage"
                   ></v-text-field>
                   <v-btn
                     size="small"
                     class="counter-btn"
                     @click="incrementCounter(index, 'field2')"
+                    @contextmenu.prevent="resetCounter(index, 'field2')"
                   >
                     {{ inputValues[index].field2Count }}
                   </v-btn>
@@ -133,11 +142,13 @@
                     v-model="inputValues[index].field3"
                     hide-details
                     dense
+                    @update:model-value="saveToLocalStorage"
                   ></v-text-field>
                   <v-btn
                     size="small"
                     class="counter-btn"
                     @click="incrementCounter(index, 'field3')"
+                    @contextmenu.prevent="resetCounter(index, 'field3')"
                   >
                     {{ inputValues[index].field3Count }}
                   </v-btn>
@@ -170,11 +181,13 @@
                     v-model="inputValues[index].field4"
                     hide-details
                     dense
+                    @update:model-value="saveToLocalStorage"
                   ></v-text-field>
                   <v-btn
                     size="small"
                     class="counter-btn"
                     @click="incrementCounter(index, 'field4')"
+                    @contextmenu.prevent="resetCounter(index, 'field4')"
                   >
                     {{ inputValues[index].field4Count }}
                   </v-btn>
@@ -211,11 +224,20 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <div class="clear-storage-area">
+      <v-btn
+        class="clear-storage-btn"
+        size="small"
+        @click="clearLocalStorage"
+      >
+        {{ $t('retire.clear_content') }}
+      </v-btn>
+    </div>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue';
+import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import charactersInfo from '@/assets/characters_info.json';
 import { useImageUrlDictionary } from '@/components/common';
@@ -252,14 +274,22 @@ const selectedSlotIndex = ref(-1);
 const selectedCharacters = ref<(CharacterInfo | null)[]>([null, null, null, null, null]);
 const imgUrlDictionary = ref<Record<string, string>>({});
 
+// ローカルストレージのキー
+const STORAGE_KEY = {
+  INPUT_VALUES: 'retire_input_values',
+  SELECTED_CHARACTERS: 'retire_selected_characters',
+  VISIBLE_FIELDS: 'retire_visible_fields',
+  RESET_COUNT: 'retire_reset_count',
+  LAST_RESET_TIME: 'retire_last_reset_time'
+};
+
 // 属性選択用のデータ
 const attributes = ref([
   { name: '火', value: 'fire', icon: '' },
   { name: '水', value: 'water', icon: '' },
-  { name: '植物', value: 'flora', icon: '' },
-  { name: '宇宙', value: 'cosmic', icon: '' },
+  { name: '木', value: 'flora', icon: '' },
+  { name: '無', value: 'cosmic', icon: '' },
 ]);
-
 
 // 入力フィールドの値を管理
 const inputValues = ref<InputValues[]>([
@@ -273,6 +303,67 @@ const inputValues = ref<InputValues[]>([
 const activeDropdown = ref<string>('');
 
 const visibleFields = ref<number[]>([2, 2, 2, 2, 2]);
+
+const resetCount = ref(0);
+const elapsedSeconds = ref(0);
+let timer: number | null = null;
+
+// 経過時間を更新する
+const updateElapsedTime = () => {
+  const lastResetTime = localStorage.getItem(STORAGE_KEY.LAST_RESET_TIME);
+  if (lastResetTime) {
+    const elapsed = Math.floor((Date.now() - parseInt(lastResetTime)) / 1000);
+    elapsedSeconds.value = elapsed;
+  }
+};
+
+// ローカルストレージからデータを読み込む
+const loadFromLocalStorage = () => {
+  try {
+    const savedInputValues = localStorage.getItem(STORAGE_KEY.INPUT_VALUES);
+    const savedSelectedCharacters = localStorage.getItem(STORAGE_KEY.SELECTED_CHARACTERS);
+    const savedVisibleFields = localStorage.getItem(STORAGE_KEY.VISIBLE_FIELDS);
+    const savedResetCount = localStorage.getItem(STORAGE_KEY.RESET_COUNT);
+    const savedLastResetTime = localStorage.getItem(STORAGE_KEY.LAST_RESET_TIME);
+
+    if (savedInputValues) {
+      inputValues.value = JSON.parse(savedInputValues);
+    }
+    if (savedSelectedCharacters) {
+      const parsed = JSON.parse(savedSelectedCharacters);
+      selectedCharacters.value = parsed.map((char: any) => {
+        if (!char) return null;
+        return {
+          ...char,
+          imgUrl: imgUrlDictionary.value[char.name_en] || ''
+        };
+      });
+    }
+    if (savedVisibleFields) {
+      visibleFields.value = JSON.parse(savedVisibleFields);
+    }
+    if (savedResetCount) {
+      resetCount.value = parseInt(savedResetCount);
+    }
+    if (savedLastResetTime) {
+      updateElapsedTime();
+    }
+  } catch (error) {
+    console.error('ローカルストレージからの読み込みに失敗しました:', error);
+  }
+};
+
+// ローカルストレージにデータを保存する
+const saveToLocalStorage = () => {
+  try {
+    localStorage.setItem(STORAGE_KEY.INPUT_VALUES, JSON.stringify(inputValues.value));
+    localStorage.setItem(STORAGE_KEY.SELECTED_CHARACTERS, JSON.stringify(selectedCharacters.value));
+    localStorage.setItem(STORAGE_KEY.VISIBLE_FIELDS, JSON.stringify(visibleFields.value));
+    localStorage.setItem(STORAGE_KEY.RESET_COUNT, resetCount.value.toString());
+  } catch (error) {
+    console.error('ローカルストレージへの保存に失敗しました:', error);
+  }
+};
 
 // 表示可能なキャラクターのリスト
 const visibleCharacters = computed(() => {
@@ -292,6 +383,7 @@ const openCharacterModal = (index: number) => {
 const selectCharacter = (character: CharacterInfo) => {
   if (selectedSlotIndex.value >= 0) {
     selectedCharacters.value[selectedSlotIndex.value] = character;
+    saveToLocalStorage();
   }
   showModal.value = false;
 };
@@ -307,6 +399,7 @@ const selectAttribute = (index: number, field: string, value: string) => {
   const fieldKey = `${field}Attribute`;
   inputValues.value[index][fieldKey] = value;
   activeDropdown.value = '';
+  saveToLocalStorage();
 };
 
 // 属性アイコンを取得する
@@ -326,16 +419,23 @@ const incrementCounter = (index: number, field: string) => {
   const countField = `${field}Count`;
   const currentCount = inputValues.value[index][countField] as number;
   inputValues.value[index][countField] = currentCount + 1;
+  saveToLocalStorage();
+};
+
+// カウンターをリセットする
+const resetCounter = (index: number, field: string) => {
+  const countField = `${field}Count`;
+  inputValues.value[index][countField] = 0;
+  saveToLocalStorage();
 };
 
 // フィールドを追加する
 const addField = (index: number) => {
   if (visibleFields.value[index] < 4) {
     visibleFields.value[index]++;
+    saveToLocalStorage();
   }
 };
-
-const resetCount = ref(0);
 
 // すべてのカウンターをリセット
 const resetAllCounters = () => {
@@ -346,6 +446,33 @@ const resetAllCounters = () => {
     inputValues.value[index].field4Count = 0;
   });
   resetCount.value++;
+  elapsedSeconds.value = 0;
+  localStorage.setItem(STORAGE_KEY.LAST_RESET_TIME, Date.now().toString());
+  saveToLocalStorage();
+};
+
+// ローカルストレージをクリアする
+const clearLocalStorage = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY.INPUT_VALUES);
+    localStorage.removeItem(STORAGE_KEY.SELECTED_CHARACTERS);
+    localStorage.removeItem(STORAGE_KEY.VISIBLE_FIELDS);
+    localStorage.removeItem(STORAGE_KEY.RESET_COUNT);
+    localStorage.removeItem(STORAGE_KEY.LAST_RESET_TIME);
+    
+    // 状態をリセット
+    inputValues.value = inputValues.value.map(() => ({
+      field1: '', field2: '', field3: '', field4: '',
+      field1Attribute: '', field2Attribute: '', field3Attribute: '', field4Attribute: '',
+      field1Count: 0, field2Count: 0, field3Count: 0, field4Count: 0
+    }));
+    selectedCharacters.value = [null, null, null, null, null];
+    visibleFields.value = [2, 2, 2, 2, 2];
+    resetCount.value = 0;
+    elapsedSeconds.value = 0;
+  } catch (error) {
+    console.error('ローカルストレージのクリアに失敗しました:', error);
+  }
 };
 
 onMounted(async () => {
@@ -369,10 +496,23 @@ onMounted(async () => {
           character.imgUrl = '';
         });
     }));
+
+    // ローカルストレージからデータを読み込む
+    loadFromLocalStorage();
+
+    // 1秒ごとに経過時間を更新
+    timer = window.setInterval(updateElapsedTime, 1000);
   } finally {
     loadingImgUrl.value = false;
   }
   characterStore.handlePageChange('retirePage');
+});
+
+// コンポーネントのアンマウント時にタイマーをクリア
+onUnmounted(() => {
+  if (timer !== null) {
+    clearInterval(timer);
+  }
 });
 </script>
 
@@ -736,11 +876,53 @@ onMounted(async () => {
   margin-top: 0;
 }
 
+.reset-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 420px;
+  position: relative;
+}
+
+.reset-btn-wrapper {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .reset-btn {
   background-color: #abf1dc !important;
   color: #000000 !important;
   border-radius: 4px;
   box-shadow: 0 2px 2px rgba(29, 29, 29, 0.7);
   transition: background 0.2s;
+}
+
+.clear-storage-area {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.clear-storage-btn {
+  background-color: #ffcdd2 !important;
+  color: #000000 !important;
+  border-radius: 4px;
+  box-shadow: 0 2px 2px rgba(29, 29, 29, 0.7);
+  transition: background 0.2s;
+}
+
+.clear-storage-btn:hover {
+  background-color: #ef9a9a !important;
+}
+
+.elapsed-time {
+  font-size: 0.9rem;
+  color: #666;
+  min-width: 60px;
+  text-align: right;
+  margin-left: auto;
+  padding-right: 10px;
 }
 </style>
