@@ -690,6 +690,12 @@ export async function calcDecks(t: (key: string) => string) {
       }
     }
   }
+
+  // sortCriteriaが空の場合はエラーを表示して終了
+  if (sortCriteria.length === 0) {
+    errorMessage.value = t('search.noSettingOptions');
+    return;
+  }
   
   const firstSortCriteria = sortCriteria[0].order === "昇順";
   async function appendResult(){

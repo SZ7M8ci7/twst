@@ -176,7 +176,8 @@
     "copySuccess": "Copied to clipboard",
     "copyError": "Failed to copy to clipboard",
     "importSuccess": "Imported {count} items",
-    "importError": "Import failed. Invalid data format."
+    "importError": "Import failed. Invalid data format.",
+    "noSettingOptions": "Please specify search settings"
   },
   "infoModal": {
     "about": "About this tool",

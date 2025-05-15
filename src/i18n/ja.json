@@ -176,7 +176,8 @@
     "copySuccess": "クリップボードにコピーしました",
     "copyError": "クリップボードへのコピーに失敗しました",
     "importSuccess": "{count}件のデータをインポートしました",
-    "importError": "インポートに失敗しました。データ形式が正しくありません。"
+    "importError": "インポートに失敗しました。データ形式が正しくありません",
+    "noSettingOptions": "検索設定を指定してください"
   },
   "infoModal": {
     "about": "ツール全体について",
