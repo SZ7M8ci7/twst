@@ -395,6 +395,7 @@
   "retire": {
     "reset": "Reset",
     "num": "times",
-    "clear_content": "Clear"
+    "clear_content": "Clear",
+    "seconds": "sec"
   }
 }

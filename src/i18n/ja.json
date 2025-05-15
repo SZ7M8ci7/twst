@@ -395,6 +395,7 @@
   "retire": {
     "reset": "カウンターリセット",
     "num": "回",
-    "clear_content": "内容クリア"
+    "clear_content": "内容クリア",
+    "seconds": "秒"
   }
 }

@@ -11,7 +11,7 @@
             {{ $t('retire.reset') }} ({{ resetCount }}{{ $t('retire.num') }})
           </v-btn>
         </div>
-        <span class="elapsed-time">{{ elapsedSeconds }}秒</span>
+        <span class="elapsed-time">{{ elapsedSeconds }} {{ $t('retire.seconds') }}</span>
       </div>
     </div>
 
