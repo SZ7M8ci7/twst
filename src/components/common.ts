@@ -369,7 +369,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     }
     let magic2pow = chara.magic2pow;
     if (name2DuoUsed[index]) {
-      magic2pow = "デュオ";
+      magic2pow = "デュオ魔法";
       deckDuo += 1;
     } else {
       if (!name2DuoUsed[index]) {
@@ -424,7 +424,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       }
 
       if (name2DuoUsed[index]) {
-        magic2pow = "デュオ";
+        magic2pow = "デュオ魔法";
         deckDuo += 1;
       }
     }
