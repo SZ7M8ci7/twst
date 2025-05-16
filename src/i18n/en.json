@@ -371,6 +371,9 @@
   "hand": {
     "filter": "Filter",
     "reset": "Reset",
+    "reset_ok": "Reset OK",
+    "reset_ng": "Reset NG",
+    "reset_stats": "Success Rate: {ok}/{total} ({percent}%)",
     "next": "Next turn",
     "add": "Add",
     "character": "Character",

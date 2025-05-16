@@ -371,6 +371,9 @@
   "hand": {
     "filter": "フィルター",
     "reset": "リセット",
+    "reset_ok": "リセット(OK)",
+    "reset_ng": "リセット(NG)",
+    "reset_stats": "OK率: {ok}/{total} ({percent}%)",
     "next": "次のターン",
     "add": "追加",
     "character": "キャラ",
