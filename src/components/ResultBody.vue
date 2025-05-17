@@ -109,13 +109,24 @@ const allowSameCharacter = computed(() => searchSettingsStore.allowSameCharacter
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 
-interface TableHeader {
-  title: string | ReturnType<typeof computed>;
+type DataTableHeader = {
+  title: string;
   value: string;
-  sortable: boolean;
+  align?: 'start' | 'center' | 'end';
+  sortable?: boolean;
+  filterable?: boolean;
+  groupable?: boolean;
+  divider?: boolean;
+  class?: string | string[];
+  cellClass?: string | string[];
+  width?: string | number;
+  filter?: (value: any, search: string, item: any) => boolean;
+  sort?: (a: any, b: any) => number;
 }
 
-const headers = computed<TableHeader[]>(() => [
+const fifthColumnTitle = computed(() => allowSameCharacter.value ? 'Sup' : '5');
+
+const headers = computed<DataTableHeader[]>(() => [
   { title: t('resultBody.HP'), value: 'hp', sortable: false },
   { title: t('resultBody.effectiveHP'), value: 'ehp', sortable: false },
   { title: t('resultBody.evasion'), value: 'evasion', sortable: false },
@@ -139,7 +150,7 @@ const headers = computed<TableHeader[]>(() => [
   { title: '2', value: 'chara2', sortable: false },
   { title: '3', value: 'chara3', sortable: false },
   { title: '4', value: 'chara4', sortable: false },
-  { title: computed(() => allowSameCharacter.value ? 'Sup' : '5'), value: 'chara5', sortable: false },
+  { title: fifthColumnTitle.value, value: 'chara5', sortable: false },
   { title: 'SIM', value: 'simuURL', sortable: false },
 ]);
 function openInNewTab(url: string){
