@@ -86,7 +86,7 @@
             </td>
             <!-- キャラ1～5の画像を表示 -->
             <td v-for="n in 5" :key="`chara${n}`">
-              <v-img :src="item[`chara${n}`]" max-width="50"></v-img>
+              <v-img :src="item[`chara${n}`]" max-width="50" width="50" height="50" :class="{ 'black-border': n === 5 && allowSameCharacter }"></v-img>
             </td>
             <td><v-btn variant="text" v-on:click="openInNewTab(item.simuURL)" icon="mdi-open-in-new" size="x-small"></v-btn></td>
           </tr>
@@ -100,8 +100,11 @@
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
+import { useSearchSettingsStore } from '@/store/searchSetting';
 const searchResultStore = useSearchResultStore();
+const searchSettingsStore = useSearchSettingsStore();
 const { results } = storeToRefs(searchResultStore);
+const allowSameCharacter = computed(() => searchSettingsStore.allowSameCharacter);
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 const headers = computed(() => [
@@ -129,7 +132,7 @@ const headers = computed(() => [
   { title: '2', value: 'chara2', sortable: false },
   { title: '3', value: 'chara3', sortable: false },
   { title: '4', value: 'chara4', sortable: false },
-  { title: '5', value: 'chara5', sortable: false },
+  { title: computed(() => allowSameCharacter.value ? 'Sup' : '5'), value: 'chara5', sortable: false },
   { title: 'SIM', value: 'simuURL', sortable: false },
 ]);
 function openInNewTab(url: string){
@@ -165,6 +168,33 @@ function openInNewTab(url: string){
   padding: 1px 1px !important;
   text-align: center;
 }
+
+::v-deep .v-data-table__td,
+::v-deep .v-data-table-column--align-start,
+::v-deep .v-data-table__th {
+  padding: 1px 1px !important;
+}
+
+::v-deep .v-data-table thead tr th {
+  text-align: center !important;
+  justify-content: center !important;
+}
+
+::v-deep .v-data-table thead tr th .v-data-table-header__content {
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+::v-deep .v-data-table tr td:nth-child(odd),
+::v-deep .v-data-table thead tr th:nth-child(odd) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+::v-deep .v-data-table tr td:nth-child(even),
+::v-deep .v-data-table thead tr th:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
 .css-fukidashi {
   padding: 0;
   margin: 0;
@@ -192,5 +222,10 @@ function openInNewTab(url: string){
 }
 .text:hover + .fukidashi {
   display: block;
+}
+.black-border {
+  border: 2px solid black;
+  border-radius: 4px;
+  box-sizing: border-box;
 }
 </style>

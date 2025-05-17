@@ -281,7 +281,6 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const mizuDamageList: number[] = [];
   const kiDamageList: number[] = [];
 
-  characters.sort((a, b) => b.calcBaseATK - a.calcBaseATK);
   characters.forEach((chara, index) => {
     name2M2Used[index] = false;
     name2MotherUsed[index] = false;
