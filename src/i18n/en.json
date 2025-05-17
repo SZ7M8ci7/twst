@@ -183,7 +183,8 @@
     "itemsPerSecond": "items/sec",
     "hours": "{hours}h",
     "minutes": "{minutes}m",
-    "seconds": "{seconds}s"
+    "seconds": "{seconds}s",
+    "support": "Support"
   },
   "infoModal": {
     "about": "About this tool",
@@ -291,7 +292,7 @@
     "searchSettings":"Search settings",
     "maximumResult":"Maximum number of result",
     "attackNum":"Number of attacks",
-    "allowSameCharacter":"Allow all SSR characters as support characters",
+    "allowSameCharacter":"Use support characters",
     "cancel":"Cancel",
     "ok":"OK",
     "yes":"Yes",
@@ -407,5 +408,9 @@
     "num": "times",
     "clear_content": "Clear",
     "seconds": "sec"
+  },
+  "support": {
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All"
   }
 }

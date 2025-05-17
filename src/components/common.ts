@@ -27,6 +27,7 @@ const {
   convertedMustCharacters,
   allowSameCharacter,
   attackNum,
+  selectedSupportCharacters,
 } = storeToRefs(searchSettingStore);
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
@@ -631,7 +632,7 @@ export async function calcDecks(t: (key: string) => string) {
       calcBaseATK: 0
     }));
   const maxLevelCharacters = characters.value
-    .filter(character => character.rare == 'SSR')
+    .filter(character => character.rare == 'SSR' && selectedSupportCharacters.value.includes(character.name))
     .map(chara => ({
       ...chara,
       calcBaseHP: 0,

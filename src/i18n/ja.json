@@ -183,7 +183,8 @@
     "itemsPerSecond": "件/秒",
     "hours": "{hours}時間",
     "minutes": "{minutes}分",
-    "seconds": "{seconds}秒"
+    "seconds": "{seconds}秒",
+    "support": "サポート"
   },
   "infoModal": {
     "about": "ツール全体について",
@@ -291,7 +292,7 @@
     "searchSettings":"検索設定",
     "maximumResult":"結果上限数",
     "attackNum":"攻撃回数",
-    "allowSameCharacter":"サポートキャラとして全SSRキャラを許可",
+    "allowSameCharacter":"サポートキャラを利用",
     "cancel":"キャンセル",
     "ok":"決定",
     "yes":"はい",
@@ -407,5 +408,9 @@
     "num": "回",
     "clear_content": "内容クリア",
     "seconds": "秒"
+  },
+  "support": {
+    "selectAll": "全選択",
+    "deselectAll": "全解除"
   }
 }

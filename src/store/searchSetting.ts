@@ -30,6 +30,7 @@ export interface SearchSettingsState {
   mustCharacters: [];
   convertedMustCharacters: [];
   allowSameCharacter: boolean;
+  selectedSupportCharacters: string[];
 }
 
 export const useSearchSettingsStore = defineStore('searchSettings', {
@@ -59,6 +60,7 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     mustCharacters: [],
     convertedMustCharacters: [],
     allowSameCharacter: false,
+    selectedSupportCharacters: [],
   }),
   actions: {
     updateSearchSettings(newSettings: Partial<SearchSettingsState>) {
