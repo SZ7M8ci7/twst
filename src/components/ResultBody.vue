@@ -101,14 +101,21 @@ import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { useSearchSettingsStore } from '@/store/searchSetting';
+
 const searchResultStore = useSearchResultStore();
 const searchSettingsStore = useSearchSettingsStore();
 const { results } = storeToRefs(searchResultStore);
 const allowSameCharacter = computed(() => searchSettingsStore.allowSameCharacter);
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
-const headers = computed(() => [
 
+interface TableHeader {
+  title: string | ReturnType<typeof computed>;
+  value: string;
+  sortable: boolean;
+}
+
+const headers = computed<TableHeader[]>(() => [
   { title: t('resultBody.HP'), value: 'hp', sortable: false },
   { title: t('resultBody.effectiveHP'), value: 'ehp', sortable: false },
   { title: t('resultBody.evasion'), value: 'evasion', sortable: false },
