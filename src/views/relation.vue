@@ -78,6 +78,15 @@
 import { computed, onBeforeMount, onMounted, Ref, ref } from 'vue';
 import { Character, useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
+import characterData from '@/assets/characters_info.json';
+
+interface CharacterInfo {
+  name_ja: string;
+  name_en: string;
+  dorm: string;
+  theme_1: string;
+  theme_2: string;
+}
 
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
@@ -106,7 +115,14 @@ const filteredCharacters = computed(() => {
 
   const visibleCharacters = characters.value.filter(character => character.visible && character.imgUrl && character.rare == "SSR");
 
-  visibleCharacters.forEach(character => {
+  // characters_info.jsonの順序に基づいてソート
+  const sortedCharacters = [...visibleCharacters].sort((a, b) => {
+    const indexA = (characterData as CharacterInfo[]).findIndex(char => char.name_ja === a.chara);
+    const indexB = (characterData as CharacterInfo[]).findIndex(char => char.name_ja === b.chara);
+    return indexA - indexB;
+  });
+
+  sortedCharacters.forEach(character => {
     name2data.value[character.name] = character;
     imgUrl2wikiUrl.value[character.imgUrl] = character.wikiURL;
     if (character.chara in chara2name.value) {
@@ -121,7 +137,7 @@ const filteredCharacters = computed(() => {
     }
   });
 
-  return visibleCharacters;
+  return sortedCharacters;
 });
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
