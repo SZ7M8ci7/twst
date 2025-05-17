@@ -24,7 +24,11 @@
         <v-btn block color="green" @click="startSearch">{{ $t('search.startSearch') }}</v-btn>
       </v-col>
       <v-col cols="12" sm="2">
-        <span v-if="totalResults && nowResults">{{ nowResults }}/{{ totalResults }} ({{ searchPercentage }}%)</span>
+        <div v-if="totalResults && nowResults">
+          <div>{{ nowResults }}/{{ totalResults }} ({{ searchPercentage }}%)</div>
+          <div v-if="remainingTime">{{ $t('search.remainingTime') }}: {{ remainingTime }}</div>
+          <div>{{ $t('search.processingSpeed') }}: {{ processingSpeed }}{{ $t('search.itemsPerSecond') }}</div>
+        </div>
       </v-col>
       <v-col cols="12" sm="3"/>
     </v-row>
@@ -76,9 +80,48 @@ const searchPercentage = computed(() => {
   return percentage.toFixed(1); // 小数点以下1桁までのパーセンテージ
 });
 
+// 進捗状況の計算用の変数
+const startTime = ref<number>(0);
+const processingSpeed = ref<string>('0');
+const remainingTime = ref<string>('');
+
+// 進捗状況の更新
+const updateProgress = () => {
+  if (!startTime.value || !nowResults.value || !totalResults.value) return;
+
+  const currentTime = Date.now();
+  const elapsedSeconds = (currentTime - startTime.value) / 1000;
+  const speed = nowResults.value / elapsedSeconds;
+  processingSpeed.value = speed.toFixed(1);
+
+  const remainingItems = totalResults.value - nowResults.value;
+  const estimatedSeconds = remainingItems / speed;
+  
+  if (estimatedSeconds > 0) {
+    const hours = Math.floor(estimatedSeconds / 3600);
+    const minutes = Math.floor((estimatedSeconds % 3600) / 60);
+    const seconds = Math.floor(estimatedSeconds % 60);
+    
+    const timeParts = [];
+    if (hours > 0) timeParts.push(t('search.hours', { hours }));
+    if (minutes > 0) timeParts.push(t('search.minutes', { minutes }));
+    timeParts.push(t('search.seconds', { seconds }));
+    
+    remainingTime.value = timeParts.join(' ');
+  }
+};
+
+// 進捗状況の監視
+watch(nowResults, () => {
+  updateProgress();
+});
+
 const emit = defineEmits(['search-started']);
 function startSearch(){
   isSearching.value = true;
+  startTime.value = Date.now();
+  processingSpeed.value = '0';
+  remainingTime.value = '';
   emit('search-started',)
   event('search start')
   setTimeout(() => {
@@ -87,6 +130,9 @@ function startSearch(){
 }
 function stopSearch(){
   isSearching.value = false; // 検索中状態をfalseに設定してループを中止
+  startTime.value = 0;
+  processingSpeed.value = '0';
+  remainingTime.value = '';
 }
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 watch(errorMessage, (newVal, oldVal) => {

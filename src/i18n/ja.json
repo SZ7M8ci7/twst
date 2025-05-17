@@ -177,7 +177,13 @@
     "copyError": "クリップボードへのコピーに失敗しました",
     "importSuccess": "{count}件のデータをインポートしました",
     "importError": "インポートに失敗しました。データ形式が正しくありません",
-    "noSettingOptions": "検索設定を指定してください"
+    "noSettingOptions": "検索設定を指定してください",
+    "remainingTime": "残り時間",
+    "processingSpeed": "処理速度",
+    "itemsPerSecond": "件/秒",
+    "hours": "{hours}時間",
+    "minutes": "{minutes}分",
+    "seconds": "{seconds}秒"
   },
   "infoModal": {
     "about": "ツール全体について",

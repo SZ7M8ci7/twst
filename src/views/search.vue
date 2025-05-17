@@ -1,5 +1,5 @@
 <template>
-  <v-container style="min-width: 80%;">
+  <v-container style="min-width: 90%;">
     <div>
       <SearchHeader @search-started="handleSearchStarted" />
     </div>
