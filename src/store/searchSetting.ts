@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import charactersData from '@/assets/chara.json';
 
 // types/searchSettingsTypes.ts
 export interface SortOption {
@@ -33,6 +34,13 @@ export interface SearchSettingsState {
   selectedSupportCharacters: string[];
 }
 
+// SSRキャラクターの名前を取得する関数
+const getInitialSSRCharacters = () => {
+  return charactersData
+    .filter(character => character.rare === 'SSR')
+    .map(character => character.name);
+};
+
 export const useSearchSettingsStore = defineStore('searchSettings', {
   state: (): SearchSettingsState => ({
     minEHP: 30000,
@@ -60,7 +68,7 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     mustCharacters: [],
     convertedMustCharacters: [],
     allowSameCharacter: false,
-    selectedSupportCharacters: [],
+    selectedSupportCharacters: getInitialSSRCharacters(),
   }),
   actions: {
     updateSearchSettings(newSettings: Partial<SearchSettingsState>) {
