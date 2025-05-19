@@ -26,7 +26,7 @@
             <v-checkbox v-model="item.required" hide-details></v-checkbox>
           </template>
           <template v-slot:[`item.hasM3`]="{ item }">
-            <v-checkbox v-model="item.hasM3" hide-details></v-checkbox>
+            <v-checkbox v-model="item.hasM3" hide-details v-if="item.rare === 'SSR'"></v-checkbox>
           </template>
           <template v-slot:[`item.name`]="{ item }">
             <img :src="item.imgUrl" :alt="item.name" class="character-image" />
@@ -163,7 +163,7 @@ const visibleCharacters = computed(() => {
 const headers = computed(() => [
   { title: 'Lv', value: 'level', sortable: false },
   { title: t('search.required'), value: 'required', sortable: false },
-  { title: 'M3', value: 'hasM3', sortable: false },
+  { title: 'M3', value: 'hasM3', sortable: false, show: (item: any) => item.rare === 'SSR' },
   { title: t('search.character'), value: 'name', sortable: false },
   { title: t('search.rarity'), value: 'rare', sortable: false },
   { title: 'HP', value: 'hp', sortable: true },
