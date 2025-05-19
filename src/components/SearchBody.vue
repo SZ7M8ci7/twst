@@ -161,11 +161,11 @@ const visibleCharacters = computed(() => {
 });
 
 const headers = computed(() => [
-  { title: 'Lv', value: 'level', sortable: false },
-  { title: t('search.required'), value: 'required', sortable: false },
-  { title: 'M3', value: 'hasM3', sortable: false, show: (item: any) => item.rare === 'SSR' },
+  { title: 'Lv', value: 'level', sortable: true },
+  { title: t('search.required'), value: 'required', sortable: true },
+  { title: 'M3', value: 'hasM3', sortable: true, show: (item: any) => item.rare === 'SSR' },
   { title: t('search.character'), value: 'name', sortable: false },
-  { title: t('search.rarity'), value: 'rare', sortable: false },
+  { title: t('search.rarity'), value: 'rare', sortable: true },
   { title: 'HP', value: 'hp', sortable: true },
   { title: 'ATK', value: 'atk', sortable: true },
   { title: t('search.other'), value: 'etc', sortable: false },
