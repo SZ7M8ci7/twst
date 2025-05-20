@@ -228,11 +228,40 @@
       <v-btn
         class="clear-storage-btn"
         size="small"
-        @click="clearLocalStorage"
+        @click="showConfirmDialog = true"
       >
         {{ $t('retire.clear_content') }}
       </v-btn>
     </div>
+
+    <!-- 確認モーダル -->
+    <v-dialog v-model="showConfirmDialog" max-width="400">
+      <v-card>
+        <v-card-title class="text-h5">
+          {{ $t('retire.confirm_clear') }}
+        </v-card-title>
+        <v-card-text>
+          {{ $t('retire.confirm_clear_message') }}
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="grey-darken-1"
+            variant="text"
+            @click="showConfirmDialog = false"
+          >
+            {{ $t('retire.cancel') }}
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="text"
+            @click="confirmClearStorage"
+          >
+            {{ $t('retire.confirm') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -307,6 +336,8 @@ const visibleFields = ref<number[]>([2, 2, 2, 2, 2]);
 const resetCount = ref(0);
 const elapsedSeconds = ref(0);
 let timer: number | null = null;
+
+const showConfirmDialog = ref(false);
 
 // 経過時間を更新する
 const updateElapsedTime = () => {
@@ -473,6 +504,12 @@ const clearLocalStorage = () => {
   } catch (error) {
     console.error('ローカルストレージのクリアに失敗しました:', error);
   }
+};
+
+// 確認後にローカルストレージをクリア
+const confirmClearStorage = () => {
+  clearLocalStorage();
+  showConfirmDialog.value = false;
 };
 
 onMounted(async () => {

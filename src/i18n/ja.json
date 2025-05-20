@@ -407,7 +407,11 @@
     "reset": "カウンターリセット",
     "num": "回",
     "clear_content": "内容クリア",
-    "seconds": "秒"
+    "seconds": "秒",
+    "confirm_clear": "入力した内容消すよ？",
+    "confirm_clear_message": "間違えて押してないね？",
+    "cancel": "キャンセル",
+    "confirm": "削除"
   },
   "support": {
     "selectAll": "全選択",

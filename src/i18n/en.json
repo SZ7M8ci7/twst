@@ -407,7 +407,11 @@
     "reset": "Reset",
     "num": "times",
     "clear_content": "Clear",
-    "seconds": "sec"
+    "seconds": "sec",
+    "confirm_clear": "Clear all input?",
+    "confirm_clear_message": "Are you sure you didn't press this by mistake?",
+    "cancel": "Cancel",
+    "confirm": "Delete"
   },
   "support": {
     "selectAll": "Select All",
