@@ -303,6 +303,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   characters.forEach((chara, index) => {
     deckList.push(chara.imgUrl);
     simuURL += '&name'+(index+1) + '=' + chara.name;
+    simuURL += '&level'+(index+1) + '=' + chara.level;
     deckTotalHP += chara.calcBaseHP;
     deckTotalBuff += chara.buff_count;
     deckTotalDebuff += chara.debuff_count;
