@@ -362,12 +362,24 @@ const loadFromLocalStorage = () => {
     }
     if (savedSelectedCharacters) {
       const parsed = JSON.parse(savedSelectedCharacters);
-      selectedCharacters.value = parsed.map((char: any) => {
-        if (!char) return null;
+      selectedCharacters.value = parsed.map((charFromFile: any) => {
+        if (!charFromFile) return null;
+
+        let resolvedImgUrl = '';
+        if (charFromFile.imgUrl) {
+          resolvedImgUrl = charFromFile.imgUrl;
+        } else if (charFromFile.name_en && imgUrlDictionary.value[charFromFile.name_en]) {
+          resolvedImgUrl = imgUrlDictionary.value[charFromFile.name_en];
+        }
+
         return {
-          ...char,
-          imgUrl: imgUrlDictionary.value[char.name_en] || ''
-        };
+          name_ja: charFromFile.name_ja,
+          name_en: charFromFile.name_en,
+          dorm: charFromFile.dorm,
+          theme_1: charFromFile.theme_1,
+          theme_2: charFromFile.theme_2,
+          imgUrl: resolvedImgUrl
+        } as CharacterInfo;
       });
     }
     if (savedVisibleFields) {
