@@ -269,7 +269,7 @@
 import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import charactersInfo from '@/assets/characters_info.json';
-import { useImageUrlDictionary } from '@/components/common';
+import { loadImageUrls } from '@/components/common';
 
 interface CharacterInfo {
   name_ja: string;
@@ -521,7 +521,7 @@ onMounted(async () => {
     }));
 
     // キャラクター画像の辞書を作成
-    imgUrlDictionary.value = await useImageUrlDictionary(charactersInfo);
+    imgUrlDictionary.value = await loadImageUrls(charactersInfo, (item: any) => item.name_en);
 
     // キャラクター画像の読み込み
     await Promise.all((charactersInfo as CharacterInfo[]).map(character => {

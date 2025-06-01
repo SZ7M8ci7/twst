@@ -27,7 +27,7 @@
               <div class="header-content">
                 <span class="vs-text">VS</span>
                 <img
-                  :src="getElementIconUrl(element.toLowerCase())"
+                  :src="characterInfoMap.get(element.toLowerCase())?.imgSrc || ''"
                   :alt="element"
                   class="element-icon"
                 />
@@ -71,11 +71,12 @@
         class="character-row"
       >
         <div class="character-item" :style="{ ...iconStyle }">
-          <img
-            :src="imgUrlDictionary[character.name_en]"
-            :alt="character.name_en"
-            class="character-image"
-          />
+          <CharacterIconWithType 
+            :iconKey="character.name_ja" 
+            :iconDictionary="iconsForCharacterIconWithType"
+            :wikiUrl="characterInfoMap.get(character.name_ja)?.wikiUrl || ''" 
+            :iconSize="iconSize" 
+            />
         </div>
         <div class="damage-row">
           <div
@@ -108,28 +109,37 @@
             >
               <div class="damage-item-content">
                 <div class="card-info">
-                  <img
-                    :src="getCardImageUrl(entry.cardName)"
-                    :alt="entry.cardName"
+                  <CharacterIconWithType
+                    :iconKey="entry.cardName || ''"
+                    :iconDictionary="iconsForCharacterIconWithType"
+                    :wikiUrl="characterInfoMap.get(entry.cardName || '')?.wikiUrl || ''"
+                    :cardType="characterInfoMap.get(entry.cardName || '')?.type || ''"
+                    :iconSize="46"
                     class="card-icon clickable-icon"
                     @click="openWikiPage(entry.cardName)"
                   />
                   <div class="buddy-cards" v-if="entry.cardName">
-                    <img
-                      v-for="buddyCard in getBuddyCards(entry.cardName)"
-                      :key="buddyCard"
-                      :src="getCardImageUrl(buddyCard)"
-                      :alt="buddyCard"
+                    <CharacterIconWithType
+                      v-for="buddyCardNameJa in getBuddyCards(entry.cardName)"
+                      :key="buddyCardNameJa"
+                      :iconKey="buddyCardNameJa"
+                      :iconDictionary="iconsForCharacterIconWithType"
+                      :wikiUrl="characterInfoMap.get(buddyCardNameJa)?.wikiUrl || ''"
+                      :cardType="characterInfoMap.get(buddyCardNameJa)?.type || ''"
+                      :iconSize="26"
                       class="buddy-icon clickable-icon"
-                      @click="openWikiPage(buddyCard)"
+                      @click="openWikiPage(buddyCardNameJa)"
                     />
                   </div>
                 </div>
                 <div class="buff-info" v-if="entry.name">
                   <div class="buff-container">
-                    <img
-                      :src="getCardImageUrl(entry.name)"
-                      :alt="entry.name"
+                    <CharacterIconWithType
+                      :iconKey="entry.name"
+                      :iconDictionary="iconsForCharacterIconWithType"
+                      :wikiUrl="characterInfoMap.get(entry.name)?.wikiUrl || ''"
+                      :cardType="characterInfoMap.get(entry.name)?.type || ''"
+                      :iconSize="46"
                       class="buff-icon clickable-icon"
                       @click="openWikiPage(entry.name)"
                     />
@@ -184,28 +194,37 @@
             >
               <div class="damage-item-content">
                 <div class="card-info">
-                  <img
-                    :src="getCardImageUrl(entry.cardName)"
-                    :alt="entry.cardName"
+                  <CharacterIconWithType
+                    :iconKey="entry.cardName"
+                    :iconDictionary="iconsForCharacterIconWithType"
+                    :wikiUrl="characterInfoMap.get(entry.cardName)?.wikiUrl || ''"
+                    :cardType="characterInfoMap.get(entry.cardName)?.type || ''"
+                    :iconSize="46"
                     class="card-icon clickable-icon"
                     @click="openWikiPage(entry.cardName)"
                   />
                   <div class="buddy-cards" v-if="entry.cardName">
-                    <img
-                      v-for="buddyCard in getBuddyCards(entry.cardName)"
-                      :key="buddyCard"
-                      :src="getCardImageUrl(buddyCard)"
-                      :alt="buddyCard"
+                    <CharacterIconWithType
+                      v-for="buddyCardNameJa in getBuddyCards(entry.cardName)"
+                      :key="buddyCardNameJa"
+                      :iconKey="buddyCardNameJa"
+                      :iconDictionary="iconsForCharacterIconWithType"
+                      :wikiUrl="characterInfoMap.get(buddyCardNameJa)?.wikiUrl || ''"
+                      :cardType="characterInfoMap.get(buddyCardNameJa)?.type || ''"
+                      :iconSize="26"
                       class="buddy-icon clickable-icon"
-                      @click="openWikiPage(buddyCard)"
+                      @click="openWikiPage(buddyCardNameJa)"
                     />
                   </div>
                 </div>
                 <div class="buff-info" v-if="entry.buffName">
                   <div class="buff-container">
-                    <img
-                      :src="getCardImageUrl(entry.buffName)"
-                      :alt="entry.buffName"
+                    <CharacterIconWithType
+                      :iconKey="entry.buffName"
+                      :iconDictionary="iconsForCharacterIconWithType"
+                      :wikiUrl="characterInfoMap.get(entry.buffName)?.wikiUrl || ''"
+                      :cardType="characterInfoMap.get(entry.buffName)?.type || ''"
+                      :iconSize="46"
                       class="buff-icon clickable-icon"
                       @click="openWikiPage(entry.buffName)"
                     />
@@ -253,14 +272,14 @@
 <script setup lang="ts">
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
-import { useImageUrlDictionary } from '@/components/common';
+import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
+import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { onMounted, ref, Ref, computed, onBeforeUnmount } from 'vue';
-import characterData from '@/assets/characters_info.json';
+import characterDataJson from '@/assets/characters_info.json';
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
-const imgUrlDictionary: Ref<Record<string, string>> = ref({});
-const elementIconDictionary: Ref<Record<string, string>> = ref({});
 
+const characterInfoMap: Ref<Map<string, CharacterCardInfo>> = ref(new Map());
 
 const iconSize = 50;
 const gapSize = 10;
@@ -270,7 +289,6 @@ const iconStyle = ref({
   '--gap-size': `${gapSize}px`
 });
 
-// 属性アイコンの辞書を追加
 const elementIcons = {
   fire: 'fire',
   water: 'water',
@@ -278,34 +296,76 @@ const elementIcons = {
   cosmic: 'cosmic'
 };
 
-// ローディング状態を管理
 const loading = ref(true);
+
+// CharacterIconWithTypeコンポーネントに渡すためのアイコン辞書
+const iconsForCharacterIconWithType = computed(() => {
+  const record: Record<string, string> = {};
+  for (const [key, info] of characterInfoMap.value.entries()) {
+    record[key] = info.iconSrc || info.imgSrc || ''; 
+  }
+  return record;
+});
 
 onMounted(async () => {
   try {
-    // 画像の読み込み
-    await Promise.all(characters.value.map(character => {
-      return import(`@/assets/img/${character.name}.png`)
-        .then(module => {
-          character.imgUrl = module.default;
-        })
-        .catch(() => {
-          character.imgUrl = ''; // 画像の読み込みに失敗した場合
-        });
-    }));
+    // 1. Piniaストアのcharactersからメイン画像URLを取得
+    const mainImageUrls = await loadImageUrls(characters.value, 'name');
 
-    // キャラクター画像の辞書を作成
-    imgUrlDictionary.value = await useImageUrlDictionary(characterData);
+    // 2. characterDataJsonからアイコン画像URLを取得 (キーは英語名)
+    const iconImageUrlsFromCharacterDataRaw = await loadImageUrls(characterDataJson, 'name_en', 'icon/');
 
-    // 属性アイコンの読み込み
-    await Promise.all(Object.entries(elementIcons).map(async ([key, value]) => {
-      try {
-        const module = await import(`@/assets/img/icon/${value}.png`);
-        elementIconDictionary.value[key] = module.default;
-      } catch {
-        elementIconDictionary.value[key] = '';
+    // 3. Piniaストアのcharactersを元に、日本語名キーのアイコン辞書を作成
+    const iconImageUrlsForStoreChars: Record<string, string> = {};
+    const characterNameEnMap = new Map(characterDataJson.map(cd => [cd.name_ja, cd.name_en]));
+
+    characters.value.forEach(char => {
+      const nameEn = characterNameEnMap.get(char.name); // 日本語名から英語名を取得
+      if (nameEn && iconImageUrlsFromCharacterDataRaw[nameEn]) {
+        iconImageUrlsForStoreChars[char.name] = iconImageUrlsFromCharacterDataRaw[nameEn];
       }
-    }));
+    });
+
+    // 4. 属性アイコンの辞書を作成
+    const elementIconUrls = await loadImageUrls(Object.values(elementIcons), (item) => item, 'icon/');
+
+    // 5. まずPiniaストアのキャラクター情報でcharacterInfoMapを作成
+    characterInfoMap.value = createCharacterInfoMap(
+      characters.value, 
+      mainImageUrls, 
+      iconImageUrlsForStoreChars, 
+      elementIconUrls
+    );
+
+    // 6. characterDataJson にのみ存在するキャラクターの情報、および既存キャラクターの英語名キーでの情報を characterInfoMap に追加
+    const existingKeysInCharacterInfoMap = new Set(characterInfoMap.value.keys());
+
+    characterDataJson.forEach(cd => {
+      const iconUrl = iconImageUrlsFromCharacterDataRaw[cd.name_en];
+      if (iconUrl) {
+        // 日本語名キーでの登録 (まだ登録されていなければ)
+        if (cd.name_ja && !existingKeysInCharacterInfoMap.has(cd.name_ja)) {
+          characterInfoMap.value.set(cd.name_ja, {
+            type: '', 
+            wikiUrl: '',
+            imgSrc: '', 
+            iconSrc: iconUrl,
+          });
+        }
+        // 英語名キーでの登録 (まだ登録されていなければ)
+        if (cd.name_en && !existingKeysInCharacterInfoMap.has(cd.name_en)) {
+          characterInfoMap.value.set(cd.name_en, {
+            type: '', 
+            wikiUrl: '', 
+            imgSrc: '', 
+            iconSrc: iconUrl, 
+          });
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("Error in onMounted finisherDamage.vue:", error);
   } finally {
     loading.value = false;
   }
@@ -459,7 +519,6 @@ characters.value.forEach(character => {
     maxCosmicDamage = Math.max(basedamage * modifiers.cosmic, maxCosmicDamage);
 
     // ダメージリストを更新
-    console.log(buffSource);
     fireDamageListByCardDict[character.name].push({ 
       damage: basedamage * modifiers.fire, 
       name: partnerName,
@@ -567,7 +626,7 @@ characters.value.forEach(character => {
 // const openPanels = ref<Record<string, { fire: number[]; water: number[]; flora: number[]; cosmic: number[] }>>({});
 const openPanels = ref<Record<string, Record<string, number[]>>>({});
 
-characterData.forEach((character) => {
+characterDataJson.forEach((character) => {
   openPanels.value[character.name_en] = {
     fire: [],
     water: [],
@@ -601,7 +660,6 @@ function openDamageModal(charaName: string, element: string) {
   const cardList = cardNameDict[charaName];
   if (!cardList || cardList.length === 0) return;
   
-  // 全てのカードのダメージ情報を結合
   const allDamageList = cardList.flatMap(card => {
     const damageList = damageDict[card] || [];
     return damageList.map(damage => ({
@@ -611,6 +669,7 @@ function openDamageModal(charaName: string, element: string) {
   });
 
   selectedDamageList.value = allDamageList;
+  
   selectedCardName.value = charaName;
   selectedElement.value = element;
   currentPage.value = 1; // ページをリセット
@@ -646,9 +705,9 @@ function toggleSort(column: string) {
 
 // ソート済みのキャラクターデータを計算
 const sortedCharacterData = computed(() => {
-  if (!sortColumn.value) return characterData;
+  if (!sortColumn.value) return characterDataJson;
 
-  return [...characterData].sort((a, b) => {
+  return [...characterDataJson].sort((a, b) => {
     const aValue = getMaxDamage(a.name_ja, sortColumn.value as ElementType);
     const bValue = getMaxDamage(b.name_ja, sortColumn.value as ElementType);
     
@@ -686,13 +745,6 @@ function getMaxDamage(charaName: string, element: ElementType): number | string 
   return value ? Math.floor(value) : '-';
 }
 
-// カード画像のURLを取得する関数
-function getCardImageUrl(cardName: string | undefined): string {
-  if (!cardName) return '';
-  const character = characters.value.find(char => char.name === cardName);
-  return character?.imgUrl || imgUrlDictionary.value[cardName];
-}
-
 // ダメージリストを降順でソート
 const sortedDamageList = computed(() => {
   return [...selectedDamageList.value].sort((a: DamageByCard, b: DamageByCard) => b.damage - a.damage);
@@ -700,21 +752,17 @@ const sortedDamageList = computed(() => {
 
 // 日本語名から英名を取得する関数
 function getEnglishName(japaneseName: string): string {
-  const character = characterData.find(char => char.name_ja === japaneseName);
+  const character = characterDataJson.find(char => char.name_ja === japaneseName);
   return character?.name_en as string || '';
 }
 
-// 属性アイコンのURLを取得する関数を更新
-function getElementIconUrl(element: string): string {
-  return elementIconDictionary.value[element] || '';
-}
-
-// Wikiページを開く関数を追加
+// Wikiページを開く関数を修正
 function openWikiPage(cardName: string | undefined) {
   if (!cardName) return;
-  const character = characters.value.find(char => char.name === cardName);
-  if (character?.wikiURL) {
-    window.open(character.wikiURL, '_blank');
+  const info = characterInfoMap.value.get(cardName);
+  // infoが存在し、かつinfo.wikiUrlが空でない文字列の場合のみページを開く
+  if (info && info.wikiUrl) { 
+    window.open(info.wikiUrl, '_blank');
   }
 }
 
@@ -785,15 +833,24 @@ const sortedAllCharactersDamageList = computed(() => {
   return [...allCharactersDamageList.value].sort((a, b) => b.damage - a.damage);
 });
 
-// バディーカードの情報を取得する関数を修正
-function getBuddyCards(cardName: string) {
+// バディーカードの情報を取得する関数を修正 (戻り値を日本語名にする)
+function getBuddyCards(cardName: string): string[] {
   const character = characters.value.find(char => char.name === cardName);
   if (!character) return [];
   
-  const buddyCards = [];
-  if (character.buddy1c && character.buddy1s.includes('ATK')) buddyCards.push(getEnglishName(character.buddy1c));
-  if (character.buddy2c && character.buddy2s.includes('ATK')) buddyCards.push(getEnglishName(character.buddy2c));
-  if (character.buddy3c && character.buddy3s.includes('ATK')) buddyCards.push(getEnglishName(character.buddy3c));
+  const buddyCards: string[] = []; // 日本語名を格納する配列
+  if (character.buddy1c && character.buddy1s.includes('ATK')) {
+    const buddy1Info = characterInfoMap.value.get(character.buddy1c);
+    if (buddy1Info) buddyCards.push(character.buddy1c);
+  }
+  if (character.buddy2c && character.buddy2s.includes('ATK')) {
+    const buddy2Info = characterInfoMap.value.get(character.buddy2c);
+    if (buddy2Info) buddyCards.push(character.buddy2c);
+  }
+  if (character.buddy3c && character.buddy3s.includes('ATK')) {
+    const buddy3Info = characterInfoMap.value.get(character.buddy3c);
+    if (buddy3Info) buddyCards.push(character.buddy3c);
+  }
   
   return buddyCards;
 }
@@ -1082,8 +1139,6 @@ function getBuddyCards(cardName: string) {
 }
 
 .card-icon, .buff-icon {
-  width: 46px;
-  height: 46px;
   border-radius: 8px;
   object-fit: cover;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
@@ -1092,8 +1147,6 @@ function getBuddyCards(cardName: string) {
 }
 
 .buddy-icon {
-  width: 26px;
-  height: 26px;
   border-radius: 4px;
   object-fit: cover;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);

@@ -2,7 +2,6 @@ import { Character, useCharacterStore} from '@/store/characters'
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
-import { Ref } from 'vue';
 const searchSettingStore = useSearchSettingsStore();
 const {
   minEHP,
@@ -33,6 +32,7 @@ const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, results, isSearching, errorMessage} = storeToRefs(searchResultStore);
+
 // 数値入力で＋とeを弾く
 export function checkNumber(input:KeyboardEvent){
   if (input.key === 'e' || input.key === '+') {
@@ -272,7 +272,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const name2M2Used:Record<number, boolean> = {};
   const name2MotherUsed:Record<number, boolean> = {};
   const name2DuoUsed:Record<number, boolean> = {};
-  const deckList: Ref<any>[] = [];
+  const deckList: string[] = [];
   let simuURL = '';
   const detailList = [];
   const healList: number[] = [];
@@ -895,19 +895,138 @@ export async function calcDecks(t: (key: string) => string) {
   }
 
 }
-export async function useImageUrlDictionary(characterData: Array<{ name_en: string }>) {
-  const imgUrlDictionary = <{ [key: string]: string }>({});  // 画像パスの辞書
 
-  await Promise.all(
-    characterData.map((character) =>
-      import(`@/assets/img/icon/${character.name_en}.png`)
-        .then((module) => {
-          imgUrlDictionary[character.name_en] = module.default;  // 画像パスを辞書に追加
-        })
-        .catch(() => {
-          imgUrlDictionary[character.name_en] = '';  // 画像の読み込みに失敗した場合
-        })
-    )
-  );
-  return imgUrlDictionary;
+// キャッシュされた画像URLの辞書 (モジュールスコープ)
+const cachedImageUrls: Record<string, string> = {};
+
+// 汎用的な画像読み込み関数
+export async function loadImageUrls(
+  items: any[],
+  nameAccessor: string | ((item: any) => string),
+  prefix: string = ''
+): Promise<Record<string, string>> {
+  const imageUrlDictionary: Record<string, string> = {};
+  const imageLoadPromises = items.map(async (item) => {
+    let itemName: string | undefined;
+    try {
+      itemName = typeof nameAccessor === 'function' ? nameAccessor(item) : item[nameAccessor];
+      if (typeof itemName !== 'string' || !itemName) {
+        console.error(`[loadImageUrls] Invalid or undefined itemName (type: ${typeof itemName}, value: ${itemName}) for item:`, item, `with prefix '${prefix}'. Skipping.`);
+        imageUrlDictionary[String(item) || 'unknown_item'] = '';
+        return;
+      }
+
+      const cacheKey = `${prefix}${itemName}`;
+      if (cachedImageUrls[cacheKey]) {
+        imageUrlDictionary[itemName] = cachedImageUrls[cacheKey];
+        return;
+      }
+
+      let module;
+      if (prefix === 'icon/') {
+        module = await import(`@/assets/img/icon/${itemName}.png`) as { default: string };
+      } else if (prefix === '') {
+        module = await import(`@/assets/img/${itemName}.png`) as { default: string };
+      } else {
+        console.error(`[loadImageUrls] Unsupported or unknown prefix '${prefix}' for item '${itemName}'. Trying a generic path that might fail.`);
+        module = await import(`@/assets/img/${prefix}${itemName}.png`) as { default: string };
+      }
+      const imageUrl = module.default;
+      cachedImageUrls[cacheKey] = imageUrl;
+      imageUrlDictionary[itemName] = imageUrl;
+    } catch (error) {
+      imageUrlDictionary[itemName || String(item) || 'unknown_error_item'] = '';
+    }
+  });
+
+  await Promise.all(imageLoadPromises);
+  return imageUrlDictionary;
+}
+
+// 単一の画像をキャッシュ付きで読み込む関数
+export async function loadCachedImageUrl(imageName: string, prefix: string = ''): Promise<string> {
+  const cacheKey = `${prefix}${imageName}`;
+  if (cachedImageUrls[cacheKey]) {
+    return cachedImageUrls[cacheKey];
+  }
+  let imagePathForLog: string = 'unknown_path'; // ログ出力用のパス変数
+  try {
+    let module;
+    if (prefix === 'icon/') {
+      imagePathForLog = `@/assets/img/icon/${imageName}.png`;
+      module = await import(`@/assets/img/icon/${imageName}.png`) as { default: string };
+    } else if (prefix === '') {
+      imagePathForLog = `@/assets/img/${imageName}.png`;
+      module = await import(`@/assets/img/${imageName}.png`) as { default: string };
+    } else {
+      console.error(`[loadCachedImageUrl] Unsupported or unknown prefix '${prefix}' for item '${imageName}'. Trying a generic path that might fail.`);
+      imagePathForLog = `@/assets/img/${prefix}${imageName}.png`;
+      module = await import(`@/assets/img/${prefix}${imageName}.png`) as { default: string };
+    }
+    const imageUrl = module.default;
+    cachedImageUrls[cacheKey] = imageUrl;
+    return imageUrl;
+  } catch (error) {
+    console.error(`[loadCachedImageUrl] Error loading image '${imageName}' (path: '${imagePathForLog}'):`, error);
+    return '';
+  }
+}
+
+export interface CharacterCardInfo {
+  type: string;
+  wikiUrl: string;
+  imgSrc: string;
+  iconSrc?: string; // アイコン画像のURL (オプショナル)
+  elementIconSrc?: string; // 属性アイコンのURL (オプショナル)
+}
+
+export function createCharacterInfoMap(
+  characters: Character[],
+  mainImageUrls?: Record<string, string>,
+  iconImageUrls?: Record<string, string>, // アイコン画像の辞書 (キーは日本語名)
+  elementIconUrls?: Record<string, string>
+): Map<string, CharacterCardInfo> {
+  const infoMap = new Map<string, CharacterCardInfo>();
+  characters.forEach(character => {
+    if (character.name) {
+      let cardTypeShort = '';
+      if (character.attr) {
+        switch (character.attr) {
+          case 'アタック':
+            cardTypeShort = 'ATK';
+            break;
+          case 'バランス':
+            cardTypeShort = 'BAL';
+            break;
+          case 'ディフェンス':
+            cardTypeShort = 'DEF';
+            break;
+          default:
+            cardTypeShort = character.attr.substring(0, 3).toUpperCase();
+            break;
+        }
+      }
+      const imgSrc = mainImageUrls && mainImageUrls[character.name] ? mainImageUrls[character.name] : character.imgUrl;
+      const iconSrc = iconImageUrls && iconImageUrls[character.name] ? iconImageUrls[character.name] : undefined; // 日本語名でアイコンを取得
+
+      infoMap.set(character.name, {
+        type: cardTypeShort,
+        wikiUrl: character.wikiURL,
+        imgSrc: imgSrc,
+        iconSrc: iconSrc,
+      });
+    }
+  });
+
+  if (elementIconUrls) {
+    for (const [elementName, url] of Object.entries(elementIconUrls)) {
+      infoMap.set(elementName, { 
+        type: 'Element',
+        wikiUrl: '',
+        imgSrc: url,
+      });
+    }
+  }
+
+  return infoMap;
 }

@@ -1,7 +1,6 @@
 // store/characters.ts
 import { defineStore } from 'pinia';
 import charactersData from '@/assets/chara.json'
-import { Ref, ref } from 'vue';
 
 export interface Character {
   id: string;
@@ -42,7 +41,7 @@ export interface Character {
   visible?: boolean;
   level: number;
   oldlevel: number;
-  imgUrl: Ref;
+  imgUrl: string;
   wikiURL: string;
   required: boolean;
   hasM3: boolean;
@@ -66,54 +65,82 @@ function countEvasion(etc:string) {
   return matchArray.length;
 }
 export const useCharacterStore = defineStore('characters', {
-  state: () => ({
-    characters: charactersData
+  state: () => {
+    const processedCharacters: Character[] = charactersData
       .sort((a, b) => {
-        // rareの降順で並び替え
         if (a.rare !== b.rare) {
           return b.rare.localeCompare(a.rare);
         }
-        // rareが同じ場合はcharaの昇順で並び替え
         return (a.chara || '').localeCompare(b.chara || '');
       })
-      .map(character => ({
-        ...character,
-        atk: Number(character.atk),
-        base_atk: Number(character.base_atk),
-        calcBaseATK: Number(character.base_atk),
-        hp: Number(character.hp),
-        base_hp: Number(character.base_hp),
-        calcBaseHP: Number(character.base_hp),
-        visible: true,
-        required: false,
-        hasM3: true,
-        level: 0,
-        oldlevel: 0,
-        chara: character.chara || '',
-        attr: character.attr || '',
-        buddy1c: character.buddy1c || '',
-        buddy1s: character.buddy1s || '',
-        buddy2c: character.buddy2c || '',
-        buddy2s: character.buddy2s || '',
-        buddy3c: character.buddy3c || '',
-        buddy3s: character.buddy3s || '',
-        etc: formatEtc(character.etc) || '',
-        buff_count: Number(character.buff_count),
-        debuff_count: Number(character.debuff_count),
-        magic1buf: character.magic1buf || '',
-        magic1heal: character.magic1heal || '',
-        magic2buf: character.magic2buf || '',
-        magic2heal: character.magic2heal || '',
-        magic3buf: character.magic3buf || '',
-        magic3heal: character.magic3heal || '',
-        imgUrl: ref(''),
-        wikiURL:character.wikiURL || '',
-        evasion: countEvasion(character.etc),
-        selections:[],
-      })) as Character[],
-    currentPage: '',  // 現在のページ名を保存
-    lastPage: '',     // 最後にアクセスしたページ名を保存
-  }),
+      .map((characterJsonData: any) => {
+        const { imgUrl: imgUrlFromJson, ...otherJsonProps } = characterJsonData;
+
+        // Character インターフェースから imgUrl を除いた型を定義
+        type CharacterWithoutImgUrl = Omit<Character, 'imgUrl'>;
+
+        // まず imgUrl を含まない Character オブジェクトを構築
+        const characterBase: CharacterWithoutImgUrl = {
+          id: otherJsonProps.id,
+          name: otherJsonProps.name,
+          rare: otherJsonProps.rare,
+          atk: Number(otherJsonProps.atk),
+          attr: otherJsonProps.attr || '',
+          costume: otherJsonProps.costume,
+          base_atk: Number(otherJsonProps.base_atk),
+          calcBaseATK: Number(otherJsonProps.base_atk),
+          hp: Number(otherJsonProps.hp),
+          base_hp: Number(otherJsonProps.base_hp),
+          calcBaseHP: Number(otherJsonProps.base_hp),
+          buddy1c: otherJsonProps.buddy1c || '',
+          buddy1s: otherJsonProps.buddy1s || '',
+          buddy2c: otherJsonProps.buddy2c || '',
+          buddy2s: otherJsonProps.buddy2s || '',
+          buddy3c: otherJsonProps.buddy3c || '',
+          buddy3s: otherJsonProps.buddy3s || '',
+          chara: otherJsonProps.chara || '',
+          duo: otherJsonProps.duo,
+          etc: formatEtc(otherJsonProps.etc) || '',
+          buff_count: Number(otherJsonProps.buff_count),
+          debuff_count: Number(otherJsonProps.debuff_count),
+          growtype: otherJsonProps.growtype,
+          magic1atr: otherJsonProps.magic1atr,
+          magic1buf: otherJsonProps.magic1buf || '',
+          magic1heal: otherJsonProps.magic1heal || '',
+          magic1pow: otherJsonProps.magic1pow,
+          magic2atr: otherJsonProps.magic2atr,
+          magic2buf: otherJsonProps.magic2buf || '',
+          magic2heal: otherJsonProps.magic2heal || '',
+          magic2pow: otherJsonProps.magic2pow,
+          magic3atr: otherJsonProps.magic3atr,
+          magic3buf: otherJsonProps.magic3buf || '',
+          magic3heal: otherJsonProps.magic3heal || '',
+          magic3pow: otherJsonProps.magic3pow,
+          visible: true,
+          level: 0,
+          oldlevel: 0,
+          wikiURL: otherJsonProps.wikiURL || '',
+          required: false,
+          hasM3: true,
+          evasion: countEvasion(otherJsonProps.etc),
+          selections:[],
+          hasDuo: false,
+        };
+        
+        // 次に characterBase と ref でラップした imgUrl を結合して Character 型オブジェクトを生成
+        const finalCharacter: Character = {
+            ...characterBase,
+            imgUrl: imgUrlFromJson || '',
+        }; 
+        return finalCharacter;
+      });
+
+    return { 
+      characters: processedCharacters,
+      currentPage: '',  
+      lastPage: '',     
+    };
+  },
 
   actions: {
     // visibleをリセットするアクション

@@ -47,7 +47,6 @@ import { computed, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
-import { useI18n } from 'vue-i18n';
 import characters_info from '@/assets/characters_info.json';
 
 interface CharacterInfo {
@@ -58,7 +57,6 @@ interface CharacterInfo {
   theme_2: string;
 }
 
-const { t } = useI18n();
 const characterStore = useCharacterStore();
 const searchSettingsStore = useSearchSettingsStore();
 const { characters } = storeToRefs(characterStore);
@@ -80,7 +78,6 @@ const ssrCharacters = computed(() => {
     const bInfo = (characters_info as CharacterInfo[]).find(char => char.name_ja === b.chara);
     
     if (!aInfo || !bInfo) {
-      console.log('Character not found:', { a: a.chara, b: b.chara });
       return 0;
     }
     

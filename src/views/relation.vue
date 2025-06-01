@@ -56,10 +56,13 @@
             <template v-slot:default>
               <tbody>
                 <tr v-for="(value, key) in selectedCharacter" :key="key">
-                  <td v-for="tmp in value" :key="tmp">
-                    <a :href="imgUrl2wikiUrl[tmp]" target="_blank" rel="noopener noreferrer">
-                      <img :src=tmp class="character-image" />
-                    </a>
+                  <td v-for="imgUrl in value" :key="imgUrl">
+                    <CharacterIconWithType 
+                      :imgSrc="imgUrl" 
+                      :wikiUrl="imgUrl2wikiUrl[imgUrl]" 
+                      :cardType="characterInfoMap.get(imgUrl2Name[imgUrl])?.type" 
+                      :iconSize="62" 
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -79,6 +82,8 @@ import { computed, onBeforeMount, onMounted, Ref, ref } from 'vue';
 import { Character, useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 import characterData from '@/assets/characters_info.json';
+import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
+import { createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
 
 interface CharacterInfo {
   name_ja: string;
@@ -97,6 +102,9 @@ const chara2name = ref<Record<string, string[]>>({});
 const duo2name = ref<Record<string, string[]>>({});
 const name2data = ref<Record<string, Character>>({});
 const imgUrl2wikiUrl = ref<Record<string, string>>({});
+const imgUrl2CharacterData = ref<Record<string, Character>>({});
+const imgUrl2Name = ref<Record<string, string>>({});
+const characterInfoMap = ref<Map<string, CharacterCardInfo>>(new Map());
 const selectedAttribute = ref('all');
 const allowEqualMultiplier = ref(false);
 const mutualDuo = ref(true);
@@ -124,7 +132,9 @@ const filteredCharacters = computed(() => {
 
   sortedCharacters.forEach(character => {
     name2data.value[character.name] = character;
-    imgUrl2wikiUrl.value[character.imgUrl] = character.wikiURL;
+    imgUrl2wikiUrl.value[character.imgUrl as string] = character.wikiURL;
+    imgUrl2CharacterData.value[character.imgUrl as string] = character;
+    imgUrl2Name.value[character.imgUrl as string] = character.name;
     if (character.chara in chara2name.value) {
       chara2name.value[character.chara].push(character.name);
     } else {
@@ -152,6 +162,9 @@ onBeforeMount(() => {
 
   Promise.all(promises).then(() => {
     loadingImgUrl.value = false;
+
+    // filteredCharacters が確定した後に characterInfoMap を初期化
+    characterInfoMap.value = createCharacterInfoMap(filteredCharacters.value);
 
     filteredCharacters.value.forEach(character => {
       computeDuo(character);
