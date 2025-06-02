@@ -42,7 +42,7 @@ const finalImgSrc = computed(() => {
   if (props.iconKey && props.iconDictionary && props.iconDictionary[props.iconKey]) {
     return props.iconDictionary[props.iconKey];
   }
-  return props.imgSrc || ''; // iconKey/DictionaryがなければimgSrcを使用、どちらもなければ空文字
+  return props.imgSrc || (props.iconDictionary && props.iconDictionary['notyet']) || '';
 });
 
 const shouldShowCardType = computed(() => currentIconSize.value >= MIN_SIZE_TO_SHOW_TYPE);

@@ -121,7 +121,7 @@ const filteredCharacters = computed(() => {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
 
-  const visibleCharacters = characters.value.filter(character => character.visible && character.imgUrl && character.rare == "SSR");
+  const visibleCharacters = characters.value.filter(character => character.visible && character.rare == "SSR");
 
   // characters_info.jsonの順序に基づいてソート
   const sortedCharacters = [...visibleCharacters].sort((a, b) => {
@@ -155,8 +155,9 @@ onBeforeMount(() => {
       .then(module => {
         character.imgUrl = module.default;
       })
-      .catch(() => {
-        character.imgUrl = '';
+      .catch(async () => {
+        const module = await import(`@/assets/img/notyet.png`);
+        character.imgUrl = module.default;
       });
   });
 

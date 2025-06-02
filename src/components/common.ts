@@ -906,6 +906,24 @@ export async function loadImageUrls(
   prefix: string = ''
 ): Promise<Record<string, string>> {
   const imageUrlDictionary: Record<string, string> = {};
+
+  // Add notyet.png loading
+  const notYetImageName = 'notyet';
+  const notYetCacheKey = notYetImageName; // Assuming no prefix for notyet.png
+  if (cachedImageUrls[notYetCacheKey]) {
+    imageUrlDictionary[notYetImageName] = cachedImageUrls[notYetCacheKey];
+  } else {
+    try {
+      const module = await import(`@/assets/img/${notYetImageName}.png`) as { default: string };
+      const imageUrl = module.default;
+      cachedImageUrls[notYetCacheKey] = imageUrl;
+      imageUrlDictionary[notYetImageName] = imageUrl;
+    } catch (error) {
+      console.error(`[loadImageUrls] Error loading ${notYetImageName}.png:`, error);
+      imageUrlDictionary[notYetImageName] = ''; // Set empty string on error
+    }
+  }
+
   const imageLoadPromises = items.map(async (item) => {
     let itemName: string | undefined;
     try {

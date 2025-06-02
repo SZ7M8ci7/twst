@@ -171,9 +171,9 @@ onMounted(async () => {
       .then(module => {
         char.imgUrl = module.default;
       })
-      .catch(() => {
-        // console.error(`Failed to load image for ${char.name}. Setting to empty string.`);
-        char.imgUrl = '';
+      .catch(async () => {
+        const module = await import(`@/assets/img/notyet.png`);
+        char.imgUrl = module.default;
       });
   });
 
