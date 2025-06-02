@@ -636,6 +636,7 @@ export async function calcDecks(t: (key: string) => string) {
     .filter(character => character.rare == 'SSR' && selectedSupportCharacters.value.includes(character.name))
     .map(chara => ({
       ...chara,
+      level: 110,
       calcBaseHP: 0,
       calcBaseATK: 0
     }));
