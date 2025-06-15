@@ -297,7 +297,26 @@
     "ok":"OK",
     "yes":"Yes",
     "no":"No",
-    "mustCharacter":"Required Character"
+    "mustCharacter":"Required Character",
+    "searchPreset":"Search Preset",
+    "preset": {
+      "fireBasicExam": "Fire Basic Exam",
+      "waterBasicExam": "Water Basic Exam",
+      "floraBasicExam": "Flora Basic Exam",
+      "allBasicExam": "Omni Basic Exam",
+      "neutralBasicExam": "Cosmic Basic Exam",
+      "fireDefenseExam": "Fire Defense Exam",
+      "waterDefenseExam": "Water Defense Exam",
+      "floraDefenseExam": "Flora Defense Exam",
+      "allDefenseExam": "Omni Defense Exam",
+      "neutralDefenseExam": "Cosmic Defense Exam",
+      "fireAttackExam": "Fire Offence Exam",
+      "waterAttackExam": "Water Offence Exam",
+      "floraAttackExam": "Flora Offence Exam",
+      "allAttackExam": "Omni Offence Exam",
+      "neutralAttackExam": "Cosmic Offence Exam",
+      "practicalClass": "Arcane Combat Drills"
+    }
   },
   "comments": {
     "effectiveHP": "Effective HP",

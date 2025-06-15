@@ -297,7 +297,26 @@
     "ok":"決定",
     "yes":"はい",
     "no":"いいえ",
-    "mustCharacter":"必須キャラクター"
+    "mustCharacter":"必須キャラクター",
+    "searchPreset":"検索プリセット",
+    "preset": {
+      "fireBasicExam": "火属性BS試験",
+      "waterBasicExam": "水属性BS試験",
+      "floraBasicExam": "木属性BS試験",
+      "allBasicExam": "全属性BS試験",
+      "neutralBasicExam": "無属性BS試験",
+      "fireDefenseExam": "火属性DF試験",
+      "waterDefenseExam": "水属性DF試験",
+      "floraDefenseExam": "木属性DF試験",
+      "allDefenseExam": "全属性DF試験",
+      "neutralDefenseExam": "無属性DF試験",
+      "fireAttackExam": "火属性ATK試験",
+      "waterAttackExam": "水属性ATK試験",
+      "floraAttackExam": "木属性ATK試験",
+      "allAttackExam": "全属性ATK試験",
+      "neutralAttackExam": "無属性ATK試験",
+      "practicalClass": "実戦授業"
+    }
   },
   "comments": {
     "effectiveHP": "実質HP",
