@@ -5,6 +5,7 @@
     <v-row>
       <!-- メインコンテンツエリア -->
       <v-col cols="12" md="8" class="main-content">
+        <div class="simulator-area">
         <!-- チャートセクション -->
         <div class="chart-section">
           <SimChart :filter-attribute="selectedAttribute" />
@@ -19,32 +20,78 @@
         <div class="character-section">
           <SimChara v-for="index in [0,1,2,3,4]" :key="index" :chara-index="index" />
         </div>
+        </div>
       </v-col>
       
       <!-- サイドバー（タブレット・PC表示） -->
       <v-col cols="4" class="sidebar d-none d-md-block">
-        <div class="calc-basic-wrapper">
-          <CalcBASIC />
+        <div class="calc-tools-area">
+        <div class="calc-container">
+          <div class="calc-header">
+            <v-btn
+              icon
+              size="small"
+              variant="text"
+              @click="prevCalc"
+              class="calc-nav-btn"
+            >
+              <v-icon size="small">mdi-chevron-left</v-icon>
+            </v-btn>
+            <h3 class="calc-title">{{ calcTitles[carouselModel] }}</h3>
+            <v-btn
+              icon
+              size="small"
+              variant="text"
+              @click="nextCalc"
+              class="calc-nav-btn"
+            >
+              <v-icon size="small">mdi-chevron-right</v-icon>
+            </v-btn>
+          </div>
+          <div class="calc-wrapper">
+            <BuddyInfo v-if="carouselModel === 0" />
+            <CalcBASIC v-else-if="carouselModel === 1" />
+            <CalcDEF v-else-if="carouselModel === 2" />
+            <CalcATK v-else-if="carouselModel === 3" />
+          </div>
+        </div>
         </div>
       </v-col>
     </v-row>
     
     <!-- カルーセル（スマホ表示） -->
     <div class="carousel-container d-md-none">
-      <v-carousel
-        v-model="carouselModel"
-        height="auto"
-        hide-delimiter-background
-        show-arrows="hover"
-        cycle
-        :interval="0"
-      >
-        <v-carousel-item>
-          <div class="carousel-content">
-            <CalcBASIC />
-          </div>
-        </v-carousel-item>
-      </v-carousel>
+      <div class="calc-tools-area">
+      <div class="calc-container">
+        <div class="calc-header">
+          <v-btn
+            icon
+            size="small"
+            variant="text"
+            @click="prevCalc"
+            class="calc-nav-btn"
+          >
+            <v-icon size="small">mdi-chevron-left</v-icon>
+          </v-btn>
+          <h3 class="calc-title">{{ calcTitles[carouselModel] }}</h3>
+          <v-btn
+            icon
+            size="small"
+            variant="text"
+            @click="nextCalc"
+            class="calc-nav-btn"
+          >
+            <v-icon size="small">mdi-chevron-right</v-icon>
+          </v-btn>
+        </div>
+        <div class="carousel-content">
+          <BuddyInfo v-if="carouselModel === 0" />
+          <CalcBASIC v-else-if="carouselModel === 1" />
+          <CalcDEF v-else-if="carouselModel === 2" />
+          <CalcATK v-else-if="carouselModel === 3" />
+        </div>
+      </div>
+      </div>
     </div>
   </v-container>
 </template>
@@ -56,12 +103,30 @@ import SimChart from '@/components/SimChart.vue';
 import SimHeader from '@/components/SimHeader.vue';
 import SimStats from '@/components/SimStats.vue';
 import CalcBASIC from '@/views/calcBASIC.vue';
+import CalcDEF from '@/views/calcDEF.vue';
+import CalcATK from '@/views/calcATK.vue';
+import BuddyInfo from '@/components/BuddyInfo.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
 
 const isLargeScreen = ref(window.innerWidth >= 768);
 const selectedAttribute = ref('対全');
 const carouselModel = ref(0);
 const simulatorStore = useSimulatorStore();
+
+const calcTitles = [
+  'バディ情報',
+  'ベーシック試験スコア計算',
+  'ディフェンス試験スコア計算', 
+  'アタック試験スコア計算'
+];
+
+function nextCalc() {
+  carouselModel.value = (carouselModel.value + 1) % 4;
+}
+
+function prevCalc() {
+  carouselModel.value = carouselModel.value === 0 ? 3 : carouselModel.value - 1;
+}
 
 // ウィンドウサイズが変更されるたびに実行される関数
 function handleResize() {
@@ -162,5 +227,63 @@ onMounted(() => {
 
 .carousel-content {
   padding: 16px;
+}
+
+.calc-container {
+  width: 100%;
+}
+
+.calc-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.calc-title {
+  text-align: center;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.calc-nav-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.calc-nav-btn:hover {
+  opacity: 1;
+}
+
+.calc-wrapper {
+  padding: 8px;
+}
+
+/* エリア別浮かせた表現 */
+.simulator-area {
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+.calc-tools-area {
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s ease;
+}
+
+/* ダークモード対応 */
+.v-theme--dark .simulator-area {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.v-theme--dark .calc-tools-area {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 </style>
