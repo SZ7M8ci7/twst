@@ -4,7 +4,23 @@
       <v-row dense>
         <v-col cols="2" class="center">
           <div class="image-section">
-            <img :src="imgpath" alt="Character" class="character-image" @click="openCharaModal" />
+            <div class="character-icon-container">
+              <img :src="imgpath" alt="Character" class="character-image" @click="openCharaModal" />
+              <!-- デュオ相手のアイコン -->
+              <div 
+                v-if="duoPartnerIcon" 
+                class="duo-icon-container"
+                :class="{ 'duo-active': isDuoActive }"
+                :title="duoTooltipText"
+              >
+                <img 
+                  :src="duoPartnerIcon" 
+                  alt="Duo Partner" 
+                  class="duo-icon"
+                  @error="handleDuoIconError"
+                />
+              </div>
+            </div>
           </div>
         </v-col>
         <v-col cols="3" class="center">
@@ -87,7 +103,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import defaultImg from '@/assets/img/default.png';
 import ElementDropdown from './ElementDropdown.vue';
 import SimCharaModal from './SimCharaModal.vue';
@@ -96,6 +112,8 @@ import BuffDropdown from './BuffDropdown.vue';
 import SimCharaDetailModal from './SimCharaDetailModal.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { useCharacterStore } from '@/store/characters';
+import charactersInfo from '@/assets/characters_info.json';
+
 const simulatorStore = useSimulatorStore();
 const characterStore = useCharacterStore();
 
@@ -130,7 +148,6 @@ const closeDetailModal = () => {
 const levelDict = {'R':70,'SR':90,'SSR':110}
 // 画像を選択したときに呼ばれる
 const selectCharaImage = (chara) => {
-  console.log('Selected character:', chara);
   
   // 初期設定の処理
   const initialSettings = {
@@ -175,29 +192,43 @@ const selectCharaImage = (chara) => {
     if (buffValue) {
       const buffType = buffValue.includes('ATKUP') ? 'ATKUP' :
                       buffValue.includes('ダメUP') ? 'ダメージUP' :
-                      buffValue.includes('属性ダメUP') ? '属性ダメUP' : '';
+                      buffValue.includes('属性ダメUP') ? '属性ダメUP' :
+                      buffValue.includes('クリティカル') ? 'クリティカル' : '';
       
       if (buffType) {
-        initialSettings.buffs.push({
+        const buff = {
           magicOption: `M${i}`,
           buffOption: buffType,
           powerOption: getPowerOption(buffValue),
-          levelOption: 10
-        });
+          levelOption: buffType === 'クリティカル' ? 1 : 10 // クリティカルはレベル無効
+        };
+        initialSettings.buffs.push(buff);
       }
     }
     
     // 回復の追加
     if (healValue) {
-      if (healValue.includes('継続回復')) {
+      if (healValue.includes('回復&継続回復')) {
         initialSettings.buffs.push({
           magicOption: `M${i}`,
           buffOption: '継続回復',
           powerOption: getPowerOption(healValue),
           levelOption: 10
         });
-      }
-      if (healValue.includes('回復')) {
+        initialSettings.buffs.push({
+          magicOption: `M${i}`,
+          buffOption: '回復',
+          powerOption: getPowerOption(healValue),
+          levelOption: 10
+        });
+      } else if (healValue.includes('継続回復')) {
+        initialSettings.buffs.push({
+          magicOption: `M${i}`,
+          buffOption: '継続回復',
+          powerOption: getPowerOption(healValue),
+          levelOption: 10
+        });
+      } else if (healValue.includes('回復')) {
         initialSettings.buffs.push({
           magicOption: `M${i}`,
           buffOption: '回復',
@@ -207,14 +238,13 @@ const selectCharaImage = (chara) => {
       }
     }
   }
-
-  // デュオキャラクターの効果を設定
-  if (chara.duo && simulatorStore.charaDict[chara.duo]) {
-    chara.magic2power = 'デュオ';
-  }
-
   // 初期設定を適用
   Object.assign(chara, initialSettings);
+
+  // デュオキャラクターの効果を設定（初期設定後に実行して上書きを防ぐ）
+  if (chara.duo && simulatorStore.charaDict[chara.duo]) {
+    chara.magic2Power = 'デュオ';
+  }
 
   // キャラクター選択時にselectCharacterを呼び出す
   simulatorStore.selectCharacter(props.charaIndex, chara);
@@ -222,7 +252,6 @@ const selectCharaImage = (chara) => {
   if (chara.imgUrl) {
     imgpath.value = chara.imgUrl;
   } else {
-    console.log(`Using default image for ${chara.chara}`);
     imgpath.value = defaultImg;
   }
   
@@ -245,11 +274,28 @@ let shakeTimeout = null;
 
 // バフの強さを判定するヘルパー関数
 const getPowerOption = (buffString) => {
+  // クリティカル分数形式の確認（旧シミュレータ形式）
+  if (buffString.includes('(1/1)')) return '1/1';
+  if (buffString.includes('(1/2)')) return '1/2';
+  if (buffString.includes('(1/3)')) return '1/3';
+  if (buffString.includes('(2/3)')) return '2/3';
+  
+  // クリティカルサイズ形式から分数形式への変換
+  if (buffString.includes('クリティカル')) {
+    if (buffString.includes('(小)')) return '1/2';
+    if (buffString.includes('(中)')) return '1/1';
+    if (buffString.includes('(大)')) return '2/3';
+    if (buffString.includes('(極大)')) return '1/1';
+    return '1/1'; // デフォルトのクリティカル値
+  }
+  
+  // 通常のバフ形式の確認
   if (buffString.includes('極小')) return '極小';
   if (buffString.includes('小')) return '小';
   if (buffString.includes('中')) return '中';
   if (buffString.includes('大')) return '大';
   if (buffString.includes('極大')) return '極大';
+  
   return '中'; // デフォルト値
 };
 
@@ -284,6 +330,63 @@ const toggleBonus = () => {
   simulatorStore.calculateAllStats();
 };
 
+// characters_info.jsonから日本語名から英語名への変換マップを動的に生成
+const jpName2enName = charactersInfo.reduce((map, character) => {
+  map[character.name_ja] = character.name_en;
+  return map;
+}, {});
+
+// デュオ相手のアイコンを取得するcomputed
+const duoPartnerIcon = ref(null);
+
+// デュオアイコンを動的に読み込む関数
+const loadDuoPartnerIcon = async (duoPartnerName) => {
+  if (!duoPartnerName) {
+    duoPartnerIcon.value = null;
+    return;
+  }
+  
+  try {
+    const module = await import(`@/assets/img/icon/${jpName2enName[duoPartnerName]}.png`);
+    duoPartnerIcon.value = module.default;
+  } catch (error) {
+    duoPartnerIcon.value = defaultImg;
+  }
+};
+
+// デュオが有効かどうか判定するcomputed
+const isDuoActive = computed(() => {
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  if (!character || !character.duo) return false;
+  
+  // デュオ相手がデッキに含まれているかチェック
+  return simulatorStore.charaDict[character.duo] === true;
+});
+
+// デュオツールチップのテキスト
+const duoTooltipText = computed(() => {
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  if (!character || !character.duo) return '';
+  
+  const duoPartnerName = character.duo;
+  const isActive = isDuoActive.value;
+  
+  return isActive 
+    ? `デュオ相手: ${duoPartnerName} (有効)` 
+    : `デュオ相手: ${duoPartnerName} (無効)`;
+});
+
+// デュオアイコンの読み込みエラーハンドリング
+const handleDuoIconError = (event) => {
+  // エラー時はデフォルト画像を表示
+  event.target.src = defaultImg;
+};
+
+// キャラクターのデュオ相手が変更されたらアイコンを読み込み
+watch(() => simulatorStore.deckCharacters[props.charaIndex]?.duo, (newDuo) => {
+  loadDuoPartnerIcon(newDuo);
+}, { immediate: true });
+
 // 選択されている M ボタンの数をカウントする
 const selectedCount = () => {
   return [simulatorStore.deckCharacters[props.charaIndex].isM1Selected,
@@ -307,6 +410,8 @@ const toggleM = (index) => {
 
   if (simulatorStore.deckCharacters[props.charaIndex][selectedKey] || selectedCount() < 2) {
     simulatorStore.deckCharacters[props.charaIndex][selectedKey] = !simulatorStore.deckCharacters[props.charaIndex][selectedKey];
+    // マジック選択変更時に再計算をトリガー
+    simulatorStore.calculateAllStats();
   } else {
     startShaking(shakingKey);
   }
@@ -335,6 +440,24 @@ const windowWidth = ref(window.innerWidth);
 const handleResize = () => {
   windowWidth.value = window.innerWidth;
 };
+// キャラクターデータの変更を監視して画像を更新
+watch(() => simulatorStore.deckCharacters[props.charaIndex]?.chara, (newChara) => {
+  if (newChara) {
+    const character = simulatorStore.deckCharacters[props.charaIndex];
+    if (character.imgUrl) {
+      imgpath.value = character.imgUrl;
+    } else {
+      // imgUrlが無い場合はデフォルト画像を使用
+      imgpath.value = defaultImg;
+    }
+    // ボーナス選択状態も同期
+    isBonusSelected.value = character.isBonusSelected || false;
+  } else {
+    imgpath.value = defaultImg;
+    isBonusSelected.value = false;
+  }
+}, { immediate: true });
+
 onMounted(() => {
   window.addEventListener('resize', handleResize);
 });
@@ -351,6 +474,7 @@ onUnmounted(() => {
   padding: 1px;
   font-size: 0.7em;
   max-width: 100%;
+  margin-bottom: 2px;
 }
 .center{
   display: flex;
@@ -369,10 +493,61 @@ onUnmounted(() => {
   color: rgb(0, 0, 0);
 }
 
+/* キャラクターアイコンのコンテナ */
+.character-icon-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: 80px;
+}
+
 .character-image {
   width: 100%;
   max-width: 80px;
   height: 100%;
+  object-fit: cover;
+  border-radius: 1px; /* アイコンに角丸を追加 */
+}
+
+/* デュオアイコンのコンテナ */
+.duo-icon-container {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  width: 21px;
+  height: 21px;
+  border-radius: 10%;
+  border: 1px solid #fff;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+
+/* デュオが有効な場合のスタイル */
+.duo-icon-container.duo-active {
+  border-color: #ff0000;
+  background-color: #E8F5E8;
+}
+
+/* デュオが無効な場合のスタイル */
+.duo-icon-container:not(.duo-active) {
+  border-color: #999;
+  background-color: #f5f5f5;
+}
+
+.duo-icon-container:not(.duo-active) .duo-icon {
+  filter: grayscale(100%);
+}
+
+/* デュオアイコン */
+.duo-icon {
+  width: 19px;
+  height: 19px;
   object-fit: cover;
 }
 

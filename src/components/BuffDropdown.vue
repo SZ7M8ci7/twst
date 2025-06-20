@@ -13,19 +13,28 @@
       <option>属性ダメUP</option>
       <option>継続回復</option>
       <option>回復</option>
+      <option>クリティカル</option>
     </select>
   </div>
   <div class="select-wrapper">
     <select v-model="powerOption" @change="updateValue">
-      <option>極小</option>
-      <option>小</option>
-      <option>中</option>
-      <option>大</option>
-      <option>極大</option>
+      <template v-if="buffOption === 'クリティカル'">
+        <option>1/1</option>
+        <option>1/2</option>
+        <option>1/3</option>
+        <option>2/3</option>
+      </template>
+      <template v-else>
+        <option>極小</option>
+        <option>小</option>
+        <option>中</option>
+        <option>大</option>
+        <option>極大</option>
+      </template>
     </select>
   </div>
   <div class="select-wrapper">
-    <select v-model="levelOption" @change="updateValue">
+    <select v-model="levelOption" @change="updateValue" :disabled="buffOption === 'クリティカル'">
       <option disabled value="">Lv</option>
       <option v-for="n in 10" :key="n" :value="n">Lv{{ n }}</option>
     </select>
@@ -63,6 +72,17 @@ watch(() => props.modelValue, (newValue) => {
     levelOption.value = newValue.levelOption || 10;
   }
 }, { immediate: true });
+
+// buffOptionの変更を監視してpowerOptionをリセット
+watch(buffOption, (newBuffOption) => {
+  if (newBuffOption === 'クリティカル') {
+    powerOption.value = '1/1'; // デフォルトのクリティカル値
+    levelOption.value = 1; // クリティカルはレベル無効だが形式上1を設定
+  } else if (powerOption.value && ['1/1', '1/2', '1/3', '2/3'].includes(powerOption.value)) {
+    powerOption.value = '小'; // 他のバフに変更時はデフォルトの'小'に戻す
+  }
+  updateValue();
+});
 
 const updateValue = () => {
   emit('update:modelValue', {
@@ -106,5 +126,12 @@ select:focus {
   outline: none;
   border-color: #66afe9;
   box-shadow: 0 0 8px rgba(102, 175, 233, 0.6);
+}
+
+/* 無効化されたselect要素のスタイル */
+select:disabled {
+  background-color: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
 }
 </style>

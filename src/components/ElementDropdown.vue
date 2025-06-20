@@ -58,9 +58,9 @@ const toggleDropdown = () => {
       const rect = dropdown.value.getBoundingClientRect();
       const menu = dropdownMenu.value;
       if (menu) {
-        menu.style.position = 'absolute';
-        menu.style.top = `${rect.top - menu.offsetHeight - 5}px`;
-        menu.style.left = `${rect.left}px`;
+        menu.style.position = 'fixed';
+        menu.style.top = `${rect.bottom + 2}px`;
+        menu.style.left = `${rect.left + 5}px`;
       }
     });
   }

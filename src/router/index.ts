@@ -112,7 +112,9 @@ const routes = [
     name: 'sim',
     component: () => import('@/views/sim.vue'),
   },
-  { path: '/twst/', component: () => import('@/views/top.vue') }
+  { path: '/twst/', component: () => import('@/views/top.vue') },
+  // キャッチオールルート - マッチしないパスをトップページにリダイレクト
+  { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
 const router = createRouter({
