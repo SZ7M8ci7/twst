@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive, watch, nextTick } from 'vue';
-import { calculateCharacterStats } from '@/utils/calculations';
+import { calculateCharacterStats, clearAllCaches } from '@/utils/calculations';
 
 function debounce(fn: Function, delay: number) {
   let timer: number | null = null;
@@ -59,7 +59,6 @@ interface Character {
     magicOption: string;
   }[];
   duo?: string;
-  magic2power?: string;
   magic2pow?: string;
 }
 
@@ -112,11 +111,11 @@ export const useSimulatorStore = defineStore('simulator', () => {
   ]);
   const selectedAttribute = ref('対全');
 
-  // デッキのキャラクター名の集合を作成
+  // デッキのキャラクター名の集合を作成（デュオ判定用）
   const charaDict = computed(() => {
-    const dict: { [key: string]: string } = {};
+    const dict: { [key: string]: boolean } = {};
     deckCharacters.forEach(char => {
-      if (char.chara) dict[char.chara] = char.chara;
+      if (char.chara) dict[char.chara] = true;
     });
     return dict;
   });
@@ -129,11 +128,11 @@ export const useSimulatorStore = defineStore('simulator', () => {
   const needsRecalculation = ref(false);
 
   // デュオの判定と設定を行う関数
-  function updateDuoStatus(character: Character, dict: { [key: string]: string }) {
+  function updateDuoStatus(character: Character, dict: { [key: string]: boolean }) {
     if (character.duo && dict[character.duo]) {
-      character.magic2power = 'デュオ';
+      character.magic2Power = 'デュオ';
     } else if (character.duo && !dict[character.duo]) {
-      character.magic2power = character.magic2pow || '連撃(強)';
+      character.magic2Power = character.magic2pow || '連撃(強)';
     }
   }
   
@@ -148,6 +147,9 @@ export const useSimulatorStore = defineStore('simulator', () => {
     await nextTick();
     
     try {
+      // キャッシュをクリアして新しい計算値を使用（クリティカルバフ対応のため）
+      clearAllCaches();
+      
       deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
       
       const newStats = [];
@@ -178,7 +180,9 @@ export const useSimulatorStore = defineStore('simulator', () => {
     level: char.level,
     hp: char.hp,
     atk: char.atk,
-    selectedMagic: [...(char.selectedMagic || [])],
+    isM1Selected: char.isM1Selected,
+    isM2Selected: char.isM2Selected,
+    isM3Selected: char.isM3Selected,
     magic1Attribute: char.magic1Attribute,
     magic2Attribute: char.magic2Attribute,
     magic3Attribute: char.magic3Attribute,
@@ -319,13 +323,15 @@ export const useSimulatorStore = defineStore('simulator', () => {
       deckCharacters[index].buffs = [];
     }
     
-    // キャラクターが変更された場合のみ再計算
-    if (oldChara !== character.chara) {
-      characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
-      
-      if (character.duo || deckCharacters.some(c => c.duo === oldChara || c.duo === character.chara)) {
-        recalculateStats();
-      }
+    // キャラクターが変更された場合は常に再計算
+    characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
+    
+    // デュオ関連のキャラクターがある場合は全体を再計算
+    if (character.duo || deckCharacters.some(c => c.duo === oldChara || c.duo === character.chara)) {
+      recalculateStats();
+    } else if (oldChara !== character.chara) {
+      // 新しいキャラクターが選択された場合も全体を再計算（同じキャラクターの重複対応）
+      recalculateStats();
     }
   }
 

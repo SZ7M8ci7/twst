@@ -42,63 +42,89 @@ for (let i = 1; i <= 10; i++) {
 }
 
 export const criticalDict: { [key: string]: number } = {
-  "クリティカル(小)": 1.5,
-  "クリティカル(中)": 2.0,
-  "クリティカル(大)": 2.5,
-  "クリティカル(極大)": 3.0
+  "クリティカル(1/1)": 1.25,
+  "クリティカル(1/2)": 1.125,
+  "クリティカル(1/3)": 1.0833,
+  "クリティカル(2/3)": 1.1666,
+  // 新形式との互換性のため
+  "クリティカル(小)": 1.125,
+  "クリティカル(中)": 1.25,
+  "クリティカル(大)": 1.1666,
+  "クリティカル(極大)": 1.25
 };
 
 export const magicDict: { [key: string]: number } = {
-  "通常攻撃Lv1": 1.0,
-  "通常攻撃Lv2": 1.05,
-  "通常攻撃Lv3": 1.1,
-  "通常攻撃Lv4": 1.15,
-  "通常攻撃Lv5": 1.2,
-  "通常攻撃Lv6": 1.25,
-  "通常攻撃Lv7": 1.3,
-  "通常攻撃Lv8": 1.35,
-  "通常攻撃Lv9": 1.4,
-  "通常攻撃Lv10": 1.45,
-  "連撃(弱)Lv1": 0.9,
-  "連撃(弱)Lv2": 0.95,
-  "連撃(弱)Lv3": 1.0,
-  "連撃(弱)Lv4": 1.05,
-  "連撃(弱)Lv5": 1.1,
-  "連撃(弱)Lv6": 1.15,
-  "連撃(弱)Lv7": 1.2,
-  "連撃(弱)Lv8": 1.25,
-  "連撃(弱)Lv9": 1.3,
-  "連撃(弱)Lv10": 1.35,
-  "連撃(強)Lv1": 1.0,
-  "連撃(強)Lv2": 1.05,
-  "連撃(強)Lv3": 1.1,
-  "連撃(強)Lv4": 1.15,
-  "連撃(強)Lv5": 1.2,
-  "連撃(強)Lv6": 1.25,
-  "連撃(強)Lv7": 1.3,
-  "連撃(強)Lv8": 1.35,
-  "連撃(強)Lv9": 1.4,
-  "連撃(強)Lv10": 1.45,
-  "デュオ魔法Lv1": 1.1,
-  "デュオ魔法Lv2": 1.15,
-  "デュオ魔法Lv3": 1.2,
-  "デュオ魔法Lv4": 1.25,
-  "デュオ魔法Lv5": 1.3,
-  "デュオ魔法Lv6": 1.35,
-  "デュオ魔法Lv7": 1.4,
-  "デュオ魔法Lv8": 1.45,
-  "デュオ魔法Lv9": 1.5,
-  "デュオ魔法Lv10": 1.55,
-  "3連撃(弱)Lv1": 0.8,
-  "3連撃(弱)Lv2": 0.85,
-  "3連撃(弱)Lv3": 0.9,
-  "3連撃(弱)Lv4": 0.95,
-  "3連撃(弱)Lv5": 1.0,
-  "3連撃(弱)Lv6": 1.05,
-  "3連撃(弱)Lv7": 1.1,
-  "3連撃(弱)Lv8": 1.15,
-  "3連撃(弱)Lv9": 1.2,
-  "3連撃(弱)Lv10": 1.25
+  "単発(弱)Lv1": 0.525,
+  "単発(弱)Lv2": 0.55,
+  "単発(弱)Lv3": 0.575,
+  "単発(弱)Lv4": 0.60,
+  "単発(弱)Lv5": 0.625,
+  "単発(弱)Lv6": 0.65,
+  "単発(弱)Lv7": 0.675,
+  "単発(弱)Lv8": 0.70,
+  "単発(弱)Lv9": 0.725,
+  "単発(弱)Lv10": 0.75,
+  "単発(強)Lv1": 0.6625,
+  "単発(強)Lv2": 0.70,
+  "単発(強)Lv3": 0.7375,
+  "単発(強)Lv4": 0.775,
+  "単発(強)Lv5": 0.8125,
+  "単発(強)Lv6": 0.85,
+  "単発(強)Lv7": 0.8875,
+  "単発(強)Lv8": 0.925,
+  "単発(強)Lv9": 0.9625,
+  "単発(強)Lv10": 1.0,
+  "連撃(弱)Lv1": 0.525,
+  "連撃(弱)Lv2": 0.55,
+  "連撃(弱)Lv3": 0.575,
+  "連撃(弱)Lv4": 0.60,
+  "連撃(弱)Lv5": 0.625,
+  "連撃(弱)Lv6": 0.65,
+  "連撃(弱)Lv7": 0.675,
+  "連撃(弱)Lv8": 0.70,
+  "連撃(弱)Lv9": 0.725,
+  "連撃(弱)Lv10": 0.75,
+  "連撃(強)Lv1": 0.6625,
+  "連撃(強)Lv2": 0.70,
+  "連撃(強)Lv3": 0.7375,
+  "連撃(強)Lv4": 0.775,
+  "連撃(強)Lv5": 0.8125,
+  "連撃(強)Lv6": 0.85,
+  "連撃(強)Lv7": 0.8875,
+  "連撃(強)Lv8": 0.925,
+  "連撃(強)Lv9": 0.9625,
+  "連撃(強)Lv10": 1.0,
+  "デュオ魔法Lv1": 0.55,
+  "デュオ魔法Lv2": 0.575,
+  "デュオ魔法Lv3": 0.60,
+  "デュオ魔法Lv4": 0.625,
+  "デュオ魔法Lv5": 0.625,
+  "デュオ魔法Lv6": 0.65,
+  "デュオ魔法Lv7": 0.675,
+  "デュオ魔法Lv8": 0.70,
+  "デュオ魔法Lv9": 0.725,
+  "デュオ魔法Lv10": 1.0,
+  "3連撃(弱)Lv1": 0.525,
+  "3連撃(弱)Lv2": 0.55,
+  "3連撃(弱)Lv3": 0.575,
+  "3連撃(弱)Lv4": 0.60,
+  "3連撃(弱)Lv5": 0.625,
+  "3連撃(弱)Lv6": 0.65,
+  "3連撃(弱)Lv7": 0.675,
+  "3連撃(弱)Lv8": 0.70,
+  "3連撃(弱)Lv9": 0.725,
+  "3連撃(弱)Lv10": 0.75,
+  // 通常攻撃との互換性のためのエントリ
+  "通常攻撃Lv1": 0.525,
+  "通常攻撃Lv2": 0.55,
+  "通常攻撃Lv3": 0.575,
+  "通常攻撃Lv4": 0.60,
+  "通常攻撃Lv5": 0.625,
+  "通常攻撃Lv6": 0.65,
+  "通常攻撃Lv7": 0.675,
+  "通常攻撃Lv8": 0.70,
+  "通常攻撃Lv9": 0.725,
+  "通常攻撃Lv10": 0.75
 };
 
 // バディHPの定数
@@ -189,71 +215,153 @@ export const buddyATKDict: { [key: string]: number } = {
   "HP&ATKUP(中)10": 0.35,
 };
 
-// 回復量の定数
+// 回復量の定数（旧シミュレータ形式に合わせる）
 export const healDict: { [key: string]: number } = {
-    "回復極小1": 0.51,
-    "回復極小2": 0.52,
-    "回復極小3": 0.53,
-    "回復極小4": 0.54,
-    "回復極小5": 0.55,
-    "回復極小6": 0.56,
-    "回復極小7": 0.57,
-    "回復極小8": 0.58,
-    "回復極小9": 0.59,
-    "回復極小10": 0.60,
-    "回復小1": 0.92,
-    "回復小2": 0.94,
-    "回復小3": 0.96,
-    "回復小4": 0.98,
-    "回復小5": 1.00,
-    "回復小6": 1.02,
-    "回復小7": 1.04,
-    "回復小8": 1.06,
-    "回復小9": 1.08,
-    "回復小10": 1.10,
-    "回復中1": 1.34,
-    "回復中2": 1.38,
-    "回復中3": 1.42,
-    "回復中4": 1.46, 
-    "回復中5": 1.50,
-    "回復中6": 1.54,
-    "回復中7": 1.58,
-    "回復中8": 1.62,
-    "回復中9": 1.66,
-    "回復中10": 1.70,
+    "回復(極小)1": 0.51,
+    "回復(極小)2": 0.52,
+    "回復(極小)3": 0.53,
+    "回復(極小)4": 0.54,
+    "回復(極小)5": 0.55,
+    "回復(極小)6": 0.56,
+    "回復(極小)7": 0.57,
+    "回復(極小)8": 0.58,
+    "回復(極小)9": 0.59,
+    "回復(極小)10": 0.60,
+    "回復(小)1": 0.92,
+    "回復(小)2": 0.94,
+    "回復(小)3": 0.96,
+    "回復(小)4": 0.98,
+    "回復(小)5": 1.00,
+    "回復(小)6": 1.02,
+    "回復(小)7": 1.04,
+    "回復(小)8": 1.06,
+    "回復(小)9": 1.08,
+    "回復(小)10": 1.10,
+    "回復(中)1": 1.34,
+    "回復(中)2": 1.38,
+    "回復(中)3": 1.42,
+    "回復(中)4": 1.46, 
+    "回復(中)5": 1.50,
+    "回復(中)6": 1.54,
+    "回復(中)7": 1.58,
+    "回復(中)8": 1.62,
+    "回復(中)9": 1.66,
+    "回復(中)10": 1.70,
+    // 継続回復エントリ（旧形式互換性のため、値は0）
+    "継続回復(小)1": 0,
+    "継続回復(小)2": 0,
+    "継続回復(小)3": 0,
+    "継続回復(小)4": 0,
+    "継続回復(小)5": 0,
+    "継続回復(小)6": 0,
+    "継続回復(小)7": 0,
+    "継続回復(小)8": 0,
+    "継続回復(小)9": 0,
+    "継続回復(小)10": 0,
+    "継続回復(中)1": 0,
+    "継続回復(中)2": 0,
+    "継続回復(中)3": 0,
+    "継続回復(中)4": 0,
+    "継続回復(中)5": 0,
+    "継続回復(中)6": 0,
+    "継続回復(中)7": 0,
+    "継続回復(中)8": 0,
+    "継続回復(中)9": 0,
+    "継続回復(中)10": 0,
+    // 回復&継続回復エントリ
+    "回復&継続回復(小)1": 0.92,
+    "回復&継続回復(小)2": 0.94,
+    "回復&継続回復(小)3": 0.96,
+    "回復&継続回復(小)4": 0.98,
+    "回復&継続回復(小)5": 1.00,
+    "回復&継続回復(小)6": 1.02,
+    "回復&継続回復(小)7": 1.04,
+    "回復&継続回復(小)8": 1.06,
+    "回復&継続回復(小)9": 1.08,
+    "回復&継続回復(小)10": 1.10
 };
 
-// 継続回復量の定数
+// 継続回復量の定数（旧シミュレータ形式に合わせる）
 export const healContinueDict: { [key: string]: number } = {
-  "継続回復小1": 0.105,
-  "継続回復小2": 0.11,
-  "継続回復小3": 0.115,
-  "継続回復小4": 0.12,
-  "継続回復小5": 0.125,
-  "継続回復小6": 0.13,
-  "継続回復小7": 0.135,
-  "継続回復小8": 0.14,
-  "継続回復小9": 0.145,
-  "継続回復小10": 0.15,
-  "継続回復中1": 0.205,
-  "継続回復中2": 0.21,
-  "継続回復中3": 0.215,
-  "継続回復中4": 0.22,
-  "継続回復中5": 0.225,
-  "継続回復中6": 0.23,
-  "継続回復中7": 0.235,
-  "継続回復中8": 0.24,
-  "継続回復中9": 0.245,
-  "継続回復中10": 0.25
+  "継続回復(小)1": 0.105,
+  "継続回復(小)2": 0.11,
+  "継続回復(小)3": 0.115,
+  "継続回復(小)4": 0.12,
+  "継続回復(小)5": 0.125,
+  "継続回復(小)6": 0.13,
+  "継続回復(小)7": 0.135,
+  "継続回復(小)8": 0.14,
+  "継続回復(小)9": 0.145,
+  "継続回復(小)10": 0.15,
+  "継続回復(中)1": 0.205,
+  "継続回復(中)2": 0.21,
+  "継続回復(中)3": 0.215,
+  "継続回復(中)4": 0.22,
+  "継続回復(中)5": 0.225,
+  "継続回復(中)6": 0.23,
+  "継続回復(中)7": 0.235,
+  "継続回復(中)8": 0.24,
+  "継続回復(中)9": 0.245,
+  "継続回復(中)10": 0.25,
+  // 通常回復エントリ（旧形式互換性のため、値は0）
+  "回復(極小)1": 0,
+  "回復(極小)2": 0,
+  "回復(極小)3": 0,
+  "回復(極小)4": 0,
+  "回復(極小)5": 0,
+  "回復(極小)6": 0,
+  "回復(極小)7": 0,
+  "回復(極小)8": 0,
+  "回復(極小)9": 0,
+  "回復(極小)10": 0,
+  "回復(小)1": 0,
+  "回復(小)2": 0,
+  "回復(小)3": 0,
+  "回復(小)4": 0,
+  "回復(小)5": 0,
+  "回復(小)6": 0,
+  "回復(小)7": 0,
+  "回復(小)8": 0,
+  "回復(小)9": 0,
+  "回復(小)10": 0,
+  "回復(中)1": 0,
+  "回復(中)2": 0,
+  "回復(中)3": 0,
+  "回復(中)4": 0,
+  "回復(中)5": 0,
+  "回復(中)6": 0,
+  "回復(中)7": 0,
+  "回復(中)8": 0,
+  "回復(中)9": 0,
+  "回復(中)10": 0,
+  // 回復&継続回復エントリ
+  "回復&継続回復(小)1": 0.105,
+  "回復&継続回復(小)2": 0.11,
+  "回復&継続回復(小)3": 0.115,
+  "回復&継続回復(小)4": 0.12,
+  "回復&継続回復(小)5": 0.125,
+  "回復&継続回復(小)6": 0.13,
+  "回復&継続回復(小)7": 0.135,
+  "回復&継続回復(小)8": 0.14,
+  "回復&継続回復(小)9": 0.145,
+  "回復&継続回復(小)10": 0.15
 };
 
 const statsCache = new Map();
 
+// キャッシュをクリアする関数
+export function clearAllCaches() {
+  statsCache.clear();
+  buffCache.clear();
+  damageCache.clear();
+  attributeDamageCache.clear();
+  magicRatioCache.clear();
+}
+
 // 計算関数
-export function calculateCharacterStats(character: any, charaDict: { [key: string]: string }) {
+export function calculateCharacterStats(character: any, charaDict: { [key: string]: boolean }) {
   // キャラクターデータが存在しない場合はデフォルト値を返す
   if (!character) {
-    console.error('Character data is not defined');
     return {
       hp: 0,
       buddyHP: 0,
@@ -265,7 +373,16 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
   const cacheKey = generateCacheKey(character, charaDict);
   
   if (statsCache.has(cacheKey)) {
-    return statsCache.get(cacheKey);
+    // キャッシュから結果を取得するが、個別のダメージ詳細は必ず計算する
+    const cachedResult = statsCache.get(cacheKey);
+    // ダメージ計算を実行してダメージ詳細を設定
+    calculateDamage(character, charaDict);
+    return {
+      ...cachedResult,
+      magic1DamageDetails: character.magic1DamageDetails,
+      magic2DamageDetails: character.magic2DamageDetails,
+      magic3DamageDetails: character.magic3DamageDetails
+    };
   }
 
   // HP計算
@@ -283,7 +400,10 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
     hp: totalHP,
     buddyHP,
     heal,
-    damage
+    damage,
+    magic1DamageDetails: character.magic1DamageDetails,
+    magic2DamageDetails: character.magic2DamageDetails,
+    magic3DamageDetails: character.magic3DamageDetails
   };
   
   statsCache.set(cacheKey, result);
@@ -292,7 +412,7 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
   return result;
 }
 
-function generateCacheKey(character: any, charaDict: { [key: string]: string }): string {
+function generateCacheKey(character: any, charaDict: { [key: string]: boolean }): string {
   const charProps = [
     character.chara,
     character.hp,
@@ -324,11 +444,10 @@ function generateCacheKey(character: any, charaDict: { [key: string]: string }):
 }
 
 // バディHPの計算
-function calculateBuddyHP(character: any, charaDict: { [key: string]: string }) {
+function calculateBuddyHP(character: any, charaDict: { [key: string]: boolean }) {
   // charaDictはデッキに選択されているすべてのキャラクター名の集合
   // バディの名前がcharaDictに存在する場合のみ、そのバディの効果が適用される
   if (!charaDict) {
-    console.log('charaDict is not defined');
     return 0;
   }
 
@@ -343,7 +462,6 @@ function calculateBuddyHP(character: any, charaDict: { [key: string]: string }) 
     if (buddyName && buddyName in charaDict) {
       const buddyKey = buddyState + buddyLevel;
       const buddyHPRatio = buddyKey in buddyHPDict ? Number(buddyHPDict[buddyKey]) : 0;
-      console.log(`Buddy${i}: ${buddyName}, Key: ${buddyKey}, Ratio: ${buddyHPRatio}`);
       totalBuddyHPRatio += buddyHPRatio;
     }
   }
@@ -356,42 +474,41 @@ function calculateBuddyHP(character: any, charaDict: { [key: string]: string }) 
 function calculateHeal(character: any) {
   let totalHeal = 0;
 
-  // バフが存在しない場合は0を返す
-  if (!character.buffs) {
-    return totalHeal;
-  }
+  // 選択された魔法を取得
+  const selectedMagic = [];
+  if (character.isM1Selected) selectedMagic.push(1);
+  if (character.isM2Selected) selectedMagic.push(2);
+  if (character.isM3Selected) selectedMagic.push(3);
 
-  // 各魔法の回復量を計算
+  // 各魔法の回復量を計算（元のシミュレータのロジックに合わせる）
   for (let i = 1; i <= 3; i++) {
-    // 該当する魔法の回復バフを取得
-    const healBuffs = character.buffs.filter((buff: any) => 
-      buff.magicOption === `M${i}` && (buff.buffOption === '回復' || buff.buffOption === '継続回復')
-    );
+    // 魔法のhealプロパティとレベルから回復キーを生成
+    const healProp = character[`magic${i}heal`] || '';
+    const magicLevel = character[`magic${i}Lv`] || 10;
+    
+    // 回復魔法がない場合はスキップ
+    if (!healProp || healProp === '') continue;
 
-    if (healBuffs.length === 0) continue;
+    // heal キーを生成（元のシミュレータ形式：magic1heal + magic1Lv）
+    const healKey = healProp + magicLevel;
 
-    // 各回復バフの効果を計算
-    healBuffs.forEach((buff: any) => {
-      // バフの選択内容から回復量を計算
-      const buffLevel = parseInt(buff.levelOption) || 10;  // レベルを数値に変換
-      const powerType = buff.powerOption || '小';  // デフォルトは'小'
-
-      // バフの種類とレベルからキーを生成
-      const healKey = `${buff.buffOption}${powerType}${buffLevel}`;
-
-      // 即時回復の計算
-      if (buff.buffOption === '回復') {
-        const healValue = healKey in healDict ? healDict[healKey] : 0;
+    // 即時回復の計算（選択された魔法のみ）
+    if (selectedMagic.includes(i)) {
+      const healValue = healKey in healDict ? healDict[healKey] : 0;
+      if (healValue > 0) {
         totalHeal += Number(healValue) * Number(character.atk);
       }
+    }
 
-      // 継続回復の計算
-      if (buff.buffOption === '継続回復') {
-        const healContinueValue = healKey in healContinueDict ? healContinueDict[healKey] : 0;
+    // 継続回復の計算（選択された魔法のみ）
+    if (selectedMagic.includes(i)) {
+      const healContinueValue = healKey in healContinueDict ? healContinueDict[healKey] : 0;
+      if (healContinueValue > 0) {
         totalHeal += 3 * Number(healContinueValue) * Number(character.hp);
       }
-    });
+    }
   }
+
   return totalHeal;
 }
 
@@ -404,7 +521,7 @@ const attributeEffectiveness: Record<string, Record<string, number>> = {
 // 属性ダメージの計算
 function calcAttributeDamage(magicAtr: string, targetAtr: string, damage: number): number {
   if (magicAtr === '無') {
-    return damage * 1.1;
+    return damage; // 無属性は属性倍率の影響を受けない
   }
   
   const effectiveness = attributeEffectiveness[magicAtr]?.[targetAtr];
@@ -426,7 +543,7 @@ function manageCacheSize(cache: Map<any, any>, maxSize: number = MAX_CACHE_SIZE)
 }
 
 // ダメージの計算
-function calculateDamage(character: any, charaDict: { [key: string]: string }) {
+function calculateDamage(character: any, charaDict: { [key: string]: boolean }) {
   const damage: { [key: string]: number } = {
     '火': 0,
     '水': 0,
@@ -475,7 +592,9 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
     
     const baseATK = character.atk + atkBuffTotal + buddyATK;
     
-    const magicRatioKey = `${power}Lv${level}`;
+    // デュオ -> デュオ魔法への変換
+    const adjustedPower = power === 'デュオ' ? 'デュオ魔法' : power;
+    const magicRatioKey = `${adjustedPower}Lv${level}`;
     let magicRatio;
     
     if (magicRatioCache.has(magicRatioKey)) {
@@ -487,7 +606,7 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
     }
     
     const attributeAdjust = attribute === '無' ? 1.1 : 1.0;
-    const rengekiMultiplier = getRengekiMultiplier(power);
+    const rengekiMultiplier = getRengekiMultiplier(adjustedPower);
     
     const baseDamage = baseATK * (Number(magicRatio) * attributeAdjust + dmgBuffTotal) * rengekiMultiplier * criticalMultiplier;
     
@@ -531,7 +650,8 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
   };
   
   for (let i = 1; i <= 3; i++) {
-    if (character.selectedMagic?.includes(i) && character[`magic${i}DamageDetails`]) {
+    const isMagicSelected = character[`isM${i}Selected`];
+    if (isMagicSelected && character[`magic${i}DamageDetails`]) {
       cacheResult[`magic${i}DamageDetails`] = { ...character[`magic${i}DamageDetails`] };
     }
   }
@@ -541,7 +661,7 @@ function calculateDamage(character: any, charaDict: { [key: string]: string }) {
   return damage;
 }
 
-function calculateBuddyATK(character: any, charaDict: { [key: string]: string }): number {
+function calculateBuddyATK(character: any, charaDict: { [key: string]: boolean }): number {
   const buddy1atkRatio = character.buddy1c && character.buddy1c in charaDict ? 
     (character.buddy1s + character.buddy1Lv in buddyATKDict ? buddyATKDict[character.buddy1s + character.buddy1Lv] : 0) : 0;
   const buddy2atkRatio = character.buddy2c && character.buddy2c in charaDict ? 
