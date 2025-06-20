@@ -1,95 +1,99 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col cols="1" />
-      <v-col cols="11">
-        <v-row align="center">
-          <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">{{ $t('deffence.difficulty') }}</span>
+  <v-container class="pa-2">
+    <v-row class="ma-0">
+      <v-col cols="12" class="pa-0">
+        <v-row align="center" class="ma-0">
+          <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('deffence.difficulty') }}</span>
           </v-col>
-          <v-col cols="9" class="pa-1">
-            <v-radio-group v-model="difficulty" hide-details inline>
-              <v-radio label="Easy" value=0.8></v-radio>
-              <v-radio label="Normal" value=1></v-radio>
-              <v-radio label="Hard" value=1.2></v-radio>
-              <v-radio label="Extra" :value=1.5 checked></v-radio>
-            </v-radio-group>
+          <v-col cols="8" sm="9" class="pa-0">
+            <v-select
+              v-model="difficulty"
+              :items="difficultyOptions"
+              item-title="text"
+              item-value="value"
+              hide-details
+              dense
+              solo
+            ></v-select>
           </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 align-center pa-0">{{ $t('deffence.finishTurn') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('deffence.finishTurn') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="turn" class="mt-0 pt-0" hide-details="auto" dense solo :min="1" :max="5" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 align-center pa-0">{{ $t('deffence.totalAllyHP') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('deffence.totalAllyHP') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="allyTotalHP" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 align-center pa-0">{{ $t('deffence.remainAllyHP') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('deffence.remainAllyHP') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="allyRemainHP" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 ">{{ $t('deffence.totalDamageDealt') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('deffence.totalDamageDealt') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="damage" class="mt-0 pt-0" hide-details="auto" dense solo
                 :min="0" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">{{ $t('deffence.numberOfEvasion') }}
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('deffence.numberOfEvasion') }}
                 <span class="mdi mdi-help-circle-outline">
                   <v-tooltip activator="parent" open-on-click>{{ $t('deffence.countIf') }}</v-tooltip>
                 </span>
               </span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="evasion" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">{{ $t('deffence.numberOfDebuff') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('deffence.numberOfDebuff') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="debuff" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
-        <v-row>
-          <v-col class="pa-1">
-            <v-table>
-              <thead>
-                <tr>
-                  <th></th>
-                  <th class="pa-1">{{ $t('deffence.advantageDamageTaken') }}</th>
-                  <th class="pa-1">{{ $t('deffence.disadvantageDamageTaken') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th class="text-nowrap wide-cell">{{ $t('deffence.damageTaken') }}</th>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.advantageDamaged" hide-details dense solo />
-                  </td>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.disadvantageDamaged" hide-details dense
-                      solo /></td>
-                </tr>
-              </tbody>
+        <v-row class="ma-0">
+          <v-col class="pa-0">
+            <div class="table-wrapper">
+              <v-table>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th class="pa-0">{{ $t('deffence.advantageDamageTaken') }}</th>
+                    <th class="pa-0">{{ $t('deffence.disadvantageDamageTaken') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th class="text-nowrap wide-cell pa-0">{{ $t('deffence.damageTaken') }}</th>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.advantageDamaged" hide-details dense solo />
+                    </td>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.disadvantageDamaged" hide-details dense
+                        solo /></td>
+                  </tr>
+                </tbody>
 
-            </v-table>
+              </v-table>
+            </div>
           </v-col>
         </v-row>
 
@@ -113,6 +117,12 @@ const damage = ref(0);
 const evasion = ref(0);
 const debuff = ref(0);
 const difficulty = ref(1.5);
+const difficultyOptions = [
+  { text: 'Easy', value: 0.8 },
+  { text: 'Normal', value: 1 },
+  { text: 'Hard', value: 1.2 },
+  { text: 'Extra', value: 1.5 }
+];
 const table = ref({
   advantageDamaged: 0,
   disadvantageDamaged: 0,
@@ -175,6 +185,116 @@ const data = computed(() => {
 
 .wide-cell {
   width: 100px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Vuetify 3 入力フィールドの余白削除 */
+:deep(.v-field) {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:deep(.v-field__field) {
+  padding: 4px 8px !important;
+  min-height: 36px !important;
+}
+
+:deep(.v-field__input) {
+  padding: 0 !important;
+  min-height: 32px !important;
+}
+
+:deep(.v-field--variant-solo) {
+  box-shadow: none !important;
+}
+
+:deep(.v-input) {
+  grid-template-rows: min-content 0 !important;
+}
+
+:deep(.v-input__details) {
+  display: none !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+:deep(.v-field__clearable) {
+  margin: 0 !important;
+}
+
+:deep(.v-field__append-inner) {
+  padding: 0 !important;
+}
+
+:deep(.v-field__prepend-inner) {
+  padding: 0 !important;
+}
+
+/* セレクトボックスの調整 */
+:deep(.v-select .v-field__input) {
+  padding: 0 !important;
+}
+
+:deep(.v-select .v-field__field) {
+  padding: 0 8px !important;
+}
+
+/* テーブル内の入力フィールドも調整 */
+:deep(.v-table .v-field) {
+  margin: 0 !important;
+}
+
+:deep(.v-table .v-input) {
+  margin: 0 !important;
+}
+
+/* 行間の余白を最小化 */
+.v-row + .v-row {
+  margin-top: 8px !important;
+}
+
+@media (max-width: 600px) {
+  .v-table th,
+  .v-table td {
+    padding: 2px !important;
+    font-size: 0.875rem;
+  }
+  
+  .v-text-field input {
+    font-size: 0.875rem;
+  }
+  
+  .wide-cell {
+    width: 80px;
+  }
+  
+  .field-label {
+    font-size: 0.75rem;
+  }
+  
+  :deep(.v-field__field) {
+    padding: 2px 6px !important;
+    min-height: 32px !important;
+  }
+  
+  :deep(.v-field__input) {
+    min-height: 28px !important;
+  }
+  
+  /* 行間の余白も削除 */
+  .v-row + .v-row {
+    margin-top: 6px !important;
+  }
 }
 
 </style>
