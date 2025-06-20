@@ -1,98 +1,102 @@
 <template>
-  <v-container>
-    <v-row>
-      <v-col cols="1" />
-      <v-col cols="11">
-        <v-row align="center">
-          <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">{{ $t('attack.difficulty') }}</span>
+  <v-container class="pa-2">
+    <v-row class="ma-0">
+      <v-col cols="12" class="pa-0">
+        <v-row align="center" class="ma-0">
+          <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('attack.difficulty') }}</span>
           </v-col>
-          <v-col cols="9" class="pa-1">
-            <v-radio-group v-model="difficulty" hide-details inline>
-              <v-radio label="Easy" value=0.8></v-radio>
-              <v-radio label="Normal" value=1></v-radio>
-              <v-radio label="Hard" value=1.2></v-radio>
-              <v-radio label="Extra" :value=1.5 checked></v-radio>
-            </v-radio-group>
+          <v-col cols="8" sm="9" class="pa-0">
+            <v-select
+              v-model="difficulty"
+              :items="difficultyOptions"
+              item-title="text"
+              item-value="value"
+              hide-details
+              dense
+              solo
+            ></v-select>
           </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 align-center pa-0">{{ $t('attack.enemyHP') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('attack.enemyHP') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="enemyHP" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1 ">{{ $t('attack.totalDamageDealt') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('attack.totalDamageDealt') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="damage" class="mt-0 pt-0" hide-details="auto" dense solo
                 :min="enemyHP" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">{{ $t('attack.buff') }}</span>
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('attack.buff') }}</span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="buff" class="mt-0 pt-0" hide-details="auto" dense solo :min="0" />
             </v-col>
         </v-row>
-        <v-row align="center">
-            <v-col cols="3" class="pa-1 text-center">
-              <span class="ma-1">{{ $t('attack.nullifingHPRestoration') }}
+        <v-row align="center" class="ma-0">
+            <v-col cols="4" sm="3" class="pa-0 pr-1 text-right">
+              <span class="field-label">{{ $t('attack.nullifingHPRestoration') }}
                 <span class="mdi mdi-help-circle-outline">
                   <v-tooltip activator="parent" open-on-click>{{ $t('attack.maxNum') }}</v-tooltip>
                 </span>
               </span>
             </v-col>
-            <v-col cols="9" class="pa-1">
+            <v-col cols="8" sm="9" class="pa-0">
               <v-text-field type="number" v-model="blockHeal" class="mt-0 pt-0" hide-details="auto" dense solo :min="0"
                 :max="1" />
             </v-col>
         </v-row>
-        <v-row>
-          <v-col class="pa-1">
-            <v-table>
-              <thead>
-                <tr>
-                  <th></th>
-                  <th class="pa-1">{{ $t('attack.advantage') }}</th>
-                  <th class="pa-1">{{ $t('attack.neutral') }}</th>
-                  <th class="pa-1">{{ $t('attack.disadvantage') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th class="text-nowrap wide-cell">{{ $t('attack.numberOfMultihit') }}
-                    <span class="mdi mdi-help-circle-outline">
+        <v-row class="ma-0">
+          <v-col class="pa-0">
+            <div class="table-wrapper">
+              <v-table>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th class="pa-0">{{ $t('attack.advantage') }}</th>
+                    <th class="pa-0">{{ $t('attack.neutral') }}</th>
+                    <th class="pa-0">{{ $t('attack.disadvantage') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th class="text-nowrap wide-cell pa-0">{{ $t('attack.numberOfMultihit') }}
+                      <span class="mdi mdi-help-circle-outline">
 
-                      <v-tooltip style="white-space: nowrap;" activator="parent"
-                        open-on-click>{{ $t('attack.attackDetail') }}</v-tooltip>
-                    </span>
-                  </th>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.advantageCombo" hide-details dense solo />
-                  </td>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.equalCombo" hide-details dense solo />
-                  </td>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.disadvantageCombo" hide-details dense
-                      solo /></td>
-                </tr>
-                <tr>
-                  <th class="text-nowrap">{{ $t('attack.numberOfSingleHit') }}</th>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.advantageSingle" hide-details dense
-                      solo /></td>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.equalSingle" hide-details dense solo />
-                  </td>
-                  <td class="pa-1"><v-text-field type="number" v-model="table.disadvantageSingle" hide-details dense
-                      solo /></td>
-                </tr>
-              </tbody>
+                        <v-tooltip style="white-space: nowrap;" activator="parent"
+                          open-on-click>{{ $t('attack.attackDetail') }}</v-tooltip>
+                      </span>
+                    </th>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.advantageCombo" hide-details dense solo />
+                    </td>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.equalCombo" hide-details dense solo />
+                    </td>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.disadvantageCombo" hide-details dense
+                        solo /></td>
+                  </tr>
+                  <tr>
+                    <th class="text-nowrap pa-0">{{ $t('attack.numberOfSingleHit') }}</th>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.advantageSingle" hide-details dense
+                        solo /></td>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.equalSingle" hide-details dense solo />
+                    </td>
+                    <td class="pa-0"><v-text-field type="number" v-model="table.disadvantageSingle" hide-details dense
+                        solo /></td>
+                  </tr>
+                </tbody>
 
-            </v-table>
+              </v-table>
+            </div>
           </v-col>
         </v-row>
 
@@ -114,6 +118,12 @@ const damage = ref(0);
 const buff = ref(0);
 const blockHeal = ref(0);
 const difficulty = ref(1.5);
+const difficultyOptions = [
+  { text: 'Easy', value: 0.8 },
+  { text: 'Normal', value: 1 },
+  { text: 'Hard', value: 1.2 },
+  { text: 'Extra', value: 1.5 }
+];
 const table = ref({
   advantageCombo: 0,
   equalCombo: 0,
@@ -199,6 +209,116 @@ const data = computed(() => {
 
 .wide-cell {
   width: 100px;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Vuetify 3 入力フィールドの余白削除 */
+:deep(.v-field) {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:deep(.v-field__field) {
+  padding: 4px 8px !important;
+  min-height: 36px !important;
+}
+
+:deep(.v-field__input) {
+  padding: 0 !important;
+  min-height: 32px !important;
+}
+
+:deep(.v-field--variant-solo) {
+  box-shadow: none !important;
+}
+
+:deep(.v-input) {
+  grid-template-rows: min-content 0 !important;
+}
+
+:deep(.v-input__details) {
+  display: none !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+:deep(.v-field__clearable) {
+  margin: 0 !important;
+}
+
+:deep(.v-field__append-inner) {
+  padding: 0 !important;
+}
+
+:deep(.v-field__prepend-inner) {
+  padding: 0 !important;
+}
+
+/* セレクトボックスの調整 */
+:deep(.v-select .v-field__input) {
+  padding: 0 !important;
+}
+
+:deep(.v-select .v-field__field) {
+  padding: 0 8px !important;
+}
+
+/* テーブル内の入力フィールドも調整 */
+:deep(.v-table .v-field) {
+  margin: 0 !important;
+}
+
+:deep(.v-table .v-input) {
+  margin: 0 !important;
+}
+
+/* 行間の余白を最小化 */
+.v-row + .v-row {
+  margin-top: 8px !important;
+}
+
+@media (max-width: 600px) {
+  .v-table th,
+  .v-table td {
+    padding: 2px !important;
+    font-size: 0.875rem;
+  }
+  
+  .v-text-field input {
+    font-size: 0.875rem;
+  }
+  
+  .wide-cell {
+    width: 80px;
+  }
+  
+  .field-label {
+    font-size: 0.75rem;
+  }
+  
+  :deep(.v-field__field) {
+    padding: 2px 6px !important;
+    min-height: 32px !important;
+  }
+  
+  :deep(.v-field__input) {
+    min-height: 28px !important;
+  }
+  
+  /* 行間の余白も削除 */
+  .v-row + .v-row {
+    margin-top: 6px !important;
+  }
 }
 
 </style>
