@@ -5,6 +5,8 @@
       <option>単発(強)</option>
       <option>連撃(弱)</option>
       <option>連撃(強)</option>
+      <option>3連撃(弱)</option>
+      <option>3連撃(強)</option>
       <option>デュオ</option>
     </select>
   </div>
