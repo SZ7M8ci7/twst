@@ -56,22 +56,39 @@
               <v-col cols="2">
                 <ElementDropdown :chara-index="props.charaIndex" :element-index="index"/>
               </v-col>
-              <v-col cols="3">
+              <v-col :cols="windowWidth >= 360 ? (showBuddyIcon() ? 2 : 3) : 0">
                 <select
                   v-if="windowWidth >= 360"
                   v-model="simulatorStore.deckCharacters[props.charaIndex][`magic${index}Lv`]"
                   class="level-select"
-                  style="min-width: 35px; max-width: 60px;"
+                  :style="getLevelSelectStyle()"
                 >
                   <option disabled value="">Lv</option>
                   <option v-for="n in 10" :key="n" :value="n">Lv{{ n }}</option>
                 </select>
               </v-col>
-              <v-col cols="4">
+              <!-- 魔法ドロップダウン: 残りの列数を計算 -->
+              <v-col :cols="getMagicDropdownCols()">
                 <MagicDropdown
                   v-model="simulatorStore.deckCharacters[props.charaIndex][`magic${index}Power`]"
-                  style="min-width: 70px; max-width: 120px;"
+                  :style="getMagicDropdownStyle()"
                 />
+              </v-col>
+              <!-- バディキャラアイコン -->
+              <v-col v-if="showBuddyIcon()" cols="1" class="buddy-icon-col" :class="{ 'buddy-inactive': !isBuddyActive(index) }">
+                <img
+                  v-if="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`] && getBuddyIconSync(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`])"
+                  :src="getBuddyIconSync(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`])"
+                  :alt="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`]"
+                  class="buddy-icon"
+                  :title="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`]"
+                />
+              </v-col>
+              <!-- バディ効果値 -->
+              <v-col v-if="showBuddyEffect()" cols="2" class="buddy-effect-col" :class="{ 'buddy-inactive': !isBuddyActive(index) }">
+                <span v-if="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}s`]" class="buddy-effect">
+                  {{ formatBuddyEffect(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}s`]) }}
+                </span>
               </v-col>
             </v-row>
           </div>
@@ -339,6 +356,147 @@ const jpName2enName = charactersInfo.reduce((map, character) => {
 // デュオ相手のアイコンを取得するcomputed
 const duoPartnerIcon = ref(null);
 
+// バディアイコンのキャッシュ
+const buddyIconCache = ref({});
+
+// バディアイコンを取得する関数
+const getBuddyIcon = async (buddyCharaName) => {
+  if (!buddyCharaName) return null;
+  
+  // キャッシュされている場合は返す
+  if (buddyIconCache.value[buddyCharaName]) {
+    return buddyIconCache.value[buddyCharaName];
+  }
+  
+  // 日本語名を英語名に変換
+  const enName = jpName2enName[buddyCharaName];
+  if (!enName) return null;
+  
+  try {
+    // 動的インポートを使用してアイコンを取得
+    const module = await import(`@/assets/img/icon/${enName}.png`);
+    buddyIconCache.value[buddyCharaName] = module.default;
+    return module.default;
+  } catch (error) {
+    console.warn(`Failed to load buddy icon for ${enName}:`, error);
+    buddyIconCache.value[buddyCharaName] = null;
+    return null;
+  }
+};
+
+// バディアイコンの同期版（テンプレートで使用）
+const getBuddyIconSync = (buddyCharaName) => {
+  if (!buddyCharaName) return null;
+  
+  // 非同期で読み込みを開始（キャッシュされていない場合）
+  if (!buddyIconCache.value[buddyCharaName]) {
+    getBuddyIcon(buddyCharaName);
+  }
+  
+  return buddyIconCache.value[buddyCharaName] || null;
+};
+
+// サイドバーの表示状態を判定
+const isSidebarVisible = computed(() => windowWidth.value >= 960);
+
+// バディアイコン表示判定
+const showBuddyIcon = () => {
+  if (isSidebarVisible.value) {
+    // サイドバーがある場合 - より保守的に
+    return windowWidth.value >= 1200;
+  } else {
+    // サイドバーがない場合（フル幅）
+    return windowWidth.value >= 600;
+  }
+};
+
+// バディ効果値表示判定
+const showBuddyEffect = () => {
+  if (isSidebarVisible.value) {
+    // サイドバーがある場合 - より保守的に
+    return windowWidth.value >= 1400;
+  } else {
+    // サイドバーがない場合
+    return windowWidth.value >= 768;
+  }
+};
+
+
+// バディ効果値のフォーマット関数（UPを削除）
+const formatBuddyEffect = (effectText) => {
+  if (!effectText) return '';
+  return effectText.replace(/UP/gi, '');
+};
+
+// バディが有効かどうかを判定
+const isBuddyActive = (magicIndex) => {
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  const buddyCharName = character[`buddy${magicIndex}c`];
+  
+  if (!buddyCharName) return false;
+  
+  // デッキ内の他のキャラクターと照合
+  return simulatorStore.deckCharacters.some((deckChar, index) => 
+    index !== props.charaIndex && deckChar.chara === buddyCharName
+  );
+};
+
+// 魔法ドロップダウンの列数計算（安全性重視）
+const getMagicDropdownCols = () => {
+  let totalUsedCols = 2 + 2; // M1ボタン(2) + 属性(2) = 4列
+  
+  // レベルセレクト
+  if (windowWidth.value >= 360) {
+    totalUsedCols += showBuddyIcon() ? 2 : 3;
+  }
+  
+  // バディ情報
+  if (showBuddyIcon()) totalUsedCols += 1;
+  if (showBuddyEffect()) totalUsedCols += 2;
+  
+  // 残りの列数を計算（最低2列は確保）
+  const remainingCols = 12 - totalUsedCols;
+  return Math.max(remainingCols, 2);
+};
+
+// レベルセレクトのスタイル
+const getLevelSelectStyle = () => {
+  if (showBuddyIcon()) {
+    return {
+      'min-width': '35px',
+      'max-width': '50px'
+    };
+  } else {
+    return {
+      'min-width': '35px',
+      'max-width': '60px'
+    };
+  }
+};
+
+// 魔法ドロップダウンのスタイルを動的に調整
+const getMagicDropdownStyle = () => {
+  const cols = getMagicDropdownCols();
+  let maxWidth;
+  
+  // 列数に基づいて最大幅を決定（より保守的）
+  if (cols <= 2) {
+    maxWidth = '100px';
+  } else if (cols <= 3) {
+    maxWidth = '110px';
+  } else if (cols <= 4) {
+    maxWidth = '130px';
+  } else {
+    maxWidth = '150px';
+  }
+  
+  return {
+    'min-width': '90px',
+    'max-width': maxWidth,
+    'width': '100%'
+  };
+};
+
 // デュオアイコンを動的に読み込む関数
 const loadDuoPartnerIcon = async (duoPartnerName) => {
   if (!duoPartnerName) {
@@ -581,7 +739,7 @@ select {
 .buff-btn, .details-btn {
   margin-bottom: 1px;
   border-radius: 8px;
-  padding: 0px 10px;
+  padding: 0px 8px;
   border: 1px solid #ccc;
   background-color: #f0f0f0;
   cursor: pointer;
@@ -606,6 +764,53 @@ select {
 
 .mbutton.shake {
   animation: shake 0.25s;
+}
+
+
+/* バディ関連のスタイル */
+.buddy-icon-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+}
+
+.buddy-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+}
+
+.buddy-effect-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1px;
+}
+
+.buddy-effect {
+  font-size: 0.7em;
+  color: #666;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  line-height: 1;
+}
+
+/* バディ無効時のグレーアウト */
+.buddy-inactive {
+  opacity: 0.6;
+  filter: grayscale(90%);
+}
+
+.buddy-inactive .buddy-icon {
+  filter: grayscale(100%);
+}
+
+.buddy-inactive .buddy-effect {
+  color: #888;
 }
 
 
@@ -653,19 +858,35 @@ select {
   margin-bottom: 2px;
 }
 
-@media (min-width: 450px) {
+/* モバイル（サイドパネルなし） */
+@media (min-width: 480px) and (max-width: 959px) {
   .buff-list {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (min-width: 900px) {
+
+@media (min-width: 768px) and (max-width: 959px) {
   .buff-list {
     grid-template-columns: repeat(3, 1fr);
   }
 }
-@media (min-width: 1350px) {
+
+/* デスクトップ（サイドパネルあり） - より保守的に */
+@media (min-width: 960px) and (max-width: 1199px) {
   .buff-list {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+@media (min-width: 1200px) and (max-width: 1399px) {
+  .buff-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1400px) {
+  .buff-list {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
