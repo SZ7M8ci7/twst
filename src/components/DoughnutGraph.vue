@@ -27,6 +27,7 @@ Chart.register(...registerables);
 const options = {
   responsive: true,
   maintainAspectRatio: false,
+  aspectRatio: 1.2,
   plugins: {
     title: {
       display: true,
@@ -50,6 +51,12 @@ const options = {
       enabled: false // ツールチップを無効化
     }
 
+  },
+  layout: {
+    padding: {
+      top: 10,
+      bottom: 10
+    }
   }
 } as any;
 
@@ -70,17 +77,28 @@ const props = defineProps({
 
 const ratioText = {
   id: 'ratio-text',
-  beforeDraw(chart: any) {
+  afterDraw(chart: any) {
     const { ctx, chartArea: { top, width, height } } = chart
     ctx.save()
-    //チャート描画部分の中央を指定
+    //チャート描画部分の中央を指定（Z軸上位で描画）
     ctx.fillRect(width / 2, top + (height / 2), 0, 0)
+    
+    // 横幅に応じてフォントサイズを動的に調整
+    const baseSize = Math.min(width, height)
+    let fontSize = Math.max(16, baseSize * 0.08) // 最小16px、グラフサイズの8%
+    if (baseSize < 200) {
+      fontSize = Math.max(14, baseSize * 0.1) // 小さい画面では10%
+    } else if (baseSize > 400) {
+      fontSize = Math.min(40, baseSize * 0.07) // 大きい画面では7%、最大40px
+    }
+    
     //フォントのスタイル指定
-    ctx.font = 'bold 30px Roboto'
+    ctx.font = `bold ${Math.round(fontSize)}px Roboto`
     ctx.fillStyle = '#333333'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(props.score, width / 2, top + (height / 2))
+    ctx.restore()
   }
 }
 // 値を表示し、値が0のラベルを表示しないように修正
@@ -127,14 +145,14 @@ const doughnutLabel = {
 .doughnut-graph-container {
   position: relative;
   width: 100%;
-  padding-top: 100%;
-  /* 高さを幅の100%に保つ */
+  padding-top: 60%;
+  /* 高さを幅の60%に保つ */
 }
 
 @media (min-width: 960px) {
   .doughnut-graph-container {
     max-width: 500px;
-    height: 500px;
+    height: 300px;
     padding-top: 0;
     margin: 0 auto;
   }
