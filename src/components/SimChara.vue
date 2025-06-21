@@ -115,7 +115,7 @@ import { useCharacterStore } from '@/store/characters';
 import charactersInfo from '@/assets/characters_info.json';
 
 const simulatorStore = useSimulatorStore();
-const characterStore = useCharacterStore();
+// const characterStore = useCharacterStore();
 
 
 const imgpath = ref(defaultImg);

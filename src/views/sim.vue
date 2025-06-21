@@ -159,6 +159,7 @@ function restoreState() {
         }
         
       } catch (error) {
+        // Error handling
       }
     }
   }
