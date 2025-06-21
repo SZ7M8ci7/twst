@@ -5,16 +5,17 @@
         キャラクター詳細設定
       </v-card-title>
 
-      <v-card-text>
-        <v-container>
-          <v-row>
+      <v-card-text class="pa-1">
+        <v-container class="pa-0">
+          <v-row dense no-gutters>
             <v-col cols="12">
-              <v-text-field
+              <v-select
                 v-model="character.chara"
+                :items="characterOptions"
                 label="キャラクター名"
                 variant="outlined"
                 density="compact"
-              ></v-text-field>
+              ></v-select>
             </v-col>
 
             <v-col cols="4">
@@ -50,36 +51,36 @@
 
             <!-- 魔法レベル設定 -->
             <v-col cols="12">
-              <v-card variant="outlined" class="mb-4">
-                <v-card-title class="text-subtitle-1">魔法レベル設定</v-card-title>
-                <v-card-text>
-                  <v-row>
+              <v-card elevation="2" class="mb-1">
+                <v-card-title class="text-subtitle-1 py-1">魔法レベル設定</v-card-title>
+                <v-card-text class="pa-1">
+                  <v-row dense>
                     <v-col cols="4">
-                      <v-text-field
+                      <v-select
                         v-model="character.magic1Lv"
-                        type="number"
-                        label="魔法1レベル"
+                        :items="magicLevelOptions"
+                        label="魔法1"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
+                      ></v-select>
                     </v-col>
                     <v-col cols="4">
-                      <v-text-field
+                      <v-select
                         v-model="character.magic2Lv"
-                        type="number"
-                        label="魔法2レベル"
+                        :items="magicLevelOptions"
+                        label="魔法2"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
+                      ></v-select>
                     </v-col>
                     <v-col cols="4">
-                      <v-text-field
+                      <v-select
                         v-model="character.magic3Lv"
-                        type="number"
-                        label="魔法3レベル"
+                        :items="magicLevelOptions"
+                        label="魔法3"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
+                      ></v-select>
                     </v-col>
                   </v-row>
                 </v-card-text>
@@ -88,72 +89,78 @@
 
             <!-- バディ設定 -->
             <v-col cols="12">
-              <v-card variant="outlined" class="mb-4">
-                <v-card-title class="text-subtitle-1">バディ設定</v-card-title>
-                <v-card-text>
-                  <v-row>
-                    <v-col cols="4">
-                      <v-text-field
+              <v-card elevation="2" class="mb-1">
+                <v-card-title class="text-subtitle-1 py-1">バディ設定</v-card-title>
+                <v-card-text class="pa-1">
+                  <v-row dense>
+                    <v-col cols="12" sm="4" class="buddy-item">
+                      <v-select
                         v-model="character.buddy1c"
+                        :items="characterOptions"
                         label="バディ1キャラ"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
-                      <v-text-field
+                      ></v-select>
+                      <v-select
                         v-model="character.buddy1s"
+                        :items="buddySkillOptions"
                         label="バディ1スキル"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
-                      <v-text-field
+                      ></v-select>
+                      <v-select
                         v-model="character.buddy1Lv"
-                        type="number"
+                        :items="buddyLevelOptions"
                         label="バディ1レベル"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
+                      ></v-select>
                     </v-col>
-                    <v-col cols="4">
-                      <v-text-field
+                    <v-col cols="12" sm="4" class="buddy-item">
+                      <v-select
                         v-model="character.buddy2c"
+                        :items="characterOptions"
                         label="バディ2キャラ"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
-                      <v-text-field
+                      ></v-select>
+                      <v-select
                         v-model="character.buddy2s"
+                        :items="buddySkillOptions"
                         label="バディ2スキル"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
-                      <v-text-field
+                      ></v-select>
+                      <v-select
                         v-model="character.buddy2Lv"
-                        type="number"
+                        :items="buddyLevelOptions"
                         label="バディ2レベル"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
+                      ></v-select>
                     </v-col>
-                    <v-col cols="4">
-                      <v-text-field
+                    <v-col cols="12" sm="4" class="buddy-item">
+                      <v-select
                         v-model="character.buddy3c"
+                        :items="characterOptions"
                         label="バディ3キャラ"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
-                      <v-text-field
+                      ></v-select>
+                      <v-select
                         v-model="character.buddy3s"
+                        :items="buddySkillOptions"
                         label="バディ3スキル"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
-                      <v-text-field
+                      ></v-select>
+                      <v-select
                         v-model="character.buddy3Lv"
-                        type="number"
+                        :items="buddyLevelOptions"
                         label="バディ3レベル"
                         variant="outlined"
                         density="compact"
-                      ></v-text-field>
+                      ></v-select>
                     </v-col>
                   </v-row>
                 </v-card-text>
@@ -162,12 +169,12 @@
 
             <!-- バフ設定 -->
             <v-col cols="12">
-              <v-card variant="outlined">
-                <v-card-title class="text-subtitle-1">バフ設定</v-card-title>
-                <v-card-text>
-                  <div v-for="(buff, index) in character.buffs" :key="index" class="mb-2">
-                    <v-row>
-                      <v-col cols="3">
+              <v-card elevation="2">
+                <v-card-title class="text-subtitle-1 py-1">バフ設定</v-card-title>
+                <v-card-text class="pa-1">
+                  <div v-for="(buff, index) in character.buffs" :key="index" class="buff-item mb-1">
+                    <v-row dense>
+                      <v-col cols="6">
                         <v-select
                           v-model="buff.magicOption"
                           :items="['M1', 'M2', 'M3']"
@@ -176,7 +183,7 @@
                           density="compact"
                         ></v-select>
                       </v-col>
-                      <v-col cols="3">
+                      <v-col cols="6">
                         <v-select
                           v-model="buff.buffOption"
                           :items="['ATKUP', 'ダメージUP', '属性ダメUP', '継続回復', '回復']"
@@ -185,7 +192,7 @@
                           density="compact"
                         ></v-select>
                       </v-col>
-                      <v-col cols="3">
+                      <v-col cols="6">
                         <v-select
                           v-model="buff.powerOption"
                           :items="['極小', '小', '中', '大', '極大']"
@@ -194,7 +201,7 @@
                           density="compact"
                         ></v-select>
                       </v-col>
-                      <v-col cols="2">
+                      <v-col cols="4">
                         <v-text-field
                           v-model="buff.levelOption"
                           type="number"
@@ -203,7 +210,7 @@
                           density="compact"
                         ></v-text-field>
                       </v-col>
-                      <v-col cols="1" class="d-flex align-center">
+                      <v-col cols="2" class="d-flex align-center">
                         <v-btn
                           icon="mdi-delete"
                           variant="text"
@@ -217,7 +224,8 @@
                     color="primary"
                     variant="text"
                     @click="addBuff"
-                    class="mt-2"
+                    class="mt-1"
+                    size="small"
                   >
                     バフを追加
                   </v-btn>
@@ -228,12 +236,12 @@
         </v-container>
       </v-card-text>
 
-      <v-card-actions>
+      <v-card-actions class="pa-1">
         <v-spacer></v-spacer>
-        <v-btn color="primary" variant="text" @click="saveChanges">
+        <v-btn color="primary" variant="text" @click="saveChanges" size="small">
           保存
         </v-btn>
-        <v-btn color="error" variant="text" @click="closeModal">
+        <v-btn color="error" variant="text" @click="closeModal" size="small">
           キャンセル
         </v-btn>
       </v-card-actions>
@@ -242,7 +250,8 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
+import charactersInfo from '@/assets/characters_info.json';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -253,6 +262,12 @@ const emit = defineEmits(['update:modelValue', 'save']);
 
 const isOpen = ref(props.modelValue);
 const character = ref({ ...props.character });
+
+watch(() => props.character, (newCharacter) => {
+  if (newCharacter) {
+    character.value = { ...newCharacter };
+  }
+}, { deep: true });
 
 watch(() => props.modelValue, (newValue) => {
   isOpen.value = newValue;
@@ -291,6 +306,27 @@ const saveChanges = () => {
 const closeModal = () => {
   isOpen.value = false;
 };
+
+// キャラクター選択肢
+const characterOptions = computed(() => 
+  charactersInfo.map(char => char.name_ja)
+);
+
+// バディスキル選択肢
+const buddySkillOptions = [
+  'ATKUP(小)',
+  'ATKUP(中)',
+  'HPUP(小)',
+  'HPUP(中)',
+  'HP&ATKUP(小)',
+  'HP&ATKUP(中)'
+];
+
+// バディレベル選択肢
+const buddyLevelOptions = Array.from({length: 10}, (_, i) => i + 1);
+
+// 魔法レベル選択肢
+const magicLevelOptions = Array.from({length: 10}, (_, i) => i + 1);
 </script>
 
 <style scoped>
@@ -302,5 +338,15 @@ const closeModal = () => {
 }
 .mt-2 {
   margin-top: 8px;
+}
+.buff-item {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  padding: 8px;
+}
+.buddy-item {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  padding: 8px;
 }
 </style> 
