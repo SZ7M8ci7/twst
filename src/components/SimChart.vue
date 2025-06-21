@@ -3,6 +3,21 @@
     <div class="chart-container">
       <canvas ref="chartCanvas"></canvas>
     </div>
+    <div class="character-images">
+      <div 
+        v-for="(char, index) in simulatorStore.deckCharacters" 
+        :key="index"
+        class="character-image-label"
+      >
+        <img 
+          v-if="char.imgUrl" 
+          :src="char.imgUrl" 
+          :alt="char.chara"
+          class="chart-character-image"
+        />
+        <div v-else class="empty-character"></div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -10,7 +25,7 @@
 import { ref, onMounted, watch } from 'vue';
 import Chart from 'chart.js/auto';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { calculateCharacterStats } from '@/utils/calculations';
+// import { calculateCharacterStats } from '@/utils/calculations';
 
 const props = defineProps<{
   filterAttribute: string;
@@ -21,12 +36,12 @@ const simulatorStore = useSimulatorStore();
 let chart: Chart | null = null;
 
 // 属性ごとの色を定義
-const colors: { [key: string]: string } = {
-  '火': 'rgba(255, 99, 132, 0.5)',
-  '水': 'rgba(54, 162, 235, 0.5)',
-  '木': 'rgba(75, 192, 192, 0.5)',
-  '無': 'rgba(153, 102, 255, 0.5)'
-};
+// const colors: { [key: string]: string } = {
+//   '火': 'rgba(255, 99, 132, 0.5)',
+//   '水': 'rgba(54, 162, 235, 0.5)',
+//   '木': 'rgba(75, 192, 192, 0.5)',
+//   '無': 'rgba(153, 102, 255, 0.5)'
+// };
 
 // スタックごとの色を定義
 const stackColors: { [key: string]: string } = {
@@ -112,7 +127,7 @@ function createChart() {
   chart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: simulatorStore.deckCharacters.map(char => char.chara  || ''),
+      labels: simulatorStore.deckCharacters.map((char, index) => index),
       datasets: datasets
     },
     options: {
@@ -133,16 +148,14 @@ function createChart() {
             display: true
           },
           ticks: {
-            maxRotation: 0,
-            minRotation: 0
+            display: false
           }
         },
         y: {
           stacked: true,
           beginAtZero: true,
           title: {
-            display: true,
-            text: '数値'
+            display: false
           },
           grid: {
             display: true
@@ -214,6 +227,7 @@ onMounted(createChart);
   padding: 0;
   position: relative;
   min-height: 300px;
+  z-index: 10;
 }
 
 canvas {
@@ -222,5 +236,49 @@ canvas {
   position: absolute;
   top: 0;
   left: 0;
+}
+
+.character-images {
+  display: flex;
+  align-items: center;
+  padding: 0px 2px;
+  margin-top: -18px;
+  position: relative;
+  width: calc(100% - 62px);
+  margin-left: 58px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.character-image-label {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.chart-character-image {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+}
+
+.empty-character {
+  width: 24px;
+  height: 24px;
+  background-color: #f5f5f5;
+  border: 1px dashed #ccc;
+  border-radius: 3px;
+}
+
+/* ダークモード対応 */
+.v-theme--dark .chart-character-image {
+  border-color: #666;
+}
+
+.v-theme--dark .empty-character {
+  background-color: #333;
+  border-color: #555;
 }
 </style>
