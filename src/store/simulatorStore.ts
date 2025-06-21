@@ -127,8 +127,10 @@ export const useSimulatorStore = defineStore('simulator', () => {
   
   const needsRecalculation = ref(false);
 
-  // デュオの判定と設定を行う関数
-  function updateDuoStatus(character: Character, dict: { [key: string]: boolean }) {
+  // デュオの判定と設定を行う関数（キャラクター選択時のみ実行）
+  function updateDuoStatus(character: Character, dict: { [key: string]: boolean }, forceUpdate = false) {
+    if (!forceUpdate) return; // forceUpdateがtrueの場合のみ実行
+    
     if (character.duo && dict[character.duo]) {
       character.magic2Power = 'デュオ';
     } else if (character.duo && !dict[character.duo]) {
@@ -150,7 +152,8 @@ export const useSimulatorStore = defineStore('simulator', () => {
       // キャッシュをクリアして新しい計算値を使用（クリティカルバフ対応のため）
       clearAllCaches();
       
-      deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
+      // recalculateStatsでは強制更新しない（ユーザーの手動選択を保持）
+      // deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
       
       const newStats = [];
       for (let i = 0; i < deckCharacters.length; i++) {
@@ -321,6 +324,12 @@ export const useSimulatorStore = defineStore('simulator', () => {
     // バフの初期値を設定
     if (!deckCharacters[index].buffs) {
       deckCharacters[index].buffs = [];
+    }
+    
+    // キャラクター選択時のみデュオ状態を強制更新
+    if (oldChara !== character.chara) {
+      // 全キャラクターのデュオ状態を更新（キャラクター選択時のみ）
+      deckCharacters.forEach(char => updateDuoStatus(char, charaDict.value, true));
     }
     
     // キャラクターが変更された場合は常に再計算
