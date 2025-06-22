@@ -202,19 +202,33 @@ function createChart() {
   });
 }
 
-watch(() => props.filterAttribute, createChart);
-watch(() => simulatorStore.characterStats, createChart, { deep: true });
-// キャラクター選択状態の変更を監視
-watch(() => simulatorStore.deckCharacters, createChart, { deep: true });
-// ダメージ詳細の変更を監視
-watch(() => simulatorStore.deckCharacters.map(char => ({
-  magic1DamageDetails: char.magic1DamageDetails,
-  magic2DamageDetails: char.magic2DamageDetails,
-  magic3DamageDetails: char.magic3DamageDetails,
-  isM1Selected: char.isM1Selected,
-  isM2Selected: char.isM2Selected,
-  isM3Selected: char.isM3Selected
-})), createChart, { deep: true });
+// デバウンス関数を作成
+function debounce(fn: Function, delay: number) {
+  let timer: number | null = null;
+  return function(...args: any[]) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      fn(...args);
+      timer = null;
+    }, delay) as unknown as number;
+  };
+}
+
+const debouncedCreateChart = debounce(createChart, 100);
+
+// 統合されたwatcher - 1つのwatcherで全ての変更を監視
+watch(() => ({
+  filterAttribute: props.filterAttribute,
+  characterStats: simulatorStore.characterStats,
+  selectedStates: simulatorStore.deckCharacters.map(char => ({
+    isM1Selected: char.isM1Selected,
+    isM2Selected: char.isM2Selected,
+    isM3Selected: char.isM3Selected,
+    magic1DamageDetails: char.magic1DamageDetails,
+    magic2DamageDetails: char.magic2DamageDetails,
+    magic3DamageDetails: char.magic3DamageDetails
+  }))
+}), debouncedCreateChart, { deep: true });
 
 onMounted(createChart);
 </script>
