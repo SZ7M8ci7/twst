@@ -1,5 +1,5 @@
 <template>
-  <div class="modal-background" ref="modalContainer">
+  <div class="modal-background" ref="modalContainer" :class="{ embedded: embedded }">
     <!-- Card Attributesセクション -->
     <div class="feature-select-all-container">
       <v-btn small @click="toggleSelectAll('cardAttributes')">
@@ -59,10 +59,13 @@
       </div>
     </div>
     <!-- ボタンのコンテナ -->
-    <div class="button-container">
+    <div class="button-container" v-if="!embedded">
       <v-btn class="button" @click="$emit('close')">{{ $t('filterModal.cancel') }}</v-btn>
       <v-btn class="button apply-button" :disabled="selectedCharacters.length === 0 || selectedRare.length === 0"
         @click="applyFilter">{{ $t('filterModal.submit') }}</v-btn>
+    </div>
+    <!-- 埋め込みモード用ボタン -->
+    <div class="button-container embedded-buttons" v-else>
     </div>
   </div>
 </template>
@@ -71,7 +74,7 @@
 import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
-import { onMounted, onBeforeUnmount, ref, computed, Ref} from 'vue';
+import { onMounted, onBeforeUnmount, ref, computed, Ref, watch} from 'vue';
 import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
 import { loadImageUrls } from '@/components/common';
@@ -88,9 +91,17 @@ const selectedRare = ref<string[]>([]);
 const selectedType = ref<string[]>([]);
 const selectedAttr = ref<string[]>([]);
 const selectedEffects = ref<string[]>([]);
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'filter-applied']);
 const displayBlockWidth = ref(0);
 const imgUrlDictionary: Ref<Record<string, string>> = ref({});
+
+// プロパティ定義
+const props = defineProps({
+  embedded: {
+    type: Boolean,
+    default: false
+  }
+});
 
 // アイコンのサイズと間隔を共通化したい
 const iconSize = 50;
@@ -197,6 +208,13 @@ onMounted(async () => {
   updateDisplayBlockWidth();
   window.addEventListener('resize', resizeListener);
   imgUrlDictionary.value = await loadImageUrls(characterData, (item: any) => item.name_en, 'icon/');
+  
+  // 埋め込みモードの場合はリアルタイム更新のためのwatcherを設定
+  if (props.embedded) {
+    watch([selectedCharacters, selectedRare, selectedType, selectedAttr, selectedEffects], () => {
+      updateCharacterVisibility();
+    }, { deep: true });
+  }
 });
 
 onBeforeUnmount(() => {
@@ -211,6 +229,16 @@ function applyFilter() {
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
 
+  updateCharacterVisibility();
+
+  emit('filter-applied'); // フィルター適用を通知
+  if (!props.embedded) {
+    emit('close'); // 埋め込みモードでない場合のみモーダルを閉じる
+  }
+}
+
+// フィルタリング処理を分離
+function updateCharacterVisibility() {
   characters.value.forEach(character => {
     // レア度チェック
     if (!selectedRare.value.includes(character.rare)) {
@@ -248,8 +276,6 @@ function applyFilter() {
       }
     }
   });
-
-  emit('close'); // モーダルを閉じる
 }
 
 function toggleSelectAll(groupName: string) {
@@ -480,6 +506,13 @@ const determineLayout = () => {
   overflow-y: auto; /* Enable vertical scrolling if content overflows */
 }
 
+.modal-background.embedded {
+  padding: 12px;
+  max-height: none;
+  border: 1px solid #e0e0e0;
+  overflow-y: visible;
+}
+
 .button-container {
   display: flex;
   gap: 10px; /* ボタン間のスペース */
@@ -500,5 +533,16 @@ const determineLayout = () => {
   background-color: #e0e0e0; /* 線の色 */
   width: 100%; /* 親要素の幅いっぱいに線を引く */
   margin-bottom: 2px; /* 区切り線と下の要素とのスペースを確保 */
+}
+
+.embedded-buttons {
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.filter-status {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
 }
 </style>
