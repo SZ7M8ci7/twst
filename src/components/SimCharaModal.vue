@@ -1,56 +1,68 @@
 <template>
   <div class="modal-overlay" @click.self="closeModal">
     <div class="modal-content">
-      <!-- フィルターセクション -->
-      <div class="filter-section">
-        <div class="filter-header">
-          <h3>キャラクターフィルター</h3>
-          <v-btn small @click="toggleSelectAll('attributes')">
-            {{ isGroupFullySelected('attributes') ? '全解除' : '全選択' }}
-          </v-btn>
-        </div>
-        
-        <!-- 属性フィルター -->
-        <div class="filter-group">
-          <div class="filter-label">属性:</div>
-          <div class="filter-items">
-            <div class="filter-item" v-for="(attr, index) in attrOptions" :key="`attr-${index}`">
-              <v-checkbox v-model="selectedAttributes" :value="attr.value" :label="attr.name" hide-details />
-            </div>
+      <!-- タブセクション -->
+      <div class="tab-section">
+        <div class="tab-header">
+          <div 
+            class="tab-item"
+            :class="{ active: activeTab === 'filter' }"
+            @click="handleTabClick('filter')"
+          >
+            <span>フィルター設定</span>
+            <v-icon>{{ activeTab === 'filter' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+          </div>
+          <div 
+            class="tab-item"
+            :class="{ active: activeTab === 'sort' }"
+            @click="handleTabClick('sort')"
+          >
+            <span>ソート設定</span>
+            <v-icon>{{ activeTab === 'sort' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
           </div>
         </div>
         
-        <!-- タイプフィルター -->
-        <div class="filter-group">
-          <div class="filter-label">タイプ:</div>
-          <div class="filter-items">
-            <div class="filter-item" v-for="(type, index) in typeOptions" :key="`type-${index}`">
-              <v-checkbox v-model="selectedTypes" :value="type.value" :label="type.name" hide-details />
+        <v-expand-transition>
+          <div v-if="isExpanded" class="tab-content">
+            <!-- フィルターセクション -->
+            <div v-show="activeTab === 'filter'">
+              <FilterModal 
+                :embedded="true"
+                @close="handleFilterClose"
+                @filter-applied="handleFilterApplied"
+              />
+            </div>
+            
+            <!-- ソートセクション -->
+            <div v-show="activeTab === 'sort'" class="sort-content">
+              <v-row>
+                <v-col cols="12" sm="6">
+                  <v-select
+                    v-model="sortBy"
+                    :items="sortOptions"
+                    label="並び順"
+                    item-title="text"
+                    item-value="value"
+                    variant="outlined"
+                    density="compact"
+                  />
+                </v-col>
+                <v-col cols="12" sm="6">
+                  <v-select
+                    v-model="sortOrder"
+                    :items="sortOrderOptions"
+                    label="順序"
+                    item-title="text"
+                    item-value="value"
+                    variant="outlined"
+                    density="compact"
+                  />
+                </v-col>
+              </v-row>
+              
             </div>
           </div>
-        </div>
-        
-        <!-- レア度フィルター -->
-        <div class="filter-group">
-          <div class="filter-label">レア度:</div>
-          <div class="filter-items">
-            <div class="filter-item" v-for="(rare, index) in rareOptions" :key="`rare-${index}`">
-              <v-checkbox v-model="selectedRares" :value="rare" :label="rare" hide-details />
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <hr class="divider" />
-      
-      <!-- 検索ボックス -->
-      <div class="search-box">
-        <input 
-          type="text" 
-          v-model="searchQuery" 
-          placeholder="キャラクター名で検索..." 
-          class="search-input"
-        />
+        </v-expand-transition>
       </div>
       
       <!-- キャラクターグリッド -->
@@ -74,16 +86,11 @@
               class="character-image" 
               :title="character.chara || character.name"
             />
-            <div class="character-name">{{ character.chara || character.name }}</div>
+            <div class="character-name">{{ getDisplayText(character) }}</div>
           </div>
         </div>
       </div>
       
-      <!-- ボタンコンテナ -->
-      <div class="button-container">
-        <v-btn class="button" @click="closeModal">キャンセル</v-btn>
-        <v-btn class="button apply-button" @click="resetFilters">フィルターリセット</v-btn>
-      </div>
     </div>
   </div>
 </template>
@@ -93,32 +100,36 @@ import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.png';
+import FilterModal from '@/components/FilterModal.vue';
+import characterData from '@/assets/characters_info.json';
 
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const loadingImgUrl = ref(true);
-const searchQuery = ref('');
 
-// フィルター状態
-const selectedAttributes = ref(['火', '水', '木', '無']);
-const selectedTypes = ref(['バランス', 'ディフェンス', 'アタック']);
-const selectedRares = ref(['SSR', 'SR', 'R']);
+// タブ管理
+const activeTab = ref('filter');
 
-// フィルターオプション
-const attrOptions = [
-  { name: '火', value: '火' },
-  { name: '水', value: '水' },
-  { name: '木', value: '木' },
-  { name: '無', value: '無' }
+// 展開状態
+const isExpanded = ref(false);
+
+// ソート設定
+const sortBy = ref('default');
+const sortOrder = ref('asc');
+
+// ソートオプション
+const sortOptions = [
+  { text: 'デフォルト順', value: 'default' },
+  { text: 'レア度', value: 'rarity' },
+  { text: 'HP', value: 'hp' },
+  { text: 'ATK', value: 'atk' }
 ];
 
-const typeOptions = [
-  { name: 'バランス', value: 'バランス' },
-  { name: 'ディフェンス', value: 'ディフェンス' },
-  { name: 'アタック', value: 'アタック' }
+const sortOrderOptions = [
+  { text: '昇順', value: 'asc' },
+  { text: '降順', value: 'desc' }
 ];
 
-const rareOptions = ['SSR', 'SR', 'R'];
 
 // フィルター適用済みのキャラクターリスト
 const filteredCharacters = computed(() => {
@@ -126,37 +137,65 @@ const filteredCharacters = computed(() => {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
 
-  return characters.value.filter(character => {
+  let filtered = characters.value.filter(character => {
     // 画像が読み込まれているか確認
     if (!character.imgUrl) return false;
     
-    // 検索クエリでフィルタリング
-    if (searchQuery.value && character.chara) {
-      const query = searchQuery.value.toLowerCase();
-      const name = character.chara.toLowerCase();
-      if (!name.includes(query)) return false;
-    }
-    
-    // レア度でフィルタリング
-    if (!selectedRares.value.includes(character.rare)) return false;
-    
-    // タイプでフィルタリング
-    if (!selectedTypes.value.includes(character.attr)) return false;
-    
-    // 属性でフィルタリング (魔法1, 2, 3のいずれかが選択された属性に含まれるか)
-    const hasSelectedAttribute = 
-      (character.magic1Attribute && selectedAttributes.value.includes(character.magic1Attribute)) ||
-      (character.magic2Attribute && selectedAttributes.value.includes(character.magic2Attribute)) ||
-      (character.magic3Attribute && selectedAttributes.value.includes(character.magic3Attribute)) ||
-      // 旧属性名もサポート
-      (character.magic1atr && selectedAttributes.value.includes(character.magic1atr)) ||
-      (character.magic2atr && selectedAttributes.value.includes(character.magic2atr)) ||
-      (character.magic3atr && selectedAttributes.value.includes(character.magic3atr));
-    
-    if (!hasSelectedAttribute) return false;
+    // visibleフラグをチェック（FilterModalから適用されたフィルター）
+    if (!character.visible) return false;
     
     return true;
   });
+
+  // ソート処理
+  if (sortBy.value === 'default') {
+    // デフォルト順：characters_info.jsonの順序でソート
+    filtered.sort((a, b) => {
+      const aInfo = characterData.find(char => char.name_ja === a.chara || char.name_en === a.chara);
+      const bInfo = characterData.find(char => char.name_ja === b.chara || char.name_en === b.chara);
+      
+      const aIndex = aInfo ? characterData.indexOf(aInfo) : 999999;
+      const bIndex = bInfo ? characterData.indexOf(bInfo) : 999999;
+      
+      return sortOrder.value === 'desc' ? bIndex - aIndex : aIndex - bIndex;
+    });
+  } else {
+    filtered.sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy.value) {
+        case 'rarity':
+          const rarityOrder = { 'SSR': 3, 'SR': 2, 'R': 1 };
+          aValue = rarityOrder[a.rare] || 0;
+          bValue = rarityOrder[b.rare] || 0;
+          break;
+        case 'hp':
+          aValue = a.hp || 0;
+          bValue = b.hp || 0;
+          break;
+        case 'atk':
+          aValue = a.atk || 0;
+          bValue = b.atk || 0;
+          break;
+        default:
+          aValue = a.chara || '';
+          bValue = b.chara || '';
+      }
+      
+      // 数値の場合はそのまま比較、文字列の場合は大文字小文字を無視
+      let comparison = 0;
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        comparison = aValue - bValue;
+      } else {
+        comparison = String(aValue).localeCompare(String(bValue), 'ja');
+      }
+      
+      // 降順の場合は反転
+      return sortOrder.value === 'desc' ? -comparison : comparison;
+    });
+  }
+
+  return filtered;
 });
 
 const emit = defineEmits(['close', 'select']);
@@ -169,31 +208,45 @@ const selectImage = (character) => {
   emit('select', character);
 };
 
-// 全選択/全解除の切り替え
-function toggleSelectAll(group) {
-  if (group === 'attributes') {
-    if (isGroupFullySelected('attributes')) {
-      selectedAttributes.value = [];
-    } else {
-      selectedAttributes.value = attrOptions.map(attr => attr.value);
-    }
+
+// FilterModalからのフィルター適用処理
+function handleFilterApplied() {
+  // FilterModalが既にcharacters.visibleを更新しているので、
+  // ここでは追加の処理は不要
+}
+
+// FilterModalの閉じる処理
+function handleFilterClose() {
+  // 詳細フィルターを閉じるだけ（フィルターは適用されない）
+  isExpanded.value = false;
+}
+
+// タブクリック処理
+function handleTabClick(tab) {
+  if (activeTab.value === tab) {
+    // 同じタブをクリックした場合は展開/折りたたみ
+    isExpanded.value = !isExpanded.value;
+  } else {
+    // 別のタブをクリックした場合はタブ切り替えて展開
+    activeTab.value = tab;
+    isExpanded.value = true;
   }
 }
 
-// グループが完全に選択されているかチェック
-function isGroupFullySelected(group) {
-  if (group === 'attributes') {
-    return attrOptions.every(attr => selectedAttributes.value.includes(attr.value));
+// 表示テキストを取得する関数
+function getDisplayText(character) {
+  switch (sortBy.value) {
+    case 'default':
+      return character.chara || character.name;
+    case 'rarity':
+      return character.rare;
+    case 'hp':
+      return character.hp || 0;
+    case 'atk':
+      return character.atk || 0;
+    default:
+      return character.chara || character.name;
   }
-  return false;
-}
-
-// フィルターをリセット
-function resetFilters() {
-  selectedAttributes.value = ['火', '水', '木', '無'];
-  selectedTypes.value = ['バランス', 'ディフェンス', 'アタック'];
-  selectedRares.value = ['SSR', 'SR', 'R'];
-  searchQuery.value = '';
 }
 
 onBeforeMount(() => {
@@ -261,56 +314,62 @@ onBeforeMount(() => {
   overflow-y: auto;
 }
 
-.filter-section {
+.tab-section {
   margin-bottom: 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.filter-header {
+.tab-header {
   display: flex;
-  justify-content: space-between;
+  background-color: #f5f5f5;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
   align-items: center;
-  margin-bottom: 15px;
+  justify-content: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  user-select: none;
+  border-right: 1px solid #e0e0e0;
 }
 
-.filter-group {
+.tab-item:last-child {
+  border-right: none;
+}
+
+.tab-item:hover {
+  background-color: #eeeeee;
+}
+
+.tab-item.active {
+  background-color: #fff;
+}
+
+.tab-item span {
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+.tab-content {
+  background-color: #fff;
+  border-top: 1px solid #e0e0e0;
+}
+
+.sort-content {
+  padding: 16px;
+}
+
+.sort-info {
   display: flex;
   align-items: center;
-  margin-bottom: 10px;
+  color: #666;
 }
 
-.filter-label {
-  width: 80px;
-  font-weight: bold;
-}
-
-.filter-items {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.filter-item {
-  margin-right: 15px;
-}
-
-.divider {
-  border: none;
-  height: 1px;
-  background-color: #e0e0e0;
-  width: 100%;
-  margin: 15px 0;
-}
-
-.search-box {
-  margin-bottom: 20px;
-}
-
-.search-input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 16px;
-}
 
 .character-grid-container {
   margin-bottom: 20px;
@@ -328,8 +387,8 @@ onBeforeMount(() => {
 
 .character-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 2px;
 }
 
 .character-item {
@@ -337,26 +396,21 @@ onBeforeMount(() => {
   flex-direction: column;
   align-items: center;
   cursor: pointer;
-  transition: transform 0.2s;
-  padding: 5px;
-  border-radius: 8px;
-}
-
-.character-item:hover {
-  transform: scale(1.05);
-  background-color: rgba(0, 0, 0, 0.05);
+  padding: 1px;
+  border-radius: 3px;
 }
 
 .character-image {
   width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: 3px;
   object-fit: cover;
 }
 
 .character-name {
-  margin-top: 5px;
-  font-size: 12px;
+  margin-top: 1px;
+  font-size: 8px;
+  line-height: 1.0;
   text-align: center;
   max-width: 100%;
   overflow: hidden;
@@ -364,18 +418,4 @@ onBeforeMount(() => {
   white-space: nowrap;
 }
 
-.button-container {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-}
-
-.button {
-  min-width: 120px;
-}
-
-.apply-button {
-  background-color: #19d241;
-  color: white;
-}
 </style>
