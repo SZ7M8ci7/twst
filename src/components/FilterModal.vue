@@ -267,12 +267,19 @@ function updateCharacterVisibility() {
     if (selectedEffects.value.length === 17) {
       // 効果が全件選択されている場合は無条件でtrue
       character.visible = true;
+    } else if (selectedEffects.value.length === 0) {
+      // 効果が全く選択されていない場合は無条件でfalse
+      character.visible = false;
+      return;
     } else {
-      // 効果が16件以下の場合、character.etcに選択された効果が含まれているかをチェック
+      // 効果が1件以上選択されている場合、character.etcに選択された効果が含まれているかをチェック
       const effectMatched = selectedEffects.value.some(effect => character.etc.includes(effect));
       if (!effectMatched) {
         character.visible = false;
         return;
+      } else {
+        // 効果がマッチした場合は表示
+        character.visible = true;
       }
     }
   });
