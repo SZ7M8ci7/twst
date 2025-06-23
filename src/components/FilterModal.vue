@@ -402,7 +402,7 @@ const determineLayout = () => {
 .feature-select-all-container {
   display: flex;
   align-items: center;
-  margin-bottom: 0px;
+  margin-bottom: 3px;
 }
 
 .feature-items {
@@ -418,8 +418,8 @@ const determineLayout = () => {
 
 .display-block {
   margin: 0 auto; /* コンテナを中央揃え */
-  margin-top: 20px;
-  margin-bottom: 20px;
+  margin-top: 3px;
+  margin-bottom: 3px;
   width: 100%; /* 画面全体に広がるコンテナ */
   max-width: 1200px; /* コンテナの最大幅を設定 */
 }
@@ -427,31 +427,31 @@ const determineLayout = () => {
 .character-list-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 3px;
   width: 100%;
 }
 
 .row {
   display: flex;
-  gap: 20px;  /* 寮ごとの間隔 */
-  margin-bottom: 20px;
+  gap: 12px;  /* 寮ごとの間隔 */
+  margin-bottom: 3px;
 }
 
 .character-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 2px;
 }
 
 .character-select-all-container {
   display: flex;
   align-items: center;
-  gap: 10px; /* 選択ボタンとアイコンの間隔 */
+  gap: 8px; /* 選択ボタンとアイコンの間隔 */
 }
 
 .character-items {
   display: flex;
-  gap: 10px;  /* キャラクター間の間隔 */
+  gap: 2px;  /* キャラクター間の間隔 */
   flex-wrap: wrap;  /* 必要に応じて改行 */
 }
 
@@ -474,7 +474,7 @@ const determineLayout = () => {
 
 .character-item.selected {
   position: relative; /* 親要素にpositionを指定 */
-  border-radius: 8px; /* アイコン自体の角を丸める */
+  border-radius: 0px; /* アイコン自体の角を丸める */
 }
 
 .character-item.selected::before {
@@ -507,10 +507,36 @@ const determineLayout = () => {
 }
 
 .modal-background.embedded {
-  padding: 12px;
+  padding: 8px;
   max-height: none;
   border: 1px solid #e0e0e0;
   overflow-y: visible;
+  font-size: 0.85em;
+}
+
+.modal-background.embedded :deep(.v-label) {
+  font-size: 0.85em;
+}
+
+.modal-background.embedded :deep(.v-checkbox .v-label) {
+  font-size: 0.85em;
+}
+
+.modal-background.embedded :deep(.v-checkbox) {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.modal-background.embedded :deep(.v-input__control) {
+  min-height: auto;
+}
+
+.modal-background.embedded :deep(.v-selection-control) {
+  min-height: auto;
+  margin-top: 2px;
+  margin-bottom: 2px;
 }
 
 .button-container {
@@ -532,12 +558,12 @@ const determineLayout = () => {
   height: 1px; /* 線の厚み */
   background-color: #e0e0e0; /* 線の色 */
   width: 100%; /* 親要素の幅いっぱいに線を引く */
-  margin-bottom: 2px; /* 区切り線と下の要素とのスペースを確保 */
+  margin-bottom: 1px; /* 区切り線と下の要素とのスペースを確保 */
 }
 
 .embedded-buttons {
   justify-content: center;
-  margin-top: 12px;
+  margin-top: 1px;
 }
 
 .filter-status {
