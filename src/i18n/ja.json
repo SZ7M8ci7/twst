@@ -334,7 +334,7 @@
     "maxFire": "火属性数",
     "maxWater": "水属性数",
     "maxFlora": "木属性数",
-    "healNum": "回復数",
+    "healNum": "回復手札数",
     "neutralDamage": "等倍ダメージ",
     "advantageDamage": "有利与ダメージ",
     "damageAgainstFire": "対火与ダメージ",
