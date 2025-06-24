@@ -20,6 +20,7 @@ export interface SearchSettingsState {
   minFire: number;
   minWater: number;
   minFlora: number;
+  minHealNum: number;
   minReferenceDamage: number;
   minReferenceAdvantageDamage: number;
   minReferenceVsHiDamage: number;
@@ -55,6 +56,7 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     minFire: 0,
     minWater: 0,
     minFlora: 0,
+    minHealNum: 0,
     minReferenceDamage: 0,
     minReferenceAdvantageDamage: 0,
     minReferenceVsHiDamage: 0,

@@ -114,6 +114,19 @@
           />
       </v-card-text>
       <v-card-text class="sort-option ma-0 pa-0">
+        <span class="min-label">{{ $t('settingModal.minimumHealNum') }}</span>
+        <v-text-field
+            type="number"
+            v-model="minHealNum"
+            class="mt-0 pt-0"
+            hide-details="auto"
+            dense
+            solo
+            :min="0"
+            :max="20"
+          />
+      </v-card-text>
+      <v-card-text class="sort-option ma-0 pa-0">
         <span class="min-label">{{ $t('settingModal.minimumDuo') }}</span>
         <v-text-field
             type="number"
@@ -511,6 +524,7 @@ const minCosmic = ref(searchSettingsStore.minCosmic);
 const minFire = ref(searchSettingsStore.minFire);
 const minWater = ref(searchSettingsStore.minWater);
 const minFlora = ref(searchSettingsStore.minFlora);
+const minHealNum = ref(searchSettingsStore.minHealNum);
 const minReferenceDamage = ref(searchSettingsStore.minReferenceDamage);
 const minReferenceAdvantageDamage = ref(searchSettingsStore.minReferenceAdvantageDamage);
 const minReferenceVsHiDamage = ref(searchSettingsStore.minReferenceVsHiDamage);
@@ -596,6 +610,7 @@ function resetAllSettings() {
   minFire.value = 0;
   minWater.value = 0;
   minFlora.value = 0;
+  minHealNum.value = 0;
   minReferenceDamage.value = 0;
   minReferenceAdvantageDamage.value = 0;
   minReferenceVsHiDamage.value = 0;
@@ -676,6 +691,7 @@ function applyFilter() {
     minFire: minFire.value,
     minWater: minWater.value,
     minFlora: minFlora.value,
+    minHealNum: minHealNum.value,
     minReferenceDamage: minReferenceDamage.value,
     minReferenceAdvantageDamage: minReferenceAdvantageDamage.value,
     minReferenceVsHiDamage: minReferenceVsHiDamage.value,

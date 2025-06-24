@@ -284,6 +284,7 @@
     "minimumFire":"Minimum Fire",
     "minimumWater":"Minimum Water",
     "minimumFlora":"Minimum Flora",
+    "minimumHealCards":"Minimum Heal Num",
     "minimumNeutralDamage":"Minimum neutral damage",
     "minimumAdvantageDamage":"Minimum advantage damage",
     "minimumAgainstFireDamage":"Minimum damage against fire",
@@ -333,6 +334,7 @@
     "maxFire": "Number of Fire",
     "maxWater": "Number of Water",
     "maxFlora": "Number of Flora",
+    "healNum": "Heal Num",
     "neutralDamage": "Neutral damage",
     "advantageDamage": "Advantage damage",
     "damageAgainstFire": "Damage against fire",
@@ -365,7 +367,8 @@
     "crowley": "Crowley",
     "crewel": "Crewel",
     "fellow": "Fellow",
-    "train": "Train"
+    "train": "Train",
+    "healCards": "Heal Num"
   },
   "resultBody": {
     "effectiveHP": "Effective HP",
@@ -375,6 +378,7 @@
     "noHPBuddy": "Without HP buddy",
     "buddy": "Buddy",
     "evasion": "Evasion",
+    "healNum": "Heal Num",
     "duo": "Duo",
     "buff": "Buff",
     "debuff": "Debuff",

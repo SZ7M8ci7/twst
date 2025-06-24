@@ -16,6 +16,7 @@ const {
   minFire,
   minWater,
   minFlora,
+  minHealNum,
   minReferenceDamage,
   minReferenceAdvantageDamage,
   minReferenceVsHiDamage,
@@ -55,6 +56,7 @@ export function getAvailableSortProps(t: (key: string) => string) {
   t('comments.noHPBuddy'),
   t('comments.buddy'),
   t('comments.evasion'),
+  t('comments.healNum'),
   t('comments.duo'),
   t('comments.buff'),
   t('comments.debuff'),
@@ -107,6 +109,7 @@ export const availableSortkeys = [
   'noHpBuddy',
   'buddy',
   'evasion',
+  'healNum',
   'duo',
   'buff',
   'debuff',
@@ -181,6 +184,12 @@ function calcHealRate(status: string): number {
 function calcConHealRate(status: string): number {
   return buddyRateMap[status]?.conHeal || 0;
 }
+
+function isHealCard(healStatus: string): boolean {
+  return healStatus !== '' && buddyRateMap[healStatus] && 
+         (buddyRateMap[healStatus].heal > 0 || buddyRateMap[healStatus].conHeal > 0);
+}
+
 const atkBuffMap: { [key: string]: number } = {
   "ATKUP(極小)": 1.1,
   "ATKUP(小)": 1.2,
@@ -258,6 +267,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   let deckFire = 0;
   let deckWater = 0;
   let deckFlora = 0;
+  let deckHealCards = 0;
   let deckMinIncreasedHPBuddy = 99999;
   const deckReferenceDamageList: number[] = [];
   const deckReferenceAdvantageDamageList: number[] = [];
@@ -363,6 +373,17 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     deckTotalHeal += hpHeal + hpConHeal
     healList.push(hpHeal + hpConHeal);
       
+    // 回復手札数をカウント
+    if (isHealCard(chara.magic1heal)) {
+      deckHealCards += 1;
+    }
+    if (isHealCard(chara.magic2heal)) {
+      deckHealCards += 1;
+    }
+    if (chara.hasM3 && isHealCard(chara.magic3heal)) {
+      deckHealCards += 1;
+    }
+    
     // 回避数加算
     deckTotalEvasion += chara.evasion;
     if (!hasHpBuddy) {
@@ -538,6 +559,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   if (deckFire < minFire.value) { return; }
   if (deckWater < minWater.value) { return; }
   if (deckFlora < minFlora.value) { return; }
+  if (deckHealCards < minHealNum.value) { return; }
   if (deckReferenceDamage < minReferenceDamage.value) { return; }
   if (deckReferenceAdvantageDamage < minReferenceAdvantageDamage.value) { return; }
   if (deckReferenceVsHiDamage < minReferenceVsHiDamage.value) { return; }
@@ -574,6 +596,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckReferenceVsHiDamage
     , deckReferenceVsMizuDamage
     , deckReferenceVsKiDamage
+    , deckHealCards
     , ...deckList
     , simuURL
     , detailList];
@@ -767,13 +790,14 @@ export async function calcDecks(t: (key: string) => string) {
           referenceVsHiDamage: ret[16],
           referenceVsMizuDamage: ret[17],
           referenceVsKiDamage: ret[18],
-          chara1: ret[19],
-          chara2: ret[20],
-          chara3: ret[21],
-          chara4: ret[22],
-          chara5: ret[23],
-          simuURL: ret[24],
-          detailList: ret[25],
+          healNum: ret[19],
+          chara1: ret[20],
+          chara2: ret[21],
+          chara3: ret[22],
+          chara4: ret[23],
+          chara5: ret[24],
+          simuURL: ret[25],
+          detailList: ret[26],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さいか同じ場合のみpushする

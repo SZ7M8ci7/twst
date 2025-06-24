@@ -18,6 +18,7 @@
               </div>
             </td>
             <td>{{ item.evasion }}</td>
+            <td>{{ item.healNum }}</td>
             <td>{{ item.hpBuddy }}</td>
             <td>{{ item.increasedHpBuddy }}</td>
             <td>{{ item.buddy }}</td>
@@ -130,6 +131,7 @@ const headers = computed<DataTableHeader[]>(() => [
   { title: t('resultBody.HP'), value: 'hp', sortable: false },
   { title: t('resultBody.effectiveHP'), value: 'ehp', sortable: false },
   { title: t('resultBody.evasion'), value: 'evasion', sortable: false },
+  { title: t('resultBody.healNum'), value: 'healNum', sortable: false },
   { title: t('resultBody.HPBuddy'), value: 'hpBuddy', sortable: false },
   { title: t('resultBody.increasedHPBuddy'), value: 'increasedHpBuddy', sortable: false },
   { title: t('resultBody.buddy'), value: 'buddy', sortable: false },
