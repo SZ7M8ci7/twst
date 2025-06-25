@@ -1211,7 +1211,7 @@ function calc() {
             }
             if (result[k].attribute != '無'){
               score[l] += 1500;
-            };
+            }
             score[l] += result[k].vszendamage;
             score[l] += 500;
           }
