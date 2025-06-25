@@ -110,7 +110,7 @@
         </template>
       </div>
     </v-row>
-    <SimCharaModal v-if="isCharaModalOpen" @close="closeCharaModal" @select="selectCharaImage" />
+    <SimCharaModal v-if="isCharaModalOpen" :chara-index="props.charaIndex" :selected-attribute="props.selectedAttribute" @close="closeCharaModal" @select="selectCharaImage" />
     <SimCharaDetailModal
       v-model="isDetailModalOpen"
       :character="simulatorStore.deckCharacters[props.charaIndex]"
@@ -136,7 +136,7 @@ const simulatorStore = useSimulatorStore();
 
 
 const imgpath = ref(defaultImg);
-const props = defineProps(['charaIndex']);
+const props = defineProps(['charaIndex', 'selectedAttribute']);
 
 // SimCharaModalの制御
 const isCharaModalOpen = ref(false);

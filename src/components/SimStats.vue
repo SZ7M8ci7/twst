@@ -74,7 +74,7 @@ const totalHeal = computed(() =>
 );
 
 const totalEffectiveHP = computed(() => 
-  totalHP.value + totalHeal.value
+  totalHP.value + totalBuddyHP.value + totalHeal.value
 );
 
 // 全キャラクターの全ダメージを収集（旧シミュレータのdamageListに相当）

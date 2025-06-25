@@ -386,9 +386,8 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
   }
 
   // HP計算
-  const baseHP = character.hp || 0;
+  const characterHP = character.hp || 0;
   const buddyHP = calculateBuddyHP(character, charaDict);
-  const totalHP = baseHP + buddyHP;
 
   // 回復量計算
   const heal = calculateHeal(character);
@@ -397,7 +396,7 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
   const damage = calculateDamage(character, charaDict);
 
   const result = {
-    hp: totalHP,
+    hp: characterHP,
     buddyHP,
     heal,
     damage,
