@@ -10,7 +10,8 @@
       "Bash(npx eslint:*)",
       "Bash(npx vite:*)",
       "Bash(ls:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }
