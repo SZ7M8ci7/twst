@@ -38,7 +38,12 @@
                   @click="toggleCharacterSelection(characterInfo.name_en)"
                   :class="{ selected: selectedCharacters.includes(characterInfo.name_en) }"
                   :style="{ ...iconStyle, opacity: selectedCharacters.includes(characterInfo.name_en) ? 1 : 0.5 }">
-                  <img :src="imgUrlDictionary[characterInfo.name_en]" :alt="characterInfo.name_en" class="character-image" />
+                  <img 
+                    :src="imgUrlDictionary[characterInfo.name_en] || defaultImg" 
+                    :alt="characterInfo.name_en" 
+                    class="character-image"
+                    @error="handleImageError"
+                  />
                 </div>
               </div>
             </div>
@@ -78,6 +83,8 @@ import { onMounted, onBeforeUnmount, ref, computed, Ref, watch} from 'vue';
 import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
 import { loadImageUrls } from '@/components/common';
+import defaultImg from '@/assets/img/default.png';
+import { effects } from '@/store/searchResult';
 
 const { t } = useI18n();
 
@@ -283,6 +290,12 @@ function updateCharacterVisibility() {
       }
     }
   });
+}
+
+// 画像読み込みエラーハンドリング
+function handleImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = defaultImg;
 }
 
 function toggleSelectAll(groupName: string) {
