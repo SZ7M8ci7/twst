@@ -1,34 +1,45 @@
 name: Build and Deploy
-
 on:
   push:
-    branches: [simulatorV2]
+    branches: [master, sim_test]
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-
+    
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
         node-version: '18.x'
-
+    
     - name: Install dependencies
-      run: npm install --force
-
+      run: npm install --legacy-peer-deps
+    
     - name: Build
-      run: npm run build
-
-    - name: Deploy
+      run: npx vite build
+    
+    - name: Add .nojekyll file
+      run: echo '' > dist/.nojekyll
+    
+    - name: Deploy to Production
+      if: github.ref == 'refs/heads/master'
       run: |
         git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
         git config --global user.name "${GITHUB_ACTOR}"
         git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-        npm run deploy-github
+        cd dist && cp index.html 404.html && cd .. && npx gh-pages -d dist
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Deploy to Test Environment
+      if: github.ref == 'refs/heads/sim_test'
+      run: |
+        git config --global user.name "${GITHUB_ACTOR}"
+        git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+        cd dist && cp index.html 404.html && cd .. && npx gh-pages -d dist -r https://github-actions:${GITHUB_TOKEN}@github.com/SZ7M8ci7/sim_test.git
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
