@@ -112,6 +112,7 @@
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.png';
 import FilterModal from '@/components/FilterModal.vue';
@@ -122,6 +123,7 @@ const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const simulatorStore = useSimulatorStore();
 const { deckCharacters } = storeToRefs(simulatorStore);
+const filterdStore = useFilterdStore();
 const loadingImgUrl = ref(false);
 
 // タブ管理
@@ -1182,9 +1184,80 @@ watch(filteredCharacters, () => {
   });
 });
 
+// モーダル初期化時にフィルター状態を設定
+const initializeModalFilter = () => {
+  // 保存された状態がない場合のみSSRデフォルト設定を適用
+  if (filterdStore.isFirst) {
+    // フィルター状態をSSRのみに設定
+    filterdStore.tempSelectedCharacters = Object.values(
+      characterData.reduce((groups, character) => {
+        const dorm = character.dorm;
+        if (!groups[dorm]) groups[dorm] = [];
+        groups[dorm].push(character);
+        return groups;
+      }, {})
+    ).flat().map(student => student.name_en);
+    
+    filterdStore.tempSelectedRare = ['SSR']; // SSRのみ
+    filterdStore.tempSelectedType = ['バランス', 'ディフェンス', 'アタック'];
+    filterdStore.tempSelectedAttr = ['火', '水', '木', '無'];
+    filterdStore.tempSelectedEffects = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
+    
+    // localStorage に保存
+    filterdStore.saveCurrentState();
+    filterdStore.isFirst = false;
+  }
+  
+  // キャラクターのvisible状態を更新
+  characters.value.forEach(character => {
+    // レア度チェック
+    if (!filterdStore.tempSelectedRare.includes(character.rare)) {
+      character.visible = false;
+      return;
+    }
+    
+    // キャラクターチェック
+    const characterInfo = characterData.find(char => 
+      char.name_ja === character.chara || char.name_en === character.chara
+    );
+    if (!characterInfo || !filterdStore.tempSelectedCharacters.includes(characterInfo.name_en)) {
+      character.visible = false;
+      return;
+    }
+    
+    // タイプチェック
+    if (!filterdStore.tempSelectedType.includes(character.attr)) {
+      character.visible = false;
+      return;
+    }
+    
+    // 属性チェック
+    if (!filterdStore.tempSelectedAttr.includes(character.magic1atr) &&
+        !filterdStore.tempSelectedAttr.includes(character.magic2atr) &&
+        !filterdStore.tempSelectedAttr.includes(character.magic3atr)) {
+      character.visible = false;
+      return;
+    }
+    
+    // 効果チェック
+    if (filterdStore.tempSelectedEffects.length === 17) {
+      character.visible = true;
+    } else if (filterdStore.tempSelectedEffects.length === 0) {
+      character.visible = false;
+    } else {
+      const effectMatched = filterdStore.tempSelectedEffects.some(effect => 
+        character.etc.includes(effect)
+      );
+      character.visible = effectMatched;
+    }
+  });
+};
+
 // コンポーネントがマウントされた後に画像を読み込む
 onMounted(() => {
   initializeImageState();
+  // モーダル初期化時にフィルター状態を設定
+  initializeModalFilter();
   // 初期フィルター・ソートを実行
   updateFilteredCharacters();
   // 初期化はフィルターされたキャラクターのみに対して実行

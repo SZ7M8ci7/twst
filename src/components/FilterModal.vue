@@ -71,6 +71,9 @@
     </div>
     <!-- 埋め込みモード用ボタン -->
     <div class="button-container embedded-buttons" v-else>
+      <v-btn class="button reset-button" @click="resetFilter" variant="outlined" size="small">
+        フィルターリセット
+      </v-btn>
     </div>
   </div>
 </template>
@@ -174,7 +177,7 @@ onMounted(async () => {
   // 初期化処理
   if (isFirst.value) {
     selectedCharacters.value = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
-    selectedRare.value = ['SSR', 'SR', 'R'];
+    selectedRare.value = ['SSR']; // SSRのみをデフォルトで選択
     selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
     selectedAttr.value = ['火', '水', '木', '無'];
     selectedEffects.value = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
@@ -205,6 +208,16 @@ onMounted(async () => {
   // 埋め込みモードの場合はリアルタイム更新のためのwatcherを設定
   if (props.embedded) {
     watch([selectedCharacters, selectedRare, selectedType, selectedAttr, selectedEffects], () => {
+      // 選択状態を一時保存エリアに更新
+      tempSelectedCharacters.value = [...selectedCharacters.value];
+      tempSelectedRare.value = [...selectedRare.value];
+      tempSelectedType.value = [...selectedType.value];
+      tempSelectedAttr.value = [...selectedAttr.value];
+      tempSelectedEffects.value = [...selectedEffects.value];
+      
+      // localStorage に永続化
+      filterdStore.saveCurrentState();
+      
       updateCharacterVisibility();
     }, { deep: true });
   }
@@ -222,12 +235,38 @@ function applyFilter() {
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
 
+  // localStorage に永続化
+  filterdStore.saveCurrentState();
+
   updateCharacterVisibility();
 
   emit('filter-applied'); // フィルター適用を通知
   if (!props.embedded) {
     emit('close'); // 埋め込みモードでない場合のみモーダルを閉じる
   }
+}
+
+// フィルターリセット機能
+function resetFilter() {
+  // デフォルト状態に戻す（SSRのみ選択）
+  selectedCharacters.value = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
+  selectedRare.value = ['SSR']; // SSRのみをデフォルトで選択
+  selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
+  selectedAttr.value = ['火', '水', '木', '無'];
+  selectedEffects.value = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
+
+  // 一時保存エリアも更新
+  tempSelectedCharacters.value = [...selectedCharacters.value];
+  tempSelectedRare.value = [...selectedRare.value];
+  tempSelectedType.value = [...selectedType.value];
+  tempSelectedAttr.value = [...selectedAttr.value];
+  tempSelectedEffects.value = [...selectedEffects.value];
+
+  // ストアの状態をリセットしlocalStorageからも削除
+  filterdStore.resetFilterState();
+
+  // フィルターを適用
+  updateCharacterVisibility();
 }
 
 // フィルタリング処理を分離
@@ -466,6 +505,16 @@ const determineLayout = () => {
   width: var(--icon-size); /* JavaScriptから渡された変数を使う */
   height: var(--icon-size); /* JavaScriptから渡された変数を使う */
   transition: border 0.3s ease;
+}
+
+.embedded-buttons {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.reset-button {
+  color: #666 !important;
+  border-color: #ddd !important;
 }
 
 .character-item img {
