@@ -130,7 +130,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
   });
 
   // 計算済みのステータスを保持
-  const characterStats = ref(deckCharacters.map(char => calculateCharacterStats(char, charaDict.value)));
+  const characterStats = ref(deckCharacters.map(char => calculateCharacterStats(char, {})));
   
   const isCalculating = ref(false);
   
@@ -158,13 +158,15 @@ export const useSimulatorStore = defineStore('simulator', () => {
     await nextTick();
     
     try {
+      // Get current charaDict value to avoid reactivity issues
+      const currentCharaDict = charaDict.value;
       
       // recalculateStatsでは強制更新しない（ユーザーの手動選択を保持）
-      // deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
+      // deckCharacters.forEach(character => updateDuoStatus(character, currentCharaDict));
       
       const newStats = [];
       for (let i = 0; i < deckCharacters.length; i++) {
-        newStats.push(calculateCharacterStats(deckCharacters[i], charaDict.value));
+        newStats.push(calculateCharacterStats(deckCharacters[i], currentCharaDict));
         if (i < deckCharacters.length - 1) await new Promise(r => setTimeout(r, 0));
       }
       
@@ -177,11 +179,14 @@ export const useSimulatorStore = defineStore('simulator', () => {
         recalculateStats();
       }
     }
-  }, 50);
+  }, 100);
 
   // charaDictの変更を監視して全キャラクターのステータスを再計算
-  watch(charaDict, () => {
-    recalculateStats();
+  watch(charaDict, (newDict, oldDict) => {
+    // Only recalculate if the dictionary actually changed
+    if (JSON.stringify(newDict) !== JSON.stringify(oldDict)) {
+      recalculateStats();
+    }
   });
 
   // デッキのキャラクターの変更を監視 - 最適化: 個別のプロパティを監視
@@ -208,15 +213,21 @@ export const useSimulatorStore = defineStore('simulator', () => {
     buddy1Lv: char.buddy1Lv,
     buddy2Lv: char.buddy2Lv,
     buddy3Lv: char.buddy3Lv
-  })), () => {
-    recalculateStats();
-  }, { deep: true });
+  })), (newVal, oldVal) => {
+    // Only recalculate if something actually changed
+    if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+      recalculateStats();
+    }
+  });
 
   // バフの変更を監視 - 最適化: 個別のバフ監視
   watch(() => deckCharacters.map(char => 
     char.buffs ? JSON.stringify(char.buffs) : ''
-  ), () => {
-    recalculateStats();
+  ), (newVal, oldVal) => {
+    // Only recalculate if buffs actually changed
+    if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+      recalculateStats();
+    }
   });
 
   // デッキ全体のステータスを計算 - 最適化: 型安全性の向上
