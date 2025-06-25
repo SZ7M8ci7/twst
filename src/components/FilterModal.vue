@@ -58,7 +58,7 @@
         {{ isGroupFullySelected('statusEffects') ? t('filterModal.release') : t('filterModal.select') }}
       </v-btn>
       <div class="feature-items">
-        <div v-for="effect in effects" :key="effect.name" class="feature-item">
+        <div v-for="effect in localEffects" :key="effect.name" class="feature-item">
           <v-checkbox v-model="selectedEffects" :value="effect.value" :label="effect.name" hide-details />
         </div>
       </div>
@@ -134,25 +134,11 @@ const attrOptions = computed(() => [
   { name: t('filterModal.cosmic'), value: '無' },
 ]);
 
-const effects = [
-{ name: t('filterModal.power_boost'), value: 'ATKUP' },
-  { name: t('filterModal.damage_boost'), value: 'ダメージUP' },
-  { name: t('filterModal.critical'), value: 'クリティカル' },
-  { name: t('filterModal.element_boost'), value: '属性ダメージUP' },
-  { name: t('filterModal.damage_vulnerability'), value: '被ダメージUP' },
-  { name: t('filterModal.power_cut'), value: 'ATKDOWN' },
-  { name: t('filterModal.damage_cut'), value: 'ダメージDOWN' },
-  { name: t('filterModal.evasion'), value: '回避' },
-  { name: t('filterModal.element_cut'), value: '属性ダメージDOWN' },
-  { name: t('filterModal.resistence'), value: '被ダメージDOWN' },
-  { name: t('filterModal.hp_restoration'), value: 'HP回復' },
-  { name: t('filterModal.hp_regen'), value: 'HP継続回復' },
-  { name: t('filterModal.nullifies_blind'), value: '暗闇無効' },
-  { name: t('filterModal.nullifies_curse'), value: '呪い無効' },
-  { name: t('filterModal.nullifies_freeze'), value: '凍結無効' },
-  { name: t('filterModal.debuff_removal'), value: 'デバフ解除' },
-  { name: t('filterModal.curse'), value: '呪い' }
-];
+// Use the translated effects by mapping the imported effects with translations
+const localEffects = computed(() => effects.map(effect => ({
+  name: t(`filterModal.${effect.name}`),
+  value: effect.value
+})));
 
 interface Character {
   name_ja: string;
@@ -301,13 +287,13 @@ function handleImageError(event: Event) {
 function toggleSelectAll(groupName: string) {
   if (groupName === 'statusEffects') {
     // ステータス効果の全選択/解除を処理
-    const allSelected = effects.every(effect => selectedEffects.value.includes(effect.value));
+    const allSelected = localEffects.value.every(effect => selectedEffects.value.includes(effect.value));
     if (allSelected) {
       // すべて選択されている場合は解除
       selectedEffects.value = [];
     } else {
       // すべてのエフェクトを選択
-      selectedEffects.value = effects.map(effect => effect.value);
+      selectedEffects.value = localEffects.value.map(effect => effect.value);
     }
   } else if (groupName === 'cardAttributes') {
     // カード属性の全選択/解除を処理
@@ -345,7 +331,7 @@ function isGroupFullySelected(groupName: string): boolean {
            typeOptions.value.every(type => selectedType.value.includes(type.value)) &&
           attrOptions.value.every(attr => selectedAttr.value.includes(attr.value));
   } else if (groupName === 'statusEffects') {
-    return effects.every(effect => selectedEffects.value.includes(effect.value));
+    return localEffects.value.every(effect => selectedEffects.value.includes(effect.value));
   }
 
   const group = characterGroups[groupName];

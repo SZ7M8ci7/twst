@@ -848,7 +848,7 @@ watch(() => deckCharacters.value.map(c => ({ chara: c.chara, level: c.level, hp:
 // キャラクターの画像読み込み状態を初期化
 const initializeImageState = () => {
   characters.value.forEach(character => {
-    if (!character.hasOwnProperty('imageLoaded')) {
+    if (!Object.prototype.hasOwnProperty.call(character, 'imageLoaded')) {
       character.imageLoaded = false;
     }
     if (!character.imgUrl || character.imgUrl === 'placeholder') {

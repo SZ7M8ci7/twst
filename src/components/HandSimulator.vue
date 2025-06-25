@@ -99,8 +99,8 @@ const removeFromDeck = (index: number) => {
   }
 };
 
-const updateSelection = (index: number, value: string) => {
-  deckStore.updateSelection(index, value);
+const updateSelection = (index: number, value: string | null) => {
+  deckStore.updateSelection(index, value || '');
 };
 
 const nextTurn = () => {
