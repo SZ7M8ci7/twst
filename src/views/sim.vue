@@ -18,7 +18,7 @@
         
         <!-- キャラクターセクション -->
         <div class="character-section">
-          <SimChara v-for="index in [0,1,2,3,4]" :key="index" :chara-index="index" />
+          <SimChara v-for="index in [0,1,2,3,4]" :key="index" :chara-index="index" :selected-attribute="selectedAttribute" />
         </div>
         </div>
       </v-col>
