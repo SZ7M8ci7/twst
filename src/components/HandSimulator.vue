@@ -1,13 +1,14 @@
 <template>
   <v-row class="mb-1">
-    <v-col cols="12" sm="4" />
-    <v-col cols="12" sm="2">
-      <v-btn block @click="resetDeck">{{ $t('hand.reset') }}</v-btn>
+    <v-col cols="12" class="text-center">
+      <div class="reset-stats">
+        {{ $t('hand.reset_stats', { 
+          ok: resetOkCount, 
+          total: resetTotalCount,
+          percent: resetTotalCount > 0 ? Math.round((resetOkCount / resetTotalCount) * 100) : 0
+        }) }}
+      </div>
     </v-col>
-    <v-col cols="12" sm="2">
-      <v-btn :disabled="selectedCount !== 2" block color="green" @click="nextTurn">{{ $t('hand.next') }}</v-btn>
-    </v-col>
-    <v-col cols="12" sm="4" />
   </v-row>
 
   <v-row class="mb-1">
@@ -17,7 +18,20 @@
           <div class="generated-text" :data-attr="getAttr(item.text, item)">{{ item.text }}</div>
         </v-img>
       </div>
+      <div class="next-turn-btn">
+        <v-btn :disabled="selectedCount !== 2" block color="green" @click="nextTurn">{{ $t('hand.next') }}</v-btn>
+      </div>
     </div>
+  </v-row>
+
+  <v-row class="mb-1">
+    <div class="reset-buttons">
+      <v-btn block color="success" @click="resetDeck(true)">{{ $t('hand.reset_ok') }}</v-btn>
+      <v-btn block color="error" @click="resetDeck(false)">{{ $t('hand.reset_ng') }}</v-btn>
+    </div>
+  </v-row>
+
+  <v-row class="mb-1">
     <div class="deck">
       <div v-for="(character, index) in deck" :key="character.name" class="deck-item">
         <v-img
@@ -54,6 +68,8 @@ const { deck, generatedList } = storeToRefs(deckStore);
 
 const showRemove = ref<number | null>(null);
 const selectedIndexes = ref<number[]>([]);
+const resetOkCount = ref(0);
+const resetTotalCount = ref(0);
 
 const displayedList = computed(() => {
   return generatedList.value.slice(0, 5);
@@ -95,9 +111,13 @@ const nextTurn = () => {
   selectedIndexes.value = [];
 };
 
-const resetDeck = () => {
+const resetDeck = (isOk: boolean) => {
   deckStore.resetDeck();
   selectedIndexes.value = [];
+  resetTotalCount.value++;
+  if (isOk) {
+    resetOkCount.value++;
+  }
 };
 
 const getAttr = (text: string, character: any) => {
@@ -108,12 +128,13 @@ const getAttr = (text: string, character: any) => {
 <style scoped>
 .deck {
   display: flex;
-  justify-content: center; /* アイテムを中央に配置 */
-  flex-wrap: wrap; /* 必要に応じてアイテムを折り返し */
-  gap: 10px; /* アイテム間の隙間 */
-  margin: 10px auto; /* コンテナ自体を中央に配置 */
-  width: 100%; /* コンテナの横幅を最大に設定 */
-  flex-direction: row; /* アイテムを横に並べる */
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 30px auto 10px;
+  width: 100%;
+  max-width: 800px;
+  flex-direction: row;
 }
 .simulator {
   display: flex;
@@ -121,23 +142,30 @@ const getAttr = (text: string, character: any) => {
   flex-wrap: wrap;
   gap: 10px;
   margin: 10px auto;
-  width: 500px;
-  flex-direction: row;
+  width: 100%;
+  max-width: 800px;
   background-color: #cecacf;
   border-radius: 10px;
   padding: 20px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
 }
+.next-turn-btn {
+  width: 100%;
+  margin-top: 20px;
+}
 .deck-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px; /* 画像とプルダウンメニューの間隔 */
+  gap: 8px;
+  flex: 0 0 calc(20% - 8px);
+  min-width: calc(20% - 8px);
+  max-width: calc(20% - 8px);
 }
 
 .character-image {
-  width: 80px;
-  height: 80px;
+  width: 100%;
+  aspect-ratio: 1;
   cursor: pointer;
 }
 
@@ -148,33 +176,41 @@ const getAttr = (text: string, character: any) => {
 }
 
 .select-menu {
-  width: 80px; /* プルダウンメニューの幅を画像に合わせる */
+  width: 100%;
 }
 .generated-list {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 20px;
+  width: 100%;
+  justify-content: center;
 }
 
 .generated-item {
   position: relative;
+  flex: 0 0 calc(20% - 8px);
+  min-width: calc(20% - 8px);
+  max-width: calc(20% - 8px);
 }
 
 .generated-image {
-  width: 80px;
-  height: 80px;
+  width: 100%;
+  aspect-ratio: 1;
 }
 
 .generated-text {
   position: absolute;
-  top: 85%;
-  left: 20%;
-  transform: translate(-50%, -50%);
+  bottom: 0;
+  left: 0;
+  transform: none;
   color: rgb(255, 255, 255);
   border-radius: 8px;
   font-weight: bold;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  padding: 2px 4px;
+  font-size: clamp(10px, 2vw, 14px);
+  margin: 0px;
 }
 .generated-text[data-attr="火"] {
   background-color: red;
@@ -193,5 +229,33 @@ const getAttr = (text: string, character: any) => {
 }
 .selected {
   opacity: 0.2;
+}
+.reset-stats {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 10px 0;
+}
+
+.reset-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 5px;
+  flex-wrap: wrap;
+}
+
+.reset-buttons .v-btn {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .reset-buttons {
+    padding: 0 2px;
+    gap: 6px;
+  }
 }
 </style>

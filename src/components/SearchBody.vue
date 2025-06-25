@@ -26,7 +26,7 @@
             <v-checkbox v-model="item.required" hide-details></v-checkbox>
           </template>
           <template v-slot:[`item.hasM3`]="{ item }">
-            <v-checkbox v-model="item.hasM3" hide-details></v-checkbox>
+            <v-checkbox v-model="item.hasM3" hide-details v-if="item.rare === 'SSR'"></v-checkbox>
           </template>
           <template v-slot:[`item.name`]="{ item }">
             <img :src="item.imgUrl" :alt="item.name" class="character-image" />
@@ -41,8 +41,8 @@
           <v-card>
             <v-card-text>
               <v-select v-model="selectedCharacter.rare" :items="['R', 'SR', 'SSR']"  label="Rare" hide-details></v-select>
-              <v-text-field v-model="selectedCharacter.hp" label="HP" type="number" :min="0" :max="99999" hide-details></v-text-field>
-              <v-text-field v-model="selectedCharacter.atk" label="ATK" type="number" :min="0" :max="99999" hide-details></v-text-field>
+              <v-text-field v-model.number="selectedCharacter.hp" label="HP" type="number" :min="0" :max="99999" hide-details></v-text-field>
+              <v-text-field v-model.number="selectedCharacter.atk" label="ATK" type="number" :min="0" :max="99999" hide-details></v-text-field>
               <v-select v-model="selectedCharacter.duo" :items=buddyCharacter  label="デュオ" hide-details></v-select>
               <v-select v-model="selectedCharacter.buddy1c" :items=buddyCharacter  label="バディ1相手" hide-details></v-select>
               <v-select v-model="selectedCharacter.buddy1s" :items=buddyStatus  label="バディ1" hide-details></v-select>
@@ -117,6 +117,7 @@ import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
+import charactersInfo from '@/assets/characters_info.json';
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
@@ -147,15 +148,24 @@ const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
-  return characters.value.filter(character => character.visible && character.imgUrl);
+  const characterOrder = charactersInfo.map((info: any) => info.name_ja);
+  return characters.value
+    .filter(character => character.visible && character.imgUrl)
+    .sort((a, b) => {
+      const indexA = characterOrder.indexOf(a.chara);
+      const indexB = characterOrder.indexOf(b.chara);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
 });
 
 const headers = computed(() => [
-  { title: 'Lv', value: 'level', sortable: false },
-  { title: t('search.required'), value: 'required', sortable: false },
-  { title: 'M3', value: 'hasM3', sortable: false },
+  { title: 'Lv', value: 'level', sortable: true },
+  { title: t('search.required'), value: 'required', sortable: true },
+  { title: 'M3', value: 'hasM3', sortable: true, show: (item: any) => item.rare === 'SSR' },
   { title: t('search.character'), value: 'name', sortable: false },
-  { title: t('search.rarity'), value: 'rare', sortable: false },
+  { title: t('search.rarity'), value: 'rare', sortable: true },
   { title: 'HP', value: 'hp', sortable: true },
   { title: 'ATK', value: 'atk', sortable: true },
   { title: t('search.other'), value: 'etc', sortable: false },
@@ -230,6 +240,8 @@ function saveCharacter() {
   const index = characters.value.findIndex(c => c.name === selectedCharacter.value.name);
   if (index !== -1) {
     characters.value[index] = { ...selectedCharacter.value };
+  } else {
+    console.error('character not found');
   }
   closeEditModal();
 }
@@ -292,6 +304,10 @@ onBeforeMount(() => {
   const promises = characters.value.map(character => {
     return import(`@/assets/img/${character.name}.png`)
       .then(module => {
+        character.imgUrl = module.default;
+      })
+      .catch(async () => {
+        const module = await import(`@/assets/img/notyet.png`);
         character.imgUrl = module.default;
       })
       .catch(() => {

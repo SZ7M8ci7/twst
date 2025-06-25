@@ -79,6 +79,16 @@
         :title="$t('tool.buddyDuo')"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'finisherDamage'}">
+      <v-list-item
+        :title="$t('tool.finisherDamage')"
+        @click="drawer = false;"
+      /></RouterLink>
+      <RouterLink :to="{name:'retire'}">
+      <v-list-item
+        :title="$t('tool.retire')"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'hand'}">
       <v-list-item
         :title="$t('tool.handGacha')"

@@ -13,9 +13,11 @@
     "mutualDuo": "Mutual or 3 Duo List",
     "handGacha": "Hand Gacha",
     "buddyDuo": "Buddy/Duo Relation",
+    "finisherDamage": "Finisher Damage",
     "data": "Data",
     "other": "Other",
-    "sim": "Simulator"
+    "sim": "Simulator",
+    "retire": "Retire Counter"
   },
   "top": {
     "twistedTool": "A web site to put tools related to Twisted Wonderland",
@@ -175,7 +177,15 @@
     "copySuccess": "Copied to clipboard",
     "copyError": "Failed to copy to clipboard",
     "importSuccess": "Imported {count} items",
-    "importError": "Import failed. Invalid data format."
+    "importError": "Import failed. Invalid data format.",
+    "noSettingOptions": "Please specify search settings",
+    "remainingTime": "Remaining time",
+    "processingSpeed": "Processing speed",
+    "itemsPerSecond": "items/sec",
+    "hours": "{hours}h",
+    "minutes": "{minutes}m",
+    "seconds": "{seconds}s",
+    "support": "Support"
   },
   "infoModal": {
     "about": "About this tool",
@@ -253,7 +263,6 @@
     "nullifies_freeze": "nullifies freeze",
     "debuff_removal": "debuff removal",
     "curse": "curse"
-
   },
   "settingModal": {
     "sortSettings": "Sort settings",
@@ -262,6 +271,7 @@
     "submit": "OK",
     "asc": "ASC",
     "desc": "DESC",
+    "effectiveHP": "Effective HP",
     "minimumValueSetting":"Minimum value settings",
     "minimumEHP":"Minimum Effective HP",
     "minimumHP":"Minimum HP",
@@ -275,6 +285,7 @@
     "minimumFire":"Minimum Fire",
     "minimumWater":"Minimum Water",
     "minimumFlora":"Minimum Flora",
+    "minimumHealCards":"Minimum Heal Num",
     "minimumNeutralDamage":"Minimum neutral damage",
     "minimumAdvantageDamage":"Minimum advantage damage",
     "minimumAgainstFireDamage":"Minimum damage against fire",
@@ -283,12 +294,31 @@
     "searchSettings":"Search settings",
     "maximumResult":"Maximum number of result",
     "attackNum":"Number of attacks",
-    "allowSameCharacter":"Allow same character",
+    "allowSameCharacter":"Use support characters",
     "cancel":"Cancel",
     "ok":"OK",
     "yes":"Yes",
     "no":"No",
-    "mustCharacter":"Required Character"
+    "mustCharacter":"Required Character",
+    "searchPreset":"Search Preset",
+    "preset": {
+      "fireBasicExam": "Fire Basic Exam",
+      "waterBasicExam": "Water Basic Exam",
+      "floraBasicExam": "Flora Basic Exam",
+      "allBasicExam": "Omni Basic Exam",
+      "neutralBasicExam": "Cosmic Basic Exam",
+      "fireDefenseExam": "Fire Defense Exam",
+      "waterDefenseExam": "Water Defense Exam",
+      "floraDefenseExam": "Flora Defense Exam",
+      "allDefenseExam": "Omni Defense Exam",
+      "neutralDefenseExam": "Cosmic Defense Exam",
+      "fireAttackExam": "Fire Offence Exam",
+      "waterAttackExam": "Water Offence Exam",
+      "floraAttackExam": "Flora Offence Exam",
+      "allAttackExam": "Omni Offence Exam",
+      "neutralAttackExam": "Cosmic Offence Exam",
+      "practicalClass": "Arcane Combat Drills"
+    }
   },
   "comments": {
     "effectiveHP": "Effective HP",
@@ -305,6 +335,7 @@
     "maxFire": "Number of Fire",
     "maxWater": "Number of Water",
     "maxFlora": "Number of Flora",
+    "healNum": "Heal Num",
     "neutralDamage": "Neutral damage",
     "advantageDamage": "Advantage damage",
     "damageAgainstFire": "Damage against fire",
@@ -337,7 +368,8 @@
     "crowley": "Crowley",
     "crewel": "Crewel",
     "fellow": "Fellow",
-    "train": "Train"
+    "train": "Train",
+    "healCards": "Heal Num"
   },
   "resultBody": {
     "effectiveHP": "Effective HP",
@@ -347,6 +379,7 @@
     "noHPBuddy": "Without HP buddy",
     "buddy": "Buddy",
     "evasion": "Evasion",
+    "healNum": "Heal Num",
     "duo": "Duo",
     "buff": "Buff",
     "debuff": "Debuff",
@@ -369,6 +402,9 @@
   "hand": {
     "filter": "Filter",
     "reset": "Reset",
+    "reset_ok": "Reset OK",
+    "reset_ng": "Reset NG",
+    "reset_stats": "Success Rate: {ok}/{total} ({percent}%)",
     "next": "Next turn",
     "add": "Add",
     "character": "Character",
@@ -387,7 +423,23 @@
   "other": {
     "text": "Other tools i made",
     "masterChef": "The Culinary Crucible Calculator",
+    "screenShot": "Screenshot owned cards",
     "OCR": "Transcription of owned furniture",
-    "defense": "Deck search tool for defensive exam (maintenance stopped)"
+    "defense": "Deck search tool for defensive exam (maintenance stopped)",
+    "wiki": "Buddy update tool for wiki"
+  },
+  "retire": {
+    "reset": "Reset",
+    "num": "times",
+    "clear_content": "Clear",
+    "seconds": "sec",
+    "confirm_clear": "Clear all input?",
+    "confirm_clear_message": "Are you sure you didn't press this by mistake?",
+    "cancel": "Cancel",
+    "confirm": "Delete"
+  },
+  "support": {
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All"
   }
 }

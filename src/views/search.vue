@@ -1,5 +1,5 @@
 <template>
-  <v-container style="min-width: 80%;">
+  <v-container style="min-width: 90%;">
     <div>
       <SearchHeader @search-started="handleSearchStarted" />
     </div>
@@ -7,12 +7,16 @@
       :show-arrows="false"
       :mobile-breakpoint="Infinity">
       <v-tab value="search">{{ $t('search.characterList') }}</v-tab>
+      <v-tab value="support">{{ $t('search.support') }}</v-tab>
       <v-tab value="result">{{ $t('search.result') }}</v-tab>
     </v-tabs>
     <v-card-text>
       <v-window v-model="tab" disabled >
         <v-window-item value="search">
           <SearchBody />
+        </v-window-item>
+        <v-window-item value="support">
+          <SupportBody />
         </v-window-item>
         <v-window-item value="result">
           <ResultBody/>
@@ -26,6 +30,7 @@
 import {onMounted, ref} from 'vue';
 import SearchHeader from '@/components/SearchHeader.vue';
 import SearchBody from '@/components/SearchBody.vue';
+import SupportBody from '@/components/SupportBody.vue';
 import ResultBody from '@/components/ResultBody.vue';
 import {useCharacterStore} from '@/store/characters';
 

@@ -1,9 +1,10 @@
-
 import { defineStore } from 'pinia';
+import charactersData from '@/assets/chara.json';
+
 // types/searchSettingsTypes.ts
 export interface SortOption {
   prop: string;
-  order: '昇順' | '降順'|'ASC' | 'DESC';
+  order: string;
 }
 
 export interface SearchSettingsState {
@@ -19,6 +20,7 @@ export interface SearchSettingsState {
   minFire: number;
   minWater: number;
   minFlora: number;
+  minHealNum: number;
   minReferenceDamage: number;
   minReferenceAdvantageDamage: number;
   minReferenceVsHiDamage: number;
@@ -30,7 +32,15 @@ export interface SearchSettingsState {
   mustCharacters: [];
   convertedMustCharacters: [];
   allowSameCharacter: boolean;
+  selectedSupportCharacters: string[];
 }
+
+// SSRキャラクターの名前を取得する関数
+const getInitialSSRCharacters = () => {
+  return charactersData
+    .filter(character => character.rare === 'SSR')
+    .map(character => character.name);
+};
 
 export const useSearchSettingsStore = defineStore('searchSettings', {
   state: (): SearchSettingsState => ({
@@ -46,6 +56,7 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     minFire: 0,
     minWater: 0,
     minFlora: 0,
+    minHealNum: 0,
     minReferenceDamage: 0,
     minReferenceAdvantageDamage: 0,
     minReferenceVsHiDamage: 0,
@@ -54,11 +65,12 @@ export const useSearchSettingsStore = defineStore('searchSettings', {
     maxResult: 10,
     attackNum: 10,
     sortOptions: [
-      { prop: 'HP', order: '降順' }
+      { prop: 'settingModal.effectiveHP', order: 'settingModal.desc' }
     ],
     mustCharacters: [],
     convertedMustCharacters: [],
-    allowSameCharacter: true,
+    allowSameCharacter: false,
+    selectedSupportCharacters: getInitialSSRCharacters(),
   }),
   actions: {
     updateSearchSettings(newSettings: Partial<SearchSettingsState>) {

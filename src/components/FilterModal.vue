@@ -77,7 +77,7 @@ import { storeToRefs } from 'pinia';
 import { onMounted, onBeforeUnmount, ref, computed, Ref, watch} from 'vue';
 import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
-import { useImageUrlDictionary } from '@/components/common';
+import { loadImageUrls } from '@/components/common';
 
 const { t } = useI18n();
 
@@ -207,7 +207,7 @@ onMounted(async () => {
   // display-block幅の更新
   updateDisplayBlockWidth();
   window.addEventListener('resize', resizeListener);
-  imgUrlDictionary.value = await useImageUrlDictionary(characterData);
+  imgUrlDictionary.value = await loadImageUrls(characterData);
   
   // 埋め込みモードの場合はリアルタイム更新のためのwatcherを設定
   if (props.embedded) {

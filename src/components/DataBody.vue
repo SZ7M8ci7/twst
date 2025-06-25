@@ -149,6 +149,10 @@ onBeforeMount(() => {
       .then(module => {
         character.imgUrl = module.default;
       })
+      .catch(async () => {
+        const module = await import(`@/assets/img/notyet.png`);
+        character.imgUrl = module.default;
+      })
       .catch(() => {
         character.imgUrl = ''; // 画像の読み込みに失敗した場合
       });

@@ -2,7 +2,6 @@ import { Character, useCharacterStore} from '@/store/characters'
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
-import { Ref } from 'vue';
 const searchSettingStore = useSearchSettingsStore();
 const {
   minEHP,
@@ -17,6 +16,7 @@ const {
   minFire,
   minWater,
   minFlora,
+  minHealNum,
   minReferenceDamage,
   minReferenceAdvantageDamage,
   minReferenceVsHiDamage,
@@ -27,11 +27,13 @@ const {
   convertedMustCharacters,
   allowSameCharacter,
   attackNum,
+  selectedSupportCharacters,
 } = storeToRefs(searchSettingStore);
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, results, isSearching, errorMessage} = storeToRefs(searchResultStore);
+
 // 数値入力で＋とeを弾く
 export function checkNumber(input:KeyboardEvent){
   if (input.key === 'e' || input.key === '+') {
@@ -54,6 +56,7 @@ export function getAvailableSortProps(t: (key: string) => string) {
   t('comments.noHPBuddy'),
   t('comments.buddy'),
   t('comments.evasion'),
+  t('comments.healNum'),
   t('comments.duo'),
   t('comments.buff'),
   t('comments.debuff'),
@@ -106,6 +109,7 @@ export const availableSortkeys = [
   'noHpBuddy',
   'buddy',
   'evasion',
+  'healNum',
   'duo',
   'buff',
   'debuff',
@@ -180,6 +184,12 @@ function calcHealRate(status: string): number {
 function calcConHealRate(status: string): number {
   return buddyRateMap[status]?.conHeal || 0;
 }
+
+function isHealCard(healStatus: string): boolean {
+  return healStatus !== '' && buddyRateMap[healStatus] && 
+         (buddyRateMap[healStatus].heal > 0 || buddyRateMap[healStatus].conHeal > 0);
+}
+
 const atkBuffMap: { [key: string]: number } = {
   "ATKUP(極小)": 1.1,
   "ATKUP(小)": 1.2,
@@ -257,6 +267,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   let deckFire = 0;
   let deckWater = 0;
   let deckFlora = 0;
+  let deckHealCards = 0;
   let deckMinIncreasedHPBuddy = 99999;
   const deckReferenceDamageList: number[] = [];
   const deckReferenceAdvantageDamageList: number[] = [];
@@ -271,7 +282,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const name2M2Used:Record<number, boolean> = {};
   const name2MotherUsed:Record<number, boolean> = {};
   const name2DuoUsed:Record<number, boolean> = {};
-  const deckList: Ref<any>[] = [];
+  const deckList: string[] = [];
   let simuURL = '';
   const detailList = [];
   const healList: number[] = [];
@@ -281,7 +292,6 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   const mizuDamageList: number[] = [];
   const kiDamageList: number[] = [];
 
-  characters.sort((a, b) => b.calcBaseATK - a.calcBaseATK);
   characters.forEach((chara, index) => {
     name2M2Used[index] = false;
     name2MotherUsed[index] = false;
@@ -303,6 +313,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   characters.forEach((chara, index) => {
     deckList.push(chara.imgUrl);
     simuURL += '&name'+(index+1) + '=' + chara.name;
+    simuURL += '&level'+(index+1) + '=' + chara.level;
     deckTotalHP += chara.calcBaseHP;
     deckTotalBuff += chara.buff_count;
     deckTotalDebuff += chara.debuff_count;
@@ -362,6 +373,17 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     deckTotalHeal += hpHeal + hpConHeal
     healList.push(hpHeal + hpConHeal);
       
+    // 回復手札数をカウント
+    if (isHealCard(chara.magic1heal)) {
+      deckHealCards += 1;
+    }
+    if (isHealCard(chara.magic2heal)) {
+      deckHealCards += 1;
+    }
+    if (chara.hasM3 && isHealCard(chara.magic3heal)) {
+      deckHealCards += 1;
+    }
+    
     // 回避数加算
     deckTotalEvasion += chara.evasion;
     if (!hasHpBuddy) {
@@ -369,7 +391,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     }
     let magic2pow = chara.magic2pow;
     if (name2DuoUsed[index]) {
-      magic2pow = "デュオ";
+      magic2pow = "デュオ魔法";
       deckDuo += 1;
     } else {
       if (!name2DuoUsed[index]) {
@@ -424,7 +446,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       }
 
       if (name2DuoUsed[index]) {
-        magic2pow = "デュオ";
+        magic2pow = "デュオ魔法";
         deckDuo += 1;
       }
     }
@@ -537,6 +559,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
   if (deckFire < minFire.value) { return; }
   if (deckWater < minWater.value) { return; }
   if (deckFlora < minFlora.value) { return; }
+  if (deckHealCards < minHealNum.value) { return; }
   if (deckReferenceDamage < minReferenceDamage.value) { return; }
   if (deckReferenceAdvantageDamage < minReferenceAdvantageDamage.value) { return; }
   if (deckReferenceVsHiDamage < minReferenceVsHiDamage.value) { return; }
@@ -573,6 +596,7 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     , deckReferenceVsHiDamage
     , deckReferenceVsMizuDamage
     , deckReferenceVsKiDamage
+    , deckHealCards
     , ...deckList
     , simuURL
     , detailList];
@@ -624,7 +648,43 @@ export async function calcDecks(t: (key: string) => string) {
       return
     }
   }
-  const nonZeroLevelCharacters = characters.value.filter(character => character.level > 0);
+  const nonZeroLevelCharacters = characters.value
+    .filter(character => character.level > 0)
+    .map(chara => ({
+      ...chara,
+      calcBaseHP: 0,
+      calcBaseATK: 0
+    }));
+  const maxLevelCharacters = characters.value
+    .filter(character => character.rare == 'SSR' && selectedSupportCharacters.value.includes(character.name))
+    .map(chara => ({
+      ...chara,
+      level: 110,
+      calcBaseHP: 0,
+      calcBaseATK: 0
+    }));
+
+  nonZeroLevelCharacters.forEach((chara) => {
+    let maxLevel = 110;  // Default max level for SSR
+    if (chara.rare == 'SR') {
+      maxLevel = 90;     // Max level for SR
+    } else if (chara.rare == 'R') {
+      maxLevel = 70;     // Max level for R
+    }
+    const bonusHP = chara.base_hp*0.2;
+    const bonusATK = chara.base_atk*0.2;
+    const HPperLv = (chara.hp - 2*bonusHP - chara.base_hp) / (maxLevel - 1);
+    const ATKperLv = (chara.atk - 2*bonusATK - chara.base_atk) / (maxLevel - 1);
+    const leveldiff = maxLevel - chara.level;
+    chara.calcBaseHP = chara.hp - HPperLv * leveldiff;
+    chara.calcBaseATK = chara.atk - ATKperLv * leveldiff;
+  });
+
+  maxLevelCharacters.forEach((chara) => {
+    chara.calcBaseHP = chara.hp;
+    chara.calcBaseATK = chara.atk;
+  });
+
   const listLength = nonZeroLevelCharacters.length;
   if (listLength < 5) {
     errorMessage.value = t('error.fewCharacter');
@@ -655,6 +715,12 @@ export async function calcDecks(t: (key: string) => string) {
       }
     }
   }
+
+  // sortCriteriaが空の場合はエラーを表示して終了
+  if (sortCriteria.length === 0) {
+    errorMessage.value = t('search.noSettingOptions');
+    return;
+  }
   
   const firstSortCriteria = sortCriteria[0].order === "昇順";
   async function appendResult(){
@@ -682,14 +748,14 @@ export async function calcDecks(t: (key: string) => string) {
     nonZeroLevelCharacters.sort((a, b) => {
       if (a.required && !b.required) return -1;
       if (!a.required && b.required) return 1;
-      return b.atk - a.atk;
+      return b.calcBaseATK - a.calcBaseATK;
     });
   } else {
     // requiredがtrueの順、HPの降順でソート
     nonZeroLevelCharacters.sort((a, b) => {
       if (a.required && !b.required) return -1;
       if (!a.required && b.required) return 1;
-      return b.hp - a.hp;
+      return b.calcBaseHP - a.calcBaseHP;
     });
   }
   // requiredがtrueの数を数える
@@ -699,28 +765,9 @@ export async function calcDecks(t: (key: string) => string) {
     return;
   }
   results.value = [];
-  nonZeroLevelCharacters.forEach((chara) => {
-    let maxLevel = 110;  // Default max level for SSR
-    if (chara.rare == 'SR') {
-      maxLevel = 90;     // Max level for SR
-    } else if (chara.rare == 'R') {
-      maxLevel = 70;     // Max level for R
-    }
-    
-    const growPercentage = chara.level / maxLevel;
-    chara.calcBaseHP = (chara.hp - chara.base_hp) * growPercentage + chara.base_hp;
-    chara.calcBaseATK = (chara.atk - chara.base_atk) * growPercentage + chara.base_atk;
-  })
   let currentLimit = sortCriteria[0].order === '昇順' ? Infinity : -Infinity;  // 現在の上限値を保持する変数を追加
-  const processCombination = async (i: number, j: number, k: number, l: number, m: number) => {
+  const processCombinationCore = async (combination: Character[]) => {
     return new Promise<void>(resolve => {
-      const combination = [
-        nonZeroLevelCharacters[i],
-        nonZeroLevelCharacters[j],
-        nonZeroLevelCharacters[k],
-        nonZeroLevelCharacters[l],
-        nonZeroLevelCharacters[m],
-      ];
       const ret: (string | number)[] | undefined = calcDeckStatus(combination);
       if (ret) {
         const transformedRet = {
@@ -743,13 +790,14 @@ export async function calcDecks(t: (key: string) => string) {
           referenceVsHiDamage: ret[16],
           referenceVsMizuDamage: ret[17],
           referenceVsKiDamage: ret[18],
-          chara1: ret[19],
-          chara2: ret[20],
-          chara3: ret[21],
-          chara4: ret[22],
-          chara5: ret[23],
-          simuURL: ret[24],
-          detailList: ret[25],
+          healNum: ret[19],
+          chara1: ret[20],
+          chara2: ret[21],
+          chara3: ret[22],
+          chara4: ret[23],
+          chara5: ret[24],
+          simuURL: ret[25],
+          detailList: ret[26],
         };
         const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
         // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さいか同じ場合のみpushする
@@ -765,6 +813,29 @@ export async function calcDecks(t: (key: string) => string) {
       resolve();
     });
   };
+
+  const processCombination = async (i: number, j: number, k: number, l: number, m: number) => {
+    const combination = [
+      nonZeroLevelCharacters[i],
+      nonZeroLevelCharacters[j],
+      nonZeroLevelCharacters[k],
+      nonZeroLevelCharacters[l],
+      nonZeroLevelCharacters[m],
+    ];
+    await processCombinationCore(combination);
+  };
+
+  const processCombinationWithSupport = async (i: number, j: number, k: number, l: number, m: number) => {
+    const combination = [
+      nonZeroLevelCharacters[i],
+      nonZeroLevelCharacters[j],
+      nonZeroLevelCharacters[k],
+      nonZeroLevelCharacters[l],
+      maxLevelCharacters[m],
+    ];
+    await processCombinationCore(combination);
+  };
+
   const lengthes: number[] = new Array(5).fill(listLength);
   for(let i = 0; i < requiredCount; i++) {
     lengthes[i] = i+1;
@@ -774,7 +845,7 @@ export async function calcDecks(t: (key: string) => string) {
     let lastRenderTime = Date.now();
     
     const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
-    totalResults.value = (beforeLastLoops*(lengthes[4]-4)/factorialize(5-requiredCount))+beforeLastLoops*4/factorialize(4-requiredCount);
+    totalResults.value = beforeLastLoops*(maxLevelCharacters.length)/factorialize(4-requiredCount);
     if (requiredCount == 5) {
       totalResults.value = 1;
       await processCombination(0, 1, 2, 3, 4);
@@ -790,18 +861,8 @@ export async function calcDecks(t: (key: string) => string) {
             return;
           }
           for (let l = k + 1; l < lengthes[3]; l++) {
-            for (let m = l + 1; m < lengthes[4]; m++) {
-
-              await processCombination(i, j, k, l, m);
-
-              if (Date.now() - lastRenderTime > 2000) {
-                lastRenderTime = Date.now();
-                await appendResult();
-              }
-            }
-            for (const m of [i,j,k,l]) {
-
-              await processCombination(i, j, k, l, m);
+            for (let m = 0; m < maxLevelCharacters.length; m++) {
+              await processCombinationWithSupport(i, j, k, l, m);
 
               if (Date.now() - lastRenderTime > 2000) {
                 lastRenderTime = Date.now();
@@ -859,19 +920,156 @@ export async function calcDecks(t: (key: string) => string) {
   }
 
 }
-export async function useImageUrlDictionary(characterData: Array<{ name_en: string }>) {
-  const imgUrlDictionary = <{ [key: string]: string }>({});  // 画像パスの辞書
 
-  await Promise.all(
-    characterData.map((character) =>
-      import(`@/assets/img/icon/${character.name_en}.png`)
-        .then((module) => {
-          imgUrlDictionary[character.name_en] = module.default;  // 画像パスを辞書に追加
-        })
-        .catch(() => {
-          imgUrlDictionary[character.name_en] = '';  // 画像の読み込みに失敗した場合
-        })
-    )
-  );
-  return imgUrlDictionary;
+// キャッシュされた画像URLの辞書 (モジュールスコープ)
+const cachedImageUrls: Record<string, string> = {};
+
+// 汎用的な画像読み込み関数
+export async function loadImageUrls(
+  items: any[],
+  nameAccessor: string | ((item: any) => string),
+  prefix: string = ''
+): Promise<Record<string, string>> {
+  const imageUrlDictionary: Record<string, string> = {};
+
+  // Add notyet.png loading
+  const notYetImageName = 'notyet';
+  const notYetCacheKey = notYetImageName; // Assuming no prefix for notyet.png
+  if (cachedImageUrls[notYetCacheKey]) {
+    imageUrlDictionary[notYetImageName] = cachedImageUrls[notYetCacheKey];
+  } else {
+    try {
+      const module = await import(`@/assets/img/${notYetImageName}.png`) as { default: string };
+      const imageUrl = module.default;
+      cachedImageUrls[notYetCacheKey] = imageUrl;
+      imageUrlDictionary[notYetImageName] = imageUrl;
+    } catch (error) {
+      console.error(`[loadImageUrls] Error loading ${notYetImageName}.png:`, error);
+      imageUrlDictionary[notYetImageName] = ''; // Set empty string on error
+    }
+  }
+
+  const imageLoadPromises = items.map(async (item) => {
+    let itemName: string | undefined;
+    try {
+      itemName = typeof nameAccessor === 'function' ? nameAccessor(item) : item[nameAccessor];
+      if (typeof itemName !== 'string' || !itemName) {
+        console.error(`[loadImageUrls] Invalid or undefined itemName (type: ${typeof itemName}, value: ${itemName}) for item:`, item, `with prefix '${prefix}'. Skipping.`);
+        imageUrlDictionary[String(item) || 'unknown_item'] = '';
+        return;
+      }
+
+      const cacheKey = `${prefix}${itemName}`;
+      if (cachedImageUrls[cacheKey]) {
+        imageUrlDictionary[itemName] = cachedImageUrls[cacheKey];
+        return;
+      }
+
+      let module;
+      if (prefix === 'icon/') {
+        module = await import(`@/assets/img/icon/${itemName}.png`) as { default: string };
+      } else if (prefix === '') {
+        module = await import(`@/assets/img/${itemName}.png`) as { default: string };
+      } else {
+        console.error(`[loadImageUrls] Unsupported or unknown prefix '${prefix}' for item '${itemName}'. Trying a generic path that might fail.`);
+        module = await import(`@/assets/img/${prefix}${itemName}.png`) as { default: string };
+      }
+      const imageUrl = module.default;
+      cachedImageUrls[cacheKey] = imageUrl;
+      imageUrlDictionary[itemName] = imageUrl;
+    } catch (error) {
+      imageUrlDictionary[itemName || String(item) || 'unknown_error_item'] = '';
+    }
+  });
+
+  await Promise.all(imageLoadPromises);
+  return imageUrlDictionary;
+}
+
+// 単一の画像をキャッシュ付きで読み込む関数
+export async function loadCachedImageUrl(imageName: string, prefix: string = ''): Promise<string> {
+  const cacheKey = `${prefix}${imageName}`;
+  if (cachedImageUrls[cacheKey]) {
+    return cachedImageUrls[cacheKey];
+  }
+  let imagePathForLog: string = 'unknown_path'; // ログ出力用のパス変数
+  try {
+    let module;
+    if (prefix === 'icon/') {
+      imagePathForLog = `@/assets/img/icon/${imageName}.png`;
+      module = await import(`@/assets/img/icon/${imageName}.png`) as { default: string };
+    } else if (prefix === '') {
+      imagePathForLog = `@/assets/img/${imageName}.png`;
+      module = await import(`@/assets/img/${imageName}.png`) as { default: string };
+    } else {
+      console.error(`[loadCachedImageUrl] Unsupported or unknown prefix '${prefix}' for item '${imageName}'. Trying a generic path that might fail.`);
+      imagePathForLog = `@/assets/img/${prefix}${imageName}.png`;
+      module = await import(`@/assets/img/${prefix}${imageName}.png`) as { default: string };
+    }
+    const imageUrl = module.default;
+    cachedImageUrls[cacheKey] = imageUrl;
+    return imageUrl;
+  } catch (error) {
+    console.error(`[loadCachedImageUrl] Error loading image '${imageName}' (path: '${imagePathForLog}'):`, error);
+    return '';
+  }
+}
+
+export interface CharacterCardInfo {
+  type: string;
+  wikiUrl: string;
+  imgSrc: string;
+  iconSrc?: string; // アイコン画像のURL (オプショナル)
+  elementIconSrc?: string; // 属性アイコンのURL (オプショナル)
+}
+
+export function createCharacterInfoMap(
+  characters: Character[],
+  mainImageUrls?: Record<string, string>,
+  iconImageUrls?: Record<string, string>, // アイコン画像の辞書 (キーは日本語名)
+  elementIconUrls?: Record<string, string>
+): Map<string, CharacterCardInfo> {
+  const infoMap = new Map<string, CharacterCardInfo>();
+  characters.forEach(character => {
+    if (character.name) {
+      let cardTypeShort = '';
+      if (character.attr) {
+        switch (character.attr) {
+          case 'アタック':
+            cardTypeShort = 'ATK';
+            break;
+          case 'バランス':
+            cardTypeShort = 'BAL';
+            break;
+          case 'ディフェンス':
+            cardTypeShort = 'DEF';
+            break;
+          default:
+            cardTypeShort = character.attr.substring(0, 3).toUpperCase();
+            break;
+        }
+      }
+      const imgSrc = mainImageUrls && mainImageUrls[character.name] ? mainImageUrls[character.name] : character.imgUrl;
+      const iconSrc = iconImageUrls && iconImageUrls[character.name] ? iconImageUrls[character.name] : undefined; // 日本語名でアイコンを取得
+
+      infoMap.set(character.name, {
+        type: cardTypeShort,
+        wikiUrl: character.wikiURL,
+        imgSrc: imgSrc,
+        iconSrc: iconSrc,
+      });
+    }
+  });
+
+  if (elementIconUrls) {
+    for (const [elementName, url] of Object.entries(elementIconUrls)) {
+      infoMap.set(elementName, { 
+        type: 'Element',
+        wikiUrl: '',
+        imgSrc: url,
+      });
+    }
+  }
+
+  return infoMap;
 }

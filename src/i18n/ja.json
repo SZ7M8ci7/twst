@@ -13,9 +13,11 @@
     "mutualDuo": "相互・3デュオ一覧",
     "handGacha": "手札ガチャ",
     "buddyDuo": "バディ・デュオ関係",
+    "finisherDamage": "フィニッシャーダメージ",
     "data": "データ",
-    "other": "その他",
-    "sim": "シミュレータ"
+    "sim": "シミュレータ",
+    "retire": "リタマラカウンター",
+    "other": "その他"
   },
   "top": {
     "twistedTool": "ツイステ関連のツール置き場",
@@ -175,7 +177,15 @@
     "copySuccess": "クリップボードにコピーしました",
     "copyError": "クリップボードへのコピーに失敗しました",
     "importSuccess": "{count}件のデータをインポートしました",
-    "importError": "インポートに失敗しました。データ形式が正しくありません。"
+    "importError": "インポートに失敗しました。データ形式が正しくありません",
+    "noSettingOptions": "検索設定を指定してください",
+    "remainingTime": "残り時間",
+    "processingSpeed": "処理速度",
+    "itemsPerSecond": "件/秒",
+    "hours": "{hours}時間",
+    "minutes": "{minutes}分",
+    "seconds": "{seconds}秒",
+    "support": "サポート"
   },
   "infoModal": {
     "about": "ツール全体について",
@@ -261,6 +271,7 @@
     "submit": "OK",
     "asc": "昇順",
     "desc": "降順",
+    "effectiveHP": "実質HP",
     "minimumValueSetting":"最低値設定",
     "minimumEHP":"最低実質HP",
     "minimumHP":"最低実HP",
@@ -274,6 +285,7 @@
     "minimumFire":"最低火属性数",
     "minimumWater":"最低水属性数",
     "minimumFlora":"最低木属性数",
+    "minimumHealNum":"最低回復手札数",
     "minimumNeutralDamage":"最低等倍ダメージ",
     "minimumAdvantageDamage":"最低有利ダメージ",
     "minimumAgainstFireDamage":"最低対火ダメージ",
@@ -282,12 +294,31 @@
     "searchSettings":"検索設定",
     "maximumResult":"結果上限数",
     "attackNum":"攻撃回数",
-    "allowSameCharacter":"同キャラを許可",
+    "allowSameCharacter":"サポートキャラを利用",
     "cancel":"キャンセル",
     "ok":"決定",
     "yes":"はい",
     "no":"いいえ",
-    "mustCharacter":"必須キャラクター"
+    "mustCharacter":"必須キャラクター",
+    "searchPreset":"検索プリセット",
+    "preset": {
+      "fireBasicExam": "火属性BS試験",
+      "waterBasicExam": "水属性BS試験",
+      "floraBasicExam": "木属性BS試験",
+      "allBasicExam": "全属性BS試験",
+      "neutralBasicExam": "無属性BS試験",
+      "fireDefenseExam": "火属性DF試験",
+      "waterDefenseExam": "水属性DF試験",
+      "floraDefenseExam": "木属性DF試験",
+      "allDefenseExam": "全属性DF試験",
+      "neutralDefenseExam": "無属性DF試験",
+      "fireAttackExam": "火属性ATK試験",
+      "waterAttackExam": "水属性ATK試験",
+      "floraAttackExam": "木属性ATK試験",
+      "allAttackExam": "全属性ATK試験",
+      "neutralAttackExam": "無属性ATK試験",
+      "practicalClass": "実戦授業"
+    }
   },
   "comments": {
     "effectiveHP": "実質HP",
@@ -304,7 +335,8 @@
     "maxFire": "火属性数",
     "maxWater": "水属性数",
     "maxFlora": "木属性数",
-    "neutralDamage": "等倍与ダメージ",
+    "healNum": "回復手札数",
+    "neutralDamage": "等倍ダメージ",
     "advantageDamage": "有利与ダメージ",
     "damageAgainstFire": "対火与ダメージ",
     "damageAgainstWater": "対水与ダメージ",
@@ -353,7 +385,8 @@
     "maxFire": "火属性数",
     "maxWater": "水属性数",
     "maxFlora": "木属性数",
-    "neutralDamage": "等倍与ダメ",
+    "healNum": "回復数",
+    "neutralDamage": "等倍ダメージ",
     "advantageDamage": "有利与ダメ",
     "damageAgainstFire": "対火与ダメ",
     "damageAgainstWater": "対水与ダメ",
@@ -368,6 +401,9 @@
   "hand": {
     "filter": "フィルター",
     "reset": "リセット",
+    "reset_ok": "リセット(OK)",
+    "reset_ng": "リセット(NG)",
+    "reset_stats": "OK率: {ok}/{total} ({percent}%)",
     "next": "次のターン",
     "add": "追加",
     "character": "キャラ",
@@ -386,7 +422,23 @@
   "other": {
     "text": "その他作ったもの",
     "masterChef": "マスターシェフ計算機",
+    "screenShot": "手持ちスクリーンショット",
     "OCR": "手持ち家具を文字起こし",
-    "defense": "ディフェンス試験用デッキ検索ツール（メンテ停止）"
+    "defense": "ディフェンス試験用デッキ検索ツール（メンテ停止）",
+    "wiki": "Wiki用バディ更新ツール"
+  },
+  "retire": {
+    "reset": "カウンターリセット",
+    "num": "回",
+    "clear_content": "内容クリア",
+    "seconds": "秒",
+    "confirm_clear": "入力した内容消すよ？",
+    "confirm_clear_message": "間違えて押してないね？",
+    "cancel": "キャンセル",
+    "confirm": "削除"
+  },
+  "support": {
+    "selectAll": "全選択",
+    "deselectAll": "全解除"
   }
 }
