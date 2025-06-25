@@ -176,7 +176,8 @@ export const useSimulatorStore = defineStore('simulator', () => {
       
       if (needsRecalculation.value) {
         needsRecalculation.value = false;
-        recalculateStats();
+        // 非同期で実行して本番環境でのstack overflowを防ぐ
+        setTimeout(() => recalculateStats(), 0);
       }
     }
   }, 100);
