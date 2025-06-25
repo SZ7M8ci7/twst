@@ -79,9 +79,9 @@ const createDefaultCharacter = (): Character => ({
   magic1Lv: 1,
   magic2Lv: 1,
   magic3Lv: 1,
-  magic1heal: 'SSR1',
-  magic2heal: 'SSR1',
-  magic3heal: 'SSR1',
+  magic1heal: '',
+  magic2heal: '',
+  magic3heal: '',
   magic1Attribute: '火',
   magic2Attribute: '火',
   magic3Attribute: '火',
@@ -182,15 +182,13 @@ export const useSimulatorStore = defineStore('simulator', () => {
     }
   }, 100);
 
-  // charaDictの変更を監視して全キャラクターのステータスを再計算
+  // 元のwatcherロジックを維持 - nextTickを使わず、デバウンスで制御
   watch(charaDict, (newDict, oldDict) => {
-    // Only recalculate if the dictionary actually changed
     if (JSON.stringify(newDict) !== JSON.stringify(oldDict)) {
-      nextTick(() => recalculateStats());
+      recalculateStats();
     }
   });
 
-  // デッキのキャラクターの変更を監視 - 最適化: 個別のプロパティを監視
   watch(() => deckCharacters.map(char => ({
     chara: char.chara,
     level: char.level,
@@ -215,19 +213,16 @@ export const useSimulatorStore = defineStore('simulator', () => {
     buddy2Lv: char.buddy2Lv,
     buddy3Lv: char.buddy3Lv
   })), (newVal, oldVal) => {
-    // Only recalculate if something actually changed
     if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
-      nextTick(() => recalculateStats());
+      recalculateStats();
     }
   });
 
-  // バフの変更を監視 - 最適化: 個別のバフ監視
   watch(() => deckCharacters.map(char => 
     char.buffs ? JSON.stringify(char.buffs) : ''
   ), (newVal, oldVal) => {
-    // Only recalculate if buffs actually changed
     if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
-      nextTick(() => recalculateStats());
+      recalculateStats();
     }
   });
 
