@@ -9,7 +9,7 @@ const routes = [
   },
   {
     path: '/twst/top',
-    name: 'top',
+    name: 'twstTop',
     component: () => import('@/views/top.vue'),
   },
   {

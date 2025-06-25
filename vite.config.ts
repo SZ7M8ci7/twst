@@ -9,7 +9,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: (process.env.NODE_ENV === 'poduction')
+  base: (process.env.NODE_ENV === 'production')
   ? 'twst' : './',
   plugins: [
     vue({
