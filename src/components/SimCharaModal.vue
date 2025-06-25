@@ -70,6 +70,9 @@
         <div v-if="loadingImgUrl" class="loading-message">
           キャラクター画像を読み込み中...
         </div>
+        <div v-else-if="isSorting && ['effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'].includes(sortBy)" class="loading-message">
+          ソート処理中...
+        </div>
         <div v-else-if="filteredCharacters.length === 0" class="no-results">
           条件に一致するキャラクターがありません
         </div>
@@ -80,12 +83,22 @@
             @click="selectImage(character)" 
             class="character-item"
           >
-            <img 
-              :src="character.imgUrl" 
-              :alt="character.name" 
-              class="character-image" 
-              :title="character.chara || character.name"
-            />
+            <div class="character-image-wrapper" :data-character-name="character.name">
+              <img 
+                v-if="character.imgUrl && character.imgUrl !== 'placeholder'"
+                :src="character.imgUrl" 
+                :alt="character.name" 
+                class="character-image" 
+                :title="character.chara || character.name"
+                @error="handleImageError(character)"
+                loading="lazy"
+              />
+              <div v-else class="character-image-placeholder">
+                <div class="placeholder-content">
+                  <v-icon size="24" color="grey">mdi-image</v-icon>
+                </div>
+              </div>
+            </div>
             <div class="character-name">{{ getDisplayText(character) }}</div>
           </div>
         </div>
@@ -96,7 +109,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeMount, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { storeToRefs } from 'pinia';
@@ -109,7 +122,7 @@ const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const simulatorStore = useSimulatorStore();
 const { deckCharacters } = storeToRefs(simulatorStore);
-const loadingImgUrl = ref(true);
+const loadingImgUrl = ref(false);
 
 // タブ管理
 const activeTab = ref('filter');
@@ -293,15 +306,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
   let deckMinIncreasedHPBuddy = 99999;
   const deckReferenceDamageList = [];
   
-  const name2DuoUsed = {};
-  const name2M2Used = {};
-  const name2MotherUsed = {};
-  
-  virtualDeck.forEach((chara, index) => {
-    name2M2Used[index] = false;
-    name2MotherUsed[index] = false;
-    name2DuoUsed[index] = false;
-  });
+  // 未使用の変数を削除
   
   // 軽量な統計計算のためのショートカット
   if (['deckHPBuddyCount', 'deckBuddyCount', 'duoCount'].includes(sortKey)) {
@@ -812,10 +817,26 @@ const clearSortCache = () => {
   sortCache.value.clear();
 };
 
+// 画像読み込みキューをリセットする関数
+const resetImageLoadingQueue = () => {
+  // 画像読み込みキューをクリア
+  imageLoadingQueue.clear();
+  
+  // Observerを再設定
+  if (imageObserver) {
+    imageObserver.disconnect();
+    // DOM更新後に再設定
+    nextTick(() => {
+      setupImageObserver();
+    });
+  }
+};
+
 // watchでソート条件が変更されたらキャッシュをクリア
 watch([sortBy, sortOrder, () => props.selectedAttribute], () => {
   clearSortCache();
   clearMemberNameCache();
+  resetImageLoadingQueue();
 });
 
 // デッキキャラクターが変更されたらキャッシュをクリア
@@ -824,30 +845,44 @@ watch(() => deckCharacters.value.map(c => ({ chara: c.chara, level: c.level, hp:
   clearMemberNameCache();
 }, { deep: true });
 
-// フィルター適用済みのキャラクターリスト
-const filteredCharacters = computed(() => {
-  if (loadingImgUrl.value) {
-    return []; // 画像URLの読み込み中は空の配列を返す
-  }
+// キャラクターの画像読み込み状態を初期化
+const initializeImageState = () => {
+  characters.value.forEach(character => {
+    if (!character.hasOwnProperty('imageLoaded')) {
+      character.imageLoaded = false;
+    }
+    if (!character.imgUrl || character.imgUrl === 'placeholder') {
+      character.imgUrl = null;
+    }
+  });
+};
 
+// ソート中フラグ
+const isSorting = ref(false);
+
+// フィルター・ソート済みのキャラクターリスト（非同期対応）
+const filteredAndSortedCharacters = ref([]);
+
+// フィルター適用済みのキャラクターリスト
+const filteredCharacters = computed(() => filteredAndSortedCharacters.value);
+
+// フィルターとソートの処理を非同期化
+const updateFilteredCharacters = async () => {
+  isSorting.value = true;
+  
   // リアクティブな依存関係を明示的に参照
   const currentSortBy = sortBy.value;
   const currentSortOrder = sortOrder.value;
-  const currentSelectedAttribute = props.selectedAttribute;
-  const currentSortUpdateCounter = sortUpdateCounter.value; // ソート強制更新カウンター
+  // ソート強制更新カウンターを参照して強制更新を有効化
+  sortUpdateCounter.value;
   
-
   // 新しい配列を作成（Vue リアクティブシステム対応）
   let filtered = [...characters.value.filter(character => {
-    // 画像が読み込まれているか確認
-    if (!character.imgUrl) return false;
-    
     // visibleフラグをチェック（FilterModalから適用されたフィルター）
     if (!character.visible) return false;
     
     return true;
   })];
-
 
   // 最適化されたデータ構造を取得
   const dataStructures = optimizedDataStructures.value;
@@ -861,69 +896,90 @@ const filteredCharacters = computed(() => {
       
       return currentSortOrder === 'desc' ? bIndex - aIndex : aIndex - bIndex;
     });
-  } else {
-    // 高コストなソート項目の場合は事前計算
-    if (['effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'].includes(currentSortBy)) {
+    filteredAndSortedCharacters.value = filtered;
+    isSorting.value = false;
+  } else if (['effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'].includes(currentSortBy)) {
+    // 高コストなソートの場合は非同期処理
+    // まずフィルターされた結果を即座に表示
+    filteredAndSortedCharacters.value = [...filtered];
+    
+    // 非同期でソート計算を実行
+    requestAnimationFrame(async () => {
+      // 各キャラクターのソート値を計算
+      const charactersWithValues = await Promise.all(
+        filtered.map(async (character) => {
+          // 計算をバッチ処理
+          await new Promise(resolve => setTimeout(resolve, 0));
+          const value = calculateDeckStats(character, currentSortBy);
+          return { character, value };
+        })
+      );
       
-      // 直接計算でソート（キャッシュ問題を回避）
-      filtered.sort((a, b) => {
-        const aValue = calculateDeckStats(a, currentSortBy);
-        const bValue = calculateDeckStats(b, currentSortBy);
-        
-        
-        const comparison = aValue - bValue;
+      // ソート
+      charactersWithValues.sort((a, b) => {
+        const comparison = a.value - b.value;
         return currentSortOrder === 'desc' ? -comparison : comparison;
       });
-    } else {
-      // 軽量なソート項目
-      filtered.sort((a, b) => {
-        let aValue, bValue;
-        
-        switch (currentSortBy) {
-          case 'rarity': {
-            const rarityOrder = { 'SSR': 3, 'SR': 2, 'R': 1 };
-            aValue = rarityOrder[a.rare] || 0;
-            bValue = rarityOrder[b.rare] || 0;
-            break;
-          }
-          case 'hp':
-            aValue = a.hp || 0;
-            bValue = b.hp || 0;
-            break;
-          case 'atk':
-            aValue = a.atk || 0;
-            bValue = b.atk || 0;
-            break;
-          case 'effectiveCardHP':
-            // カード単体の計算では、置き換え対象のキャラクターを除外
-            aValue = calculateEffectiveCardHP(a, getOptimizedMemberNameSet(null, props.charaIndex));
-            bValue = calculateEffectiveCardHP(b, getOptimizedMemberNameSet(null, props.charaIndex));
-            break;
-          case 'effectiveCardATK':
-            // カード単体の計算では、置き換え対象のキャラクターを除外
-            aValue = calculateEffectiveCardATK(a, getOptimizedMemberNameSet(null, props.charaIndex));
-            bValue = calculateEffectiveCardATK(b, getOptimizedMemberNameSet(null, props.charaIndex));
-            break;
-          default:
-            aValue = a.chara || '';
-            bValue = b.chara || '';
+      
+      // 結果を更新
+      filteredAndSortedCharacters.value = charactersWithValues.map(item => item.character);
+      isSorting.value = false;
+    });
+  } else {
+    // 軽量なソート項目
+    filtered.sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (currentSortBy) {
+        case 'rarity': {
+          const rarityOrder = { 'SSR': 3, 'SR': 2, 'R': 1 };
+          aValue = rarityOrder[a.rare] || 0;
+          bValue = rarityOrder[b.rare] || 0;
+          break;
         }
-        
-        // 数値の場合はそのまま比較、文字列の場合は大文字小文字を無視
-        let comparison = 0;
-        if (typeof aValue === 'number' && typeof bValue === 'number') {
-          comparison = aValue - bValue;
-        } else {
-          comparison = String(aValue).localeCompare(String(bValue), 'ja');
-        }
-        
-        return currentSortOrder === 'desc' ? -comparison : comparison;
-      });
-    }
+        case 'hp':
+          aValue = a.hp || 0;
+          bValue = b.hp || 0;
+          break;
+        case 'atk':
+          aValue = a.atk || 0;
+          bValue = b.atk || 0;
+          break;
+        case 'effectiveCardHP':
+          // カード単体の計算では、置き換え対象のキャラクターを除外
+          aValue = calculateEffectiveCardHP(a, getOptimizedMemberNameSet(null, props.charaIndex));
+          bValue = calculateEffectiveCardHP(b, getOptimizedMemberNameSet(null, props.charaIndex));
+          break;
+        case 'effectiveCardATK':
+          // カード単体の計算では、置き換え対象のキャラクターを除外
+          aValue = calculateEffectiveCardATK(a, getOptimizedMemberNameSet(null, props.charaIndex));
+          bValue = calculateEffectiveCardATK(b, getOptimizedMemberNameSet(null, props.charaIndex));
+          break;
+        default:
+          aValue = a.chara || '';
+          bValue = b.chara || '';
+      }
+      
+      // 数値の場合はそのまま比較、文字列の場合は大文字小文字を無視
+      let comparison = 0;
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        comparison = aValue - bValue;
+      } else {
+        comparison = String(aValue).localeCompare(String(bValue), 'ja');
+      }
+      
+      return currentSortOrder === 'desc' ? -comparison : comparison;
+    });
+    
+    filteredAndSortedCharacters.value = filtered;
+    isSorting.value = false;
   }
+};
 
-  return filtered;
-});
+// ソート条件変更時に更新
+watch([sortBy, sortOrder, () => characters.value.filter(c => c.visible).length], () => {
+  updateFilteredCharacters();
+}, { immediate: true });
 
 const closeModal = () => {
   emit('close');
@@ -971,10 +1027,11 @@ function getDisplayText(character) {
       return character.hp || 0;
     case 'atk':
       return character.atk || 0;
-    case 'effectiveCardHP':
+    case 'effectiveCardHP': {
       const effectiveHP = calculateEffectiveCardHP(character, getOptimizedMemberNameSet(null, props.charaIndex));
       const roundedHP = Math.round(effectiveHP);
       return roundedHP;
+    }
     case 'effectiveCardATK':
       return Math.round(calculateEffectiveCardATK(character, getOptimizedMemberNameSet(null, props.charaIndex)));
     case 'effectiveDeckHP':
@@ -982,52 +1039,184 @@ function getDisplayText(character) {
     case 'deckHPBuddyCount':
     case 'deckBuddyCount':
     case 'minBuddyHPIncrease':
-    case 'duoCount':
+    case 'duoCount': {
       const value = calculateDeckStats(character, currentSortBy);
       return Math.round(value);
+    }
     default:
       return character.chara || character.name;
   }
 }
 
-onBeforeMount(() => {
-  // 画像の読み込みを最適化するために、表示されるキャラクターのみを処理
-  const visibleCharacters = characters.value.filter(character => character.visible);
+// 画像読み込みエラーのハンドラー
+const handleImageError = (character) => {
+  // 画像読み込みエラー時はデフォルト画像を設定
+  character.imgUrl = defaultImg;
+  character.imageLoaded = true;
+};
+
+// 画像の遅延読み込み
+let imageObserver = null;
+const imageLoadingQueue = new Set();
+
+// 並列読み込みの設定
+const INITIAL_LOAD_COUNT = 50; // 初期読み込み数を増加
+const BATCH_SIZE = 30; // スクロール時のバッチサイズを増加
+const MAX_CONCURRENT = 100; // 最大同時読み込み数
+
+// 並列読み込みを実行する関数（バッチ処理対応）
+const loadImagesInParallel = async (charactersToLoad, batchSize = MAX_CONCURRENT) => {
+  // 既に読み込み済みのキャラクターを除外
+  const toLoad = charactersToLoad.filter(character => 
+    !character.imageLoaded || 
+    !character.imgUrl || 
+    character.imgUrl === 'placeholder'
+  );
   
-  // 画像の読み込みを小さなバッチに分割して処理
-  const batchSize = 10;
-  const batches = [];
+  if (toLoad.length === 0) return;
   
-  for (let i = 0; i < visibleCharacters.length; i += batchSize) {
-    batches.push(visibleCharacters.slice(i, i + batchSize));
-  }
-  
-  // バッチごとに順次処理
-  const processBatch = async (index) => {
-    if (index >= batches.length) {
-      loadingImgUrl.value = false; // すべての画像のロードが完了
-      return;
-    }
+  // 大量のキャラクターをバッチに分割して処理
+  for (let i = 0; i < toLoad.length; i += batchSize) {
+    const batch = toLoad.slice(i, i + batchSize);
     
-    const batch = batches[index];
     const promises = batch.map(character => {
       return import(`@/assets/img/${character.name}.png`)
         .then(module => {
           character.imgUrl = module.default;
+          character.imageLoaded = true;
         })
         .catch(() => {
-          console.log(`Image not found for ${character.name}, using default`);
-          character.imgUrl = defaultImg; // デフォルト画像を使用
+          character.imgUrl = defaultImg;
+          character.imageLoaded = true;
+        })
+        .finally(() => {
+          // キューから削除
+          imageLoadingQueue.delete(character.name);
         });
     });
     
+    // バッチを並列で実行
     await Promise.all(promises);
-    // 次のバッチを処理
-    setTimeout(() => processBatch(index + 1), 0);
-  };
+    
+    // 小さな遅延でブラウザをブロックしないように
+    if (i + batchSize < toLoad.length) {
+      await new Promise(resolve => setTimeout(resolve, 1));
+    }
+  }
+};
+
+// Observerを設定する関数
+const setupImageObserver = () => {
+  const imageWrappers = document.querySelectorAll('.character-image-wrapper');
+  imageWrappers.forEach(wrapper => {
+    if (imageObserver) {
+      imageObserver.observe(wrapper);
+    }
+  });
   
-  // 最初のバッチから処理開始
-  processBatch(0);
+  // 最初の大量の画像を即座に読み込む（非同期）
+  requestAnimationFrame(() => {
+    const visibleCharacters = filteredCharacters.value.slice(0, INITIAL_LOAD_COUNT);
+    if (visibleCharacters.length > 0) {
+      loadImagesInParallel(visibleCharacters, 50); // 初期読み込みはさらに高速化
+    }
+  });
+  
+  // バックグラウンドで残りの画像を遅延読み込み
+  setTimeout(() => {
+    const remainingCharacters = filteredCharacters.value.slice(INITIAL_LOAD_COUNT);
+    if (remainingCharacters.length > 0) {
+      loadImagesInParallel(remainingCharacters, 20); // バックグラウンド読み込み
+    }
+  }, 500); // 500ms後に開始
+};
+
+const loadCharacterImages = () => {
+  // 既存のオブザーバーがあれば切断
+  if (imageObserver) {
+    imageObserver.disconnect();
+  }
+  
+  // すぐにloadingImgUrlをfalseにして枠を表示
+  loadingImgUrl.value = false;
+  
+  // IntersectionObserverを使った遅延読み込み（最適化）
+  imageObserver = new IntersectionObserver((entries) => {
+    const charactersToLoad = [];
+    
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const characterName = entry.target.getAttribute('data-character-name');
+        const character = characters.value.find(c => c.name === characterName && c.visible);
+        
+        if (character && !character.imageLoaded && !imageLoadingQueue.has(character.name)) {
+          imageLoadingQueue.add(character.name);
+          charactersToLoad.push(character);
+        }
+        
+        // 観察を停止
+        imageObserver.unobserve(entry.target);
+      }
+    });
+    
+    // 複数の画像を並列で読み込み（バッチサイズ指定）
+    if (charactersToLoad.length > 0) {
+      loadImagesInParallel(charactersToLoad, BATCH_SIZE);
+    }
+  }, {
+    rootMargin: '200px', // 画面に入る200px前から読み込み開始（拡大）
+    threshold: 0.01 // 少しでも見えたら読み込み開始
+  });
+  
+  // Vue.nextTickを使用してDOMの更新後に監視を開始
+  nextTick(() => {
+    setupImageObserver();
+  });
+};
+
+// filteredCharactersの変更を監視してIntersectionObserverを再設定
+watch(filteredCharacters, () => {
+  // DOM更新後にIntersectionObserverを再設定
+  nextTick(() => {
+    loadCharacterImages();
+  });
+});
+
+// コンポーネントがマウントされた後に画像を読み込む
+onMounted(() => {
+  initializeImageState();
+  // 初期フィルター・ソートを実行
+  updateFilteredCharacters();
+  // 初期化はフィルターされたキャラクターのみに対して実行
+  requestAnimationFrame(() => {
+    loadCharacterImages();
+  });
+  
+  // 非同期で全てのキャラクターをプリロード（低優先度）
+  setTimeout(() => {
+    const allVisibleCharacters = characters.value.filter(c => c.visible);
+    if (allVisibleCharacters.length > INITIAL_LOAD_COUNT) {
+      const remainingCharacters = allVisibleCharacters.slice(INITIAL_LOAD_COUNT);
+      // バックグラウンドでゆっくりと読み込み
+      loadImagesInParallel(remainingCharacters, 10);
+    }
+  }, 2000); // 2秒後に開始
+});
+
+// filteredAndSortedCharactersが変更されたときにObserverを再設定
+watch(filteredAndSortedCharacters, () => {
+  if (imageObserver && !isSorting.value) {
+    nextTick(() => {
+      setupImageObserver();
+    });
+  }
+}, { flush: 'post' });
+
+// クリーンアップ
+onUnmounted(() => {
+  if (imageObserver) {
+    imageObserver.disconnect();
+  }
 });
 </script>
 
@@ -1141,11 +1330,42 @@ onBeforeMount(() => {
   border-radius: 3px;
 }
 
-.character-image {
+.character-image-wrapper {
+  position: relative;
   width: 100%;
-  height: auto;
+  padding-top: 100%; /* 1:1 アスペクト比 */
+  background-color: #f5f5f5;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.character-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border-radius: 3px;
   object-fit: cover;
+}
+
+.character-image-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+}
+
+.placeholder-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
 }
 
 .character-name {
