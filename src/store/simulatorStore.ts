@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive, watch, nextTick } from 'vue';
-import { calculateCharacterStats, clearAllCaches } from '@/utils/calculations';
+import { calculateCharacterStats } from '@/utils/calculations';
 
 function debounce(fn: Function, delay: number) {
   let timer: number | null = null;
@@ -149,8 +149,6 @@ export const useSimulatorStore = defineStore('simulator', () => {
     await nextTick();
     
     try {
-      // キャッシュをクリアして新しい計算値を使用（クリティカルバフ対応のため）
-      clearAllCaches();
       
       // recalculateStatsでは強制更新しない（ユーザーの手動選択を保持）
       // deckCharacters.forEach(character => updateDuoStatus(character, charaDict.value));
@@ -243,12 +241,12 @@ export const useSimulatorStore = defineStore('simulator', () => {
     return characterStats.value.map(charStats => charStats.damage[attribute] || 0);
   };
 
-  // キャラクターの基本ステータスを計算
+  // キャラクターの基本ステータスを計算（twstsimu.jsのchangeLevel関数に合わせる）
   function calculateBaseStats(character: Character) {
     const rare = character.rare;
     const level = character.level;
     const levelDict: Record<string, number> = {'R':70,'SR':90,'SSR':110}
-    const maxLevel = levelDict[rare as keyof typeof levelDict] || 110; // 最大レベルを設定
+    const maxLevel = levelDict[rare as keyof typeof levelDict] || 110; // hiddenLv
 
     // 基本ステータスを計算（不正な値の場合は0を使用）
     const maxATK = Number(character.max_atk) || 0;
@@ -256,24 +254,27 @@ export const useSimulatorStore = defineStore('simulator', () => {
     const baseATK = Number(character.base_atk) || Math.floor(maxATK / (character.rare === 'SSR' ? 4.7 : character.rare === 'SR' ? 4.3 : 4.2));
     const baseHP = Number(character.base_hp) || Math.floor(maxHP / (character.rare === 'SSR' ? 4.7 : character.rare === 'SR' ? 4.3 : 4.2));
 
-    // ボーナスステータス（20%）
+    // ボーナスステータス（20%）- twstsimu.jsと同じ
     const bonusATK = baseATK * 0.2;
     const bonusHP = baseHP * 0.2;
 
-    // ボーナス選択状態を確認
-    const isBonusSelected = Boolean(character.isBonusSelected);
-    
-    // レベルごとの成長量を計算（不正な値の場合は0を使用）
+    // レベルごとの成長量を計算 - twstsimu.jsの計算式と同じ
     const ATKperLv = maxLevel > 1 ? (maxATK - 2 * bonusATK - baseATK) / (maxLevel - 1) : 0;
     const HPperLv = maxLevel > 1 ? (maxHP - 2 * bonusHP - baseHP) / (maxLevel - 1) : 0;
 
-    // 現在のレベルでのステータスを計算
-    const levelDiff = Math.max(0, maxLevel - level);
+    // 現在のレベルでのステータスを計算 - twstsimu.jsと同じ
+    const levelDiff = maxLevel - level; // leveldef = hiddenLv - inLv
     
-    // 必要な値のみを更新
+    // totsurate: 凸選択状態 (1 = 未凸, 0 = 凸済み)
+    const totsurate = character.isBonusSelected ? 0 : 1;
+    
+    // twstsimu.jsと同じ計算式で小数点第1位まで計算
+    const calculatedATK = (maxATK - ATKperLv * levelDiff) - bonusATK * totsurate;
+    const calculatedHP = (maxHP - HPperLv * levelDiff) - bonusHP * totsurate;
+    
     return {
-      atk: Math.max(0, Math.floor((maxATK - ATKperLv * levelDiff) - (isBonusSelected ? 0 : bonusATK))),
-      hp: Math.max(0, Math.floor((maxHP - HPperLv * levelDiff) - (isBonusSelected ? 0 : bonusHP)))
+      atk: Math.max(0, Number(calculatedATK.toFixed(1))),
+      hp: Math.max(0, Number(calculatedHP.toFixed(1)))
     };
   }
 

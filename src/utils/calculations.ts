@@ -94,15 +94,15 @@ export const magicDict: { [key: string]: number } = {
   "連撃(強)Lv8": 0.925,
   "連撃(強)Lv9": 0.9625,
   "連撃(強)Lv10": 1.0,
-  "デュオ魔法Lv1": 0.55,
-  "デュオ魔法Lv2": 0.575,
-  "デュオ魔法Lv3": 0.60,
-  "デュオ魔法Lv4": 0.625,
-  "デュオ魔法Lv5": 0.625,
-  "デュオ魔法Lv6": 0.65,
-  "デュオ魔法Lv7": 0.675,
-  "デュオ魔法Lv8": 0.70,
-  "デュオ魔法Lv9": 0.725,
+  "デュオ魔法Lv1": 0.6625,
+  "デュオ魔法Lv2": 0.70,
+  "デュオ魔法Lv3": 0.7375,
+  "デュオ魔法Lv4": 0.775,
+  "デュオ魔法Lv5": 0.8125,
+  "デュオ魔法Lv6": 0.85,
+  "デュオ魔法Lv7": 0.8875,
+  "デュオ魔法Lv8": 0.925,
+  "デュオ魔法Lv9": 0.9625,
   "デュオ魔法Lv10": 1.0,
   "3連撃(弱)Lv1": 0.525,
   "3連撃(弱)Lv2": 0.55,
@@ -114,17 +114,16 @@ export const magicDict: { [key: string]: number } = {
   "3連撃(弱)Lv8": 0.70,
   "3連撃(弱)Lv9": 0.725,
   "3連撃(弱)Lv10": 0.75,
-  // 通常攻撃との互換性のためのエントリ
-  "通常攻撃Lv1": 0.525,
-  "通常攻撃Lv2": 0.55,
-  "通常攻撃Lv3": 0.575,
-  "通常攻撃Lv4": 0.60,
-  "通常攻撃Lv5": 0.625,
-  "通常攻撃Lv6": 0.65,
-  "通常攻撃Lv7": 0.675,
-  "通常攻撃Lv8": 0.70,
-  "通常攻撃Lv9": 0.725,
-  "通常攻撃Lv10": 0.75
+  "3連撃(強)Lv1": 0.6625,
+  "3連撃(強)Lv2": 0.70,
+  "3連撃(強)Lv3": 0.7375,
+  "3連撃(強)Lv4": 0.775,
+  "3連撃(強)Lv5": 0.8125,
+  "3連撃(強)Lv6": 0.85,
+  "3連撃(強)Lv7": 0.8875,
+  "3連撃(強)Lv8": 0.925,
+  "3連撃(強)Lv9": 0.9625,
+  "3連撃(強)Lv10": 1.0,
 };
 
 // バディHPの定数
@@ -347,16 +346,6 @@ export const healContinueDict: { [key: string]: number } = {
   "回復&継続回復(小)10": 0.15
 };
 
-const statsCache = new Map();
-
-// キャッシュをクリアする関数
-export function clearAllCaches() {
-  statsCache.clear();
-  buffCache.clear();
-  damageCache.clear();
-  attributeDamageCache.clear();
-  magicRatioCache.clear();
-}
 
 // 計算関数
 export function calculateCharacterStats(character: any, charaDict: { [key: string]: boolean }) {
@@ -367,21 +356,6 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
       buddyHP: 0,
       heal: 0,
       damage: {}
-    };
-  }
-
-  const cacheKey = generateCacheKey(character, charaDict);
-  
-  if (statsCache.has(cacheKey)) {
-    // キャッシュから結果を取得するが、個別のダメージ詳細は必ず計算する
-    const cachedResult = statsCache.get(cacheKey);
-    // ダメージ計算を実行してダメージ詳細を設定
-    calculateDamage(character, charaDict);
-    return {
-      ...cachedResult,
-      magic1DamageDetails: character.magic1DamageDetails,
-      magic2DamageDetails: character.magic2DamageDetails,
-      magic3DamageDetails: character.magic3DamageDetails
     };
   }
 
@@ -405,42 +379,9 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
     magic3DamageDetails: character.magic3DamageDetails
   };
   
-  statsCache.set(cacheKey, result);
-  manageCacheSize(statsCache);
-  
   return result;
 }
 
-function generateCacheKey(character: any, charaDict: { [key: string]: boolean }): string {
-  const charProps = [
-    character.chara,
-    character.hp,
-    character.atk,
-    character.magic1Lv,
-    character.magic2Lv,
-    character.magic3Lv,
-    character.magic1Attribute,
-    character.magic2Attribute,
-    character.magic3Attribute,
-    character.magic1Power,
-    character.magic2Power,
-    character.magic3Power,
-    JSON.stringify(character.selectedMagic),
-    character.buddy1c,
-    character.buddy2c,
-    character.buddy3c,
-    character.buddy1Lv,
-    character.buddy2Lv,
-    character.buddy3Lv
-  ].join('|');
-  
-  const buffsStr = character.buffs ? JSON.stringify(character.buffs) : '';
-  
-  // charaDictのキーを文字列化
-  const charaDictKeys = Object.keys(charaDict).sort().join(',');
-  
-  return `${charProps}|${buffsStr}|${charaDictKeys}`;
-}
 
 // バディHPの計算
 function calculateBuddyHP(character: any, charaDict: { [key: string]: boolean }) {
@@ -527,19 +468,6 @@ function calcAttributeDamage(magicAtr: string, targetAtr: string, damage: number
   return effectiveness ? damage * effectiveness : damage;
 }
 
-const MAX_CACHE_SIZE = 100;
-
-const buffCache = new Map();
-const damageCache = new Map();
-const attributeDamageCache = new Map();
-const magicRatioCache = new Map();
-
-function manageCacheSize(cache: Map<any, any>, maxSize: number = MAX_CACHE_SIZE): void {
-  if (cache.size > maxSize) {
-    const oldestKey = cache.keys().next().value;
-    cache.delete(oldestKey);
-  }
-}
 
 // ダメージの計算
 function calculateDamage(character: any, charaDict: { [key: string]: boolean }) {
@@ -568,59 +496,25 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
     const power = character[`${magicKey}Power`] || '単発(弱)';
     const level = character[`${magicKey}Lv`] || 1;
     
-    const buffCacheKey = `${character.chara}|${magicKey}|${JSON.stringify(character.buffs)}`;
-    
-    let atkBuffTotal = 0;
-    let dmgBuffTotal = 0;
-    let criticalMultiplier = 1.0;
-    
-    if (buffCache.has(buffCacheKey)) {
-      const cachedBuffs = buffCache.get(buffCacheKey);
-      atkBuffTotal = cachedBuffs.atkBuffTotal;
-      dmgBuffTotal = cachedBuffs.dmgBuffTotal;
-      criticalMultiplier = cachedBuffs.criticalMultiplier;
-    } else {
-      const buffResults = calculateBuffs(character, magicKey);
-      atkBuffTotal = buffResults.atkBuffTotal;
-      dmgBuffTotal = buffResults.dmgBuffTotal;
-      criticalMultiplier = buffResults.criticalMultiplier;
-      
-      buffCache.set(buffCacheKey, buffResults);
-      manageCacheSize(buffCache);
-    }
+    const buffResults = calculateBuffs(character, magicKey);
+    const atkBuffTotal = buffResults.atkBuffTotal;
+    const dmgBuffTotal = buffResults.dmgBuffTotal;
+    const criticalMultiplier = buffResults.criticalMultiplier;
     
     const baseATK = character.atk + atkBuffTotal + buddyATK;
     
     // デュオ -> デュオ魔法への変換
     const adjustedPower = power === 'デュオ' ? 'デュオ魔法' : power;
     const magicRatioKey = `${adjustedPower}Lv${level}`;
-    let magicRatio;
-    
-    if (magicRatioCache.has(magicRatioKey)) {
-      magicRatio = magicRatioCache.get(magicRatioKey);
-    } else {
-      magicRatio = magicRatioKey in magicDict ? magicDict[magicRatioKey] : 1.0;
-      magicRatioCache.set(magicRatioKey, magicRatio);
-      manageCacheSize(magicRatioCache);
-    }
+    const magicRatio = magicRatioKey in magicDict ? magicDict[magicRatioKey] : 1.0;
     
     const attributeAdjust = attribute === '無' ? 1.1 : 1.0;
     const rengekiMultiplier = getRengekiMultiplier(adjustedPower);
     
     const baseDamage = baseATK * (Number(magicRatio) * attributeAdjust + dmgBuffTotal) * rengekiMultiplier * criticalMultiplier;
     
-    // 属性ダメージのキャッシュキー
-    const attrDamageCacheKey = `${attribute}|${Math.round(baseDamage)}`;
-    
-    let attributeDamages;
-    if (attributeDamageCache.has(attrDamageCacheKey)) {
-      attributeDamages = attributeDamageCache.get(attrDamageCacheKey);
-    } else {
-      // 属性ダメージの計算 - 一度に計算
-      attributeDamages = calculateAttributeDamages(attribute, baseDamage);
-      attributeDamageCache.set(attrDamageCacheKey, attributeDamages);
-      manageCacheSize(attributeDamageCache);
-    }
+    // 属性ダメージの計算
+    const attributeDamages = calculateAttributeDamages(attribute, baseDamage);
     
     character[`magic${i}DamageDetails`] = {
       attribute,
@@ -640,22 +534,6 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
     damage['無'] += Math.round(attributeDamages.neutral);
     damage['対全'] += Math.round(attributeDamages.max);
   }
-  
-  const cacheResult: { 
-    damage: { [key: string]: number },
-    [key: string]: any 
-  } = {
-    damage: { ...damage },
-  };
-  
-  for (let i = 1; i <= 3; i++) {
-    const isMagicSelected = character[`isM${i}Selected`];
-    if (isMagicSelected && character[`magic${i}DamageDetails`]) {
-      cacheResult[`magic${i}DamageDetails`] = { ...character[`magic${i}DamageDetails`] };
-    }
-  }
-  
-  manageCacheSize(damageCache);
 
   return damage;
 }
