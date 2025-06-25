@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed, reactive, watch, nextTick } from 'vue';
+import { ref, computed, reactive, nextTick } from 'vue';
 import { calculateCharacterStats } from '@/utils/calculations';
 
 function debounce(fn: Function, delay: number) {
@@ -148,6 +148,8 @@ export const useSimulatorStore = defineStore('simulator', () => {
   }
   
   const recalculateStats = debounce(async () => {
+    // 全ての処理をコメントアウトして切り分け
+    /*
     if (isCalculating.value) {
       needsRecalculation.value = true;
       return;
@@ -180,9 +182,11 @@ export const useSimulatorStore = defineStore('simulator', () => {
         setTimeout(() => recalculateStats(), 0);
       }
     }
+    */
   }, 100);
 
-  // 元のwatcherロジックを維持 - nextTickを使わず、デバウンスで制御
+  // 全てのwatcherをコメントアウトして切り分け
+  /*
   watch(charaDict, (newDict, oldDict) => {
     if (JSON.stringify(newDict) !== JSON.stringify(oldDict)) {
       recalculateStats();
@@ -225,6 +229,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
       recalculateStats();
     }
   });
+  */
 
   // デッキ全体のステータスを計算 - 最適化: 型安全性の向上
   const deckStats = computed(() => {
@@ -328,7 +333,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
       character.atk = newStats.atk;
       character.hp = newStats.hp;
       // レベル更新後に再計算
-      characterStats.value[index] = calculateCharacterStats(character, charaDict.value);
+      // characterStats.value[index] = calculateCharacterStats(character, charaDict.value);
     }
   }
 
@@ -352,7 +357,8 @@ export const useSimulatorStore = defineStore('simulator', () => {
       deckCharacters.forEach(char => updateDuoStatus(char, charaDict.value, true));
     }
     
-    // キャラクターが変更された場合は常に再計算
+    // 個別更新と再計算の処理をコメントアウト
+    /*
     characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
     
     // デュオ関連のキャラクターがある場合は全体を再計算
@@ -362,11 +368,12 @@ export const useSimulatorStore = defineStore('simulator', () => {
       // 新しいキャラクターが選択された場合も全体を再計算（同じキャラクターの重複対応）
       recalculateStats();
     }
+    */
   }
 
   // 全キャラクターのステータスを再計算 - 最適化: デバウンス適用
   function calculateAllStats() {
-    recalculateStats();
+    // recalculateStats();
   }
 
   // バフの更新処理 - 最適化: 個別バフの更新
@@ -391,7 +398,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
       };
       deckCharacters[index].buffs[buffIndex] = updatedBuff;
       
-      characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
+      // characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
     }
   }
 
