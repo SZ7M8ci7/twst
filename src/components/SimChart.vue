@@ -97,7 +97,7 @@ function createChart() {
         label: `対${element}(${magicType})`,
         stack: `Stack ${element}${magicType}`,
         backgroundColor: simulatorStore.deckCharacters.map((char) => {
-          const isMagicSelected = char[`isM${magicNumber}Selected`];
+          const isMagicSelected = char[`isM${magicNumber}Selected` as keyof typeof char];
           // 選択されていない魔法は透明度を下げる
           const baseColor = stackColors[element];
           if (!isMagicSelected) {
@@ -127,7 +127,7 @@ function createChart() {
   chart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: simulatorStore.deckCharacters.map((char, index) => index),
+      labels: simulatorStore.deckCharacters.map((_, index) => index),
       datasets: datasets
     },
     options: {
