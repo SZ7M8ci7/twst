@@ -16,6 +16,7 @@ function debounce(fn: Function, delay: number) {
 
 // キャラクターのインターフェースを定義
 interface Character {
+  [key: string]: any;
   isBonusSelected: any;
   base_hp: any;
   base_atk: any;
@@ -60,6 +61,10 @@ interface Character {
   }[];
   duo?: string;
   magic2pow?: string;
+  imgUrl?: string;
+  isM1Selected?: boolean;
+  isM2Selected?: boolean;
+  isM3Selected?: boolean;
 }
 
 // デフォルトのキャラクター設定
@@ -97,7 +102,11 @@ const createDefaultCharacter = (): Character => ({
   base_hp: 0,
   base_atk: 0,
   rare: 'SSR',
-  isBonusSelected: false
+  isBonusSelected: false,
+  imgUrl: '',
+  isM1Selected: true,
+  isM2Selected: true,
+  isM3Selected: true
 });
 
 export const useSimulatorStore = defineStore('simulator', () => {
@@ -238,7 +247,10 @@ export const useSimulatorStore = defineStore('simulator', () => {
 
   // 属性ごとのダメージを取得
   const getDamageByAttribute = (attribute: string) => {
-    return characterStats.value.map(charStats => charStats.damage[attribute] || 0);
+    return characterStats.value.map(charStats => {
+      const damage = charStats.damage as { [key: string]: number };
+      return damage[attribute] || 0;
+    });
   };
 
   // キャラクターの基本ステータスを計算（twstsimu.jsのchangeLevel関数に合わせる）
