@@ -186,7 +186,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
   watch(charaDict, (newDict, oldDict) => {
     // Only recalculate if the dictionary actually changed
     if (JSON.stringify(newDict) !== JSON.stringify(oldDict)) {
-      recalculateStats();
+      nextTick(() => recalculateStats());
     }
   });
 
@@ -217,7 +217,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
   })), (newVal, oldVal) => {
     // Only recalculate if something actually changed
     if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
-      recalculateStats();
+      nextTick(() => recalculateStats());
     }
   });
 
@@ -227,7 +227,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
   ), (newVal, oldVal) => {
     // Only recalculate if buffs actually changed
     if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
-      recalculateStats();
+      nextTick(() => recalculateStats());
     }
   });
 
