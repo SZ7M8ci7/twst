@@ -50,9 +50,10 @@
           </div>
           <div class="calc-wrapper">
             <BuddyInfo v-if="carouselModel === 0" />
-            <CalcBASIC v-else-if="carouselModel === 1" />
-            <CalcDEF v-else-if="carouselModel === 2" />
-            <CalcATK v-else-if="carouselModel === 3" />
+            <CharacterEtc v-else-if="carouselModel === 1" />
+            <CalcBASIC v-else-if="carouselModel === 2" />
+            <CalcDEF v-else-if="carouselModel === 3" />
+            <CalcATK v-else-if="carouselModel === 4" />
           </div>
         </div>
         </div>
@@ -86,9 +87,10 @@
         </div>
         <div class="carousel-content">
           <BuddyInfo v-if="carouselModel === 0" />
-          <CalcBASIC v-else-if="carouselModel === 1" />
-          <CalcDEF v-else-if="carouselModel === 2" />
-          <CalcATK v-else-if="carouselModel === 3" />
+          <CharacterEtc v-else-if="carouselModel === 1" />
+          <CalcBASIC v-else-if="carouselModel === 2" />
+          <CalcDEF v-else-if="carouselModel === 3" />
+          <CalcATK v-else-if="carouselModel === 4" />
         </div>
       </div>
       </div>
@@ -106,6 +108,7 @@ import CalcBASIC from '@/views/calcBASIC.vue';
 import CalcDEF from '@/views/calcDEF.vue';
 import CalcATK from '@/views/calcATK.vue';
 import BuddyInfo from '@/components/BuddyInfo.vue';
+import CharacterEtc from '@/components/CharacterEtc.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
 
 const isLargeScreen = ref(window.innerWidth >= 768);
@@ -115,17 +118,18 @@ const simulatorStore = useSimulatorStore();
 
 const calcTitles = [
   'バディ情報',
+  'その他',
   'ベーシック試験スコア計算',
   'ディフェンス試験スコア計算', 
   'アタック試験スコア計算'
 ];
 
 function nextCalc() {
-  carouselModel.value = (carouselModel.value + 1) % 4;
+  carouselModel.value = (carouselModel.value + 1) % 5;
 }
 
 function prevCalc() {
-  carouselModel.value = carouselModel.value === 0 ? 3 : carouselModel.value - 1;
+  carouselModel.value = carouselModel.value === 0 ? 4 : carouselModel.value - 1;
 }
 
 // ウィンドウサイズが変更されるたびに実行される関数
