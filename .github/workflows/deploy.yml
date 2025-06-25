@@ -2,7 +2,7 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [master]
+    branches: [simulatorV2]
   workflow_dispatch:
 
 jobs:
