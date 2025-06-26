@@ -52,8 +52,8 @@
             <BuddyInfo v-if="carouselModel === 0" />
             <CharacterEtc v-else-if="carouselModel === 1" />
             <CalcBASIC v-else-if="carouselModel === 2" :selected-attribute="selectedAttribute" />
-            <CalcDEF v-else-if="carouselModel === 3" />
-            <CalcATK v-else-if="carouselModel === 4" />
+            <CalcDEF v-else-if="carouselModel === 3" :selected-attribute="selectedAttribute" />
+            <CalcATK v-else-if="carouselModel === 4" :selected-attribute="selectedAttribute" />
           </div>
         </div>
         </div>
@@ -89,8 +89,8 @@
           <BuddyInfo v-if="carouselModel === 0" />
           <CharacterEtc v-else-if="carouselModel === 1" />
           <CalcBASIC v-else-if="carouselModel === 2" :selected-attribute="selectedAttribute" />
-          <CalcDEF v-else-if="carouselModel === 3" />
-          <CalcATK v-else-if="carouselModel === 4" />
+          <CalcDEF v-else-if="carouselModel === 3" :selected-attribute="selectedAttribute" />
+          <CalcATK v-else-if="carouselModel === 4" :selected-attribute="selectedAttribute" />
         </div>
       </div>
       </div>

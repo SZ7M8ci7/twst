@@ -103,12 +103,22 @@
   </v-container>
 </template>
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { Chart, registerables } from 'chart.js';
 import DoughnutGraph from '@/components/DoughnutGraph.vue';
 import { useI18n } from 'vue-i18n';
+import { useSimulatorStore } from '@/store/simulatorStore';
 Chart.register(...registerables);
 const { t } = useI18n();
+const simulatorStore = useSimulatorStore();
+
+// Propsの定義
+const props = defineProps<{
+  selectedAttribute?: string
+}>();
+
+// 初期化フラグ
+const isInitialized = ref(false);
 const turn = ref(5);
 const turns = [0.8,0.85,0.9,0.95,1]
 const allyTotalHP = ref(0);
@@ -175,6 +185,139 @@ const data = computed(() => {
   };
 });
 
+// 初期化完了後にwatchを開始
+nextTick(async () => {
+  // simulatorStoreの初期化を確実に待機
+  await simulatorStore.waitForDeckStats();
+  
+  isInitialized.value = true;
+  
+  // シミュレータの値と属性選択を監視して自動反映
+  watch(
+    () => [simulatorStore.deckCharacters, props.selectedAttribute, simulatorStore.isDeckStatsReady],
+    () => {
+      if (isInitialized.value && simulatorStore.isDeckStatsReady) {
+        autoFillFromSimulator();
+      }
+    },
+    { deep: true, immediate: true }
+  );
+});
+
+// シミュレータから自動入力する関数
+async function autoFillFromSimulator() {
+  if (!isInitialized.value) return;
+  
+  try {
+    // propsから属性を取得（デフォルトは'対全'）
+    const currentAttribute = props.selectedAttribute || '対全';
+    
+    // 1. 実質たるHP（総たるHP）を設定
+    const stats = await simulatorStore.waitForDeckStats();
+    const totalHP = stats?.totalHP || 0;
+    allyTotalHP.value = totalHP;
+    
+    // 2. 与ダメージ（合計ダメージ）を設定
+    const totalDamage = await simulatorStore.getSafeDeckDamage(currentAttribute);
+    damage.value = Math.floor(totalDamage);
+    
+    // 3. 回避発動数を計算
+    const evasionCount = calculateEvasionCount();
+    evasion.value = evasionCount;
+    
+    // 4. デバフ発動数を計算
+    const debuffCount = calculateDebuffCount();
+    debuff.value = debuffCount;
+    
+  } catch (error) {
+    // エラー時はデフォルト値を設定
+    allyTotalHP.value = 0;
+    damage.value = 0;
+    evasion.value = 0;
+    debuff.value = 0;
+  }
+}
+
+// 回避効果のある魔法の数を計算
+function calculateEvasionCount(): number {
+  let count = 0;
+  
+  (simulatorStore.deckCharacters || []).forEach(char => {
+    // キャラが未選択の場合はスキップ
+    if (!char || !char.name || char.name === '' || char.name === 'なし') return;
+    
+    for (let i = 1; i <= 3; i++) {
+      if (char[`isM${i}Selected`]) {
+        // etcフィールドをbrタグで分割して各効果をチェック
+        const etcContent = char.etc || '';
+        const effects = etcContent.split('<br>').map(effect => effect.trim());
+        
+        // 該当する魔法番号を含む効果行で回避効果をチェック
+        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
+        const hasEvasion = magicEffects.some(effect => effect.includes('回避'));
+        
+        if (hasEvasion) {
+          count++;
+        }
+      }
+    }
+  });
+  
+  return count;
+}
+
+// デバフ効果のある魔法の数を計算
+function calculateDebuffCount(): number {
+  let count = 0;
+  
+  const debuffPatterns = [
+    'ATKDOWN',
+    '火属性ダメージDOWN',
+    '水属性ダメージDOWN',
+    '木属性ダメージDOWN',
+    '無属性ダメージDOWN',
+    'ダメージDOWN',
+    '被ダメージDOWN'
+  ];
+  
+  (simulatorStore.deckCharacters || []).forEach(char => {
+    // キャラが未選択の場合はスキップ
+    if (!char || !char.name || char.name === '' || char.name === 'なし') return;
+    
+    for (let i = 1; i <= 3; i++) {
+      if (char[`isM${i}Selected`]) {
+        // etcフィールドをbrタグで分割して各効果をチェック
+        const etcContent = char.etc || '';
+        const effects = etcContent.split(',').map(effect => effect.trim());
+        console.log(effects);
+        // 該当する魔法番号を含む効果行でデバフ効果をチェック
+        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
+        
+        for (const effect of magicEffects) {
+          for (const pattern of debuffPatterns) {
+            if (effect.includes(pattern)) {
+              // 被ダメージDOWNの場合は自身または味方が対象
+              if (pattern === '被ダメージDOWN') {
+                if (effect.includes('自') || effect.includes('味方')) {
+                  count++;
+                  break;
+                }
+              } else {
+                // その他のデバフは相手が対象
+                if (effect.includes('相手')) {
+                  count++;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+  
+  return count;
+}
 
 </script>
 <style scoped>

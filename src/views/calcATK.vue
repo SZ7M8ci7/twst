@@ -106,13 +106,23 @@
   </v-container>
 </template>
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { Chart, registerables } from 'chart.js';
 import DoughnutGraph from '@/components/DoughnutGraph.vue';
 import { useI18n } from 'vue-i18n';
+import { useSimulatorStore } from '@/store/simulatorStore';
 Chart.register(...registerables);
 
 const { t } = useI18n();
+const simulatorStore = useSimulatorStore();
+
+// Propsの定義
+const props = defineProps<{
+  selectedAttribute?: string
+}>();
+
+// 初期化フラグ
+const isInitialized = ref(false);
 const enemyHP = ref(0);
 const damage = ref(0);
 const buff = ref(0);
@@ -199,6 +209,224 @@ const data = computed(() => {
   };
 });
 
+// 初期化完了後にwatchを開始
+nextTick(async () => {
+  // simulatorStoreの初期化を確実に待機
+  await simulatorStore.waitForDeckStats();
+  
+  isInitialized.value = true;
+  
+  // シミュレータの値と属性選択を監視して自動反映
+  watch(
+    () => [simulatorStore.deckCharacters, props.selectedAttribute, simulatorStore.isDeckStatsReady],
+    () => {
+      if (isInitialized.value && simulatorStore.isDeckStatsReady) {
+        autoFillFromSimulator();
+      }
+    },
+    { deep: true, immediate: true }
+  );
+});
+
+// シミュレータから自動入力する関数
+async function autoFillFromSimulator() {
+  if (!isInitialized.value) return;
+  
+  try {
+    // propsから属性を取得（デフォルトは'対全'）
+    const currentAttribute = props.selectedAttribute || '対全';
+    
+    // 1. 与ダメージ（合計ダメージ）を設定
+    const totalDamage = await simulatorStore.getSafeDeckDamage(currentAttribute);
+    damage.value = Math.floor(totalDamage);
+    
+    // 2. バフ発動数を計算
+    const buffCount = calculateBuffCount();
+    buff.value = buffCount;
+    
+    // 3. 回復阻害数を計算（最大1回）
+    const healBlockCount = calculateHealBlockCount();
+    blockHeal.value = Math.min(healBlockCount, 1);
+    
+    // 4. 連撃数・単発数を計算
+    const attackCounts = calculateAttackCounts();
+    table.value.advantageCombo = attackCounts.advantage.combo;
+    table.value.equalCombo = attackCounts.equal.combo;
+    table.value.disadvantageCombo = attackCounts.disadvantage.combo;
+    table.value.advantageSingle = attackCounts.advantage.single;
+    table.value.equalSingle = attackCounts.equal.single;
+    table.value.disadvantageSingle = attackCounts.disadvantage.single;
+    
+  } catch (error) {
+    // エラー時はデフォルト値を設定
+    damage.value = 0;
+    buff.value = 0;
+    blockHeal.value = 0;
+    table.value.advantageCombo = 0;
+    table.value.equalCombo = 0;
+    table.value.disadvantageCombo = 0;
+    table.value.advantageSingle = 0;
+    table.value.equalSingle = 0;
+    table.value.disadvantageSingle = 0;
+  }
+}
+
+// バフ効果のある魔法の数を計算
+function calculateBuffCount(): number {
+  let count = 0;
+  
+  const buffPatterns = [
+    'ATKUP',
+    '火属性ダメージUP',
+    '水属性ダメージUP',
+    '木属性ダメージUP',
+    '無属性ダメージUP',
+    'ダメージUP',
+    'クリティカル'
+  ];
+  
+  (simulatorStore.deckCharacters || []).forEach(char => {
+    // キャラが未選択の場合はスキップ
+    if (!char || !char.name || char.name === '' || char.name === 'なし') return;
+    
+    for (let i = 1; i <= 3; i++) {
+      if (char[`isM${i}Selected`]) {
+        // etcフィールドをbrタグで分割して各効果をチェック
+        const etcContent = char.etc || '';
+        const effects = etcContent.split(',').map(effect => effect.trim());
+        
+        // 該当する魔法番号を含む効果行でバフ効果をチェック
+        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
+        
+        for (const effect of magicEffects) {
+          for (const pattern of buffPatterns) {
+            if (effect.includes(pattern)) {
+              // 被ダメージUPは除外（バフではない）
+              if (effect.includes('被ダメージUP')) {
+                continue;
+              }
+              // バフは自身または味方が対象
+              if (effect.includes('自') || effect.includes('味方')) {
+                count++;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+  
+  return count;
+}
+
+// 回復阻害効果の有無を計算（最大1回）
+function calculateHealBlockCount(): number {
+  for (const char of (simulatorStore.deckCharacters || [])) {
+    // キャラが未選択の場合はスキップ
+    if (!char || !char.name || char.name === '' || char.name === 'なし') continue;
+    
+    for (let i = 1; i <= 3; i++) {
+      if (char[`isM${i}Selected`]) {
+        // etcフィールドをbrタグで分割して各効果をチェック
+        const etcContent = char.etc || '';
+        const effects = etcContent.split(',').map(effect => effect.trim());
+        
+        // 該当する魔法番号を含む効果行で呪い効果をチェック
+        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
+        
+        for (const effect of magicEffects) {
+          // 呪い効果があり、呪い無効でない場合
+          if (effect.includes('呪い') && !effect.includes('呪い無効')) {
+            return 1; // 最大1回なので見つけたら即座に1を返す
+          }
+        }
+      }
+    }
+  }
+  
+  return 0;
+}
+
+// 連撃数・単発数を計算
+function calculateAttackCounts() {
+  const counts = {
+    advantage: { combo: 0, single: 0 },
+    equal: { combo: 0, single: 0 },
+    disadvantage: { combo: 0, single: 0 }
+  };
+  
+  // 選択された属性を取得
+  const selectedAttribute = props.selectedAttribute || '対全';
+  // 「対火」から「火」を抽出
+  const targetAttribute = selectedAttribute.replace('対', '');
+  
+  (simulatorStore.deckCharacters || []).forEach(char => {
+    // キャラが未選択の場合はスキップ
+    if (!char || !char.name || char.name === '' || char.name === 'なし') return;
+    
+    for (let i = 1; i <= 3; i++) {
+      if (char[`isM${i}Selected`]) {
+        const magicAttribute = char[`magic${i}Attribute`];
+        const magicPower = char[`magic${i}Power`];
+        
+        // 属性相性を判定
+        let compatibilityType: 'advantage' | 'equal' | 'disadvantage';
+        
+        if (selectedAttribute === '対全') {
+          // 対全の場合: 無属性は等倍、それ以外は有利として扱う
+          if (magicAttribute === '無') {
+            compatibilityType = 'equal';
+          } else {
+            compatibilityType = 'advantage';
+          }
+        } else if (targetAttribute === '無') {
+          // 対無の場合: 全て等倍
+          compatibilityType = 'equal';
+        } else {
+          // 特定属性の場合: 属性相性を判定
+          if (isAdvantage(magicAttribute, targetAttribute)) {
+            compatibilityType = 'advantage';
+          } else if (isDisadvantage(magicAttribute, targetAttribute)) {
+            compatibilityType = 'disadvantage';
+          } else {
+            compatibilityType = 'equal';
+          }
+        }
+        
+        // 魔法の種類によって単発か連撃かを判定
+        if (magicPower === '単発(弱)' || magicPower === '単発(強)') {
+          counts[compatibilityType].single++;
+        } else {
+          // それ以外（連撃系、デュオなど）は連撃として扱う
+          counts[compatibilityType].combo++;
+        }
+      }
+    }
+  });
+  
+  return counts;
+}
+
+// 有利属性判定
+function isAdvantage(magicAttr: string, targetAttr: string): boolean {
+  const advantages: Record<string, string> = {
+    '火': '木',
+    '水': '火', 
+    '木': '水'
+  };
+  return advantages[magicAttr] === targetAttr;
+}
+
+// 不利属性判定
+function isDisadvantage(magicAttr: string, targetAttr: string): boolean {
+  const disadvantages: Record<string, string> = {
+    '火': '水',
+    '水': '木',
+    '木': '火'
+  };
+  return disadvantages[magicAttr] === targetAttr;
+}
 
 </script>
 <style scoped>
