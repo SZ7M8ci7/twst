@@ -95,8 +95,12 @@
         </v-col>
         <v-col cols="2" class="center">
           <div class="buttons-section">
-            <button class="buff-btn"  @click="addBuff">バフ<br>追加</button>
-            <button class="details-btn" @click="openDetailModal">詳細<br>編集</button>
+            <button class="details-btn tall" @click="openDetailModal" title="詳細編集">
+              <v-icon size="16">mdi-cog</v-icon>
+            </button>
+            <button class="buff-btn bottom-aligned" @click="addBuff" title="バフ追加">
+              <v-icon size="16">mdi-plus</v-icon>
+            </button>
           </div>
         </v-col>
       </v-row>
@@ -732,18 +736,44 @@ select {
 .buttons-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  height: 100%;
   align-items: stretch;
 }
 
 .buff-btn, .details-btn {
   margin-bottom: 1px;
-  border-radius: 8px;
-  padding: 0px 8px;
-  border: 1px solid #ccc;
-  background-color: #f0f0f0;
+  border-radius: 4px;
+  padding: 6px 8px;
+  border: 1px solid #e0e0e0;
+  background-color: transparent;
   cursor: pointer;
   font-size: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: all 0.2s ease;
+}
+
+.buff-btn:hover, .details-btn:hover {
+  background-color: #f5f5f5;
+  border-color: #ccc;
+  color: #333;
+}
+
+.details-btn.tall {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 4px;
+}
+
+.buff-btn.bottom-aligned {
+  flex: 1;
+  margin-top: auto;
+  min-height: 28px;
+  width: 32px;
 }
 .bonusbutton {
   margin-bottom: 1px;
