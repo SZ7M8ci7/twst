@@ -66,13 +66,14 @@ function countEvasion(etc:string) {
 }
 export const useCharacterStore = defineStore('characters', {
   state: () => {
-    const processedCharacters: Character[] = charactersData
+    const sortedData = charactersData
       .sort((a, b) => {
         if (a.rare !== b.rare) {
           return b.rare.localeCompare(a.rare);
         }
         return (a.chara || '').localeCompare(b.chara || '');
-      })
+      });
+    const processedCharacters: Character[] = sortedData
       .map((characterJsonData: any) => {
         const { imgUrl: imgUrlFromJson, ...otherJsonProps } = characterJsonData;
 

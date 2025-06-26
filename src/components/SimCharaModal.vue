@@ -117,6 +117,13 @@ import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.png';
 import FilterModal from '@/components/FilterModal.vue';
 import characterData from '@/assets/characters_info.json';
+
+// characterDataの高速検索用Mapを事前に作成
+const characterDataMap = new Map();
+characterData.forEach(char => {
+  characterDataMap.set(char.name_ja, char);
+  characterDataMap.set(char.name_en, char);
+});
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict } from '@/utils/calculations';
 
 const characterStore = useCharacterStore();
@@ -124,6 +131,7 @@ const { characters } = storeToRefs(characterStore);
 const simulatorStore = useSimulatorStore();
 const { deckCharacters } = storeToRefs(simulatorStore);
 const filterdStore = useFilterdStore();
+
 const loadingImgUrl = ref(false);
 
 // タブ管理
@@ -870,7 +878,7 @@ watch(() => deckCharacters.value.map(c => c.chara), () => {
   clearMemberNameCache();
 }, { deep: true });
 
-// Props定義（他の定義より前に配置）
+// Props定義
 const props = defineProps({
   charaIndex: {
     type: Number,
@@ -884,8 +892,17 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'select']);
 
+// 最適化されたデータ構造の遅延初期化
+let _optimizedDataStructuresCache = null;
+let _optimizedDataStructuresInitialized = false;
+
 // 最適化されたデータ構造：高速ルックアップテーブル
 const optimizedDataStructures = computed(() => {
+  // キャッシュが既に存在する場合は返す
+  if (_optimizedDataStructuresInitialized && _optimizedDataStructuresCache) {
+    return _optimizedDataStructuresCache;
+  }
+  
   // キャラクター情報のインデックスマップ
   const characterIndexMap = new Map();
   const characterByName = new Map();
@@ -909,6 +926,7 @@ const optimizedDataStructures = computed(() => {
   });
   
   // キャラクターリストの事前処理
+  
   characters.value.forEach(character => {
     // デュオ相手のマッピング
     if (character.duo) {
@@ -939,13 +957,17 @@ const optimizedDataStructures = computed(() => {
     });
   });
   
-  return {
+  // キャッシュに保存
+  _optimizedDataStructuresCache = {
     characterIndexMap,
     characterByName,
     charactersByRarity,
     duoCharacterMap,
     buddyCharacterMap
   };
+  _optimizedDataStructuresInitialized = true;
+  
+  return _optimizedDataStructuresCache;
 });
 
 // ソート用計算値のキャッシュ
@@ -986,14 +1008,7 @@ watch(() => deckCharacters.value.map(c => ({ chara: c.chara, level: c.level, hp:
 
 // キャラクターの画像読み込み状態を初期化
 const initializeImageState = () => {
-  characters.value.forEach(character => {
-    if (!Object.prototype.hasOwnProperty.call(character, 'imageLoaded')) {
-      character.imageLoaded = false;
-    }
-    if (!character.imgUrl || character.imgUrl === 'placeholder') {
-      character.imgUrl = null;
-    }
-  });
+  // 遅延初期化でモーダル表示を高速化
 };
 
 // ソート中フラグ
@@ -1023,8 +1038,11 @@ const updateFilteredCharacters = async () => {
     return true;
   })];
 
-  // 最適化されたデータ構造を取得
-  const dataStructures = optimizedDataStructures.value;
+  // 最適化されたデータ構造を取得 (デフォルトソートの場合のみ必要)
+  let dataStructures = null;
+  if (currentSortBy === 'default') {
+    dataStructures = optimizedDataStructures.value;
+  }
 
   // ソート処理
   if (currentSortBy === 'default') {
@@ -1199,8 +1217,8 @@ let imageObserver = null;
 const imageLoadingQueue = new Set();
 
 // 並列読み込みの設定
-const INITIAL_LOAD_COUNT = 50; // 初期読み込み数を増加
-const BATCH_SIZE = 30; // スクロール時のバッチサイズを増加
+const INITIAL_LOAD_COUNT = 50; // 初期読み込み数
+const BATCH_SIZE = 30; // スクロール時のバッチサイズ
 const MAX_CONCURRENT = 100; // 最大同時読み込み数
 
 // 並列読み込みを実行する関数（バッチ処理対応）
@@ -1326,15 +1344,7 @@ const initializeModalFilter = () => {
   // 保存された状態がない場合のみSSRデフォルト設定を適用
   if (filterdStore.isFirst) {
     // フィルター状態をSSRのみに設定
-    filterdStore.tempSelectedCharacters = Object.values(
-      characterData.reduce((groups, character) => {
-        const dorm = character.dorm;
-        if (!groups[dorm]) groups[dorm] = [];
-        groups[dorm].push(character);
-        return groups;
-      }, {})
-    ).flat().map(student => student.name_en);
-    
+    filterdStore.tempSelectedCharacters = characterData.map(student => student.name_en);
     filterdStore.tempSelectedRare = ['SSR']; // SSRのみ
     filterdStore.tempSelectedType = ['バランス', 'ディフェンス', 'アタック'];
     filterdStore.tempSelectedAttr = ['火', '水', '木', '無'];
@@ -1345,72 +1355,134 @@ const initializeModalFilter = () => {
     filterdStore.isFirst = false;
   }
   
-  // キャラクターのvisible状態を更新
-  characters.value.forEach(character => {
-    // レア度チェック
-    if (!filterdStore.tempSelectedRare.includes(character.rare)) {
-      character.visible = false;
-      return;
+  // 最適化：早期退出とキャッシュを使用
+  const selectedRareSet = new Set(filterdStore.tempSelectedRare);
+  const selectedTypeSet = new Set(filterdStore.tempSelectedType);
+  const selectedAttrSet = new Set(filterdStore.tempSelectedAttr);
+  const selectedCharactersSet = new Set(filterdStore.tempSelectedCharacters);
+  const allEffectsSelected = filterdStore.tempSelectedEffects.length === 17;
+  
+  // SSRキャラクターのみをまず抽出
+  const ssrCharacters = [];
+  const nonSsrCharacters = [];
+  
+  for (let i = 0; i < characters.value.length; i++) {
+    const character = characters.value[i];
+    if (character.rare === 'SSR') {
+      ssrCharacters.push(character);
+    } else {
+      nonSsrCharacters.push(character);
     }
+  }
+  
+  // 変更が必要なもののみ更新
+  const updatesNeeded = [];
+  
+  // 非SSRキャラクターで visible=true になっているもののみ更新対象に
+  for (let i = 0; i < nonSsrCharacters.length; i++) {
+    const character = nonSsrCharacters[i];
+    if (character.visible !== false) {
+      updatesNeeded.push({ character, newValue: false });
+    }
+  }
+  
+  // SSRキャラクターの詳細フィルタリング結果を収集
+  for (let i = 0; i < ssrCharacters.length; i++) {
+    const character = ssrCharacters[i];
+    let shouldBeVisible = false;
     
     // キャラクターチェック
-    const characterInfo = characterData.find(char => 
-      char.name_ja === character.chara || char.name_en === character.chara
-    );
-    if (!characterInfo || !filterdStore.tempSelectedCharacters.includes(characterInfo.name_en)) {
-      character.visible = false;
-      return;
+    const characterInfo = characterDataMap.get(character.chara);
+    if (characterInfo && selectedCharactersSet.has(characterInfo.name_en)) {
+      // タイプチェック
+      if (selectedTypeSet.has(character.attr)) {
+        // 属性チェック
+        if (selectedAttrSet.has(character.magic1atr) ||
+            selectedAttrSet.has(character.magic2atr) ||
+            selectedAttrSet.has(character.magic3atr)) {
+          
+          // 効果チェック
+          if (allEffectsSelected) {
+            shouldBeVisible = true;
+          } else if (filterdStore.tempSelectedEffects.length > 0) {
+            for (let j = 0; j < filterdStore.tempSelectedEffects.length; j++) {
+              if (character.etc.indexOf(filterdStore.tempSelectedEffects[j]) !== -1) {
+                shouldBeVisible = true;
+                break;
+              }
+            }
+          }
+        }
+      }
     }
     
-    // タイプチェック
-    if (!filterdStore.tempSelectedType.includes(character.attr)) {
-      character.visible = false;
-      return;
+    // 現在の値と異なる場合のみ更新対象に追加
+    if (character.visible !== shouldBeVisible) {
+      updatesNeeded.push({ character, newValue: shouldBeVisible });
     }
-    
-    // 属性チェック
-    if (!filterdStore.tempSelectedAttr.includes(character.magic1atr) &&
-        !filterdStore.tempSelectedAttr.includes(character.magic2atr) &&
-        !filterdStore.tempSelectedAttr.includes(character.magic3atr)) {
-      character.visible = false;
-      return;
-    }
-    
-    // 効果チェック
-    if (filterdStore.tempSelectedEffects.length === 17) {
-      character.visible = true;
-    } else if (filterdStore.tempSelectedEffects.length === 0) {
-      character.visible = false;
-    } else {
-      const effectMatched = filterdStore.tempSelectedEffects.some(effect => 
-        character.etc.includes(effect)
-      );
-      character.visible = effectMatched;
-    }
-  });
+  }
+  
+  // 実際に変更が必要なもののみ更新
+  for (let i = 0; i < updatesNeeded.length; i++) {
+    const update = updatesNeeded[i];
+    update.character.visible = update.newValue;
+  }
 };
 
-// コンポーネントがマウントされた後に画像を読み込む
-onMounted(() => {
-  initializeImageState();
-  // モーダル初期化時にフィルター状態を設定
-  initializeModalFilter();
-  // 初期フィルター・ソートを実行
-  updateFilteredCharacters();
-  // 初期化はフィルターされたキャラクターのみに対して実行
-  requestAnimationFrame(() => {
-    loadCharacterImages();
-  });
-  
-  // 非同期で全てのキャラクターをプリロード（低優先度）
-  setTimeout(() => {
-    const allVisibleCharacters = characters.value.filter(c => c.visible);
-    if (allVisibleCharacters.length > INITIAL_LOAD_COUNT) {
-      const remainingCharacters = allVisibleCharacters.slice(INITIAL_LOAD_COUNT);
-      // バックグラウンドでゆっくりと読み込み
-      loadImagesInParallel(remainingCharacters, 10);
-    }
-  }, 2000); // 2秒後に開始
+// 遅延初期化のユーティリティ関数
+const ensureImagePropertiesInitialized = (character) => {
+  if (!('imageLoaded' in character)) {
+    character.imageLoaded = false;
+  }
+  if (!character.imgUrl || character.imgUrl === 'placeholder') {
+    character.imgUrl = null;
+  }
+};
+
+const ensureVisiblePropertiesInitialized = (character) => {
+  if (!('visible' in character)) {
+    character.visible = false; // フィルター適用前は非表示
+  }
+};
+
+// コンポーネントがマウントされた後に初期化
+onMounted(async () => {
+  try {
+    // フィルター適用前に全キャラクターのvisibleを初期化（非表示から開始）
+    characters.value.forEach(ensureVisiblePropertiesInitialized);
+    
+    // 高速初期化：最小限の処理のみ
+    initializeImageState();
+    
+    // 初期フィルター・ソートを実行（フィルター処理前）
+    updateFilteredCharacters();
+    
+    // モーダル表示後にフィルター処理を非同期で実行（UIをブロックしない）
+    setTimeout(() => {
+      initializeModalFilter();
+      
+      // フィルター適用後にソートを更新
+      nextTick(() => {
+        updateFilteredCharacters();
+      });
+    }, 0);
+    
+    // 初期化はフィルターされたキャラクターのみに対して実行
+    requestAnimationFrame(() => {
+      loadCharacterImages();
+    });
+    
+    // バックグラウンドでプリロード
+    setTimeout(() => {
+      const allVisibleCharacters = characters.value.filter(c => c.visible);
+      if (allVisibleCharacters.length > INITIAL_LOAD_COUNT) {
+        const remainingCharacters = allVisibleCharacters.slice(INITIAL_LOAD_COUNT);
+        loadImagesInParallel(remainingCharacters, 10);
+      }
+    }, 100);
+  } catch (error) {
+    console.error('SimCharaModal:onMounted - Error during initialization:', error);
+  }
 });
 
 // filteredAndSortedCharactersが変更されたときにObserverを再設定

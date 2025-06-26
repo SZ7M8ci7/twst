@@ -11,7 +11,8 @@
       "Bash(npx vite:*)",
       "Bash(ls:*)",
       "Bash(npx tsc:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(jq:*)"
     ],
     "deny": []
   }
