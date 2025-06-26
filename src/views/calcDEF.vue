@@ -242,7 +242,7 @@ async function autoFillFromSimulator() {
 function calculateEvasionCount(): number {
   let count = 0;
   
-  (simulatorStore.deckCharacters || []).forEach(char => {
+  (simulatorStore.deckCharacters || []).forEach((char: any) => {
     // キャラが未選択の場合はスキップ
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
@@ -250,11 +250,11 @@ function calculateEvasionCount(): number {
       if (char[`isM${i}Selected`]) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
-        const effects = etcContent.split('<br>').map(effect => effect.trim());
+        const effects = etcContent.split('<br>').map((effect: string) => effect.trim());
         
         // 該当する魔法番号を含む効果行で回避効果をチェック
-        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
-        const hasEvasion = magicEffects.some(effect => effect.includes('回避'));
+        const magicEffects = effects.filter((effect: string) => effect.includes(`(M${i})`));
+        const hasEvasion = magicEffects.some((effect: string) => effect.includes('回避'));
         
         if (hasEvasion) {
           count++;
@@ -280,7 +280,7 @@ function calculateDebuffCount(): number {
     '被ダメージDOWN'
   ];
   
-  (simulatorStore.deckCharacters || []).forEach(char => {
+  (simulatorStore.deckCharacters || []).forEach((char: any) => {
     // キャラが未選択の場合はスキップ
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
@@ -288,10 +288,9 @@ function calculateDebuffCount(): number {
       if (char[`isM${i}Selected`]) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
-        const effects = etcContent.split(',').map(effect => effect.trim());
-        console.log(effects);
+        const effects = etcContent.split(',').map((effect: string) => effect.trim());
         // 該当する魔法番号を含む効果行でデバフ効果をチェック
-        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
+        const magicEffects = effects.filter((effect: string) => effect.includes(`(M${i})`));
         
         for (const effect of magicEffects) {
           for (const pattern of debuffPatterns) {

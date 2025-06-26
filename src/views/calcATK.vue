@@ -293,10 +293,10 @@ function calculateBuffCount(): number {
       if (char[`isM${i}Selected`]) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
-        const effects = etcContent.split(',').map(effect => effect.trim());
+        const effects = etcContent.split(',').map((effect: string) => effect.trim());
         
         // 該当する魔法番号を含む効果行でバフ効果をチェック
-        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
+        const magicEffects = effects.filter((effect: string) => effect.includes(`(M${i})`));
         
         for (const effect of magicEffects) {
           for (const pattern of buffPatterns) {
@@ -330,10 +330,10 @@ function calculateHealBlockCount(): number {
       if (char[`isM${i}Selected`]) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
-        const effects = etcContent.split(',').map(effect => effect.trim());
+        const effects = etcContent.split(',').map((effect: string) => effect.trim());
         
         // 該当する魔法番号を含む効果行で呪い効果をチェック
-        const magicEffects = effects.filter(effect => effect.includes(`(M${i})`));
+        const magicEffects = effects.filter((effect: string) => effect.includes(`(M${i})`));
         
         for (const effect of magicEffects) {
           // 呪い効果があり、呪い無効でない場合

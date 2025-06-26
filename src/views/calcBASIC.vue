@@ -178,7 +178,7 @@ async function autoFillFromSimulator() {
     damage.value = Math.floor(totalDamage);
     
     // 2. デュオ魔法の数を設定
-    const duoCount = (simulatorStore.deckCharacters || []).filter(char => 
+    const duoCount = (simulatorStore.deckCharacters || []).filter((char: any) => 
       char?.magic2Power === 'デュオ' && char?.isM2Selected
     ).length;
     duo.value = duoCount;
@@ -203,7 +203,7 @@ function calculateAttributeCompatibility() {
   // 「対火」から「火」を抽出
   const targetAttribute = selectedAttribute.replace('対', '');
   
-  (simulatorStore.deckCharacters || []).forEach(char => {
+  (simulatorStore.deckCharacters || []).forEach((char: any) => {
     // キャラが未選択の場合（nameが空など）はスキップ
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
