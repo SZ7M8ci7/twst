@@ -214,8 +214,7 @@ watch(deckCharactersWithBuddies, async (newCharacters) => {
 
 <style scoped>
 .buddy-info-container {
-  max-height: 450px;
-  overflow-y: auto;
+  overflow-y: visible;
   padding: 8px;
 }
 

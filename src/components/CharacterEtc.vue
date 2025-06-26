@@ -108,8 +108,7 @@ const handleImageError = (event: Event) => {
 
 <style scoped>
 .etc-info-container {
-  max-height: 450px;
-  overflow-y: auto;
+  overflow-y: visible;
   padding: 8px;
 }
 
