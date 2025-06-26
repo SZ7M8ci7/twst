@@ -51,7 +51,7 @@
           <div class="calc-wrapper">
             <BuddyInfo v-if="carouselModel === 0" />
             <CharacterEtc v-else-if="carouselModel === 1" />
-            <CalcBASIC v-else-if="carouselModel === 2" />
+            <CalcBASIC v-else-if="carouselModel === 2" :selected-attribute="selectedAttribute" />
             <CalcDEF v-else-if="carouselModel === 3" />
             <CalcATK v-else-if="carouselModel === 4" />
           </div>
@@ -88,7 +88,7 @@
         <div class="carousel-content">
           <BuddyInfo v-if="carouselModel === 0" />
           <CharacterEtc v-else-if="carouselModel === 1" />
-          <CalcBASIC v-else-if="carouselModel === 2" />
+          <CalcBASIC v-else-if="carouselModel === 2" :selected-attribute="selectedAttribute" />
           <CalcDEF v-else-if="carouselModel === 3" />
           <CalcATK v-else-if="carouselModel === 4" />
         </div>

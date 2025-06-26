@@ -129,12 +129,18 @@ export const useSimulatorStore = defineStore('simulator', () => {
     return dict;
   });
 
-  // 計算済みのステータスを保持
+  // 計算済みのステータスを保持（初期化時は空の辞書を使用）
   const characterStats = ref(deckCharacters.map(char => calculateCharacterStats(char, {})));
   
   const isCalculating = ref(false);
   
   const needsRecalculation = ref(false);
+  
+  // 初期化状態を管理
+  const isInitialized = ref(false);
+  
+  // deckStatsの初期化完了を待つ
+  const isDeckStatsReady = ref(false);
 
   // デュオの判定と設定を行う関数（キャラクター選択時のみ実行）
   function updateDuoStatus(character: Character, dict: { [key: string]: boolean }, forceUpdate = false) {
@@ -171,6 +177,14 @@ export const useSimulatorStore = defineStore('simulator', () => {
       }
       
       characterStats.value = newStats;
+      
+      // 初期化完了後にdeckStatsの準備完了を設定
+      if (!isInitialized.value) {
+        isInitialized.value = true;
+      }
+      
+      // deckStatsの準備完了を設定
+      isDeckStatsReady.value = true;
     } finally {
       isCalculating.value = false;
       
@@ -240,7 +254,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
       totalDamage: {} as { [key: string]: number }
     };
 
-    characterStats.value.forEach(charStats => {
+    characterStats.value.forEach((charStats, index) => {
       stats.totalHP += charStats.hp;
       stats.totalBuddyHP += charStats.buddyHP;
       stats.totalHeal += charStats.heal;
@@ -263,6 +277,70 @@ export const useSimulatorStore = defineStore('simulator', () => {
       const damage = charStats.damage as { [key: string]: number };
       return damage[attribute] || 0;
     });
+  };
+
+  // deckStatsの初期化を待機してから取得する関数
+  const waitForDeckStats = async (): Promise<typeof deckStats.value> => {
+    // 既に準備完了している場合は即座に返す
+    if (isDeckStatsReady.value) {
+      return deckStats.value;
+    }
+    
+    // 計算中の場合は完了を待つ
+    if (isCalculating.value) {
+      return new Promise((resolve) => {
+        const checkReady = () => {
+          if (isDeckStatsReady.value && !isCalculating.value) {
+            resolve(deckStats.value);
+          } else {
+            setTimeout(checkReady, 50);
+          }
+        };
+        checkReady();
+      });
+    }
+    
+      // 初期化が必要な場合は実行してから待つ
+    if (!isInitialized.value) {
+      // 初期計算を実行
+      await recalculateStats();
+      return new Promise((resolve) => {
+        const checkReady = () => {
+          if (isDeckStatsReady.value && !isCalculating.value) {
+            resolve(deckStats.value);
+          } else {
+            setTimeout(checkReady, 50);
+          }
+        };
+        checkReady();
+      });
+    }
+    
+    return deckStats.value;
+  };
+
+  // 安全にdeckStatsのダメージを取得する関数
+  const getSafeDeckDamage = async (attribute: string = '対全'): Promise<number> => {
+    try {
+      const stats = await waitForDeckStats();
+      
+      if (!stats || !stats.totalDamage) {
+        return 0;
+      }
+      
+      // 属性に応じてダメージを取得
+      if (attribute === '対全') {
+        // 全属性の最大値を取得
+        const damages = Object.values(stats.totalDamage).map(d => Number(d) || 0);
+        return Math.max(...damages, 0);
+      } else {
+        // 特定属性のダメージを取得（例: '対火' -> '火'）
+        const targetAttribute = attribute.replace('対', '');
+        return Number(stats.totalDamage[targetAttribute]) || 0;
+      }
+    } catch (error) {
+      return 0;
+    }
   };
 
   // キャラクターの基本ステータスを計算（twstsimu.jsのchangeLevel関数に合わせる）
@@ -415,6 +493,20 @@ export const useSimulatorStore = defineStore('simulator', () => {
     calculateAllStats,
     updateBuff,
     charaDict,
-    calculateCharacterStats
+    calculateCharacterStats,
+    isInitialized,
+    isDeckStatsReady,
+    waitForDeckStats,
+    getSafeDeckDamage
   };
 });
+
+// ストア初期化時に初期計算を実行
+export const initializeSimulatorStore = () => {
+  const store = useSimulatorStore();
+  // 初期計算をトリガー
+  nextTick(() => {
+    store.calculateAllStats();
+  });
+  return store;
+};

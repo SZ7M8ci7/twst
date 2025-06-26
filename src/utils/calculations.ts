@@ -489,7 +489,9 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
   
   // 各魔法のダメージ計算
   for (let i = 1; i <= 3; i++) {
-    if (!character.selectedMagic?.includes(i)) continue;
+    // selectedMagicを使わず、個別のフラグをチェック
+    const isSelected = character[`isM${i}Selected`];
+    if (!isSelected) continue;
 
     const magicKey = `magic${i}`;
     const attribute = character[`${magicKey}Attribute`];

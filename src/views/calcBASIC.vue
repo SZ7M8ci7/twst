@@ -75,12 +75,22 @@
   </v-container>
 </template>
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
 import { Chart, registerables } from 'chart.js';
 import DoughnutGraph from '@/components/DoughnutGraph.vue';
 import { useI18n } from 'vue-i18n';
+import { useSimulatorStore } from '@/store/simulatorStore';
 Chart.register(...registerables);
 const { t } = useI18n();
+const simulatorStore = useSimulatorStore();
+
+// Propsの定義
+const props = defineProps<{
+  selectedAttribute?: string
+}>();
+
+// 初期化フラグ
+const isInitialized = ref(false);
 const turns = [0.144,0.138,0.132,0.126,0.1];
 const damage = ref(0);
 const duo = ref(0);
@@ -135,6 +145,118 @@ const data = computed(() => {
   };
 });
 
+// 初期化完了後にwatchを開始
+nextTick(async () => {
+  // simulatorStoreの初期化を確実に待機
+  await simulatorStore.waitForDeckStats();
+  
+  isInitialized.value = true;
+  
+  // シミュレータの値と属性選択を監視して自動反映
+  watch(
+    () => [simulatorStore.deckCharacters, props.selectedAttribute, simulatorStore.isDeckStatsReady],
+    () => {
+      if (isInitialized.value && simulatorStore.isDeckStatsReady) {
+        autoFillFromSimulator();
+      }
+    },
+    { deep: true, immediate: true }
+  );
+});
+
+// シミュレータから自動入力する関数
+async function autoFillFromSimulator() {
+  if (!isInitialized.value) return;
+  
+  try {
+    // propsから属性を取得（デフォルトは'対全'）
+    const currentAttribute = props.selectedAttribute || '対全';
+    
+    // simulatorStoreのdeckStatsからダメージを安全に取得
+    const totalDamage = await simulatorStore.getSafeDeckDamage(currentAttribute);
+    
+    damage.value = Math.floor(totalDamage);
+    
+    // 2. デュオ魔法の数を設定
+    const duoCount = (simulatorStore.deckCharacters || []).filter(char => 
+      char?.magic2Power === 'デュオ' && char?.isM2Selected
+    ).length;
+    duo.value = duoCount;
+    
+    // 3. 属性相性を計算して設定
+    const compatibility = calculateAttributeCompatibility();
+    table.value.advantage = compatibility.advantage;
+    table.value.equal = compatibility.equal;
+    table.value.disadvantage = compatibility.disadvantage;
+    
+  } catch (error) {
+    // エラーが発生した場合は0に設定
+    damage.value = 0;
+  }
+}
+
+// 属性相性を計算する関数
+function calculateAttributeCompatibility() {
+  const compatibility = { advantage: 0, equal: 0, disadvantage: 0 };
+  // 選択された属性を取得
+  const selectedAttribute = props.selectedAttribute || '対全';
+  // 「対火」から「火」を抽出
+  const targetAttribute = selectedAttribute.replace('対', '');
+  
+  (simulatorStore.deckCharacters || []).forEach(char => {
+    // キャラが未選択の場合（nameが空など）はスキップ
+    if (!char || !char.name || char.name === '' || char.name === 'なし') return;
+    
+    for (let i = 1; i <= 3; i++) {
+      if (char[`isM${i}Selected`]) {
+        const magicAttribute = char[`magic${i}Attribute`];
+        
+        if (selectedAttribute === '対全') {
+          // 対全の場合: 無属性は等倍、それ以外は有利として扱う
+          if (magicAttribute === '無') {
+            compatibility.equal++;
+          } else {
+            compatibility.advantage++;
+          }
+        } else if (targetAttribute === '無') {
+          // 対無の場合: 全て等倍
+          compatibility.equal++;
+        } else {
+          // 特定属性の場合: 属性相性を判定
+          if (isAdvantage(magicAttribute, targetAttribute)) {
+            compatibility.advantage++;
+          } else if (isDisadvantage(magicAttribute, targetAttribute)) {
+            compatibility.disadvantage++;
+          } else {
+            compatibility.equal++;
+          }
+        }
+      }
+    }
+  });
+  
+  return compatibility;
+}
+
+// 有利属性判定
+function isAdvantage(magicAttr: string, targetAttr: string): boolean {
+  const advantages: Record<string, string> = {
+    '火': '木',
+    '水': '火', 
+    '木': '水'
+  };
+  return advantages[magicAttr] === targetAttr;
+}
+
+// 不利属性判定
+function isDisadvantage(magicAttr: string, targetAttr: string): boolean {
+  const disadvantages: Record<string, string> = {
+    '火': '水',
+    '水': '木',
+    '木': '火'
+  };
+  return disadvantages[magicAttr] === targetAttr;
+}
 
 </script>
 <style scoped>
