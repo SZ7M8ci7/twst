@@ -367,7 +367,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
             name2DuoUsed[partnerIndex] = true;
             name2M2Used[index] = true;
             name2M2Used[partnerIndex] = true;
-            totalDuo += 2;
+            totalDuo += 2; // 2人がデュオ魔法を使用
             break;
           }
         }
@@ -514,10 +514,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       recalculatedChara.magic2Power = recalculatedChara.magic2pow || '連撃(強)';
     }
     
-    // ダメージ計算が必要な場合のみ統計を再計算
-    if (sortKey === 'deckDamage') {
-      calculateCharacterStats(recalculatedChara, fullMemberNameDict);
-    }
+    // ダメージ計算は後でまとめて行う
     
     recalculatedVirtualDeck.push(recalculatedChara);
   }
@@ -595,6 +592,13 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     chara.magic2Power = name2DuoUsed[index] ? 'デュオ' : (chara.magic2pow || '連撃(強)');
   });
   
+  // デュオ判定後、全キャラクターの統計を再計算（ダメージ計算が必要な場合）
+  if (sortKey === 'deckDamage') {
+    recalculatedVirtualDeck.forEach((chara) => {
+      calculateCharacterStats(chara, fullMemberNameDict);
+    });
+  }
+  
   // 再計算されたキャラクターデータを使用してHP・ヒール計算
   recalculatedVirtualDeck.forEach((chara) => {
     deckTotalHP += chara.hp || 0;
@@ -637,13 +641,24 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     
     deckMinIncreasedHPBuddy = Math.min(deckMinIncreasedHPBuddy, increasedHP);
     
-    // HP回復分計算（レベル10を仮定）
-    const hpHeal = (calcHealRate(chara.magic1heal, 10) +
-                    calcHealRate(chara.magic2heal, 10) +
-                    (chara.hasM3 ? calcHealRate(chara.magic3heal, 10) : 0)) * chara.atk;
-    const hpConHeal = (calcConHealRate(chara.magic1heal, 10) +
-                       calcConHealRate(chara.magic2heal, 10) +
-                       (chara.hasM3 ? calcConHealRate(chara.magic3heal, 10) : 0)) * chara.hp;
+    // HP回復分計算（選択されたマジックのみ）
+    let hpHeal = 0;
+    let hpConHeal = 0;
+    
+    // マジック選択状態を考慮した回復計算
+    if (chara.isM1Selected) {
+      hpHeal += calcHealRate(chara.magic1heal, 10) * chara.atk;
+      hpConHeal += calcConHealRate(chara.magic1heal, 10) * chara.hp;
+    }
+    if (chara.isM2Selected) {
+      hpHeal += calcHealRate(chara.magic2heal, 10) * chara.atk;
+      hpConHeal += calcConHealRate(chara.magic2heal, 10) * chara.hp;
+    }
+    if (chara.isM3Selected) {
+      hpHeal += calcHealRate(chara.magic3heal, 10) * chara.atk;
+      hpConHeal += calcConHealRate(chara.magic3heal, 10) * chara.hp;
+    }
+    
     deckTotalHeal += hpHeal + hpConHeal;
     
     // デュオカウント（再計算済みデータから判定）
