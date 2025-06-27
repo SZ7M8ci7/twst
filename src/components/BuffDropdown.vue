@@ -56,7 +56,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'buff-changed']);
 
 const magicOption = ref(props.modelValue.magicOption || '');
 const buffOption = ref(props.modelValue.buffOption || '');
@@ -92,6 +92,9 @@ const updateValue = () => {
     levelOption: levelOption.value,
     isManuallyAdded: props.modelValue?.isManuallyAdded || false // 既存のフラグを保持
   });
+  
+  // バフ値変更時に再計算をトリガー
+  emit('buff-changed');
 };
 </script>
 

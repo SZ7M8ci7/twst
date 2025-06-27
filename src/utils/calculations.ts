@@ -413,40 +413,41 @@ function calculateBuddyHP(character: any, charaDict: { [key: string]: boolean })
 // 回復量の計算
 function calculateHeal(character: any) {
   let totalHeal = 0;
-
   // 選択された魔法を取得
-  const selectedMagic = [];
+  const selectedMagic: number[] = [];
   if (character.isM1Selected) selectedMagic.push(1);
   if (character.isM2Selected) selectedMagic.push(2);
   if (character.isM3Selected) selectedMagic.push(3);
 
-  // 各魔法の回復量を計算（元のシミュレータのロジックに合わせる）
-  for (let i = 1; i <= 3; i++) {
-    // 魔法のhealプロパティとレベルから回復キーを生成
-    const healProp = character[`magic${i}heal`] || '';
-    const magicLevel = character[`magic${i}Lv`] || 10;
-    
-    // 回復魔法がない場合はスキップ
-    if (!healProp || healProp === '') continue;
-
-    // heal キーを生成（元のシミュレータ形式：magic1heal + magic1Lv）
-    const healKey = healProp + magicLevel;
-
-    // 即時回復の計算（選択された魔法のみ）
-    if (selectedMagic.includes(i)) {
-      const healValue = healKey in healDict ? healDict[healKey] : 0;
-      if (healValue > 0) {
-        totalHeal += Number(healValue) * Number(character.atk);
+  // buffs配列からの回復値を追加
+  if (character.buffs && Array.isArray(character.buffs)) {
+    character.buffs.forEach((buff: any) => {
+      // 回復タイプのバフをチェック
+      if ((buff.buffOption === '回復' || buff.buffOption === '継続回復') && buff.magicOption) {
+        const magicNum = Number(buff.magicOption.replace('M', ''));
+        
+        // 該当する魔法が選択されている場合のみ
+        if (selectedMagic.includes(magicNum)) {
+          const level = Number(buff.levelOption) || 10;
+          
+          if (buff.buffOption === '回復') {
+            // 即時回復: healDictから値を取得
+            const healKey = `回復(${buff.powerOption})${level}`;
+            const healValue = healKey in healDict ? healDict[healKey] : 0;
+            if (healValue > 0) {
+              totalHeal += Number(healValue) * Number(character.atk);
+            }
+          } else if (buff.buffOption === '継続回復') {
+            // 継続回復: healContinueDictから値を取得
+            const healContinueKey = `継続回復(${buff.powerOption})${level}`;
+            const healContinueValue = healContinueKey in healContinueDict ? healContinueDict[healContinueKey] : 0;
+            if (healContinueValue > 0) {
+              totalHeal += 3 * Number(healContinueValue) * Number(character.hp);
+            }
+          }
+        }
       }
-    }
-
-    // 継続回復の計算（選択された魔法のみ）
-    if (selectedMagic.includes(i)) {
-      const healContinueValue = healKey in healContinueDict ? healContinueDict[healKey] : 0;
-      if (healContinueValue > 0) {
-        totalHeal += 3 * Number(healContinueValue) * Number(character.hp);
-      }
-    }
+    });
   }
 
   return totalHeal;

@@ -109,7 +109,7 @@
       <div class="buff-list">
         <template v-for="(buff, index) in simulatorStore.deckCharacters[props.charaIndex].buffs" :key="index">
           <div class="buff-section" :class="{ 'manually-added': buff.isManuallyAdded }">
-            <BuffDropdown v-model="simulatorStore.deckCharacters[props.charaIndex].buffs[index]"/>
+            <BuffDropdown v-model="simulatorStore.deckCharacters[props.charaIndex].buffs[index]" @buff-changed="handleBuffChanged"/>
           </div>
         </template>
       </div>
@@ -597,6 +597,12 @@ const handleLevelInput = (event) => {
 const saveDetailChanges = (updatedCharacter) => {
   simulatorStore.selectCharacter(props.charaIndex, updatedCharacter);
   closeDetailModal();
+};
+
+// バフ変更時の処理
+const handleBuffChanged = () => {
+  // 全ステータスを再計算
+  simulatorStore.calculateAllStats();
 };
 
 const windowWidth = ref(window.innerWidth);
