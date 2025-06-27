@@ -9,7 +9,7 @@
       </div>
     </v-col>
     <v-col cols="3">
-      <button class="button" @click="openInNewTab">選択内容を別タブで開く<span class="dli-external-link"><span></span></span></button>
+      <button class="button" @click="openInNewTab">別タブ<span class="dli-external-link"><span></span></span></button>
     </v-col>
   </v-row>
 </template>

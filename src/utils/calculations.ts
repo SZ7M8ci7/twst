@@ -615,7 +615,7 @@ function calculateBuffs(character: any, magicKey: string) {
 function getRengekiMultiplier(power: string): number {
   if (power === '連撃(弱)' || power === '連撃(強)') {
     return 1.8;
-  } else if (power === 'デュオ魔法' || power === '3連撃(弱)') {
+  } else if (power === 'デュオ魔法' || power === '3連撃(弱)' || power === '3連撃(強)') {
     return 2.4;
   }
   return 1.0;
