@@ -118,7 +118,7 @@ const simulatorStore = useSimulatorStore();
 
 const calcTitles = [
   'バディ情報',
-  'その他',
+  '付与効果',
   'ベーシック試験スコア計算',
   'ディフェンス試験スコア計算', 
   'アタック試験スコア計算'

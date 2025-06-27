@@ -489,10 +489,6 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
   
   // 各魔法のダメージ計算
   for (let i = 1; i <= 3; i++) {
-    // selectedMagicを使わず、個別のフラグをチェック
-    const isSelected = character[`isM${i}Selected`];
-    if (!isSelected) continue;
-
     const magicKey = `magic${i}`;
     const attribute = character[`${magicKey}Attribute`];
     const power = character[`${magicKey}Power`] || '単発(弱)';
@@ -518,6 +514,7 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
     // 属性ダメージの計算
     const attributeDamages = calculateAttributeDamages(attribute, baseDamage);
     
+    // 全ての魔法のダメージ詳細を保存（グラフ表示用）
     character[`magic${i}DamageDetails`] = {
       attribute,
       power,
@@ -529,7 +526,11 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
       max: Math.round(attributeDamages.max)
     };
     
-    // 選択された魔法のダメージを合計
+    // selectedMagicを使わず、個別のフラグをチェック
+    const isSelected = character[`isM${i}Selected`];
+    if (!isSelected) continue;
+    
+    // 選択された魔法のダメージのみを合計
     damage['火'] += Math.round(attributeDamages.fire);
     damage['水'] += Math.round(attributeDamages.water);
     damage['木'] += Math.round(attributeDamages.wood);
