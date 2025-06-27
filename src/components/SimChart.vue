@@ -184,7 +184,7 @@ function createChart() {
               return `${label}: ${value}`;
             },
             title: function(context) {
-              return context[0].label;
+              return ''; // タイトルを空にして数字を表示しない
             },
             afterBody: function(context) {
               const totalHP = context.reduce((sum, item) => {
