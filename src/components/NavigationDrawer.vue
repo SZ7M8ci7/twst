@@ -59,11 +59,11 @@
         :title="$t('tool.deckSimulator')"
         @click="drawer = false;"
       /></RouterLink>
-      <RouterLink :to="{name:'sim'}">
+      <!-- <RouterLink :to="{name:'sim'}">
       <v-list-item
         :title="$t('tool.sim')"
         @click="drawer = false;"
-      /></RouterLink>
+      /></RouterLink> -->
       <RouterLink :to="{name:'search'}">
       <v-list-item
         :title="$t('tool.deckExplorationTools')"
