@@ -186,7 +186,7 @@
                       <v-col cols="6">
                         <v-select
                           v-model="buff.buffOption"
-                          :items="['ATKUP', 'ダメージUP', '属性ダメUP', '継続回復', '回復']"
+                          :items="['ATKUP', 'ATKDOWN', 'ダメージUP', 'ダメージDOWN', '属性ダメUP', '属性ダメDOWN', '継続回復', '回復', 'クリティカル']"
                           label="バフ種類"
                           variant="outlined"
                           density="compact"

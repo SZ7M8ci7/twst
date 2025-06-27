@@ -105,7 +105,7 @@ function createChart() {
             return baseColor.replace(/[\d.]+\)$/, '0.2)');
           }
           return baseColor;
-        }),
+        }) as any,
         // 各キャラクターの指定された魔法タイプと属性のダメージを取得
         data: simulatorStore.deckCharacters.map((char) => {
           const damageDetails = char[`magic${magicNumber}DamageDetails`];

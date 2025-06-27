@@ -566,16 +566,21 @@ function calculateBuffs(character: any, magicKey: string) {
       const powerType = buff.powerOption;
       const level = buff.levelOption || 10;
       
-      if (buffType === 'ATKUP') {
-        const buffKey = `ATKUP(${powerType})${level}`;
+      if (buffType === 'ATKUP' || buffType === 'ATKDOWN') {
+        const buffKey = `${buffType}(${powerType})${level}`;
         if (buffKey in atkbuffDict) {
           atkBuffTotal += Number(atkbuffDict[buffKey]) * character.atk;
         }
       }
       
       // ダメージバフの計算
-      if (buffType === 'ダメージUP' || buffType === '属性ダメUP') {
-        const prefix = buffType === 'ダメージUP' ? 'ダメUP' : '属性ダメUP';
+      if (buffType === 'ダメージUP' || buffType === '属性ダメUP' || buffType === 'ダメージDOWN' || buffType === '属性ダメDOWN') {
+        let prefix = '';
+        if (buffType === 'ダメージUP') prefix = 'ダメUP';
+        else if (buffType === 'ダメージDOWN') prefix = 'ダメDOWN';
+        else if (buffType === '属性ダメUP') prefix = '属性ダメUP';
+        else if (buffType === '属性ダメDOWN') prefix = '属性ダメDOWN';
+        
         const buffKey = `${prefix}(${powerType})${level}`;
         if (buffKey in dmgbuffDict) {
           dmgBuffTotal += Number(dmgbuffDict[buffKey]);

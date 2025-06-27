@@ -14,6 +14,9 @@
       <option>継続回復</option>
       <option>回復</option>
       <option>クリティカル</option>
+      <option>ATKDOWN</option>
+      <option>ダメージDOWN</option>
+      <option>属性ダメDOWN</option>
     </select>
   </div>
   <div class="select-wrapper">
