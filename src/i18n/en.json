@@ -15,9 +15,9 @@
     "buddyDuo": "Buddy/Duo Relation",
     "finisherDamage": "Finisher Damage",
     "data": "Data",
-    "retire": "Retire Counter",
     "other": "Other",
-    "sim": "Simulator"
+    "sim": "New Deck Simulator",
+    "retire": "Retire Counter"
   },
   "top": {
     "twistedTool": "A web site to put tools related to Twisted Wonderland",
