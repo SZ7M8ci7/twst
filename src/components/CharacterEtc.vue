@@ -1,6 +1,6 @@
 <template>
   <div class="etc-info-container">
-    <!-- その他情報 -->
+    <!-- 付与効果情報 -->
     <div class="etc-list">
       <div 
         v-for="(character, charIndex) in deckCharactersWithEtc" 
@@ -21,8 +21,12 @@
             v-for="(effect, effectIndex) in character.etcEffects" 
             :key="effectIndex"
             class="effect-item"
+            :class="{
+              'magic-selected': effect.isSelected,
+              'magic-not-selected': effect.magicNumber > 0 && !effect.isSelected
+            }"
           >
-            {{ effect }}
+            {{ effect.text }}
           </div>
           <div v-if="character.etcEffects.length === 0" class="no-effects">
             効果なし
@@ -80,7 +84,29 @@ const deckCharactersWithEtc = computed(() => {
       const etcEffects = etcText
         .split('<br>')
         .map((effect: string) => effect.trim())
-        .filter((effect: string) => effect.length > 0);
+        .filter((effect: string) => effect.length > 0)
+        .map((effect: string) => {
+          // 効果がどのマジックに関連しているかチェック
+          let magicNumber = 0;
+          let isSelected = false;
+          
+          if (effect.includes('(M1)')) {
+            magicNumber = 1;
+            isSelected = char.isM1Selected || false;
+          } else if (effect.includes('(M2)')) {
+            magicNumber = 2;
+            isSelected = char.isM2Selected || false;
+          } else if (effect.includes('(M3)')) {
+            magicNumber = 3;
+            isSelected = char.isM3Selected || false;
+          }
+          
+          return {
+            text: effect,
+            magicNumber,
+            isSelected
+          };
+        });
       
       return {
         ...char,
@@ -112,7 +138,7 @@ const handleImageError = (event: Event) => {
   padding: 8px;
 }
 
-/* その他情報リスト */
+/* 付与効果情報リスト */
 .etc-list {
   display: flex;
   flex-direction: column;
@@ -158,6 +184,21 @@ const handleImageError = (event: Event) => {
   background: rgba(0, 0, 0, 0.05);
   border-radius: 4px;
   line-height: 1.4;
+  transition: background-color 0.2s ease;
+}
+
+/* マジックが選択されている場合 */
+.effect-item.magic-selected {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  font-weight: 500;
+}
+
+/* マジックが選択されていない場合 */
+.effect-item.magic-not-selected {
+  background: rgba(0, 0, 0, 0.03);
+  color: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .no-effects {
@@ -191,6 +232,20 @@ const handleImageError = (event: Event) => {
 .v-theme--dark .effect-item {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.05);
+}
+
+/* ダークモード - マジックが選択されている場合 */
+.v-theme--dark .effect-item.magic-selected {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+}
+
+/* ダークモード - マジックが選択されていない場合 */
+.v-theme--dark .effect-item.magic-not-selected {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .v-theme--dark .no-effects {
@@ -229,6 +284,11 @@ const handleImageError = (event: Event) => {
   .effect-item {
     font-size: 0.65rem;
     padding: 2px 6px;
+  }
+  
+  .effect-item.magic-selected,
+  .effect-item.magic-not-selected {
+    border-width: 1px;
   }
 }
 </style>
