@@ -3,7 +3,7 @@
     <!-- 合計HP表示 -->
     <div class="margin">
       実質HP:<span id="totalHealHP">{{ formatNumber(totalEffectiveHP) }}</span>
-      <span class="hp-breakdown">(HP:{{ formatNumber(totalHP - totalBuddyHP) }}+バディ:{{ formatNumber(totalBuddyHP) }}+回復:{{ formatNumber(totalHeal) }})</span>
+      <span class="hp-breakdown">(HP:{{ formatNumber(totalHP) }}+バディ:{{ formatNumber(totalBuddyHP) }}+回復:{{ formatNumber(totalHeal) }})</span>
     </div>
     
     <!-- 合計ダメージとBasicスコア表示 -->
