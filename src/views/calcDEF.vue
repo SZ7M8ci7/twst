@@ -212,7 +212,7 @@ async function autoFillFromSimulator() {
     // propsから属性を取得（デフォルトは'対全'）
     const currentAttribute = props.selectedAttribute || '対全';
     
-    // 1. 実質たるHP（総たるHP）を設定
+    // 1. 実質HP（総HP）を設定
     const stats = await simulatorStore.waitForDeckStats();
     const totalHP = stats?.totalHP || 0;
     allyTotalHP.value = totalHP;
