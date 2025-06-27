@@ -212,8 +212,8 @@ const selectCharaImage = (chara) => {
     // バフの追加
     if (buffValue) {
       const buffType = buffValue.includes('ATKUP') ? 'ATKUP' :
-                      buffValue.includes('ダメUP') ? 'ダメージUP' :
                       buffValue.includes('属性ダメUP') ? '属性ダメUP' :
+                      buffValue.includes('ダメUP') ? 'ダメージUP' :
                       buffValue.includes('クリティカル') ? 'クリティカル' : '';
       
       if (buffType) {
