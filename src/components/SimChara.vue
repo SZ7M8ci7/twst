@@ -108,7 +108,7 @@
     <v-row dense>
       <div class="buff-list">
         <template v-for="(buff, index) in simulatorStore.deckCharacters[props.charaIndex].buffs" :key="index">
-          <div class="buff-section">
+          <div class="buff-section" :class="{ 'manually-added': buff.isManuallyAdded }">
             <BuffDropdown v-model="simulatorStore.deckCharacters[props.charaIndex].buffs[index]"/>
           </div>
         </template>
@@ -333,7 +333,8 @@ const addBuff = () => {
     magicOption: '',
     buffOption: '',
     powerOption: '',
-    levelOption: 10
+    levelOption: 10,
+    isManuallyAdded: true // 手動追加フラグ
   });
 };
 
@@ -888,6 +889,16 @@ select {
   margin-bottom: 2px;
 }
 
+.buff-section {
+  border-radius: 4px;
+  padding: 4px;
+  width: 100%;
+}
+
+.buff-section.manually-added {
+  background-color: rgba(255, 0, 0, 0.05);
+}
+
 /* モバイル（サイドパネルなし） */
 @media (min-width: 480px) and (max-width: 959px) {
   .buff-list {
@@ -941,5 +952,10 @@ select {
   outline: none;
   border-color: #66afe9;
   box-shadow: 0 0 8px rgba(102, 175, 233, 0.6);
+}
+
+/* ダークモード対応 */
+:deep(.v-theme--dark) .buff-section.manually-added {
+  background-color: rgba(255, 100, 100, 0.1);
 }
 </style>

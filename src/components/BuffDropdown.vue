@@ -89,7 +89,8 @@ const updateValue = () => {
     magicOption: magicOption.value,
     buffOption: buffOption.value,
     powerOption: powerOption.value,
-    levelOption: levelOption.value
+    levelOption: levelOption.value,
+    isManuallyAdded: props.modelValue?.isManuallyAdded || false // 既存のフラグを保持
   });
 };
 </script>

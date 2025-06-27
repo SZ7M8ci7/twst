@@ -165,7 +165,7 @@ const midDamage5T = computed(() => {
   return `${formatNumber(rest)}+${formatNumber(highest)}`;
 });
 
-// Basic試験スコア計算（旧シミュレータのロジックに従う）
+// Basic試験スコア計算（calcBASICと統一）
 const scoreBase = computed(() => {
   const scores = [0, 0, 0, 0, 0]; // 1T～5T
   
@@ -195,107 +195,172 @@ const scoreBase = computed(() => {
     }
   });
   
+  // 各ターンの攻撃数を計算
+  const attackCounts = [2, 4, 6, 8, 10]; // 1T～5Tの攻撃数
+  
   // 選択された属性に基づいてスコア計算
   if (props.selectedAttribute === '対全') {
     // 全属性: vszendamageでソート
     const result = damageDataList.sort((a, b) => b.vszendamage - a.vszendamage);
     for (let j = 0; j < 5; j++) {
-      for (let k = 2 * j; k < 2 * j + 2; k++) {
-        for (let l = j; l < 5; l++) {
-          if (!result[k]) continue;
-          
-          if (result[k].duoMagic === 'デュオ魔法') {
-            scores[l] += 3000;
-          }
-          if (result[k].attribute !== '無') {
-            scores[l] += 1500;
-          }
-          scores[l] += result[k].vszendamage;
-          scores[l] += 500;
+      let totalDamage = 0;
+      let duoCount = 0;
+      let advantageCount = 0;
+      let equalCount = 0;
+      let disadvantageCount = 0;
+      
+      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
+        if (!result[k]) continue;
+        
+        totalDamage += result[k].vszendamage;
+        
+        if (result[k].duoMagic === 'デュオ魔法') {
+          duoCount++;
+        }
+        if (result[k].attribute !== '無') {
+          advantageCount++;
+        } else {
+          equalCount++;
         }
       }
+      
+      // calcBASICと同じ計算式
+      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
+                  duoCount * 3000 + 
+                  advantageCount * 2000 + 
+                  equalCount * 500 + 
+                  disadvantageCount * (-1000);
     }
   } else if (props.selectedAttribute === '対火') {
     // 対火: vshidamageでソート
     const result = damageDataList.sort((a, b) => b.vshidamage - a.vshidamage);
     for (let j = 0; j < 5; j++) {
-      for (let k = 2 * j; k < 2 * j + 2; k++) {
-        for (let l = j; l < 5; l++) {
-          if (!result[k]) continue;
-          
-          if (result[k].duoMagic === 'デュオ魔法') {
-            scores[l] += 3000;
-          }
-          if (result[k].attribute === '水') {
-            scores[l] += 1500;
-          }
-          if (result[k].attribute === '木') {
-            scores[l] -= 1500;
-          }
-          scores[l] += result[k].vshidamage;
-          scores[l] += 500;
+      let totalDamage = 0;
+      let duoCount = 0;
+      let advantageCount = 0;
+      let equalCount = 0;
+      let disadvantageCount = 0;
+      
+      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
+        if (!result[k]) continue;
+        
+        totalDamage += result[k].vshidamage;
+        
+        if (result[k].duoMagic === 'デュオ魔法') {
+          duoCount++;
+        }
+        if (result[k].attribute === '水') {
+          advantageCount++;
+        } else if (result[k].attribute === '木') {
+          disadvantageCount++;
+        } else {
+          equalCount++;
         }
       }
+      
+      // calcBASICと同じ計算式
+      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
+                  duoCount * 3000 + 
+                  advantageCount * 2000 + 
+                  equalCount * 500 + 
+                  disadvantageCount * (-1000);
     }
   } else if (props.selectedAttribute === '対木') {
     // 対木: vskidamageでソート
     const result = damageDataList.sort((a, b) => b.vskidamage - a.vskidamage);
     for (let j = 0; j < 5; j++) {
-      for (let k = 2 * j; k < 2 * j + 2; k++) {
-        for (let l = j; l < 5; l++) {
-          if (!result[k]) continue;
-          
-          if (result[k].duoMagic === 'デュオ魔法') {
-            scores[l] += 3000;
-          }
-          if (result[k].attribute === '火') {
-            scores[l] += 1500;
-          }
-          if (result[k].attribute === '水') {
-            scores[l] -= 1500;
-          }
-          scores[l] += result[k].vskidamage;
-          scores[l] += 500;
+      let totalDamage = 0;
+      let duoCount = 0;
+      let advantageCount = 0;
+      let equalCount = 0;
+      let disadvantageCount = 0;
+      
+      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
+        if (!result[k]) continue;
+        
+        totalDamage += result[k].vskidamage;
+        
+        if (result[k].duoMagic === 'デュオ魔法') {
+          duoCount++;
+        }
+        if (result[k].attribute === '火') {
+          advantageCount++;
+        } else if (result[k].attribute === '水') {
+          disadvantageCount++;
+        } else {
+          equalCount++;
         }
       }
+      
+      // calcBASICと同じ計算式
+      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
+                  duoCount * 3000 + 
+                  advantageCount * 2000 + 
+                  equalCount * 500 + 
+                  disadvantageCount * (-1000);
     }
   } else if (props.selectedAttribute === '対水') {
     // 対水: vsmizudamageでソート
     const result = damageDataList.sort((a, b) => b.vsmizudamage - a.vsmizudamage);
     for (let j = 0; j < 5; j++) {
-      for (let k = 2 * j; k < 2 * j + 2; k++) {
-        for (let l = j; l < 5; l++) {
-          if (!result[k]) continue;
-          
-          if (result[k].duoMagic === 'デュオ魔法') {
-            scores[l] += 3000;
-          }
-          if (result[k].attribute === '木') {
-            scores[l] += 1500;
-          }
-          if (result[k].attribute === '火') {
-            scores[l] -= 1500;
-          }
-          scores[l] += result[k].vsmizudamage;
-          scores[l] += 500;
+      let totalDamage = 0;
+      let duoCount = 0;
+      let advantageCount = 0;
+      let equalCount = 0;
+      let disadvantageCount = 0;
+      
+      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
+        if (!result[k]) continue;
+        
+        totalDamage += result[k].vsmizudamage;
+        
+        if (result[k].duoMagic === 'デュオ魔法') {
+          duoCount++;
+        }
+        if (result[k].attribute === '木') {
+          advantageCount++;
+        } else if (result[k].attribute === '火') {
+          disadvantageCount++;
+        } else {
+          equalCount++;
         }
       }
+      
+      // calcBASICと同じ計算式
+      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
+                  duoCount * 3000 + 
+                  advantageCount * 2000 + 
+                  equalCount * 500 + 
+                  disadvantageCount * (-1000);
     }
   } else if (props.selectedAttribute === '対無' || props.selectedAttribute === '対無属性') {
     // 対無: vsmudamageでソート
     const result = damageDataList.sort((a, b) => b.vsmudamage - a.vsmudamage);
     for (let j = 0; j < 5; j++) {
-      for (let k = 2 * j; k < 2 * j + 2; k++) {
-        for (let l = j; l < 5; l++) {
-          if (!result[k]) continue;
-          
-          if (result[k].duoMagic === 'デュオ魔法') {
-            scores[l] += 3000;
-          }
-          scores[l] += result[k].vsmudamage;
-          scores[l] += 500;
+      let totalDamage = 0;
+      let duoCount = 0;
+      let advantageCount = 0;
+      let equalCount = 0;
+      let disadvantageCount = 0;
+      
+      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
+        if (!result[k]) continue;
+        
+        totalDamage += result[k].vsmudamage;
+        
+        if (result[k].duoMagic === 'デュオ魔法') {
+          duoCount++;
         }
+        // 対無の場合は全て等倍
+        equalCount++;
       }
+      
+      // calcBASICと同じ計算式
+      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
+                  duoCount * 3000 + 
+                  advantageCount * 2000 + 
+                  equalCount * 500 + 
+                  disadvantageCount * (-1000);
     }
   }
   
@@ -304,11 +369,11 @@ const scoreBase = computed(() => {
 
 // 各難易度のスコア計算（EXTRAの3T,4Tのみ）
 const extraScores = computed(() => [
-  scoreBase.value[0] * 0.216,
-  scoreBase.value[1] * 0.207,
-  scoreBase.value[2] * 0.198,
-  scoreBase.value[3] * 0.189,
-  scoreBase.value[4] * 0.15
+  scoreBase.value[0] * 0.144 * 1.5,
+  scoreBase.value[1] * 0.138 * 1.5,
+  scoreBase.value[2] * 0.132 * 1.5,
+  scoreBase.value[3] * 0.126 * 1.5,
+  scoreBase.value[4] * 0.1 * 1.5
 ]);
 
 // 数値フォーマット

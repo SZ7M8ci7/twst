@@ -343,10 +343,17 @@ const magicLevelOptions = Array.from({length: 10}, (_, i) => i + 1);
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 4px;
   padding: 8px;
+  background-color: rgba(0, 0, 0, 0.03);
 }
 .buddy-item {
   border: 1px solid rgba(0, 0, 0, 0.12);
   border-radius: 4px;
   padding: 8px;
+}
+
+/* ダークモード対応 */
+:deep(.v-theme--dark) .buff-item {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 </style> 
