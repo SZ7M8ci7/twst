@@ -160,7 +160,8 @@ const sortOptions = [
   { text: 'HPバディ数（デッキ）', value: 'deckHPBuddyCount' },
   { text: 'バディ数（デッキ）', value: 'deckBuddyCount' },
   { text: 'バディ増加HP最低値', value: 'minBuddyHPIncrease' },
-  { text: 'DUO数', value: 'duoCount' }
+  { text: 'DUO数', value: 'duoCount' },
+  { text: 'DUO相手', value: 'duoPartner' }
 ];
 
 const sortOrderOptions = [
@@ -171,10 +172,10 @@ const sortOrderOptions = [
 // ソート設定の保存と監視
 watch(sortBy, (newValue, oldValue) => {
   localStorage.setItem('simCharaModal_sortBy', newValue);
-  // 新しい項目を選択した場合のみ、デフォルト順以外は降順を初期値にする
-  if (newValue !== oldValue && newValue !== 'default') {
+  // 新しい項目を選択した場合のみ、デフォルト順とDUO相手以外は降順を初期値にする
+  if (newValue !== oldValue && newValue !== 'default' && newValue !== 'duoPartner') {
     sortOrder.value = 'desc';
-  } else if (newValue === 'default') {
+  } else if (newValue === 'default' || newValue === 'duoPartner') {
     sortOrder.value = 'asc';
   }
   sortUpdateCounter.value++; // ソート更新を強制
@@ -190,7 +191,7 @@ if (!localStorage.getItem('simCharaModal_sortBy')) {
   // 初回アクセス時のデフォルト値
   sortBy.value = 'default';
   sortOrder.value = 'asc';
-} else if (sortBy.value !== 'default' && !localStorage.getItem('simCharaModal_sortOrder')) {
+} else if (sortBy.value !== 'default' && sortBy.value !== 'duoPartner' && !localStorage.getItem('simCharaModal_sortOrder')) {
   // ソートキーは保存されているが順序が保存されていない場合（バージョンアップ対応）
   sortOrder.value = 'desc';
 }
@@ -1053,9 +1054,9 @@ const updateFilteredCharacters = async () => {
     return true;
   })];
 
-  // 最適化されたデータ構造を取得 (デフォルトソートの場合のみ必要)
+  // 最適化されたデータ構造を取得 (デフォルトソートとDUO相手ソートの場合に必要)
   let dataStructures = null;
-  if (currentSortBy === 'default') {
+  if (currentSortBy === 'default' || currentSortBy === 'duoPartner') {
     dataStructures = optimizedDataStructures.value;
   }
 
@@ -1117,6 +1118,14 @@ const updateFilteredCharacters = async () => {
           aValue = a.atk || 0;
           bValue = b.atk || 0;
           break;
+        case 'duoPartner': {
+          // DUO相手の名前をデフォルト順（characterDataのインデックス）でソート
+          const aIndex = a.duo ? (dataStructures.characterIndexMap.get(a.duo) ?? 999999) : 999999;
+          const bIndex = b.duo ? (dataStructures.characterIndexMap.get(b.duo) ?? 999999) : 999999;
+          aValue = aIndex;
+          bValue = bIndex;
+          break;
+        }
         case 'effectiveCardHP':
           // カード単体の計算では、置き換え対象のキャラクターを除外
           aValue = calculateEffectiveCardHP(a, getOptimizedMemberNameSet(null, props.charaIndex));
@@ -1199,6 +1208,8 @@ function getDisplayText(character) {
       return character.hp || 0;
     case 'atk':
       return character.atk || 0;
+    case 'duoPartner':
+      return character.duo || 'なし';
     case 'effectiveCardHP': {
       const effectiveHP = calculateEffectiveCardHP(character, getOptimizedMemberNameSet(null, props.charaIndex));
       const roundedHP = Math.round(effectiveHP);
