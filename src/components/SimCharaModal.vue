@@ -98,6 +98,19 @@
                   <v-icon size="24" color="grey">mdi-image</v-icon>
                 </div>
               </div>
+              <!-- デュオ相手のアイコン -->
+              <div 
+                v-if="character.duo && getDuoIconSync(character.duo)" 
+                class="modal-duo-icon-container"
+                :class="{ 'duo-active': isDuoActive(character) }"
+                :title="isDuoActive(character) ? `DUO: ${character.duo} (有効)` : `DUO: ${character.duo} (無効)`"
+              >
+                <img 
+                  :src="getDuoIconSync(character.duo)" 
+                  alt="Duo Partner" 
+                  class="modal-duo-icon"
+                />
+              </div>
             </div>
             <div class="character-name">{{ getDisplayText(character) }}</div>
           </div>
@@ -117,6 +130,7 @@ import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.png';
 import FilterModal from '@/components/FilterModal.vue';
 import characterData from '@/assets/characters_info.json';
+import charactersInfo from '@/assets/characters_info.json';
 
 // characterDataの高速検索用Mapを事前に作成
 const characterDataMap = new Map();
@@ -125,6 +139,71 @@ characterData.forEach(char => {
   characterDataMap.set(char.name_en, char);
 });
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict } from '@/utils/calculations';
+
+// characters_info.jsonから日本語名から英語名への変換マップを動的に生成
+const jpName2enName = charactersInfo.reduce((map, character) => {
+  map[character.name_ja] = character.name_en;
+  return map;
+}, {});
+
+// デュオアイコンのキャッシュ
+const duoIconCache = ref({});
+
+// デュオアイコンを取得する関数
+const getDuoIcon = async (duoCharaName) => {
+  if (!duoCharaName) return null;
+  
+  // キャッシュされている場合は返す
+  if (duoIconCache.value[duoCharaName]) {
+    return duoIconCache.value[duoCharaName];
+  }
+  
+  // 日本語名を英語名に変換
+  const enName = jpName2enName[duoCharaName];
+  if (!enName) return null;
+  
+  try {
+    // 動的インポートを使用してアイコンを取得
+    const module = await import(`@/assets/img/icon/${enName}.png`);
+    duoIconCache.value[duoCharaName] = module.default;
+    return module.default;
+  } catch (error) {
+    duoIconCache.value[duoCharaName] = defaultImg;
+    return defaultImg;
+  }
+};
+
+// デュオアイコンの同期版（テンプレートで使用）
+const getDuoIconSync = (duoCharaName) => {
+  if (!duoCharaName) return null;
+  
+  // 非同期で読み込みを開始（キャッシュされていない場合）
+  if (!duoIconCache.value[duoCharaName]) {
+    getDuoIcon(duoCharaName);
+  }
+  
+  return duoIconCache.value[duoCharaName] || null;
+};
+
+// デュオが有効かどうか判定する関数
+const isDuoActive = (character) => {
+  if (!character || !character.duo) return false;
+  
+  // 入れ替え対象のキャラクターを除外した仮想デッキを作成
+  const virtualDeck = [];
+  deckCharacters.value.forEach((deckChar, index) => {
+    // 入れ替え対象のインデックスをスキップ
+    if (index !== props.charaIndex && deckChar.chara) {
+      virtualDeck.push(deckChar.chara);
+    }
+  });
+  
+  // 候補キャラクターを仮想デッキに追加
+  virtualDeck.push(character.chara);
+  
+  // デュオ相手が仮想デッキに含まれているかチェック
+  return virtualDeck.includes(character.duo);
+};
 
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
@@ -1685,6 +1764,48 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* デュオアイコンのスタイル */
+.modal-duo-icon-container {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 14px;
+  height: 14px;
+  border-radius: 10%;
+  border: 1px solid #fff;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+/* デュオが有効な場合のスタイル */
+.modal-duo-icon-container.duo-active {
+  border-color: #ff0000;
+  background-color: #E8F5E8;
+}
+
+/* デュオが無効な場合のスタイル */
+.modal-duo-icon-container:not(.duo-active) {
+  border-color: #999;
+  background-color: #f5f5f5;
+}
+
+.modal-duo-icon-container:not(.duo-active) .modal-duo-icon {
+  filter: grayscale(100%);
+  opacity: 0.7;
+}
+
+/* デュオアイコン画像 */
+.modal-duo-icon {
+  width: 12px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 10%;
 }
 
 </style>
