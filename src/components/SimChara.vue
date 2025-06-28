@@ -208,7 +208,7 @@ const selectCharaImage = (chara) => {
     // バフと回復の自動設定
     const buffValue = chara[`${magicKey}buf`];
     const healValue = chara[`${magicKey}heal`];
-
+    
     // バフの追加
     if (buffValue) {
       const buffType = buffValue.includes('ATKUP') ? 'ATKUP' :
@@ -224,6 +224,29 @@ const selectCharaImage = (chara) => {
           levelOption: buffType === 'クリティカル' ? 1 : 10 // クリティカルはレベル無効
         };
         initialSettings.buffs.push(buff);
+      }
+    }
+    
+    // etcフィールドから被ダメージUPの相手対象をチェック
+    if (chara.etc) {
+      const etcEffects = chara.etc.split(',').map(effect => effect.trim());
+      
+      // 該当する魔法番号を含む効果をフィルタリング
+      const magicEffects = etcEffects.filter(effect => effect.includes(`(M${i})`));
+      
+      // 被ダメージUPで相手対象のものを探す
+      for (const effect of magicEffects) {
+        if (effect.includes('被ダメージUP') && effect.includes('相手')) {
+          // 被ダメージUPのバフを追加
+          const buff = {
+            magicOption: `M${i}`,
+            buffOption: 'ダメージUP',
+            powerOption: getPowerOption(effect),
+            levelOption: 10
+          };
+          initialSettings.buffs.push(buff);
+          break; // 同じ魔法で複数の被ダメージUPはないはずなので最初の1つで終了
+        }
       }
     }
     
