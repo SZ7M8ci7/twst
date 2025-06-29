@@ -335,10 +335,10 @@ const getPowerOption = (buffString) => {
   
   // 通常のバフ形式の確認
   if (buffString.includes('極小')) return '極小';
+  if (buffString.includes('極大')) return '極大';
   if (buffString.includes('小')) return '小';
   if (buffString.includes('中')) return '中';
   if (buffString.includes('大')) return '大';
-  if (buffString.includes('極大')) return '極大';
   
   return '中'; // デフォルト値
 };
