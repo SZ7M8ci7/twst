@@ -140,6 +140,11 @@ characterData.forEach(char => {
 });
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict } from '@/utils/calculations';
 
+// セッション内でのみ有効なソート設定（モジュールレベルで定義）
+let sessionSortBy = null;
+let sessionSortOrder = null;
+let userHasModifiedSort = false;
+
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
 const jpName2enName = charactersInfo.reduce((map, character) => {
   map[character.name_ja] = character.name_en;
@@ -990,11 +995,6 @@ const emit = defineEmits(['close', 'select']);
 // 最適化されたデータ構造の遅延初期化
 let _optimizedDataStructuresCache = null;
 let _optimizedDataStructuresInitialized = false;
-
-// セッション内でのみ有効なソート設定
-let sessionSortBy = null;
-let sessionSortOrder = null;
-let userHasModifiedSort = false;
 
 // 最適化されたデータ構造：高速ルックアップテーブル
 const optimizedDataStructures = computed(() => {
