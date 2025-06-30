@@ -140,10 +140,6 @@ characterData.forEach(char => {
 });
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict } from '@/utils/calculations';
 
-// セッション内でのみ有効なソート設定（モジュールレベルで定義）
-let sessionSortBy = null;
-let sessionSortOrder = null;
-let userHasModifiedSort = false;
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
 const jpName2enName = charactersInfo.reduce((map, character) => {
@@ -224,9 +220,8 @@ const activeTab = ref('filter');
 // 展開状態
 const isExpanded = ref(false);
 
-// ソート設定（セッションベース）
-const sortBy = ref(userHasModifiedSort && sessionSortBy ? sessionSortBy : 'default');
-const sortOrder = ref(userHasModifiedSort && sessionSortOrder ? sessionSortOrder : 'asc');
+// ソート設定（ストアから取得）
+const { sortBy, sortOrder } = storeToRefs(filterdStore);
 
 // ソート更新を強制するためのリアクティブカウンター
 const sortUpdateCounter = ref(0);
@@ -255,9 +250,11 @@ const sortOrderOptions = [
 
 // ソート設定の保存と監視
 watch(sortBy, (newValue, oldValue) => {
-  // セッションに保存
-  sessionSortBy = newValue;
-  userHasModifiedSort = true;
+  // 値が実際に変更された場合、ユーザーが変更したとマーク
+  if (newValue !== oldValue) {
+    filterdStore.markSortAsModified();
+    filterdStore.saveCurrentSortState();
+  }
   
   // 新しい項目を選択した場合のみ、デフォルト順とDUO相手以外は降順を初期値にする
   if (newValue !== oldValue && newValue !== 'default' && newValue !== 'duoPartner') {
@@ -268,17 +265,17 @@ watch(sortBy, (newValue, oldValue) => {
   sortUpdateCounter.value++; // ソート更新を強制
 });
 
-watch(sortOrder, (newValue) => {
-  // セッションに保存
-  sessionSortOrder = newValue;
-  userHasModifiedSort = true;
+watch(sortOrder, (newValue, oldValue) => {
+  // 値が実際に変更された場合、ユーザーが変更したとマーク
+  if (newValue !== oldValue) {
+    filterdStore.markSortAsModified();
+    filterdStore.saveCurrentSortState();
+  }
   
   sortUpdateCounter.value++; // ソート更新を強制
 });
 
-// 初期値設定：セッションに保存された設定を使用
-// ユーザーが変更していない場合は、watchが実行されないので
-// デフォルト値（'default', 'asc'）がそのまま使われる
+// ソート設定はストアから自動的に復元される
 
 // 計算関数（calculations.tsの定数を使用）
 function calcHPBuddyRate(status, level = 10) {
