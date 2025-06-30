@@ -219,9 +219,9 @@ const activeTab = ref('filter');
 // 展開状態
 const isExpanded = ref(false);
 
-// ソート設定（保存機能付き）
-const sortBy = ref(localStorage.getItem('simCharaModal_sortBy') || 'default');
-const sortOrder = ref(localStorage.getItem('simCharaModal_sortOrder') || 'asc');
+// ソート設定（セッションベース）
+const sortBy = ref(userHasModifiedSort && sessionSortBy ? sessionSortBy : 'default');
+const sortOrder = ref(userHasModifiedSort && sessionSortOrder ? sessionSortOrder : 'asc');
 
 // ソート更新を強制するためのリアクティブカウンター
 const sortUpdateCounter = ref(0);
@@ -250,7 +250,10 @@ const sortOrderOptions = [
 
 // ソート設定の保存と監視
 watch(sortBy, (newValue, oldValue) => {
-  localStorage.setItem('simCharaModal_sortBy', newValue);
+  // セッションに保存
+  sessionSortBy = newValue;
+  userHasModifiedSort = true;
+  
   // 新しい項目を選択した場合のみ、デフォルト順とDUO相手以外は降順を初期値にする
   if (newValue !== oldValue && newValue !== 'default' && newValue !== 'duoPartner') {
     sortOrder.value = 'desc';
@@ -261,19 +264,16 @@ watch(sortBy, (newValue, oldValue) => {
 });
 
 watch(sortOrder, (newValue) => {
-  localStorage.setItem('simCharaModal_sortOrder', newValue);
+  // セッションに保存
+  sessionSortOrder = newValue;
+  userHasModifiedSort = true;
+  
   sortUpdateCounter.value++; // ソート更新を強制
 });
 
-// 初期値設定：保存された設定がない場合のデフォルト値
-if (!localStorage.getItem('simCharaModal_sortBy')) {
-  // 初回アクセス時のデフォルト値
-  sortBy.value = 'default';
-  sortOrder.value = 'asc';
-} else if (sortBy.value !== 'default' && sortBy.value !== 'duoPartner' && !localStorage.getItem('simCharaModal_sortOrder')) {
-  // ソートキーは保存されているが順序が保存されていない場合（バージョンアップ対応）
-  sortOrder.value = 'desc';
-}
+// 初期値設定：セッションに保存された設定を使用
+// ユーザーが変更していない場合は、watchが実行されないので
+// デフォルト値（'default', 'asc'）がそのまま使われる
 
 // 計算関数（calculations.tsの定数を使用）
 function calcHPBuddyRate(status, level = 10) {
@@ -991,6 +991,11 @@ const emit = defineEmits(['close', 'select']);
 let _optimizedDataStructuresCache = null;
 let _optimizedDataStructuresInitialized = false;
 
+// セッション内でのみ有効なソート設定
+let sessionSortBy = null;
+let sessionSortOrder = null;
+let userHasModifiedSort = false;
+
 // 最適化されたデータ構造：高速ルックアップテーブル
 const optimizedDataStructures = computed(() => {
   // キャッシュが既に存在する場合は返す
@@ -1446,17 +1451,19 @@ watch(filteredCharacters, () => {
 
 // モーダル初期化時にフィルター状態を設定
 const initializeModalFilter = () => {
-  // 保存された状態がない場合のみSSRデフォルト設定を適用
-  if (filterdStore.isFirst) {
-    // フィルター状態をSSRのみに設定
+  // セッション内でユーザーが変更していない場合は、デフォルトのSSR表示
+  if (!filterdStore.isFirst) {
+    // ユーザーが既にフィルターを変更済みの場合は、その状態が自動的に復元される
+    // （filterdStoreの初期化時に自動的にロードされる）
+  } else {
+    // 初回またはユーザーが未変更の場合は、SSRのみのデフォルト設定
     filterdStore.tempSelectedCharacters = characterData.map(student => student.name_en);
     filterdStore.tempSelectedRare = ['SSR']; // SSRのみ
     filterdStore.tempSelectedType = ['バランス', 'ディフェンス', 'アタック'];
     filterdStore.tempSelectedAttr = ['火', '水', '木', '無'];
     filterdStore.tempSelectedEffects = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
     
-    // localStorage に保存
-    filterdStore.saveCurrentState();
+    // 初回表示フラグをfalseに設定（ただし、保存はしない）
     filterdStore.isFirst = false;
   }
   
@@ -1467,44 +1474,25 @@ const initializeModalFilter = () => {
   const selectedCharactersSet = new Set(filterdStore.tempSelectedCharacters);
   const allEffectsSelected = filterdStore.tempSelectedEffects.length === 17;
   
-  // SSRキャラクターのみをまず抽出
-  const ssrCharacters = [];
-  const nonSsrCharacters = [];
-  
-  for (let i = 0; i < characters.value.length; i++) {
-    const character = characters.value[i];
-    if (character.rare === 'SSR') {
-      ssrCharacters.push(character);
-    } else {
-      nonSsrCharacters.push(character);
-    }
-  }
-  
   // 変更が必要なもののみ更新
   const updatesNeeded = [];
   
-  // 非SSRキャラクターで visible=true になっているもののみ更新対象に
-  for (let i = 0; i < nonSsrCharacters.length; i++) {
-    const character = nonSsrCharacters[i];
-    if (character.visible !== false) {
-      updatesNeeded.push({ character, newValue: false });
-    }
-  }
-  
-  // SSRキャラクターの詳細フィルタリング結果を収集
-  for (let i = 0; i < ssrCharacters.length; i++) {
-    const character = ssrCharacters[i];
+  // 全キャラクターの詳細フィルタリング結果を収集
+  for (let i = 0; i < characters.value.length; i++) {
+    const character = characters.value[i];
     let shouldBeVisible = false;
     
-    // キャラクターチェック
-    const characterInfo = characterDataMap.get(character.chara);
-    if (characterInfo && selectedCharactersSet.has(characterInfo.name_en)) {
-      // タイプチェック
-      if (selectedTypeSet.has(character.attr)) {
-        // 属性チェック
-        if (selectedAttrSet.has(character.magic1atr) ||
-            selectedAttrSet.has(character.magic2atr) ||
-            selectedAttrSet.has(character.magic3atr)) {
+    // レア度チェック
+    if (selectedRareSet.has(character.rare)) {
+      // キャラクターチェック
+      const characterInfo = characterDataMap.get(character.chara);
+      if (characterInfo && selectedCharactersSet.has(characterInfo.name_en)) {
+        // タイプチェック
+        if (selectedTypeSet.has(character.attr)) {
+          // 属性チェック
+          if (selectedAttrSet.has(character.magic1atr) ||
+              selectedAttrSet.has(character.magic2atr) ||
+              selectedAttrSet.has(character.magic3atr)) {
           
           // 効果チェック
           if (allEffectsSelected) {
@@ -1516,6 +1504,7 @@ const initializeModalFilter = () => {
                 break;
               }
             }
+          }
           }
         }
       }

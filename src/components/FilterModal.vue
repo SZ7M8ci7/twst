@@ -215,7 +215,10 @@ onMounted(async () => {
       tempSelectedAttr.value = [...selectedAttr.value];
       tempSelectedEffects.value = [...selectedEffects.value];
       
-      // localStorage に永続化
+      // ユーザーがフィルターを変更したことを記録
+      filterdStore.markFilterAsModified();
+      
+      // セッション内での永続化
       filterdStore.saveCurrentState();
       
       updateCharacterVisibility();
@@ -235,7 +238,10 @@ function applyFilter() {
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
 
-  // localStorage に永続化
+  // ユーザーがフィルターを変更したことを記録
+  filterdStore.markFilterAsModified();
+  
+  // セッション内での永続化
   filterdStore.saveCurrentState();
 
   updateCharacterVisibility();

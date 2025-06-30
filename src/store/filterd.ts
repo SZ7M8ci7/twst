@@ -11,29 +11,23 @@ interface FilterState {
   selectedEffects: string[];
 }
 
-// localStorageキー
-const FILTER_STORAGE_KEY = 'twstSimulatorFilterState';
+// セッション内でのみ有効なフィルター状態（メモリ内管理）
+let sessionFilterState: FilterState | null = null;
+let userHasModifiedFilter = false;
 
-// フィルター状態をlocalStorageから読み込む
+// フィルター状態をセッションから読み込む
 function loadFilterState(): FilterState | null {
-  try {
-    const stored = localStorage.getItem(FILTER_STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-  } catch (error) {
-    console.warn('Failed to load filter state from localStorage:', error);
+  // ユーザーが明示的にフィルターを変更した場合のみ、セッション内の状態を返す
+  if (userHasModifiedFilter && sessionFilterState) {
+    return sessionFilterState;
   }
   return null;
 }
 
-// フィルター状態をlocalStorageに保存
+// フィルター状態をセッションに保存
 function saveFilterState(state: FilterState): void {
-  try {
-    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.warn('Failed to save filter state to localStorage:', error);
-  }
+  sessionFilterState = state;
+  userHasModifiedFilter = true;
 }
 
 export const useFilterdStore = defineStore('filterd', () => {
@@ -68,12 +62,14 @@ export const useFilterdStore = defineStore('filterd', () => {
     tempSelectedEffects.value = [];
     isFirst.value = true;
     
-    // localStorageからも削除
-    try {
-      localStorage.removeItem(FILTER_STORAGE_KEY);
-    } catch (error) {
-      console.warn('Failed to remove filter state from localStorage:', error);
-    }
+    // セッション状態もリセット
+    sessionFilterState = null;
+    userHasModifiedFilter = false;
+  }
+  
+  // ユーザーがフィルターを変更したことを記録する関数
+  function markFilterAsModified() {
+    userHasModifiedFilter = true;
   }
 
   return {
@@ -85,5 +81,6 @@ export const useFilterdStore = defineStore('filterd', () => {
     tempSelectedEffects,
     saveCurrentState,
     resetFilterState,
+    markFilterAsModified,
   };
 });
