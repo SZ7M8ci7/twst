@@ -208,7 +208,7 @@ function calculateAttributeCompatibility() {
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const magicAttribute = char[`magic${i}Attribute`];
         
         if (selectedAttribute === '対全') {

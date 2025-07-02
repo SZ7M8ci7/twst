@@ -290,7 +290,7 @@ function calculateBuffCount(): number {
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
         const effects = etcContent.split(',').map((effect: string) => effect.trim());
@@ -327,7 +327,7 @@ function calculateHealBlockCount(): number {
     if (!char || !char.name || char.name === '' || char.name === 'なし') continue;
     
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
         const effects = etcContent.split(',').map((effect: string) => effect.trim());
@@ -366,7 +366,7 @@ function calculateAttackCounts() {
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const magicAttribute = char[`magic${i}Attribute`];
         const magicPower = char[`magic${i}Power`];
         

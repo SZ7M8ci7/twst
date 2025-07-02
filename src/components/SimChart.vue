@@ -98,9 +98,10 @@ function createChart() {
         stack: `Stack ${element}${magicType}`,
         backgroundColor: simulatorStore.deckCharacters.map((char) => {
           const isMagicSelected = char[`isM${magicNumber}Selected` as keyof typeof char];
-          // 選択されていない魔法は透明度を下げる
+          const isMagicValid = simulatorStore.isMagicValidForRarity(char, magicNumber);
+          // 選択されていない魔法やレア度により無効な魔法は透明度を下げる
           const baseColor = stackColors[element];
-          if (!isMagicSelected) {
+          if (!isMagicSelected || !isMagicValid) {
             // RGBAの透明度を0.2に変更（より薄く）
             return baseColor.replace(/[\d.]+\)$/, '0.2)');
           }
@@ -109,8 +110,9 @@ function createChart() {
         // 各キャラクターの指定された魔法タイプと属性のダメージを取得
         data: simulatorStore.deckCharacters.map((char) => {
           const damageDetails = char[`magic${magicNumber}DamageDetails`];
-          // 選択されていない魔法も表示（ダメージ詳細がある場合は表示）
-          if (!damageDetails) {
+          const isMagicValid = simulatorStore.isMagicValidForRarity(char, magicNumber);
+          // レア度により無効な魔法は0にする
+          if (!damageDetails || !isMagicValid) {
             return 0;
           }
           

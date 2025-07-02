@@ -152,6 +152,18 @@ export const useSimulatorStore = defineStore('simulator', () => {
       character.magic2Power = character.magic2pow || '連撃(強)';
     }
   }
+
+  // レア度に応じてマジックが有効かどうかを判定するヘルパー関数
+  function isMagicValidForRarity(character: Character, magicIndex: number): boolean {
+    if (!character || !character.rare) return true;
+    
+    // R、SRの場合はM3を無効
+    if ((character.rare === 'R' || character.rare === 'SR') && magicIndex === 3) {
+      return false;
+    }
+    
+    return true;
+  }
   
   const recalculateStats = debounce(async () => {
     if (isCalculating.value) {
@@ -210,6 +222,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
     level: char.level,
     hp: char.hp,
     atk: char.atk,
+    rare: char.rare,
     isM1Selected: char.isM1Selected,
     isM2Selected: char.isM2Selected,
     isM3Selected: char.isM3Selected,
@@ -229,6 +242,19 @@ export const useSimulatorStore = defineStore('simulator', () => {
     buddy2Lv: char.buddy2Lv,
     buddy3Lv: char.buddy3Lv
   })), (newVal, oldVal) => {
+    // レア度変更によるM3の自動無効化をチェック
+    if (oldVal) {
+      newVal.forEach((newChar, index) => {
+        const oldChar = oldVal[index];
+        if (oldChar && newChar.rare !== oldChar.rare) {
+          // レア度が変更された場合、R/SRならM3を無効化
+          if ((newChar.rare === 'R' || newChar.rare === 'SR') && deckCharacters[index].isM3Selected) {
+            deckCharacters[index].isM3Selected = false;
+          }
+        }
+      });
+    }
+    
     // Only recalculate if something actually changed
     if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
       recalculateStats();
@@ -497,7 +523,8 @@ export const useSimulatorStore = defineStore('simulator', () => {
     isInitialized,
     isDeckStatsReady,
     waitForDeckStats,
-    getSafeDeckDamage
+    getSafeDeckDamage,
+    isMagicValidForRarity
   };
 });
 

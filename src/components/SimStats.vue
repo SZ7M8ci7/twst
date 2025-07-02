@@ -110,7 +110,7 @@ const damageList = computed(() => {
   simulatorStore.deckCharacters.forEach((char) => {
     // 各キャラクターの選択されたマジックのダメージを収集
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const damageDetails = char[`magic${i}DamageDetails`];
         const damage = getAttributeDamage(damageDetails);
         if (damage > 0) {
@@ -173,7 +173,7 @@ const scoreBase = computed(() => {
   const damageDataList: any[] = [];
   simulatorStore.deckCharacters.forEach((char) => {
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const damageDetails = char[`magic${i}DamageDetails`];
         if (damageDetails) {
           const magicAttribute = char[`magic${i}Attribute`];

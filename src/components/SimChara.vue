@@ -47,8 +47,8 @@
             </div>
           </div>
         </v-col>
-        <v-col cols="5">
-          <div v-for="index in 3" :key="index" class="stat">
+        <v-col cols="5" style="margin-top: 2px;">
+          <div v-for="index in getMagicCount()" :key="index" class="stat">
             <v-row dense>
               <v-col cols="2">
                 <button :class="{'mbutton': true, 'selected': simulatorStore.deckCharacters[props.charaIndex][`isM${index}Selected`], 'shake': shakingStates[`isM${index}Shaking`]}" @click="toggleM(index)">M{{ index }}</button>
@@ -132,11 +132,9 @@ import MagicDropdown from './MagicDropdown.vue';
 import BuffDropdown from './BuffDropdown.vue';
 import SimCharaDetailModal from './SimCharaDetailModal.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { useCharacterStore } from '@/store/characters';
 import charactersInfo from '@/assets/characters_info.json';
 
 const simulatorStore = useSimulatorStore();
-// const characterStore = useCharacterStore();
 
 
 const imgpath = ref(defaultImg);
@@ -575,9 +573,15 @@ watch(() => simulatorStore.deckCharacters[props.charaIndex]?.duo, (newDuo) => {
 
 // 選択されている M ボタンの数をカウントする
 const selectedCount = () => {
-  return [simulatorStore.deckCharacters[props.charaIndex].isM1Selected,
-   simulatorStore.deckCharacters[props.charaIndex].isM2Selected,
-    simulatorStore.deckCharacters[props.charaIndex].isM3Selected].filter(Boolean).length;
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  const magicCount = getMagicCount();
+  
+  const selections = [character.isM1Selected, character.isM2Selected];
+  if (magicCount >= 3) {
+    selections.push(character.isM3Selected);
+  }
+  
+  return selections.filter(Boolean).length;
 };
 
 // 揺れアニメーションの開始
@@ -593,6 +597,12 @@ const startShaking = (shakingKey) => {
 const toggleM = (index) => {
   const selectedKey = `isM${index}Selected`;
   const shakingKey = `isM${index}Shaking`;
+  const magicCount = getMagicCount();
+
+  // R/SRの場合、M3は選択不可
+  if (index > magicCount) {
+    return;
+  }
 
   if (simulatorStore.deckCharacters[props.charaIndex][selectedKey] || selectedCount() < 2) {
     simulatorStore.deckCharacters[props.charaIndex][selectedKey] = !simulatorStore.deckCharacters[props.charaIndex][selectedKey];
@@ -606,6 +616,15 @@ const toggleM = (index) => {
 // 最大レベルを取得する関数
 const getMaxLevel = (rare) => {
   return levelDict[rare] || 110;
+};
+
+// レア度に応じて表示するマジックの数を取得
+const getMagicCount = () => {
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  if (!character || !character.rare) return 3;
+  
+  // R、SRの場合は2つまで、SSRの場合は3つ
+  return (character.rare === 'R' || character.rare === 'SR') ? 2 : 3;
 };
 
 // レベル入力のハンドラー
@@ -647,6 +666,19 @@ watch(() => simulatorStore.deckCharacters[props.charaIndex]?.chara, (newChara) =
   } else {
     imgpath.value = defaultImg;
     isBonusSelected.value = false;
+  }
+}, { immediate: true });
+
+// レア度の変更を監視してM3の状態を調整
+watch(() => simulatorStore.deckCharacters[props.charaIndex]?.rare, (newRare) => {
+  if (newRare) {
+    const character = simulatorStore.deckCharacters[props.charaIndex];
+    // R/SRの場合、M3を無効化
+    if (newRare === 'R' || newRare === 'SR') {
+      character.isM3Selected = false;
+      // ステータス再計算
+      simulatorStore.calculateAllStats();
+    }
   }
 }, { immediate: true });
 
@@ -820,6 +852,12 @@ select {
   border-radius: 5px;
   border: 1px solid #ccc;
   cursor: pointer;
+}
+
+/* mbuttonを含むdense rowの左パディングを調整 */
+:deep(.v-row--dense > .v-col),
+:deep(.v-row--dense > [class*=v-col-]) {
+  padding-left: 1px;
 }
 
 .mbutton.shake {

@@ -247,7 +247,7 @@ function calculateEvasionCount(): number {
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
         const effects = etcContent.split('<br>').map((effect: string) => effect.trim());
@@ -285,7 +285,7 @@ function calculateDebuffCount(): number {
     if (!char || !char.name || char.name === '' || char.name === 'なし') return;
     
     for (let i = 1; i <= 3; i++) {
-      if (char[`isM${i}Selected`]) {
+      if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
         const effects = etcContent.split(',').map((effect: string) => effect.trim());
