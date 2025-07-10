@@ -122,4 +122,15 @@ const router = createRouter({
   routes,
 })
 
+// Google Analytics tracking for route changes
+router.afterEach((to) => {
+  // Check if gtag is available (Google Analytics loaded)
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('config', 'G-4RSRD920TZ', {
+      page_path: to.fullPath,
+      page_title: to.name as string || document.title,
+    })
+  }
+})
+
 export default router
