@@ -94,6 +94,11 @@
         :title="$t('tool.handGacha')"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'handCollection'}">
+      <v-list-item
+        :title="$t('tool.handCollection')"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'data'}">
       <v-list-item
         :title="$t('tool.data')"

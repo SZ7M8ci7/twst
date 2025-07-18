@@ -9,7 +9,7 @@
             :class="{ active: activeTab === 'filter' }"
             @click="handleTabClick('filter')"
           >
-            <span>フィルター設定</span>
+            <span>フィルター</span>
             <v-icon>{{ activeTab === 'filter' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
           </div>
           <div 
@@ -17,8 +17,16 @@
             :class="{ active: activeTab === 'sort' }"
             @click="handleTabClick('sort')"
           >
-            <span>ソート設定</span>
+            <span>ソート</span>
             <v-icon>{{ activeTab === 'sort' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+          </div>
+          <div 
+            class="tab-item"
+            :class="{ active: activeTab === 'handCollection' }"
+            @click="handleTabClick('handCollection')"
+          >
+            <span>手持ち</span>
+            <v-icon>{{ activeTab === 'handCollection' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
           </div>
         </div>
         
@@ -60,6 +68,41 @@
                 </v-col>
               </v-row>
               
+            </div>
+            
+            <!-- 手持ち設定セクション -->
+            <div v-show="activeTab === 'handCollection'" class="hand-collection-content">
+              <v-row class="ma-0">
+                <v-col cols="12" class="pa-2">
+                  <div class="hand-collection-options">
+                    <v-switch
+                      v-model="handCollectionStore.useHandCollection"
+                      label="手持ちカードから選択"
+                      color="primary"
+                      hide-details
+                      inset
+                    />
+                    <div class="mt-2 text-caption text-grey">
+                      <template v-if="handCollectionStore.useHandCollection">
+                        所持しているカードのみ表示され、設定されたレベル・状態が適用されます
+                      </template>
+                      <template v-else>
+                        全てのカードが表示され、最大レベル・完凸状態が適用されます
+                      </template>
+                    </div>
+                    <div class="mt-3">
+                      <v-btn 
+                        :to="{ name: 'handCollection' }"
+                        variant="outlined"
+                        size="small"
+                        prepend-icon="mdi-cog"
+                      >
+                        手持ち設定を管理
+                      </v-btn>
+                    </div>
+                  </div>
+                </v-col>
+              </v-row>
             </div>
           </div>
         </v-expand-transition>
@@ -126,6 +169,7 @@ import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { useFilterdStore } from '@/store/filterd';
+import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.png';
 import FilterModal from '@/components/FilterModal.vue';
@@ -138,7 +182,7 @@ characterData.forEach(char => {
   characterDataMap.set(char.name_ja, char);
   characterDataMap.set(char.name_en, char);
 });
-import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict } from '@/utils/calculations';
+import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict, recalculateHP, recalculateATK } from '@/utils/calculations';
 
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
@@ -211,6 +255,7 @@ const { characters } = storeToRefs(characterStore);
 const simulatorStore = useSimulatorStore();
 const { deckCharacters } = storeToRefs(simulatorStore);
 const filterdStore = useFilterdStore();
+const handCollectionStore = useHandCollectionStore();
 
 const loadingImgUrl = ref(false);
 
@@ -307,10 +352,27 @@ function calcConHealRate(status, level = 10) {
 
 // キャラクター単体の実質HPを計算
 function calculateEffectiveCardHP(character, memberNameDict) {
-  // 計算の元となるHP
-  const characterHP = character.hp || 0;
   
-  // バディHP増加分（レベル10を仮定）
+  // 回復量（ATK基準）
+  let characterATK = character.atk || 0;
+  let characterHP = character.hp || 0;
+  let hasM3 = character.hasM3;
+  
+  if (handCollectionStore.useHandCollection) {
+    const handCard = handCollectionStore.getHandCard(character.name);
+    if (!handCard.isOwned) {
+      // 未所持の場合は計算しない
+      return 0;
+    }
+  
+    // 手持ちレベルに基づいてHP,ATKを再計算
+    characterHP = recalculateHP(character, Number(handCard.level), handCard.isLimitBreak);
+    characterATK = recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
+    // M3状況は手持ち設定から取得
+    hasM3 = handCard.isM3;
+  }
+  
+  // バディHP増加分
   let buddyHP = 0;
   if (memberNameDict[character.buddy1c]) {
     const rate = calcHPBuddyRate(character.buddy1s, 10);
@@ -324,29 +386,58 @@ function calculateEffectiveCardHP(character, memberNameDict) {
     const rate = calcHPBuddyRate(character.buddy3s, 10);
     buddyHP += characterHP * rate;
   }
-  
-  // 回復量（ATK基準、レベル10を仮定）
-  const characterATK = character.atk || 0;
+  // 回復量（ATK基準）
   const heal = (calcHealRate(character.magic1heal, 10) + 
                 calcHealRate(character.magic2heal, 10) + 
-                (character.hasM3 ? calcHealRate(character.magic3heal, 10) : 0)) * characterATK;
+                (hasM3 ? calcHealRate(character.magic3heal, 10) : 0)) * characterATK;
   
-  // 継続回復量（HP基準、レベル10を仮定）
+  // 継続回復量（HP基準）
   const conHeal = (calcConHealRate(character.magic1heal, 10) + 
                    calcConHealRate(character.magic2heal, 10) + 
-                   (character.hasM3 ? calcConHealRate(character.magic3heal, 10) : 0)) * characterHP;
+                   (hasM3 ? calcConHealRate(character.magic3heal, 10) : 0)) * characterHP;
   
   const totalHP = characterHP + buddyHP + heal + conHeal;
-  
-  
   return totalHP;
 }
 
+// ソート用のステータス値を取得（手持ち設定を考慮）
+function getStatForSort(character, statType) {
+  // 手持ち設定が有効な場合
+  if (handCollectionStore.useHandCollection) {
+    const handCard = handCollectionStore.getHandCard(character.name);
+    if (!handCard.isOwned) {
+      // 未所持の場合は0を返す（実質HPの計算と一貫性を保つ）
+      return 0;
+    }
+    // 手持ちレベルでステータスを再計算
+    if (statType === 'hp') {
+      return recalculateHP(character, Number(handCard.level), handCard.isLimitBreak);
+    } else if (statType === 'atk') {
+      return recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
+    }
+  }
+  // 手持ち設定が無効な場合はフルステータス
+  return character[statType] || 0;
+}
+
+
 // キャラクター単体の実質ATKを計算
 function calculateEffectiveCardATK(character, memberNameDict) {
-  const baseATK = character.atk || 0;
   
-  // バディATK増加分（レベル10を仮定）
+  let baseATK = character.atk || 0;
+  
+  if (handCollectionStore.useHandCollection) {
+    const handCard = handCollectionStore.getHandCard(character.name);
+    if (!handCard.isOwned) {
+      // 未所持の場合は計算しない
+      return 0;
+    }
+  
+    // 手持ちレベルに基づいてATKを再計算
+    baseATK = recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
+  }
+  
+  // バディATK増加分
   let buddyATK = 0;
   if (memberNameDict[character.buddy1c]) {
     buddyATK += baseATK * calcATKBuddyRate(character.buddy1s, 10);
@@ -397,8 +488,6 @@ function calculateDeckStats(candidateCharacter, sortKey) {
   let deckDuo = 0;
   let deckMinIncreasedHPBuddy = 99999;
   const deckReferenceDamageList = [];
-  
-  // 未使用の変数を削除
   
   // 軽量な統計計算のためのショートカット
   if (['deckHPBuddyCount', 'deckBuddyCount', 'duoCount'].includes(sortKey)) {
@@ -553,6 +642,25 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       recalculatedChara.duo = chara.duo || '';
       recalculatedChara.buffs = [];
       
+      // 元のフルステータス最大値を保存
+      recalculatedChara.originalMaxHP = chara.hp;
+      recalculatedChara.originalMaxATK = chara.atk;
+      
+      // 手持ち設定がONの場合、候補キャラクターのHP/ATKを手持ちレベルで再計算
+      if (handCollectionStore.useHandCollection) {
+        const handCard = handCollectionStore.getHandCard(chara.name);
+        if (handCard.isOwned) {
+          recalculatedChara.level = Number(handCard.level);
+          recalculatedChara.hasM3 = handCard.isM3;
+          recalculatedChara.hp = recalculateHP(chara, Number(handCard.level), handCard.isLimitBreak);
+          recalculatedChara.atk = recalculateATK(chara, Number(handCard.level), handCard.isLimitBreak);
+          recalculatedChara.isBonusSelected = handCard.isLimitBreak;
+        } else {
+          // 所持していない場合のhasM3設定を追加
+          recalculatedChara.hasM3 = false;
+        }
+      }
+      
       // 自動バフ設定
       for (let j = 1; j <= 3; j++) {
         const buffValue = chara[`magic${j}buf`];
@@ -597,7 +705,6 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     }
     
     // ダメージ計算は後でまとめて行う
-    
     recalculatedVirtualDeck.push(recalculatedChara);
   }
 
@@ -682,40 +789,65 @@ function calculateDeckStats(candidateCharacter, sortKey) {
   }
   
   // 再計算されたキャラクターデータを使用してHP・ヒール計算
-  recalculatedVirtualDeck.forEach((chara) => {
-    deckTotalHP += chara.hp || 0;
+  recalculatedVirtualDeck.forEach((chara, virtualIndex) => {
+    // virtualDeckIndexMapから元のdeckCharactersのインデックスを取得
+    const originalIndex = virtualDeckIndexMap[virtualIndex];
+    const isCandidate = originalIndex === -1; // -1は候補キャラクター
+    
+    // 候補キャラクターの場合のみ手持ち設定でHP,ATK再計算
+    let characterHP = chara.hp || 0;
+    let characterATK = chara.atk || 0;
+    let hasM3 = chara.hasM3;
+    let isOwned = true; // デッキキャラクターは手持ち設定に関係なく常に含む   
+    
+    if (handCollectionStore.useHandCollection && isCandidate) {
+      // 候補キャラクターのみ手持ち設定を適用
+      const handCard = handCollectionStore.getHandCard(chara.name);
+      isOwned = handCard.isOwned;
+      
+      if (isOwned) {
+        hasM3 = handCard.isM3;
+        characterHP = recalculateHP(chara, Number(handCard.level), handCard.isLimitBreak);
+        characterATK = recalculateATK(chara, Number(handCard.level), handCard.isLimitBreak);
+      } else {
+        hasM3 = false;
+      }
+    }
+    
+    deckTotalHP += characterHP;
     
     let increasedHP = 0;
     
-    // バディHP増加分計算（レベル10を仮定）
-    if (memberNameSet.has(chara.buddy1c)) {
+    // バディHP増加分計算
+    // デッキキャラクターは手持ち設定に関係なく計算に含む、候補キャラクターのみ所持チェック
+    if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy1c)) {
       deckTotalBuddy += 1;
       const hpRate = calcHPBuddyRate(chara.buddy1s, 10);
       if (hpRate !== 0) {
         deckTotalHPBuddy += 1;
-        const hpIncrease = chara.hp * hpRate;
+        const hpIncrease = characterHP * hpRate;
         deckTotalHP += hpIncrease;
         increasedHP += hpIncrease;
       }
     }
     
-    if (memberNameSet.has(chara.buddy2c)) {
+    if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy2c)) {
       deckTotalBuddy += 1;
       const hpRate = calcHPBuddyRate(chara.buddy2s, 10);
       if (hpRate !== 0) {
         deckTotalHPBuddy += 1;
-        const hpIncrease = chara.hp * hpRate;
+        const hpIncrease = characterHP * hpRate;
         deckTotalHP += hpIncrease;
         increasedHP += hpIncrease;
       }
     }
     
-    if (memberNameSet.has(chara.buddy3c)) {
+    if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy3c)) {
       deckTotalBuddy += 1;
       const hpRate = calcHPBuddyRate(chara.buddy3s, 10);
       if (hpRate !== 0) {
         deckTotalHPBuddy += 1;
-        const hpIncrease = chara.hp * hpRate;
+        const hpIncrease = characterHP * hpRate;
         deckTotalHP += hpIncrease;
         increasedHP += hpIncrease;
       }
@@ -728,17 +860,20 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     let hpConHeal = 0;
     
     // マジック選択状態を考慮した回復計算
-    if (chara.isM1Selected) {
-      hpHeal += calcHealRate(chara.magic1heal, 10) * chara.atk;
-      hpConHeal += calcConHealRate(chara.magic1heal, 10) * chara.hp;
-    }
-    if (chara.isM2Selected) {
-      hpHeal += calcHealRate(chara.magic2heal, 10) * chara.atk;
-      hpConHeal += calcConHealRate(chara.magic2heal, 10) * chara.hp;
-    }
-    if (chara.isM3Selected) {
-      hpHeal += calcHealRate(chara.magic3heal, 10) * chara.atk;
-      hpConHeal += calcConHealRate(chara.magic3heal, 10) * chara.hp;
+    // デッキキャラクターは手持ち設定に関係なく計算に含む、候補キャラクターのみ所持チェック
+    if (!isCandidate || isOwned) {
+      if (chara.isM1Selected) {
+        hpHeal += calcHealRate(chara.magic1heal, 10) * characterATK;
+        hpConHeal += calcConHealRate(chara.magic1heal, 10) * characterHP;
+      }
+      if (chara.isM2Selected) {
+        hpHeal += calcHealRate(chara.magic2heal, 10) * characterATK;
+        hpConHeal += calcConHealRate(chara.magic2heal, 10) * characterHP;
+      }
+      if (chara.isM3Selected && hasM3) {
+        hpHeal += calcHealRate(chara.magic3heal, 10) * characterATK;
+        hpConHeal += calcConHealRate(chara.magic3heal, 10) * characterHP;
+      }
     }
     
     deckTotalHeal += hpHeal + hpConHeal;
@@ -1132,6 +1267,14 @@ const updateFilteredCharacters = async () => {
     // visibleフラグをチェック（FilterModalから適用されたフィルター）
     if (!character.visible) return false;
     
+    // 手持ちコレクション設定をチェック
+    if (handCollectionStore.useHandCollection) {
+      // 手持ちモードの場合、所持していないカードを除外
+      if (!handCollectionStore.isCharacterOwned(character.name)) {
+        return false;
+      }
+    }
+    
     return true;
   })];
 
@@ -1192,12 +1335,10 @@ const updateFilteredCharacters = async () => {
           break;
         }
         case 'hp':
-          aValue = a.hp || 0;
-          bValue = b.hp || 0;
-          break;
         case 'atk':
-          aValue = a.atk || 0;
-          bValue = b.atk || 0;
+          // 手持ち設定に基づいてHP/ATK値を計算
+          aValue = getStatForSort(a, currentSortBy);
+          bValue = getStatForSort(b, currentSortBy);
           break;
         case 'duoPartner': {
           // DUO相手の名前をデフォルト順（characterDataのインデックス）でソート
@@ -1208,14 +1349,14 @@ const updateFilteredCharacters = async () => {
           break;
         }
         case 'effectiveCardHP':
-          // カード単体の計算では、置き換え対象のキャラクターを除外
-          aValue = calculateEffectiveCardHP(a, getOptimizedMemberNameSet(null, props.charaIndex));
-          bValue = calculateEffectiveCardHP(b, getOptimizedMemberNameSet(null, props.charaIndex));
+          // カード単体の計算では、置き換え対象のキャラクターを除外し、候補キャラクターを含む仮想デッキでバディ効果を計算
+          aValue = calculateEffectiveCardHP(a, getOptimizedMemberNameSet(a, props.charaIndex));
+          bValue = calculateEffectiveCardHP(b, getOptimizedMemberNameSet(b, props.charaIndex));
           break;
         case 'effectiveCardATK':
-          // カード単体の計算では、置き換え対象のキャラクターを除外
-          aValue = calculateEffectiveCardATK(a, getOptimizedMemberNameSet(null, props.charaIndex));
-          bValue = calculateEffectiveCardATK(b, getOptimizedMemberNameSet(null, props.charaIndex));
+          // カード単体の計算では、置き換え対象のキャラクターを除外し、候補キャラクターを含む仮想デッキでバディ効果を計算
+          aValue = calculateEffectiveCardATK(a, getOptimizedMemberNameSet(a, props.charaIndex));
+          bValue = calculateEffectiveCardATK(b, getOptimizedMemberNameSet(b, props.charaIndex));
           break;
         default:
           aValue = a.chara || '';
@@ -1243,12 +1384,50 @@ watch([sortBy, sortOrder, () => characters.value.filter(c => c.visible).length],
   updateFilteredCharacters();
 }, { immediate: true });
 
+// 手持ちコレクション設定変更時に候補キャラクターの表示を更新
+watch(() => handCollectionStore.useHandCollection, () => {
+  updateFilteredCharacters();
+});
+
 const closeModal = () => {
   emit('close');
 };
 
 const selectImage = (character) => {
-  emit('select', character);
+  // 手持ちコレクション設定が有効な場合、キャラクターにその設定を適用
+  if (handCollectionStore.useHandCollection) {
+    const handCard = handCollectionStore.getHandCard(character.name);
+    if (handCard.isOwned) {
+      // 手持ち設定に基づいてキャラクターのステータスを調整
+      const modifiedCharacter = { ...character };
+      
+      // レベル設定
+      modifiedCharacter.level = handCard.level;
+      
+      // 完凸設定に基づくM3の有効/無効
+      modifiedCharacter.hasM3 = handCard.isM3;
+      
+      // キャラクターステータスを手持ち設定に基づいて調整
+      // 元のフルステータス最大値を保存
+      modifiedCharacter.originalMaxHP = character.hp;
+      modifiedCharacter.originalMaxATK = character.atk;
+      
+      // HP/ATKを手持ちレベルで再計算
+      modifiedCharacter.hp = recalculateHP(character, Number(handCard.level), handCard.isLimitBreak);
+      modifiedCharacter.atk = recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
+      modifiedCharacter.isBonusSelected = handCard.isLimitBreak;
+      
+      emit('select', modifiedCharacter);
+      return;
+    }
+  }
+  
+  // 通常モードまたは手持ちコレクションが無効な場合でも、元の最大値を保存
+  const normalCharacter = { ...character };
+  normalCharacter.originalMaxHP = character.hp;
+  normalCharacter.originalMaxATK = character.atk;
+  
+  emit('select', normalCharacter);
 };
 
 
@@ -1286,18 +1465,17 @@ function getDisplayText(character) {
     case 'rarity':
       return character.rare;
     case 'hp':
-      return character.hp || 0;
     case 'atk':
-      return character.atk || 0;
+      return getStatForSort(character, currentSortBy);
     case 'duoPartner':
       return character.duo || 'なし';
     case 'effectiveCardHP': {
-      const effectiveHP = calculateEffectiveCardHP(character, getOptimizedMemberNameSet(null, props.charaIndex));
+      const effectiveHP = calculateEffectiveCardHP(character, getOptimizedMemberNameSet(character, props.charaIndex));
       const roundedHP = Math.round(effectiveHP);
       return roundedHP;
     }
     case 'effectiveCardATK':
-      return Math.round(calculateEffectiveCardATK(character, getOptimizedMemberNameSet(null, props.charaIndex)));
+      return Math.round(calculateEffectiveCardATK(character, getOptimizedMemberNameSet(character, props.charaIndex)));
     case 'effectiveDeckHP':
     case 'deckDamage':
     case 'deckHPBuddyCount':
@@ -1665,6 +1843,16 @@ onUnmounted(() => {
 
 .sort-content {
   padding: 16px;
+}
+
+.hand-collection-content {
+  padding: 16px;
+}
+
+.hand-collection-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .sort-info {
