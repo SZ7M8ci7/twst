@@ -1124,82 +1124,20 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'select']);
 
-// 最適化されたデータ構造の遅延初期化
-let _optimizedDataStructuresCache = null;
-let _optimizedDataStructuresInitialized = false;
-
-// 最適化されたデータ構造：高速ルックアップテーブル
+// 最適化されたデータ構造：高速ルックアップテーブル（lazy evaluation）
 const optimizedDataStructures = computed(() => {
-  // キャッシュが既に存在する場合は返す
-  if (_optimizedDataStructuresInitialized && _optimizedDataStructuresCache) {
-    return _optimizedDataStructuresCache;
-  }
-  
   // キャラクター情報のインデックスマップ
   const characterIndexMap = new Map();
-  const characterByName = new Map();
-  const charactersByRarity = new Map();
-  const duoCharacterMap = new Map();
-  const buddyCharacterMap = new Map();
   
-  // キャラクターデータの事前処理とインデックス化
+  // キャラクターデータの事前処理とインデックス化（必要最小限）
   characterData.forEach((char, index) => {
-    // 名前によるインデックス
     characterIndexMap.set(char.name_ja, index);
     characterIndexMap.set(char.name_en, index);
-    characterByName.set(char.name_ja, char);
-    characterByName.set(char.name_en, char);
-    
-    // レア度別グループ化
-    if (!charactersByRarity.has(char.rarity)) {
-      charactersByRarity.set(char.rarity, []);
-    }
-    charactersByRarity.get(char.rarity).push(char);
   });
   
-  // キャラクターリストの事前処理
-  
-  characters.value.forEach(character => {
-    // デュオ相手のマッピング
-    if (character.duo) {
-      if (!duoCharacterMap.has(character.duo)) {
-        duoCharacterMap.set(character.duo, new Set());
-      }
-      duoCharacterMap.get(character.duo).add(character.chara);
-      
-      if (!duoCharacterMap.has(character.chara)) {
-        duoCharacterMap.set(character.chara, new Set());
-      }
-      duoCharacterMap.get(character.chara).add(character.duo);
-    }
-    
-    // バディ関係のマッピング
-    [character.buddy1c, character.buddy2c, character.buddy3c].forEach(buddy => {
-      if (buddy) {
-        if (!buddyCharacterMap.has(buddy)) {
-          buddyCharacterMap.set(buddy, new Set());
-        }
-        buddyCharacterMap.get(buddy).add(character.chara);
-        
-        if (!buddyCharacterMap.has(character.chara)) {
-          buddyCharacterMap.set(character.chara, new Set());
-        }
-        buddyCharacterMap.get(character.chara).add(buddy);
-      }
-    });
-  });
-  
-  // キャッシュに保存
-  _optimizedDataStructuresCache = {
-    characterIndexMap,
-    characterByName,
-    charactersByRarity,
-    duoCharacterMap,
-    buddyCharacterMap
+  return {
+    characterIndexMap
   };
-  _optimizedDataStructuresInitialized = true;
-  
-  return _optimizedDataStructuresCache;
 });
 
 // ソート用計算値のキャッシュ
@@ -1230,12 +1168,16 @@ watch([sortBy, sortOrder, () => props.selectedAttribute], () => {
   clearSortCache();
   clearMemberNameCache();
   resetImageLoadingQueue();
-});
+}, { flush: 'sync' });
 
-// デッキキャラクターが変更されたらキャッシュをクリア
+// デッキキャラクターが変更されたらキャッシュをクリア（デバウンス）
+let deckWatchTimer = null;
 watch(() => deckCharacters.value.map(c => ({ chara: c.chara, level: c.level, hp: c.hp, atk: c.atk })), () => {
-  clearSortCache();
-  clearMemberNameCache();
+  if (deckWatchTimer) clearTimeout(deckWatchTimer);
+  deckWatchTimer = setTimeout(() => {
+    clearSortCache();
+    clearMemberNameCache();
+  }, 100);
 }, { deep: true });
 
 // キャラクターの画像読み込み状態を初期化
@@ -1279,10 +1221,8 @@ const updateFilteredCharacters = async () => {
   })];
 
   // 最適化されたデータ構造を取得 (デフォルトソートとDUO相手ソートの場合に必要)
-  let dataStructures = null;
-  if (currentSortBy === 'default' || currentSortBy === 'duoPartner') {
-    dataStructures = optimizedDataStructures.value;
-  }
+  const dataStructures = (currentSortBy === 'default' || currentSortBy === 'duoPartner') ? 
+    optimizedDataStructures.value : null;
 
   // ソート処理
   if (currentSortBy === 'default') {
@@ -1379,9 +1319,13 @@ const updateFilteredCharacters = async () => {
   }
 };
 
-// ソート条件変更時に更新
+// ソート条件変更時に更新（デバウンス）
+let updateTimer = null;
 watch([sortBy, sortOrder, () => characters.value.filter(c => c.visible).length], () => {
-  updateFilteredCharacters();
+  if (updateTimer) clearTimeout(updateTimer);
+  updateTimer = setTimeout(() => {
+    updateFilteredCharacters();
+  }, 50);
 }, { immediate: true });
 
 // 手持ちコレクション設定変更時に候補キャラクターの表示を更新
@@ -1507,7 +1451,7 @@ const BATCH_SIZE = 30; // スクロール時のバッチサイズ
 const MAX_CONCURRENT = 100; // 最大同時読み込み数
 
 // 並列読み込みを実行する関数（バッチ処理対応）
-const loadImagesInParallel = async (charactersToLoad, batchSize = MAX_CONCURRENT) => {
+const loadImagesInParallel = (charactersToLoad, batchSize = MAX_CONCURRENT) => {
   // 既に読み込み済みのキャラクターを除外
   const toLoad = charactersToLoad.filter(character => 
     !character.imageLoaded || 
@@ -1515,11 +1459,11 @@ const loadImagesInParallel = async (charactersToLoad, batchSize = MAX_CONCURRENT
     character.imgUrl === 'placeholder'
   );
   
-  if (toLoad.length === 0) return;
+  if (toLoad.length === 0) return Promise.resolve();
   
   // 大量のキャラクターをバッチに分割して処理
-  for (let i = 0; i < toLoad.length; i += batchSize) {
-    const batch = toLoad.slice(i, i + batchSize);
+  const processBatch = async (startIndex) => {
+    const batch = toLoad.slice(startIndex, startIndex + batchSize);
     
     const promises = batch.map(character => {
       return import(`@/assets/img/${character.name}.png`)
@@ -1537,14 +1481,17 @@ const loadImagesInParallel = async (charactersToLoad, batchSize = MAX_CONCURRENT
         });
     });
     
-    // バッチを並列で実行
     await Promise.all(promises);
     
-    // 小さな遅延でブラウザをブロックしないように
-    if (i + batchSize < toLoad.length) {
+    // 次のバッチを処理
+    const nextIndex = startIndex + batchSize;
+    if (nextIndex < toLoad.length) {
       await new Promise(resolve => setTimeout(resolve, 1));
+      return processBatch(nextIndex);
     }
-  }
+  };
+  
+  return processBatch(0);
 };
 
 // Observerを設定する関数
@@ -1616,12 +1563,15 @@ const loadCharacterImages = () => {
   });
 };
 
-// filteredCharactersの変更を監視してIntersectionObserverを再設定
+// filteredCharactersの変更を監視してIntersectionObserverを再設定（デバウンス）
+let imageWatchTimer = null;
 watch(filteredCharacters, () => {
-  // DOM更新後にIntersectionObserverを再設定
-  nextTick(() => {
-    loadCharacterImages();
-  });
+  if (imageWatchTimer) clearTimeout(imageWatchTimer);
+  imageWatchTimer = setTimeout(() => {
+    nextTick(() => {
+      loadCharacterImages();
+    });
+  }, 100);
 });
 
 // モーダル初期化時にフィルター状態を設定
@@ -1698,16 +1648,6 @@ const initializeModalFilter = () => {
   }
 };
 
-// 遅延初期化のユーティリティ関数
-const ensureImagePropertiesInitialized = (character) => {
-  if (!('imageLoaded' in character)) {
-    character.imageLoaded = false;
-  }
-  if (!character.imgUrl || character.imgUrl === 'placeholder') {
-    character.imgUrl = null;
-  }
-};
-
 const ensureVisiblePropertiesInitialized = (character) => {
   if (!('visible' in character)) {
     character.visible = false; // フィルター適用前は非表示
@@ -1721,7 +1661,6 @@ onMounted(async () => {
     characters.value.forEach(ensureVisiblePropertiesInitialized);
     
     // 高速初期化：最小限の処理のみ
-    initializeImageState();
     
     // 初期フィルター・ソートを実行（フィルター処理前）
     updateFilteredCharacters();
@@ -1754,12 +1693,16 @@ onMounted(async () => {
   }
 });
 
-// filteredAndSortedCharactersが変更されたときにObserverを再設定
+// filteredAndSortedCharactersが変更されたときにObserverを再設定（デバウンス）
+let observerTimer = null;
 watch(filteredAndSortedCharacters, () => {
+  if (observerTimer) clearTimeout(observerTimer);
   if (imageObserver && !isSorting.value) {
-    nextTick(() => {
-      setupImageObserver();
-    });
+    observerTimer = setTimeout(() => {
+      nextTick(() => {
+        setupImageObserver();
+      });
+    }, 100);
   }
 }, { flush: 'post' });
 
