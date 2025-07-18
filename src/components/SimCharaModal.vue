@@ -1466,7 +1466,7 @@ function getDisplayText(character) {
       return character.rare;
     case 'hp':
     case 'atk':
-      return getStatForSort(character, currentSortBy);
+      return Math.round(getStatForSort(character, currentSortBy));
     case 'duoPartner':
       return character.duo || 'なし';
     case 'effectiveCardHP': {
