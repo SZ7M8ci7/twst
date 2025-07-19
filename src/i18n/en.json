@@ -422,7 +422,9 @@
     "flora": "Flora",
     "duo": "Mutual Duo",
     "duo3": "Triple Duo",
-    "allowEqual": "Allow One Neutral Attribute"
+    "allowEqual": "Allow One Neutral Attribute",
+    "handCollection": "Owned",
+    "allCards": "All"
   },
   "other": {
     "text": "Other tools i made",

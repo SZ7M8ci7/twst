@@ -421,7 +421,9 @@
     "flora": "木属性",
     "duo": "相互デュオ",
     "duo3": "3デュオ",
-    "allowEqual": "等倍を1つ許容する"
+    "allowEqual": "等倍を1つ許容する",
+    "handCollection": "手持ち",
+    "allCards": "全て"
   },
   "other": {
     "text": "その他作ったもの",
