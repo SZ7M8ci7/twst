@@ -444,5 +444,10 @@
   "support": {
     "selectAll": "全選択",
     "deselectAll": "全解除"
+  },
+  "finisherDamage": {
+    "useHandCollection": "手持ち設定を使用",
+    "handCollection": "手持ち",
+    "allCards": "全て"
   }
 }

@@ -445,5 +445,10 @@
   "support": {
     "selectAll": "Select All",
     "deselectAll": "Deselect All"
+  },
+  "finisherDamage": {
+    "useHandCollection": "Use Card Settings",
+    "handCollection": "Owned",
+    "allCards": "All"
   }
 }
