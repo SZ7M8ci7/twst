@@ -74,7 +74,7 @@
           ソート処理中...
         </div>
         <div v-else-if="filteredCharacters.length === 0" class="no-results">
-          条件に一致するキャラクターがありません
+          条件に一致するキャラクターがありません。フィルターか手持ち設定を確認して下さい。
         </div>
         <div v-else class="character-grid">
           <div 
