@@ -5,47 +5,44 @@
         <!-- ヘッダー -->
         <div class="header-section">
           <div class="title-container">
-            <h2 class="page-title">手持ち設定</h2>
+            <h2 class="page-title">{{ $t('handCollection.title') }}</h2>
             <v-chip 
               v-if="hasUnsavedChanges" 
               color="warning" 
               size="small"
               class="unsaved-indicator"
             >
-              未保存
+              {{ $t('handCollection.unsaved') }}
             </v-chip>
           </div>
 
-          <!-- フィルター設定 -->
-          <div class="filter-section">
-            <div class="filter-actions">
-              <v-btn 
-                @click="showFilterModal = true" 
-                variant="outlined"
-                prepend-icon="mdi-filter"
-                size="small"
-              >
-                フィルター
-              </v-btn>
-              
-              <v-btn
-                color="primary"
-                variant="outlined"
-                @click="openDataModal"
-                prepend-icon="mdi-database"
-                size="small"
-              >
-                データ管理
-              </v-btn>
-              
-            </div>
+          <!-- 保存・元に戻すボタン -->
+          <div class="header-actions">
+            <v-btn 
+              @click="saveHandCollection" 
+              color="primary" 
+              size="small"
+              :loading="saving"
+              prepend-icon="mdi-content-save"
+            >
+              {{ $t('handCollection.save') }}
+            </v-btn>
+            <v-btn 
+              @click="resetUnsavedChanges" 
+              color="grey" 
+              size="small"
+              :disabled="!hasUnsavedChanges"
+              prepend-icon="mdi-undo"
+            >
+              {{ $t('handCollection.undo') }}
+            </v-btn>
           </div>
         </div>
 
         <!-- 一括操作コントロール -->
         <div class="controls-main-container">
           <div class="controls-container">
-            <h3 class="controls-title">一括設定</h3>
+            <h3 class="controls-title">{{ $t('handCollection.bulkSettings') }}</h3>
             <div class="bulk-controls">
               <!-- レベル設定 -->
               <div class="control-group">
@@ -53,57 +50,58 @@
                   type="number" 
                   v-model="bulkLevel" 
                   class="level-input" 
-                  label="レベル" 
+                  :label="$t('handCollection.level')" 
                   hide-details 
                   :min="0" 
                   :max="110"
                   variant="outlined"
                   density="compact"
                 />
-                <v-btn @click="applyBulkLevel" color="primary" size="small">レベル設定</v-btn>
+                <v-btn @click="applyBulkLevel" color="primary" size="small">{{ $t('handCollection.levelSetting') }}</v-btn>
               </div>
               
               <!-- 所持設定 -->
               <div class="control-group">
-                <v-btn @click="applyBulkOwnership(true)" color="success" size="small">所持設定</v-btn>
-                <v-btn @click="applyBulkOwnership(false)" color="grey" size="small">所持解除</v-btn>
+                <v-btn @click="applyBulkOwnership(true)" color="success" size="small">{{ $t('handCollection.ownershipSetting') }}</v-btn>
+                <v-btn @click="applyBulkOwnership(false)" color="grey" size="small">{{ $t('handCollection.ownershipCancel') }}</v-btn>
               </div>
               
               <!-- 完凸設定 -->
               <div class="control-group">
-                <v-btn @click="applyBulkLimitBreak(true)" color="success" size="small">完凸設定</v-btn>
-                <v-btn @click="applyBulkLimitBreak(false)" color="grey" size="small">完凸解除</v-btn>
+                <v-btn @click="applyBulkLimitBreak(true)" color="success" size="small">{{ $t('handCollection.limitBreakSetting') }}</v-btn>
+                <v-btn @click="applyBulkLimitBreak(false)" color="grey" size="small">{{ $t('handCollection.limitBreakCancel') }}</v-btn>
               </div>
               
               <!-- M3設定 -->
               <div class="control-group">
-                <v-btn @click="applyBulkM3(true)" color="success" size="small">M3設定</v-btn>
-                <v-btn @click="applyBulkM3(false)" color="grey" size="small">M3解除</v-btn>
+                <v-btn @click="applyBulkM3(true)" color="success" size="small">{{ $t('handCollection.m3Setting') }}</v-btn>
+                <v-btn @click="applyBulkM3(false)" color="grey" size="small">{{ $t('handCollection.m3Cancel') }}</v-btn>
               </div>
             </div>
           </div>
 
-          <!-- 保存・元に戻すボタン -->
+          <!-- フィルター・データ管理 -->
           <div class="save-controls-container">
-            <h3 class="controls-title">データ操作</h3>
-            <div class="save-controls">
+            <div class="save-controls data-management-controls">
               <v-btn 
-                @click="saveHandCollection" 
-                color="primary" 
+                @click="showFilterModal = true" 
+                variant="outlined"
+                prepend-icon="mdi-filter"
                 size="default"
-                :loading="saving"
-                prepend-icon="mdi-content-save"
+                class="data-btn"
               >
-                保存
+                {{ $t('handCollection.filter') }}
               </v-btn>
-              <v-btn 
-                @click="resetUnsavedChanges" 
-                color="grey" 
+              
+              <v-btn
+                color="primary"
+                variant="outlined"
+                @click="openDataModal"
+                prepend-icon="mdi-database"
                 size="default"
-                :disabled="!hasUnsavedChanges"
-                prepend-icon="mdi-undo"
+                class="data-btn"
               >
-                元に戻す
+                {{ $t('handCollection.dataManagement') }}
               </v-btn>
             </div>
           </div>
@@ -118,8 +116,8 @@
 
         <div v-else-if="filteredCharacters.length === 0" class="text-center py-4">
           <v-icon size="48" color="grey">mdi-cards-outline</v-icon>
-          <div class="mt-2 text-grey">条件に一致するカードがありません</div>
-          <v-btn @click="resetFilters" class="mt-2" color="primary" size="small">フィルターをリセット</v-btn>
+          <div class="mt-2 text-grey">{{ $t('handCollection.noMatchingCards') }}</div>
+          <v-btn @click="resetFilters" class="mt-2" color="primary" size="small">{{ $t('handCollection.resetFilters') }}</v-btn>
         </div>
         
         <div v-else>
@@ -127,13 +125,31 @@
           <div class="manual-table">
             <!-- ヘッダー -->
             <div class="table-header">
-              <div class="header-cell character-col">キャラクター</div>
-              <div class="header-cell checkbox-col">所持</div>
-              <div class="header-cell checkbox-col">完凸</div>
-              <div class="header-cell checkbox-col">M3</div>
-              <div class="header-cell level-col">Lv</div>
-              <div class="header-cell rare-col" v-if="windowWidth > 600">レア度</div>
-              <div class="header-cell costume-col" v-if="windowWidth > 600">衣装</div>
+              <div class="header-cell character-col">{{ $t('handCollection.character') }}</div>
+              <div class="header-cell checkbox-col sortable-header" @click="handleSort('isOwned')">
+                {{ $t('handCollection.owned') }}
+                <v-icon size="16" class="sort-icon">{{ getSortIcon('isOwned') }}</v-icon>
+              </div>
+              <div class="header-cell checkbox-col sortable-header" @click="handleSort('isLimitBreak')">
+                {{ $t('handCollection.limitBreak') }}
+                <v-icon size="16" class="sort-icon">{{ getSortIcon('isLimitBreak') }}</v-icon>
+              </div>
+              <div class="header-cell checkbox-col sortable-header" @click="handleSort('isM3')">
+                M3
+                <v-icon size="16" class="sort-icon">{{ getSortIcon('isM3') }}</v-icon>
+              </div>
+              <div class="header-cell level-col sortable-header" @click="handleSort('level')">
+                Lv
+                <v-icon size="16" class="sort-icon">{{ getSortIcon('level') }}</v-icon>
+              </div>
+              <div class="header-cell rare-col sortable-header" v-if="windowWidth > 600" @click="handleSort('rare')">
+                {{ $t('handCollection.rarity') }}
+                <v-icon size="16" class="sort-icon">{{ getSortIcon('rare') }}</v-icon>
+              </div>
+              <div class="header-cell costume-col sortable-header" v-if="windowWidth > 600" @click="handleSort('costume')">
+                {{ $t('handCollection.costume') }}
+                <v-icon size="16" class="sort-icon">{{ getSortIcon('costume') }}</v-icon>
+              </div>
             </div>
             
             <!-- データ行 -->
@@ -217,20 +233,20 @@
         <!-- データ管理モーダル -->
         <v-dialog v-model="dataModal" max-width="800px">
           <v-card>
-            <v-card-title>データ管理</v-card-title>
+            <v-card-title>{{ $t('handCollection.dataManagement') }}</v-card-title>
             <v-card-text>
               <div class="data-actions mb-4">
                 <v-btn color="primary" @click="copyToClipboard" class="action-btn" size="small">
                   <v-icon>mdi-content-copy</v-icon>
-                  <span class="ml-2">コピー</span>
+                  <span class="ml-2">{{ $t('handCollection.copy') }}</span>
                 </v-btn>
                 <v-btn color="primary" @click="importFromText" class="action-btn" size="small">
                   <v-icon>mdi-database-import</v-icon>
-                  <span class="ml-2">インポート</span>
+                  <span class="ml-2">{{ $t('handCollection.import') }}</span>
                 </v-btn>
                 <v-btn color="grey" @click="closeDataModal" class="action-btn" size="small">
                   <v-icon>mdi-close</v-icon>
-                  <span class="ml-2">閉じる</span>
+                  <span class="ml-2">{{ $t('handCollection.close') }}</span>
                 </v-btn>
               </div>
               <v-textarea
@@ -239,7 +255,7 @@
                 auto-grow
                 rows="10"
                 class="mt-4"
-                label="データ（タブ区切り）: キャラ名, 衣装, レベル, 必須, M3, 所持, 完凸"
+                :label="$t('handCollection.dataFormat')"
               ></v-textarea>
             </v-card-text>
           </v-card>
@@ -275,8 +291,10 @@ import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.png';
 import FilterModal from '@/components/FilterModal.vue';
 import charactersInfo from '@/assets/characters_info.json';
+import { useI18n } from 'vue-i18n';
 
-// Stores
+// Stores and i18n
+const { t } = useI18n();
 const handCollectionStore = useHandCollectionStore();
 const characterStore = useCharacterStore();
 const filterdStore = useFilterdStore();
@@ -289,6 +307,10 @@ const bulkLevel = ref(110);
 const windowWidth = ref(window.innerWidth);
 const saving = ref(false);
 const hasUnsavedChanges = ref(false);
+
+// ソート機能
+const sortKey = ref<string>('default');
+const sortOrder = ref<'asc' | 'desc'>('asc');
 
 // 保存前の状態を保存（元に戻す機能用）
 const savedState = ref<string>('');
@@ -349,12 +371,66 @@ const filteredCharacters = computed(() => {
       };
     })
     .sort((a, b) => {
-      // キャッシュされた順序でソート
-      const indexA = order.indexOf(a.chara);
-      const indexB = order.indexOf(b.chara);
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-      return indexA - indexB;
+      // ソートキーに基づく並び替え
+      if (sortKey.value === 'default') {
+        // デフォルトソート: キャッシュされた順序でソート
+        const indexA = order.indexOf(a.chara);
+        const indexB = order.indexOf(b.chara);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      } else {
+        // カスタムソート
+        let aValue: any, bValue: any;
+        
+        switch (sortKey.value) {
+          case 'isOwned':
+            aValue = a.isOwned ? 1 : 0;
+            bValue = b.isOwned ? 1 : 0;
+            break;
+          case 'isLimitBreak':
+            aValue = a.isLimitBreak ? 1 : 0;
+            bValue = b.isLimitBreak ? 1 : 0;
+            break;
+          case 'isM3':
+            aValue = a.isM3 ? 1 : 0;
+            bValue = b.isM3 ? 1 : 0;
+            break;
+          case 'level':
+            aValue = a.level;
+            bValue = b.level;
+            break;
+          case 'rare':
+            // SSR > SR > R の順序で数値化
+            const rareOrder = { 'SSR': 3, 'SR': 2, 'R': 1 };
+            aValue = rareOrder[a.rare as keyof typeof rareOrder] || 0;
+            bValue = rareOrder[b.rare as keyof typeof rareOrder] || 0;
+            break;
+          case 'costume':
+            aValue = a.costume;
+            bValue = b.costume;
+            break;
+          default:
+            aValue = 0;
+            bValue = 0;
+        }
+        
+        // 文字列比較
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          const comparison = aValue.localeCompare(bValue);
+          return sortOrder.value === 'asc' ? comparison : -comparison;
+        }
+        
+        // 数値比較
+        if (aValue === bValue) {
+          // 同じ値の場合はデフォルト順序で二次ソート
+          const indexA = order.indexOf(a.chara);
+          const indexB = order.indexOf(b.chara);
+          return indexA - indexB;
+        }
+        
+        return sortOrder.value === 'asc' ? aValue - bValue : bValue - aValue;
+      }
     });
   
   return result;
@@ -365,6 +441,25 @@ const filteredCharacters = computed(() => {
 // Methods
 function getHandCard(cardName: string) {
   return handCollectionStore.getHandCard(cardName);
+}
+
+// ソート機能
+function handleSort(key: string) {
+  if (sortKey.value === key) {
+    // 同じキーをクリックした場合は昇順/降順を切り替え
+    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
+  } else {
+    // 異なるキーをクリックした場合は新しいキーで昇順に設定
+    sortKey.value = key;
+    sortOrder.value = 'asc';
+  }
+}
+
+function getSortIcon(key: string): string {
+  if (sortKey.value !== key) {
+    return 'mdi-sort';
+  }
+  return sortOrder.value === 'asc' ? 'mdi-sort-ascending' : 'mdi-sort-descending';
 }
 
 function updateOwnership(cardName: string, isOwned: boolean) {
@@ -419,10 +514,10 @@ async function saveHandCollection() {
     // 未保存フラグをリセット
     hasUnsavedChanges.value = false;
     
-    showSnackbar('手持ち設定を保存しました');
+    showSnackbar(t('handCollection.saveSuccess'));
   } catch (error) {
     console.error('保存エラー:', error);
-    showSnackbar('保存に失敗しました', 'error');
+    showSnackbar(t('handCollection.saveError'), 'error');
   } finally {
     saving.value = false;
   }
@@ -440,10 +535,10 @@ function resetUnsavedChanges() {
       Object.assign(handCollectionStore.handCollection, saved);
       
       hasUnsavedChanges.value = false;
-      showSnackbar('変更を元に戻しました');
+      showSnackbar(t('handCollection.undoSuccess'));
     } catch (error) {
       console.error('復元エラー:', error);
-      showSnackbar('復元に失敗しました', 'error');
+      showSnackbar(t('handCollection.undoError'), 'error');
     }
   }
 }
@@ -515,11 +610,11 @@ function showSnackbar(text: string, color: 'success' | 'error' = 'success') {
 function copyToClipboard() {
   navigator.clipboard.writeText(dataText.value)
     .then(() => {
-      showSnackbar('クリップボードにコピーしました');
+      showSnackbar(t('handCollection.copySuccess'));
     })
     .catch(err => {
       console.error('クリップボードへのコピーに失敗しました:', err);
-      showSnackbar('コピーに失敗しました', 'error');
+      showSnackbar(t('handCollection.copyError'), 'error');
     });
 }
 
@@ -586,10 +681,10 @@ function importFromText() {
     });
     
     closeDataModal();
-    showSnackbar(`${importedCount}件のデータをインポートしました`);
+    showSnackbar(t('handCollection.importSuccess', { count: importedCount }));
   } catch (error) {
     console.error('インポートエラー:', error);
-    showSnackbar('インポートに失敗しました', 'error');
+    showSnackbar(t('handCollection.importError'), 'error');
   }
 }
 
@@ -706,24 +801,18 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .stats-summary {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.filter-section {
-  margin-bottom: 16px;
-  padding: 12px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
 
 .controls-main-container {
   display: flex;
@@ -775,6 +864,16 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
+.data-management-controls {
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+}
+
+.data-btn {
+  flex: 0 1 auto !important;
+  min-width: 120px;
+}
+
 .level-controls {
   display: flex;
   align-items: center;
@@ -823,8 +922,13 @@ onUnmounted(() => {
 /* モバイル対応 */
 @media (max-width: 600px) {
   .header-section {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .header-actions {
+    flex-shrink: 0;
   }
   
   .controls-main-container {
@@ -863,8 +967,19 @@ onUnmounted(() => {
   }
 
   .save-controls {
-    flex-direction: column;
+    flex-direction: row;
     gap: 8px;
+    justify-content: center;
+  }
+  
+  .data-management-controls {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+  }
+  
+  .data-btn {
+    flex: 1 1 45% !important;
+    min-width: 100px !important;
   }
 }
 
@@ -936,6 +1051,29 @@ onUnmounted(() => {
   background-color: #f5f5f5;
   font-weight: bold;
   border-bottom: 2px solid #ddd;
+}
+
+.sortable-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.sortable-header:hover {
+  background-color: #e8f4fd;
+}
+
+.sort-icon {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.sortable-header:hover .sort-icon {
+  opacity: 1;
 }
 
 .table-row {
