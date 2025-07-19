@@ -14,7 +14,18 @@
         <v-radio :label="$t('relation.flora')" value="flora"></v-radio>
       </v-radio-group>
 
-      <div style="display: flex; flex-direction: row; gap: 15px;">
+      <div style="display: flex; flex-direction: row; gap: 15px; align-items: center;">
+        <!-- 手持ち設定トグル -->
+        <div class="hand-collection-toggle">
+          <div 
+            class="toggle-button" 
+            @click="toggleHandCollection"
+            :class="{ 'active': useHandCollection }"
+          >
+            {{ useHandCollection ? t('relation.handCollection') : t('relation.allCards') }}
+          </div>
+        </div>
+        
         <v-checkbox v-model="mutualDuo" :label="$t('relation.duo')" @change="recomputeDuos"></v-checkbox>
         <v-checkbox v-model="tripleDuo" :label="$t('relation.duo3')" @change="recomputeDuos"></v-checkbox>
         <v-checkbox
@@ -78,12 +89,14 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, onBeforeMount, onMounted, Ref, ref } from 'vue';
+import { computed, onBeforeMount, onMounted, Ref, ref, watch } from 'vue';
 import { Character, useCharacterStore } from '@/store/characters';
+import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import characterData from '@/assets/characters_info.json';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
+import { useI18n } from 'vue-i18n';
 
 interface CharacterInfo {
   name_ja: string;
@@ -93,8 +106,12 @@ interface CharacterInfo {
   theme_2: string;
 }
 
+const { t } = useI18n();
 const characterStore = useCharacterStore();
+const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
+// 独自の手持ち設定状態を管理（ストアとは独立）
+const useHandCollection = ref(false);
 const loadingImgUrl = ref(true);
 const showModal = ref(false);
 const selectedCharacter: Ref<string[][]> = ref([]);
@@ -109,6 +126,12 @@ const selectedAttribute = ref('all');
 const allowEqualMultiplier = ref(false);
 const mutualDuo = ref(true);
 const tripleDuo = ref(true);
+
+// 手持ち設定の切り替え関数
+function toggleHandCollection() {
+  useHandCollection.value = !useHandCollection.value;
+}
+
 const recomputeDuos = () => {
   filteredCharacters.value.forEach(character => {
     computeDuo(character);
@@ -121,7 +144,15 @@ const filteredCharacters = computed(() => {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
 
-  const visibleCharacters = characters.value.filter(character => character.visible && character.rare == "SSR");
+  let visibleCharacters = characters.value.filter(character => character.visible && character.rare == "SSR");
+  
+  // 手持ち設定ONの場合、所持しているカードのみを表示
+  if (useHandCollection.value) {
+    visibleCharacters = visibleCharacters.filter(character => {
+      const handCard = handCollectionStore.getHandCard(character.name);
+      return handCard.isOwned;
+    });
+  }
 
   // characters_info.jsonの順序に基づいてソート
   const sortedCharacters = [...visibleCharacters].sort((a, b) => {
@@ -149,6 +180,27 @@ const filteredCharacters = computed(() => {
 
   return sortedCharacters;
 });
+
+// 手持ち設定の変更を監視して再計算を実行
+watch(() => useHandCollection.value, () => {
+  recomputeDuos();
+});
+
+// filteredCharactersの変更を監視してデュオ計算を更新
+watch(() => filteredCharacters.value, () => {
+  if (!loadingImgUrl.value && filteredCharacters.value.length > 0) {
+    recomputeDuos();
+  }
+}, { deep: true });
+
+// 手持ちコレクションの内容変更を監視
+watch(() => handCollectionStore.handCollection, () => {
+  if (useHandCollection.value) {
+    // 手持ち設定ONの場合のみ再計算
+    recomputeDuos();
+  }
+}, { deep: true });
+
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
     return import(`@/assets/img/${character.name}.png`)
@@ -183,9 +235,29 @@ function arraysEqualIgnoreOrder(a: string | any[], b: string | any[]) {
 }
 const computeDuo = (character: Character) => {
   selectedCharacter.value = [];
+  const addedCombinations = new Set<string>(); // 重複防止用
+  
+  // 重複チェック付きで組み合わせを追加するヘルパー関数
+  const addUniqueCombo = (combo: string[]) => {
+    const key = [...combo].sort().join('|');
+    if (!addedCombinations.has(key)) {
+      selectedCharacter.value.push(combo);
+      addedCombinations.add(key);
+    }
+  };
+  
   // duo相手のカード全てに対してループでチェックする
   for (let name1 of chara2name.value[character.duo] || []) {
     let character1 = name2data.value[name1];
+    
+    // 手持ち設定ONの場合、デュオ相手も所持している必要がある
+    if (useHandCollection.value) {
+      const handCard1 = handCollectionStore.getHandCard(character1.name);
+      if (!handCard1.isOwned) {
+        continue; // デュオ相手を所持していない場合はスキップ
+      }
+    }
+    
     const characterImgUrl = character.imgUrl as unknown as string;
     const character1ImgUrl = character1.imgUrl as unknown as string;
     const duoImg = [characterImgUrl, character1ImgUrl];
@@ -197,18 +269,18 @@ const computeDuo = (character: Character) => {
         const atrs = [character.magic2atr, character1.magic2atr]
         // 全属性の場合は無条件で追加
         if (selectedAttribute.value == 'all') {
-          selectedCharacter.value.push(duoImg);
+          addUniqueCombo(duoImg);
 
         // 火属性が選択されている場合
         } else if (selectedAttribute.value == 'fire') {
           // 等倍を一つ許容している場合は片方等倍でも追加
           if (allowEqualMultiplier.value) {
             if (arraysEqualIgnoreOrder(atrs, ['火', '火']) || arraysEqualIgnoreOrder(atrs, ['火', '無']) || arraysEqualIgnoreOrder(atrs, ['火', '木'])) {
-              selectedCharacter.value.push(duoImg);
+              addUniqueCombo(duoImg);
             }
           } else {
             if (arraysEqualIgnoreOrder(atrs, ['火', '火'])) {
-              selectedCharacter.value.push(duoImg);
+              addUniqueCombo(duoImg);
             }
           }
         // 水属性が選択されている場合
@@ -216,11 +288,11 @@ const computeDuo = (character: Character) => {
           // 等倍を一つ許容している場合は片方等倍でも追加
           if (allowEqualMultiplier.value) {
             if (arraysEqualIgnoreOrder(atrs, ['水', '水']) || arraysEqualIgnoreOrder(atrs, ['水', '無']) || arraysEqualIgnoreOrder(atrs, ['水', '火'])) {
-              selectedCharacter.value.push(duoImg);
+              addUniqueCombo(duoImg);
             }
           } else {
             if (arraysEqualIgnoreOrder(atrs, ['水', '水'])) {
-              selectedCharacter.value.push(duoImg);
+              addUniqueCombo(duoImg);
             }
           }
         // 木属性が選択されている場合
@@ -228,20 +300,30 @@ const computeDuo = (character: Character) => {
           // 等倍を一つ許容している場合は片方等倍でも追加
           if (allowEqualMultiplier.value) {
             if (arraysEqualIgnoreOrder(atrs, ['木', '木']) || arraysEqualIgnoreOrder(atrs, ['木', '無']) || arraysEqualIgnoreOrder(atrs, ['木', '水'])) {
-              selectedCharacter.value.push(duoImg);
+              addUniqueCombo(duoImg);
             }
           } else {
             if (arraysEqualIgnoreOrder(atrs, ['木', '木'])) {
-              selectedCharacter.value.push(duoImg);
+              addUniqueCombo(duoImg);
             }
           }
         }
       }
       // 3デュオを選択
       if (tripleDuo.value) {
-        // duo相手に自身か、相互duoの相手を対象に持つカードをループでチェック
-        for (let name2 of [...(duo2name.value[character.chara] || []), ...(duo2name.value[character1.chara] || [])]) {
+        // duo相手に自身か、相互duoの相手を対象に持つカードをループでチェック（重複除去）
+        const name2List = [...new Set([...(duo2name.value[character.chara] || []), ...(duo2name.value[character1.chara] || [])])];
+        for (let name2 of name2List) {
           let character2 = name2data.value[name2];
+          
+          // 手持ち設定ONの場合、3デュオの3番目のキャラも所持している必要がある
+          if (useHandCollection.value) {
+            const handCard2 = handCollectionStore.getHandCard(character2.name);
+            if (!handCard2.isOwned) {
+              continue; // 3番目のキャラを所持していない場合はスキップ
+            }
+          }
+          
           const duo3Img = [characterImgUrl, character1ImgUrl, character2.imgUrl as unknown as string];
           const atrs = [character.magic2atr, character1.magic2atr, character2.magic2atr]
           let useMagics: string | string[] = [];
@@ -252,7 +334,7 @@ const computeDuo = (character: Character) => {
           }
           // 全属性の場合は無条件で追加
           if (selectedAttribute.value == 'all') {
-            selectedCharacter.value.push(duo3Img);
+            addUniqueCombo(duo3Img);
 
           // 火属性が選択されている場合
           } else if (selectedAttribute.value == 'fire') {
@@ -260,15 +342,15 @@ const computeDuo = (character: Character) => {
             if (allowEqualMultiplier.value) {
               // DUO魔法が全て火の場合はそれ以外で火、木、無を許容
               if (arraysEqualIgnoreOrder(atrs, ['火', '火', '火']) && ['火','木','無'].some(item => useMagics.includes(item))) {
-                selectedCharacter.value.push(duo3Img);
+                addUniqueCombo(duo3Img);
               } else if (arraysEqualIgnoreOrder(atrs, ['火', '火', '木']) || arraysEqualIgnoreOrder(atrs, ['火', '火', '無'])) {
                 if (['火'].some(item => useMagics.includes(item))) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
               }
             } else {
               if (arraysEqualIgnoreOrder(atrs, ['火', '火', '火']) && ['火'].some(item => useMagics.includes(item))) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
               }
             }
           // 水属性が選択されている場合
@@ -277,15 +359,15 @@ const computeDuo = (character: Character) => {
             if (allowEqualMultiplier.value) {
               // DUO魔法が全て水の場合はそれ以外で水、火、無を許容
               if (arraysEqualIgnoreOrder(atrs, ['水', '水', '水']) && ['水','火','無'].some(item => useMagics.includes(item))) {
-                selectedCharacter.value.push(duo3Img);
+                addUniqueCombo(duo3Img);
               } else if (arraysEqualIgnoreOrder(atrs, ['水', '水', '火']) || arraysEqualIgnoreOrder(atrs, ['水', '水', '無'])) {
                 if (['水'].some(item => useMagics.includes(item))) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
               }
             } else {
               if (arraysEqualIgnoreOrder(atrs, ['水', '水', '水']) && ['水'].some(item => useMagics.includes(item))) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
               }
             }
           // 木属性が選択されている場合
@@ -294,15 +376,15 @@ const computeDuo = (character: Character) => {
             if (allowEqualMultiplier.value) {
               // DUO魔法が全て木の場合はそれ以外で木、水、無を許容
               if (arraysEqualIgnoreOrder(atrs, ['木', '木', '木']) && ['木','水','無'].some(item => useMagics.includes(item))) {
-                selectedCharacter.value.push(duo3Img);
+                addUniqueCombo(duo3Img);
               } else if (arraysEqualIgnoreOrder(atrs, ['木', '木', '水']) || arraysEqualIgnoreOrder(atrs, ['木', '木', '無'])) {
                 if (['木'].some(item => useMagics.includes(item))) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
               }
             } else {
               if (arraysEqualIgnoreOrder(atrs, ['木', '木', '木']) && ['木'].some(item => useMagics.includes(item))) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
               }
             }
           }
@@ -314,12 +396,21 @@ const computeDuo = (character: Character) => {
         // duo相手のduo相手を探索
         for (let name2 of chara2name.value[character1.duo] || []) {
           let character2 = name2data.value[name2];
+          
+          // 手持ち設定ONの場合、3デュオの3番目のキャラも所持している必要がある
+          if (useHandCollection.value) {
+            const handCard2 = handCollectionStore.getHandCard(character2.name);
+            if (!handCard2.isOwned) {
+              continue; // 3番目のキャラを所持していない場合はスキップ
+            }
+          }
+          
           const duo3Img = [characterImgUrl, character1ImgUrl, character2.imgUrl as unknown as string];
           // 循環3デュオの場合
           if (character2.duo == character.chara) {
             // 全属性の場合は無条件で追加
             if (selectedAttribute.value == 'all') {
-              selectedCharacter.value.push(duo3Img);
+              addUniqueCombo(duo3Img);
             // 火属性が選択されている場合
             } else if (selectedAttribute.value == 'fire') {
               // 等倍を一つ許容している場合は一つ等倍でも追加
@@ -377,7 +468,7 @@ const computeDuo = (character: Character) => {
                   continue;
                 }
                 if (useMagics.filter(item => item === '等').length <= 1) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
 
               // 等倍を許容しない場合は全て火のみ追加
@@ -396,7 +487,7 @@ const computeDuo = (character: Character) => {
                 if (!(character2.magic1atr == '火' || character2.magic3atr == '火')) {
                   continue;
                 }
-                selectedCharacter.value.push(duo3Img);                
+                addUniqueCombo(duo3Img);                
               }
             } else if (selectedAttribute.value == 'water') {
               // 等倍を一つ許容している場合は一つ等倍でも追加
@@ -454,7 +545,7 @@ const computeDuo = (character: Character) => {
                   continue;
                 }
                 if (useMagics.filter(item => item === '等').length <= 1) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
 
               // 等倍を許容しない場合は全て水のみ追加
@@ -473,7 +564,7 @@ const computeDuo = (character: Character) => {
                 if (!(character2.magic1atr == '水' || character2.magic3atr == '水')) {
                   continue;
                 }
-                selectedCharacter.value.push(duo3Img);                
+                addUniqueCombo(duo3Img);                
               }
             } else if (selectedAttribute.value == 'flora') {
               // 等倍を一つ許容している場合は一つ等倍でも追加
@@ -531,7 +622,7 @@ const computeDuo = (character: Character) => {
                   continue;
                 }
                 if (useMagics.filter(item => item === '等').length <= 1) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
 
               // 等倍を許容しない場合は全て木のみ追加
@@ -550,7 +641,7 @@ const computeDuo = (character: Character) => {
                 if (!(character2.magic1atr == '木' || character2.magic3atr == '木')) {
                   continue;
                 }
-                selectedCharacter.value.push(duo3Img);                
+                addUniqueCombo(duo3Img);                
               }
             }
 
@@ -558,7 +649,7 @@ const computeDuo = (character: Character) => {
           } else if (character2.duo == character1.chara) {
             // 全属性の場合は無条件で追加
             if (selectedAttribute.value == 'all') {
-              selectedCharacter.value.push(duo3Img);
+              addUniqueCombo(duo3Img);
             } else if (selectedAttribute.value == 'fire') {
               // 等倍を一つ許容している場合は一つ等倍でも追加
               if (allowEqualMultiplier.value) {
@@ -607,7 +698,7 @@ const computeDuo = (character: Character) => {
                   }
                 }
                 if (useMagics.filter(item => item === '等').length <= 1) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
               // 等倍を許容しない場合 
               } else {
@@ -618,12 +709,12 @@ const computeDuo = (character: Character) => {
                 // キャラとキャラ1がDUOパターン
                 if (character.duo == character1.chara) {
                   if (character1.magic1atr == '火' || character1.magic3atr == '火') {
-                    selectedCharacter.value.push(duo3Img);
+                    addUniqueCombo(duo3Img);
                   }
                 // キャラとキャラ2がDUOパターン
                 } else if (character.duo == character2.chara) {
                   if (character2.magic1atr == '火' || character2.magic3atr == '火') {
-                    selectedCharacter.value.push(duo3Img);
+                    addUniqueCombo(duo3Img);
                   }
                 }
               }
@@ -674,7 +765,7 @@ const computeDuo = (character: Character) => {
                   }
                 }
                 if (useMagics.filter(item => item === '等').length <= 1) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
               // 等倍を許容しない場合 
               } else {
@@ -685,12 +776,12 @@ const computeDuo = (character: Character) => {
                 // キャラとキャラ1がDUOパターン
                 if (character.duo == character1.chara) {
                   if (character1.magic1atr == '水' || character1.magic3atr == '水') {
-                    selectedCharacter.value.push(duo3Img);
+                    addUniqueCombo(duo3Img);
                   }
                 // キャラとキャラ2がDUOパターン
                 } else if (character.duo == character2.chara) {
                   if (character2.magic1atr == '水' || character2.magic3atr == '水') {
-                    selectedCharacter.value.push(duo3Img);
+                    addUniqueCombo(duo3Img);
                   }
                 }
               }
@@ -741,7 +832,7 @@ const computeDuo = (character: Character) => {
                   }
                 }
                 if (useMagics.filter(item => item === '等').length <= 1) {
-                  selectedCharacter.value.push(duo3Img);
+                  addUniqueCombo(duo3Img);
                 }
               // 等倍を許容しない場合 
               } else {
@@ -752,12 +843,12 @@ const computeDuo = (character: Character) => {
                 // キャラとキャラ1がDUOパターン
                 if (character.duo == character1.chara) {
                   if (character1.magic1atr == '木' || character1.magic3atr == '木') {
-                    selectedCharacter.value.push(duo3Img);
+                    addUniqueCombo(duo3Img);
                   }
                 // キャラとキャラ2がDUOパターン
                 } else if (character.duo == character2.chara) {
                   if (character2.magic1atr == '木' || character2.magic3atr == '木') {
-                    selectedCharacter.value.push(duo3Img);
+                    addUniqueCombo(duo3Img);
                   }
                 }
               }
@@ -792,6 +883,7 @@ onMounted(() => {
 .container {
   height: 100vh;
   padding: 0;
+  padding-top: 15px;
   margin: 0;
   justify-content: center;
   align-items: center;
@@ -806,5 +898,73 @@ onMounted(() => {
 
 .new-row {
   flex-basis: 100%;
+}
+
+.hand-collection-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.toggle-button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.875rem;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  white-space: nowrap;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-button:hover {
+  background-color: #e3f2fd;
+  border-color: #1976d2;
+  color: #1976d2;
+}
+
+.toggle-button.active {
+  background-color: #1976d2;
+  border-color: #1976d2;
+  color: white;
+}
+
+/* ラジオボタンとチェックボックスの高さとスタイルを調整 */
+:deep(.v-input) {
+  grid-template-rows: min-content 0 !important;
+  padding: 1px;
+}
+
+:deep(.v-input__details) {
+  display: none !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* ラジオボタンとチェックボックスのラベル部分の高さをトグルボタンと合わせる */
+:deep(.v-selection-control) {
+  min-height: 40px !important;
+  align-items: center;
+}
+
+:deep(.v-selection-control__wrapper) {
+  height: auto;
+  align-items: center;
+}
+
+/* ラジオボタングループの調整 */
+:deep(.v-radio-group) {
+  align-items: center;
+}
+
+:deep(.v-radio) {
+  margin-right: 16px;
 }
 </style>

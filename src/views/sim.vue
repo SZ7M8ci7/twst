@@ -154,7 +154,7 @@ function restoreState() {
             }
           });
           // 全体を再計算
-          simulatorStore.calculateAllStats();
+          simulatorStore.recalculateStats();
         }
         
         // 選択された属性を復元

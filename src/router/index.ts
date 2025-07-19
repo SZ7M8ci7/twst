@@ -68,6 +68,11 @@ const routes = [
     component: () => import('@/views/hand.vue'),
   },
   {
+    path: '/twst/hand-collection',
+    name: 'handCollection',
+    component: () => import('@/views/HandCollection.vue'),
+  },
+  {
     path: '/twst/relation',
     name: 'relation',
     component: () => import('@/views/relation.vue'),

@@ -1,114 +1,127 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+このファイルは、Claude Code (claude.ai/code) がこのリポジトリで作業する際のガイダンスを提供します。
 
-## Development Commands
+## 開発コマンド
 
-### Setup and Installation
+### セットアップとインストール
 ```bash
-npm install --force  # Force install dependencies (required due to package conflicts)
+npm install --force         # 依存関係を強制インストール（パッケージ競合のため必須）
+npm install --legacy-peer-deps  # CI/CDで使用される代替インストール方法
 ```
 
-### Development and Build
+### 開発とビルド
 ```bash
-npm run dev          # Start development server on port 3000
-npm run build        # TypeScript check + production build
-npm run preview      # Preview production build locally
-npm run lint         # ESLint with auto-fix
+npm run dev          # 開発サーバーをポート3000で起動
+npm run build        # TypeScriptチェック + プロダクションビルド
+npm run preview      # プロダクションビルドをローカルでプレビュー
+npm run lint         # ESLintで自動修正
 ```
 
-### Deployment
+### デプロイ
 ```bash
-npm run deploy       # Deploy to GitHub Pages (Unix)
-npm run deploy-github # Deploy to GitHub Pages (Windows)
+npm run deploy       # GitHub Pagesにデプロイ（Unix）
+npm run deploy-github # GitHub Pagesにデプロイ（Windows）
 ```
 
-## Architecture Overview
+## アーキテクチャ概要
 
-### Technology Stack
-- **Vue 3** with TypeScript and Composition API
-- **Vuetify 3** for Material Design components
-- **Pinia** for state management across components
-- **Vue Router** for client-side routing
-- **Chart.js + vue-chartjs** for data visualization
-- **Vue i18n** for Japanese/English internationalization
-- **Vite** for build tooling
+### 技術スタック
+- **Vue 3** TypeScript と Composition API
+- **Vuetify 3** Material Design コンポーネント
+- **Pinia** コンポーネント間の状態管理
+- **Vue Router** クライアントサイドルーティング
+- **Chart.js + vue-chartjs** データ可視化
+- **Vue i18n** 日本語/英語国際化対応
+- **Vite** ビルドツール
 
-### Key Application Structure
+### 主要なアプリケーション構造
 
-#### State Management (Pinia Stores)
-- `simulatorStore.ts` - Main deck simulator state with character management and statistics calculation
-- `characters.ts` - Character data and filtering logic
-- `searchResult.ts` / `searchSetting.ts` - Search functionality state
-- `deckStore.ts` - Deck building functionality
+#### 状態管理（Piniaストア）
+- `simulatorStore.ts` - キャラクター管理と統計計算を含むメインデッキシミュレーター状態
+- `characters.ts` - キャラクターデータとフィルタリングロジック
+- `searchResult.ts` / `searchSetting.ts` - 検索機能の状態
+- `deckStore.ts` - デッキ構築機能
+- `handCollection.ts` - ガチャコレクション追跡と管理
+- `app.ts` - グローバルアプリケーション状態と設定
+- `filterd.ts` - フィルター済みデータ管理
 
-#### Core Views Architecture
-- `sim.vue` - Main simulator page with responsive carousel for calculation tools
-- `calcBASIC.vue`, `calcDEF.vue`, `calcATK.vue` - Exam score calculators with mobile-optimized layouts
-- `search.vue`, `search1.vue`, `search2.vue` - Multi-variant search interfaces
-- `data.vue` - Character data browser
-- `hand.vue` - Hand gacha simulator
+#### コアビューアーキテクチャ
+- `sim.vue` - 計算ツール用レスポンシブカルーセルを持つメインシミュレーターページ
+- `calcBASIC.vue`, `calcDEF.vue`, `calcATK.vue` - モバイル最適化レイアウトを持つ試験スコア計算機
+- `search.vue`, `search1.vue`, `search2.vue` - 複数バリアント検索インターフェース
+- `data.vue` - キャラクターデータブラウザ
+- `hand.vue` - ハンドガチャシミュレーター
 
-#### Component Organization
-- `SimChara.vue` - Individual character configuration component
-- `SimChart.vue` - Statistics visualization with Chart.js
-- `SimStats.vue` - Real-time statistics display
-- `DoughnutGraph.vue` - Reusable chart component for score calculators
-- Modal components (`*Modal.vue`) for overlay interfaces
+#### コンポーネント構成
+- `SimChara.vue` - 個別キャラクター設定コンポーネント
+- `SimChart.vue` - Chart.jsによる統計可視化
+- `SimStats.vue` - リアルタイム統計表示
+- `DoughnutGraph.vue` - スコア計算機用再利用可能チャートコンポーネント
+- モーダルコンポーネント（`*Modal.vue`）オーバーレイインターフェース用
 
-### Data Flow Patterns
+### データフローパターン
 
-#### Character Management
-Characters are managed through the `simulatorStore` with:
-- Reactive character arrays with computed statistics
-- Debounced calculations for performance optimization
-- State persistence to localStorage
-- Cache management for expensive calculations
+#### キャラクター管理
+キャラクターは以下の機能を持つ `simulatorStore` で管理されます：
+- 計算された統計を持つリアクティブキャラクター配列
+- パフォーマンス最適化のためのデバウンス計算
+- localStorageへの状態永続化
+- 高コスト計算のキャッシュ管理
 
-#### Responsive Design Strategy
-The application uses Vuetify's breakpoint system:
-- Mobile-first approach with `cols="12"` default
-- Breakpoint-specific layouts: `sm`, `md` variants
-- Carousel navigation for tools on mobile vs. sidebar on desktop
-- Custom CSS with `:deep()` selectors to override Vuetify defaults
+#### レスポンシブデザイン戦略
+アプリケーションはVuetifyのブレークポイントシステムを使用：
+- `cols="12"` デフォルトのモバイルファースト手法
+- ブレークポイント固有レイアウト：`sm`, `md` バリアント
+- モバイルではカルーセルナビゲーション、デスクトップではサイドバー
+- Vuetifyのデフォルトを上書きするための `:deep()` セレクターを使用したカスタムCSS
 
-#### Internationalization Pattern
-All messages must be translated.
-Translation keys are organized by feature domain:
+#### 国際化パターン
+すべてのメッセージは翻訳が必要です。
+翻訳キーは機能ドメインごとに整理されています：
 ```javascript
-// Access pattern
-{{ $t('basic.difficulty') }}    // Exam calculator translations
-{{ $t('tool.deckSimulator') }}  // Tool name translations
+// アクセスパターン
+{{ $t('basic.difficulty') }}    // 試験計算機翻訳
+{{ $t('tool.deckSimulator') }}  // ツール名翻訳
 ```
 
-### Mobile Optimization Approach
+### モバイル最適化手法
 
-#### Layout Adjustments
-- Responsive column breakpoints: `cols="4" sm="3"` for labels, `cols="8" sm="9"` for inputs
-- Compact field styling with minimal padding
-- Horizontal scroll tables with wrapper divs
-- Custom CSS overrides for Vuetify 3 field spacing
+#### レイアウト調整
+- レスポンシブカラムブレークポイント：ラベル用 `cols="4" sm="3"`、入力用 `cols="8" sm="9"`
+- 最小パディングでのコンパクトフィールドスタイリング
+- ラッパーdivでの水平スクロールテーブル
+- Vuetify 3フィールド間隔のカスタムCSSオーバーライド
 
-#### Input Optimizations
-- Dropdowns replace radio button groups on mobile
-- Reduced font sizes and padding on small screens
-- Touch-friendly button sizing and spacing
+#### 入力最適化
+- モバイルでのラジオボタングループをドロップダウンに置換
+- 小画面でのフォントサイズとパディング削減
+- タッチフレンドリーなボタンサイズと間隔
 
-### Data Integration
-- Character data sourced from external repositories via GitHub Actions
-- Static JSON assets in `/src/assets/` for character information
-- Image assets organized by character and costume variant
-- Periodic data synchronization from simulator and room repositories
+### データ統合
+- 外部 `SZ7M8ci7/simulator` リポジトリからGitHub Actions経由でキャラクターデータを取得
+- `/src/assets/` のキャラクター情報用静的JSONアセット（自動更新される `chara.json`）
+- `/src/assets/img/` でキャラクターとコスチュームバリアント別に整理された画像アセット
+- 1日4回の自動データ同期（04:30, 09:30, 16:30, 21:30 UTC）
+- データ更新時にワークフロー実行による自動デプロイメントをトリガー
 
-### Performance Considerations
-- Debounced calculations in simulator store (300ms delay)
-- Memoized computed properties for expensive operations
-- Cache management with manual clearing utilities
-- Lazy loading of character images
-- Component-level state isolation to prevent unnecessary re-renders
+### パフォーマンスの考慮事項
+- シミュレーターストアでのデバウンス計算（300ms遅延）
+- 高コスト操作に対するメモ化されたcomputedプロパティ
+- 手動クリアユーティリティによるキャッシュ管理
+- キャラクター画像の遅延読み込み
+- 不要な再レンダリングを防ぐコンポーネントレベルの状態分離
 
-### Deployment Architecture
-- GitHub Actions builds on master branch pushes
-- Static site deployment to GitHub Pages
-- Production build optimization through Vite
-- Asset path configuration for GitHub Pages subdirectory hosting
+### デプロイメントアーキテクチャ
+- Node.js 20を使用したmasterブランチプッシュ時のGitHub Actionsビルド
+- 自動404ページハンドリングによるGitHub Pagesへの静的サイトデプロイメント
+- 相対アセットパスによるViteでのプロダクションビルド最適化
+- GitHub Pagesサブディレクトリホスティング用のアセットパス設定
+- データ同期ワークフローによってトリガーされる自動デプロイメント
+
+### ゲーム固有の機能
+- バフ/デバフシステムを持つ `utils/calculations.ts` の複雑ダメージ計算エンジン
+- ベースステータスとレベルスケーリングによるキャラクター成長公式
+- 属性有効性とレア度検証によるマジックダメージ計算
+- ツイステッドワンダーランドのゲームメカニクス用のバディシステムボーナスとデュオマジックメカニクス
+- `xlsx` ライブラリを使用したデータ分析用Excelエクスポート機能

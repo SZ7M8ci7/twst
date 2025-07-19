@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive, watch, nextTick } from 'vue';
-import { calculateCharacterStats } from '@/utils/calculations';
+import { calculateCharacterStats, recalculateHP, recalculateATK } from '@/utils/calculations';
+import { useHandCollectionStore } from '@/store/handCollection';
 
 function debounce(fn: Function, delay: number) {
   let timer: number | null = null;
@@ -110,6 +111,9 @@ const createDefaultCharacter = (): Character => ({
 });
 
 export const useSimulatorStore = defineStore('simulator', () => {
+  // 手持ちコレクションストアへの参照
+  const handCollectionStore = useHandCollectionStore();
+
   // デッキのキャラクター（5人分）
   const deckCharacters = reactive([
     createDefaultCharacter(),
@@ -184,7 +188,10 @@ export const useSimulatorStore = defineStore('simulator', () => {
       
       const newStats = [];
       for (let i = 0; i < deckCharacters.length; i++) {
-        newStats.push(calculateCharacterStats(deckCharacters[i], currentCharaDict));
+        const character = deckCharacters[i];
+        
+        // デッキ内のキャラクターは手持ち設定に関係なく、ユーザーが設定した値を使用
+        newStats.push(calculateCharacterStats(character, currentCharaDict));
         if (i < deckCharacters.length - 1) await new Promise(r => setTimeout(r, 0));
       }
       
@@ -271,6 +278,16 @@ export const useSimulatorStore = defineStore('simulator', () => {
     }
   });
 
+  // 手持ちコレクションの変更を監視
+  watch(handCollectionStore.handCollection, () => {
+    recalculateStats();
+  }, { deep: true });
+
+  // 手持ちコレクション使用設定の変更を監視
+  watch(() => handCollectionStore.useHandCollection, () => {
+    recalculateStats();
+  });
+
   // デッキ全体のステータスを計算 - 最適化: 型安全性の向上
   const deckStats = computed(() => {
     const stats = {
@@ -297,13 +314,6 @@ export const useSimulatorStore = defineStore('simulator', () => {
     return stats;
   });
 
-  // 属性ごとのダメージを取得
-  const getDamageByAttribute = (attribute: string) => {
-    return characterStats.value.map(charStats => {
-      const damage = charStats.damage as { [key: string]: number };
-      return damage[attribute] || 0;
-    });
-  };
 
   // deckStatsの初期化を待機してから取得する関数
   const waitForDeckStats = async (): Promise<typeof deckStats.value> => {
@@ -371,53 +381,15 @@ export const useSimulatorStore = defineStore('simulator', () => {
 
   // キャラクターの基本ステータスを計算（twstsimu.jsのchangeLevel関数に合わせる）
   function calculateBaseStats(character: Character) {
-    const rare = character.rare;
-    const level = character.level;
-    const levelDict: Record<string, number> = {'R':70,'SR':90,'SSR':110}
-    const maxLevel = levelDict[rare as keyof typeof levelDict] || 110; // hiddenLv
-
-    // 基本ステータスを計算（不正な値の場合は0を使用）
-    const maxATK = Number(character.max_atk) || 0;
-    const maxHP = Number(character.max_hp) || 0;
-    const baseATK = Number(character.base_atk) || Math.floor(maxATK / (character.rare === 'SSR' ? 4.7 : character.rare === 'SR' ? 4.3 : 4.2));
-    const baseHP = Number(character.base_hp) || Math.floor(maxHP / (character.rare === 'SSR' ? 4.7 : character.rare === 'SR' ? 4.3 : 4.2));
-
-    // ボーナスステータス（20%）- twstsimu.jsと同じ
-    const bonusATK = baseATK * 0.2;
-    const bonusHP = baseHP * 0.2;
-
-    // レベルごとの成長量を計算 - twstsimu.jsの計算式と同じ
-    const ATKperLv = maxLevel > 1 ? (maxATK - 2 * bonusATK - baseATK) / (maxLevel - 1) : 0;
-    const HPperLv = maxLevel > 1 ? (maxHP - 2 * bonusHP - baseHP) / (maxLevel - 1) : 0;
-
-    // 現在のレベルでのステータスを計算 - twstsimu.jsと同じ
-    const levelDiff = maxLevel - level; // leveldef = hiddenLv - inLv
-    
-    // totsurate: 凸選択状態 (1 = 未凸, 0 = 凸済み)
-    const totsurate = character.isBonusSelected ? 0 : 1;
-    
-    // twstsimu.jsと同じ計算式で小数点第1位まで計算
-    const calculatedATK = (maxATK - ATKperLv * levelDiff) - bonusATK * totsurate;
-    const calculatedHP = (maxHP - HPperLv * levelDiff) - bonusHP * totsurate;
-    
     return {
-      atk: Math.max(0, Number(calculatedATK.toFixed(1))),
-      hp: Math.max(0, Number(calculatedHP.toFixed(1)))
+      atk: recalculateATK(character, character.level, character.isBonusSelected),
+      hp: recalculateHP(character, character.level, character.isBonusSelected)
     };
   }
 
-  function addCharacter(character: Partial<Character>) {
-    deckCharacters.push({ ...createDefaultCharacter(), ...character });
-  }
-
-  function removeCharacter(index: number) {
-    deckCharacters.splice(index, 1);
-  }
 
 
-  function setSelectedAttribute(attribute: string) {
-    selectedAttribute.value = attribute;
-  }
+
 
   // キャラクターのレベルを更新
   function updateLevel(index: number, level: number) {
@@ -443,9 +415,45 @@ export const useSimulatorStore = defineStore('simulator', () => {
 
   // キャラクター選択時の処理 - 最適化: 個別キャラクターの更新
   function selectCharacter(index: number, character: any) {
-    // 最大HPと最大ATKを保存
-    character.max_hp = character.hp;
-    character.max_atk = character.atk;
+    // 最大HPと最大ATKを保存（常にフルステータスの最大値を使用）
+    // originalMaxHP/originalMaxATKがある場合はそれを使用、なければ現在の値を使用
+    character.max_hp = character.originalMaxHP || character.hp;
+    character.max_atk = character.originalMaxATK || character.atk;
+    
+    // 現在の手持ち設定に基づいてHP/ATKを再計算
+    // これにより、手持ち設定が変更された後の置き換えでも正しいステータスが適用される
+    if (handCollectionStore.useHandCollection) {
+      const handCard = handCollectionStore.getHandCard(character.name);
+      if (handCard.isOwned) {
+        // 手持ち設定ONで所持している場合、手持ちレベルで再計算
+        character.level = Number(handCard.level);
+        character.hp = recalculateHP(character, Number(handCard.level), handCard.isLimitBreak);
+        character.atk = recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
+        character.isBonusSelected = handCard.isLimitBreak;
+        character.hasM3 = handCard.isM3;
+      } else {
+        // 手持ち設定ONで所持していない場合、レベル1・未凸で計算
+        character.level = 1;
+        character.hp = recalculateHP(character, 1, false);
+        character.atk = recalculateATK(character, 1, false);
+        character.isBonusSelected = false;
+        character.hasM3 = false;
+      }
+    } else {
+      // 手持ち設定OFFの場合、フルステータスを使用
+      // originalMaxHP/ATKがある場合はそれを使用
+      if (character.originalMaxHP) {
+        character.hp = character.originalMaxHP;
+      }
+      if (character.originalMaxATK) {
+        character.atk = character.originalMaxATK;
+      }
+      // フルステータスの場合の設定
+      const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
+      character.level = levelDict[character.rare as keyof typeof levelDict] || 110;
+      character.isBonusSelected = true;
+      character.hasM3 = true;
+    }
     
     const oldChara = deckCharacters[index].chara;
     Object.assign(deckCharacters[index], character);
@@ -473,51 +481,17 @@ export const useSimulatorStore = defineStore('simulator', () => {
     }
   }
 
-  // 全キャラクターのステータスを再計算 - 最適化: デバウンス適用
-  function calculateAllStats() {
-    recalculateStats();
-  }
 
-  // バフの更新処理 - 最適化: 個別バフの更新
-  function updateBuff(index: number, buffIndex: number, buff: any) {
-    if (!deckCharacters[index].buffs) {
-      deckCharacters[index].buffs = [];
-    }
-    
-    const currentBuff = deckCharacters[index].buffs[buffIndex];
-    const hasChanged = !currentBuff || 
-      currentBuff.buffOption !== buff.buffOption ||
-      currentBuff.powerOption !== buff.powerOption ||
-      currentBuff.levelOption !== buff.levelOption ||
-      currentBuff.magicOption !== buff.magicOption;
-    
-    if (hasChanged) {
-      // バフの初期値を設定
-      const updatedBuff = {
-        ...buff,
-        levelOption: buff.levelOption || '10',
-        powerOption: buff.powerOption || '小'
-      };
-      deckCharacters[index].buffs[buffIndex] = updatedBuff;
-      
-      characterStats.value[index] = calculateCharacterStats(deckCharacters[index], charaDict.value);
-    }
-  }
 
   return {
     deckCharacters,
     selectedAttribute,
     characterStats,
     deckStats,
-    getDamageByAttribute,
-    addCharacter,
-    removeCharacter,
-    setSelectedAttribute,
     updateLevel,
     calculateBaseStats,
     selectCharacter,
-    calculateAllStats,
-    updateBuff,
+    recalculateStats,
     charaDict,
     calculateCharacterStats,
     isInitialized,
@@ -528,12 +502,3 @@ export const useSimulatorStore = defineStore('simulator', () => {
   };
 });
 
-// ストア初期化時に初期計算を実行
-export const initializeSimulatorStore = () => {
-  const store = useSimulatorStore();
-  // 初期計算をトリガー
-  nextTick(() => {
-    store.calculateAllStats();
-  });
-  return store;
-};

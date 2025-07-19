@@ -642,3 +642,42 @@ function calculateAttributeDamages(attribute: string, baseDamage: number) {
     max: maxDamage
   };
 }
+
+// 共通のHP/ATK計算関数
+export function calculateStatFromLevel(
+  maxStat: number,
+  baseStat: number,
+  rare: string,
+  level: number,
+  isLimitBreak: boolean
+): number {
+  const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
+  const maxLevel = levelDict[rare as keyof typeof levelDict] || 110;
+  
+  // base値が0の場合は計算式から算出
+  const calculatedBaseStat = baseStat || Math.floor(maxStat / (rare === 'SSR' ? 4.7 : rare === 'SR' ? 4.3 : 4.2));
+  
+  const bonusStat = calculatedBaseStat * 0.2;
+  const statPerLv = maxLevel > 1 ? (maxStat - 2 * bonusStat - calculatedBaseStat) / (maxLevel - 1) : 0;
+  const levelDiff = maxLevel - level;
+  const totsurate = isLimitBreak ? 0 : 1;
+  
+  const calculatedStat = (maxStat - statPerLv * levelDiff) - bonusStat * totsurate;
+  return Math.max(0, Number(calculatedStat.toFixed(1)));
+}
+
+// HPの再計算
+export function recalculateHP(character: any, level: number, isLimitBreak: boolean): number {
+  // 常にフルステータスの最大値を使用
+  const maxHP = Number(character.originalMaxHP) || Number(character.max_hp) || Number(character.hp) || 0;
+  const baseHP = Number(character.base_hp) || 0;
+  return calculateStatFromLevel(maxHP, baseHP, character.rare, level, isLimitBreak);
+}
+
+// ATKの再計算
+export function recalculateATK(character: any, level: number, isLimitBreak: boolean): number {
+  // 常にフルステータスの最大値を使用
+  const maxATK = Number(character.originalMaxATK) || Number(character.max_atk) || Number(character.atk) || 0;
+  const baseATK = Number(character.base_atk) || 0;
+  return calculateStatFromLevel(maxATK, baseATK, character.rare, level, isLimitBreak);
+}

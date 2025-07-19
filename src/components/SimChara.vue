@@ -132,9 +132,11 @@ import MagicDropdown from './MagicDropdown.vue';
 import BuffDropdown from './BuffDropdown.vue';
 import SimCharaDetailModal from './SimCharaDetailModal.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { useHandCollectionStore } from '@/store/handCollection';
 import charactersInfo from '@/assets/characters_info.json';
 
 const simulatorStore = useSimulatorStore();
+const handCollectionStore = useHandCollectionStore();
 
 
 const imgpath = ref(defaultImg);
@@ -168,16 +170,35 @@ const levelDict = {'R':70,'SR':90,'SSR':110}
 // 画像を選択したときに呼ばれる
 const selectCharaImage = (chara) => {
   
+  // 手持ちコレクション設定を確認
+  let characterLevel = levelDict[chara.rare];
+  let hasM3 = false;
+  let bonusSelected = true;
+  
+  if (handCollectionStore.useHandCollection) {
+    const handCard = handCollectionStore.getHandCard(chara.name);
+    if (handCard.isOwned) {
+      characterLevel = handCard.level;
+      hasM3 = handCard.isM3;
+      bonusSelected = handCard.isLimitBreak; // 完凸状態をボーナス選択に反映
+    } else {
+      // 未所持の場合はデフォルト設定
+      characterLevel = 1;
+      hasM3 = false;
+      bonusSelected = false;
+    }
+  }
+  
   // 初期設定の処理
   const initialSettings = {
     chara: chara.chara || '',
-    level: levelDict[chara.rare],
+    level: characterLevel,
     hp: chara.hp || 0,
     atk: chara.atk || 0,
     isM1Selected: true,
     isM2Selected: true,
     isM3Selected: false,
-    isBonusSelected: true,
+    isBonusSelected: bonusSelected,
     magic1Lv: chara.magic1Lv || 10,
     magic2Lv: chara.magic2Lv || 10,
     magic3Lv: chara.magic3Lv || 10,
@@ -290,6 +311,22 @@ const selectCharaImage = (chara) => {
 
   // キャラクター選択時にselectCharacterを呼び出す
   simulatorStore.selectCharacter(props.charaIndex, chara);
+  
+  // 手持ちコレクション設定に基づいてレベルとボーナス状態を更新
+  if (handCollectionStore.useHandCollection) {
+    // deckCharactersのレベルとボーナス状態を更新
+    simulatorStore.deckCharacters[props.charaIndex].level = chara.level;
+    simulatorStore.deckCharacters[props.charaIndex].isBonusSelected = chara.isBonusSelected;
+    
+    // ステータスを再計算して更新
+    const newStats = simulatorStore.calculateBaseStats(simulatorStore.deckCharacters[props.charaIndex]);
+    simulatorStore.deckCharacters[props.charaIndex].atk = newStats.atk;
+    simulatorStore.deckCharacters[props.charaIndex].hp = newStats.hp;
+  }
+  
+  // 全ステータスを再計算
+  simulatorStore.recalculateStats();
+  
   // 画像を更新 - エラーハンドリングを追加
   if (chara.imgUrl) {
     imgpath.value = chara.imgUrl;
@@ -298,7 +335,7 @@ const selectCharaImage = (chara) => {
   }
   
   // ボーナス選択状態を更新
-  isBonusSelected.value = chara.isBonusSelected;
+  isBonusSelected.value = bonusSelected;
   closeCharaModal();
 };
 
@@ -370,7 +407,7 @@ const toggleBonus = () => {
   character.atk = newStats.atk;
   character.hp = newStats.hp;
   // 全ステータスを再計算
-  simulatorStore.calculateAllStats();
+  simulatorStore.recalculateStats();
 };
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
@@ -607,7 +644,7 @@ const toggleM = (index) => {
   if (simulatorStore.deckCharacters[props.charaIndex][selectedKey] || selectedCount() < 2) {
     simulatorStore.deckCharacters[props.charaIndex][selectedKey] = !simulatorStore.deckCharacters[props.charaIndex][selectedKey];
     // マジック選択変更時に再計算をトリガー
-    simulatorStore.calculateAllStats();
+    simulatorStore.recalculateStats();
   } else {
     startShaking(shakingKey);
   }
@@ -644,7 +681,7 @@ const saveDetailChanges = (updatedCharacter) => {
 // バフ変更時の処理
 const handleBuffChanged = () => {
   // 全ステータスを再計算
-  simulatorStore.calculateAllStats();
+  simulatorStore.recalculateStats();
 };
 
 const windowWidth = ref(window.innerWidth);
@@ -677,7 +714,7 @@ watch(() => simulatorStore.deckCharacters[props.charaIndex]?.rare, (newRare) => 
     if (newRare === 'R' || newRare === 'SR') {
       character.isM3Selected = false;
       // ステータス再計算
-      simulatorStore.calculateAllStats();
+      simulatorStore.recalculateStats();
     }
   }
 }, { immediate: true });

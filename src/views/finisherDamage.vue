@@ -15,7 +15,14 @@
       <!-- 属性表示を1行目に追加 -->
       <div class="character-row">
         <div class="character-item" :style="{ ...iconStyle }">
-          <!-- 空のスペース -->
+          <!-- 手持ち設定トグル（クリック切り替え） -->
+          <div 
+            class="toggle-button" 
+            @click="toggleHandCollection"
+            :class="{ 'active': useHandCollection }"
+          >
+            {{ useHandCollection ? t('finisherDamage.handCollection') : t('finisherDamage.allCards') }}
+          </div>
         </div>
         <div class="damage-row">
           <div
@@ -271,13 +278,20 @@
 
 <script setup lang="ts">
 import { useCharacterStore } from '@/store/characters';
+import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
-import { onMounted, ref, Ref, computed, onBeforeUnmount } from 'vue';
+import { onMounted, ref, Ref, computed, onBeforeUnmount, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { recalculateATK } from '@/utils/calculations';
 import characterDataJson from '@/assets/characters_info.json';
+const { t } = useI18n();
 const characterStore = useCharacterStore();
+const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
+// 独自の手持ち設定状態を管理（ストアとは独立）
+const useHandCollection = ref(false);
 
 const characterInfoMap: Ref<Map<string, CharacterCardInfo>> = ref(new Map());
 
@@ -409,66 +423,125 @@ const floraDamageListByCardDict: { [key: string]: DamageByCard[] } = {};
 const cosmicDamageListByCardDict: { [key: string]: DamageByCard[] } = {};
 
 
-// キャラ名をキーとして、バフ効果を持つカード名と効果値を辞書に追加
-characters.value.forEach(character => {
-  // etcをカンマで分割
-  const etcItems = character.etc.split(',');
+// バフ要員の辞書を構築する関数
+function buildEffectDict() {
+  // 辞書をクリア
+  Object.keys(effectDict).forEach(key => {
+    effectDict[key] = [];
+  });
 
-  // キャラ名をキーとして初期化
-  if (!effectDict[character.chara]) {
-    effectDict[character.chara] = [];
-  }
-
-  // 各効果をチェックし、キャラのリストに追加
-  etcItems.forEach(item => {
-    const trimmedItem = item.trim();
-    if (!trimmedItem.includes('味方') && !(trimmedItem.includes('被ダメージUP') && trimmedItem.includes('相手'))) return;
-    buffTypes.forEach(buffType => {
-      // 〇属性ダメージUPとダメージUPを区別するために、バフの種別で文字列が始まっているかチェックする
-      if (trimmedItem.startsWith(buffType)) {
-        // 効果値毎に区別して辞書に追加
-        buffValues.forEach(buffValue => {
-          
-          if (trimmedItem.includes(buffValue)) {
-            // バフの種類を判定
-            let buffbuffSource = '';
-            if (trimmedItem.includes('(M1)')) buffbuffSource = 'M1';
-            else if (trimmedItem.includes('(M2)')) buffbuffSource = 'M2';
-            else if (trimmedItem.includes('(M3)')) buffbuffSource = 'M3';
-            
-            effectDict[character.chara].push({ 
-              buff: buffType + buffValue, 
-              name: character.name,
-              buffSource: buffbuffSource
-            });
-          }
-        });
+  characters.value.forEach(character => {
+    // 手持ち設定ONの場合、所持していないカードはバフ要員から除外
+    if (useHandCollection.value) {
+      const handCard = handCollectionStore.getHandCard(character.name);
+      if (!handCard.isOwned) {
+        return; // 所持していない場合はスキップ
       }
+    }
+
+    // etcをカンマで分割
+    const etcItems = character.etc.split(',');
+
+    // キャラ名をキーとして初期化
+    if (!effectDict[character.chara]) {
+      effectDict[character.chara] = [];
+    }
+
+    // 各効果をチェックし、キャラのリストに追加
+    etcItems.forEach(item => {
+      const trimmedItem = item.trim();
+      if (!trimmedItem.includes('味方') && !(trimmedItem.includes('被ダメージUP') && trimmedItem.includes('相手'))) return;
+      buffTypes.forEach(buffType => {
+        // 〇属性ダメージUPとダメージUPを区別するために、バフの種別で文字列が始まっているかチェックする
+        if (trimmedItem.startsWith(buffType)) {
+          // 効果値毎に区別して辞書に追加
+          buffValues.forEach(buffValue => {
+            
+            if (trimmedItem.includes(buffValue)) {
+              // バフの種類を判定
+              let buffbuffSource = '';
+              if (trimmedItem.includes('(M1)')) buffbuffSource = 'M1';
+              else if (trimmedItem.includes('(M2)')) buffbuffSource = 'M2';
+              else if (trimmedItem.includes('(M3)')) buffbuffSource = 'M3';
+              
+              // M3バフの場合、レア度制限をチェック
+              if (buffbuffSource === 'M3') {
+                // レア度によるM3制限
+                if ((character.rare === 'R' || character.rare === 'SR')) {
+                  return; // R/SRの場合はM3バフをスキップ
+                }
+                // 手持ち設定でM3がfalseの場合もスキップ
+                if (useHandCollection.value) {
+                  const handCard = handCollectionStore.getHandCard(character.name);
+                  if (handCard.isOwned && !handCard.isM3) {
+                    return;
+                  }
+                }
+              }
+              
+              effectDict[character.chara].push({ 
+                buff: buffType + buffValue, 
+                name: character.name,
+                buffSource: buffbuffSource
+              });
+            }
+          });
+        }
+      });
     });
   });
-});
-// カード毎のダメージ計算
-characters.value.forEach(character => {
-  // SSR以外は計算しない
-  if (character.rare != 'SSR') return;
+}
 
-  // ATKバディーボーナス値計算
-  const buddyBonus = calcBuddy(character.buddy1s) + calcBuddy(character.buddy2s) + calcBuddy(character.buddy3s);
-  // 自己3TATKバフ計算
-  const selfAtkBuff = calcSelfAtkUp(character.etc);
-  // 自己3Tダメージバフ計算
-  const selfDamageBuff = calcSelfDamageUp(character.etc);
-  // 対各属性最大ダメージ
-  let maxFireDamage = 0;
-  let maxWaterDamage = 0;
-  let maxFloraDamage = 0;
-  let maxCosmicDamage = 0;
+// 初期バフ辞書構築
+buildEffectDict();
+// カード毎のダメージ計算を関数化
+function calculateDamage() {
+  characters.value.forEach(character => {
+    // SSR以外は計算しない
+    if (character.rare != 'SSR') return;
 
-  // ダメージ計算関数
-  function calcDamage(atr: string, partnerBuff: string, partnerName: string, buffSource: string) {
-    const atkPartnerBuff = atkBuffDict[partnerBuff] || 0;
-    // バフ込みのATK値
-    const atk = character.atk + character.atk * buddyBonus + character.atk * selfAtkBuff + character.atk * atkPartnerBuff;
+    // 手持ち設定からカード情報を取得（新デッキシミュレータと同じロジック）
+    let characterAtk: number;
+    let shouldCalculate = true; // 計算を行うかどうかのフラグ
+    
+    if (useHandCollection.value) {
+      const handCard = handCollectionStore.getHandCard(character.name);
+      if (handCard.isOwned) {
+        // 所持している場合、手持ち設定の値を使用
+        const characterLevel = Number(handCard.level);
+        const isLimitBreak = handCard.isLimitBreak;
+        // 新デッキシミュレータと同じATK計算
+        characterAtk = recalculateATK(character, characterLevel, isLimitBreak);
+      } else {
+        // 所持していない場合は計算しない（キャラごとの集計からは除外）
+        shouldCalculate = false;
+        characterAtk = 0;
+      }
+    } else {
+      // 手持ち設定OFFの場合、フルステータスを使用
+      characterAtk = Number(character.originalMaxATK) || Number(character.max_atk) || Number(character.atk) || 0;
+    }
+
+    // 所持していないカードは計算をスキップ
+    if (!shouldCalculate) return;
+
+    // ATKバディーボーナス値計算
+    const buddyBonus = calcBuddy(character.buddy1s) + calcBuddy(character.buddy2s) + calcBuddy(character.buddy3s);
+    // 自己3TATKバフ計算
+    const selfAtkBuff = calcSelfAtkUp(character.etc);
+    // 自己3Tダメージバフ計算
+    const selfDamageBuff = calcSelfDamageUp(character.etc);
+    // 対各属性最大ダメージ
+    let maxFireDamage = 0;
+    let maxWaterDamage = 0;
+    let maxFloraDamage = 0;
+    let maxCosmicDamage = 0;
+
+    // ダメージ計算関数
+    function calcDamage(atr: string, partnerBuff: string, partnerName: string, buffSource: string) {
+      const atkPartnerBuff = atkBuffDict[partnerBuff] || 0;
+      // バフ込みのATK値
+      const atk = characterAtk + characterAtk * buddyBonus + characterAtk * selfAtkBuff + characterAtk * atkPartnerBuff;
     let partnerDamageBuff = 0;
     const cosmicRatio = atr === '無' ? 1.1 : 1; // 無属性ダメージ補正
     // 味方のバフ値計算
@@ -539,24 +612,43 @@ characters.value.forEach(character => {
       name: partnerName,
       buffSource: buffSource
     });
-  }
-  // 味方バフ無しで計算
-  calcDamage(character.magic2atr, '', getEnglishName(character.duo), '');
-  // 味方バフ有りで計算
-  effectDict[character.duo].forEach(duoPartner => {
-    calcDamage(character.magic2atr, duoPartner.buff, duoPartner.name, duoPartner.buffSource);
+    }
+    // 味方バフ無しで計算
+    calcDamage(character.magic2atr, '', getEnglishName(character.duo), '');
+    // 味方バフ有りで計算
+    effectDict[character.duo].forEach(duoPartner => {
+      // M3バフの場合、デュオ相手のレア度制限をチェック
+      if (duoPartner.buffSource === 'M3') {
+        const duoCharacter = characters.value.find(c => c.name === duoPartner.name);
+        if (duoCharacter && (duoCharacter.rare === 'R' || duoCharacter.rare === 'SR')) {
+          return; // デュオ相手がR/SRの場合はM3バフをスキップ
+        }
+        // 手持ち設定でM3がfalseの場合もスキップ
+        if (useHandCollection.value) {
+          const handCard = handCollectionStore.getHandCard(duoPartner.name);
+          if (handCard.isOwned && !handCard.isM3) {
+            return;
+          }
+        }
+      }
+      
+      calcDamage(character.magic2atr, duoPartner.buff, duoPartner.name, duoPartner.buffSource);
+    });
+    if (!maxFireDamageByCharaDict[character.chara]) {
+      maxFireDamageByCharaDict[character.chara] = 0;
+      maxWaterDamageByCharaDict[character.chara] = 0;
+      maxFloraDamageByCharaDict[character.chara] = 0;
+      maxCosmicDamageByCharaDict[character.chara] = 0;
+    }
+    maxFireDamageByCharaDict[character.chara] = Math.max(maxFireDamageByCharaDict[character.chara], maxFireDamage);
+    maxWaterDamageByCharaDict[character.chara] = Math.max(maxWaterDamageByCharaDict[character.chara], maxWaterDamage);
+    maxFloraDamageByCharaDict[character.chara] = Math.max(maxFloraDamageByCharaDict[character.chara], maxFloraDamage);
+    maxCosmicDamageByCharaDict[character.chara] = Math.max(maxCosmicDamageByCharaDict[character.chara], maxCosmicDamage);
   });
-  if (!maxFireDamageByCharaDict[character.chara]) {
-    maxFireDamageByCharaDict[character.chara] = 0;
-    maxWaterDamageByCharaDict[character.chara] = 0;
-    maxFloraDamageByCharaDict[character.chara] = 0;
-    maxCosmicDamageByCharaDict[character.chara] = 0;
-  }
-  maxFireDamageByCharaDict[character.chara] = Math.max(maxFireDamageByCharaDict[character.chara], maxFireDamage);
-  maxWaterDamageByCharaDict[character.chara] = Math.max(maxWaterDamageByCharaDict[character.chara], maxWaterDamage);
-  maxFloraDamageByCharaDict[character.chara] = Math.max(maxFloraDamageByCharaDict[character.chara], maxFloraDamage);
-  maxCosmicDamageByCharaDict[character.chara] = Math.max(maxCosmicDamageByCharaDict[character.chara], maxCosmicDamage);
-});
+}
+
+// 初期計算を実行
+calculateDamage();
 
 // ATKバディ計算
 function calcBuddy(buddy: string) {
@@ -622,19 +714,6 @@ characters.value.forEach(character => {
   cardNameDict[character.chara].push(character.name);
 
 });
-
-// const openPanels = ref<Record<string, { fire: number[]; water: number[]; flora: number[]; cosmic: number[] }>>({});
-const openPanels = ref<Record<string, Record<string, number[]>>>({});
-
-characterDataJson.forEach((character) => {
-  openPanels.value[character.name_en] = {
-    fire: [],
-    water: [],
-    flora: [],
-    cosmic: []
-  };
-});
-
 
 // モーダル関連
 const dialogVisible = ref(false);
@@ -705,9 +784,14 @@ function toggleSort(column: string) {
 
 // ソート済みのキャラクターデータを計算
 const sortedCharacterData = computed(() => {
-  if (!sortColumn.value) return characterDataJson;
+  let filteredData = [...characterDataJson];
+  
+  // 手持ち設定に関係なく全キャラクターを表示
+  // （各キャラクターの所持状況は getMaxDamage で判定）
+  
+  if (!sortColumn.value) return filteredData;
 
-  return [...characterDataJson].sort((a, b) => {
+  return filteredData.sort((a, b) => {
     const aValue = getMaxDamage(a.name_ja, sortColumn.value as ElementType);
     const bValue = getMaxDamage(b.name_ja, sortColumn.value as ElementType);
     
@@ -725,14 +809,39 @@ const sortedCharacterData = computed(() => {
 function getMaxDamage(charaName: string, element: ElementType): number | string {
   if (charaName === '全キャラ') {
     const damageDict = getDamageListByElement(element);
-    const maxDamage = characters.value
+    let maxDamage = 0;
+    
+    characters.value
       .filter(character => character.rare === 'SSR')
-      .reduce((max, character) => {
+      .forEach(character => {
+        // 手持ち設定を考慮した表示判定
+        if (useHandCollection.value) {
+          const handCard = handCollectionStore.getHandCard(character.name);
+          if (!handCard.isOwned) {
+            return; // 所持していない場合は除外
+          }
+        }
+        
         const damageList = damageDict[character.name] || [];
         const characterMaxDamage = Math.max(...damageList.map(d => d.damage), 0);
-        return Math.max(max, characterMaxDamage);
-      }, 0);
+        maxDamage = Math.max(maxDamage, characterMaxDamage);
+      });
+    
     return Math.floor(maxDamage);
+  }
+
+  // 手持ち設定ONの場合、そのキャラクターのカードを1枚も所持していなければ"-"を返す
+  if (useHandCollection.value) {
+    const hasOwnedCard = characters.value
+      .filter(character => character.rare === 'SSR' && character.chara === charaName)
+      .some(character => {
+        const handCard = handCollectionStore.getHandCard(character.name);
+        return handCard.isOwned;
+      });
+    
+    if (!hasOwnedCard) {
+      return '-';
+    }
   }
 
   const dict = {
@@ -773,15 +882,13 @@ const selectedAllCharactersElement = ref<ElementType>('fire');
 const allCharactersCurrentPage = ref(1);
 const allCharactersItemsPerPage = ref(10);
 
-// 1アイテムの高さ（px）
-const LIST_ITEM_HEIGHT = 80; // min-height:56px + padding上下24px
-
 function calcItemsPerPage() {
   // モーダルの最大高さ: 95vh, ヘッダーや余白を差し引く
   const modalMaxHeight = window.innerHeight * 0.95;
   const headerFooterHeight = 60; // ヘッダー・フッター・余白の合計（調整可）
   const availableHeight = modalMaxHeight - headerFooterHeight;
-  const count = Math.max(1, Math.floor(availableHeight / LIST_ITEM_HEIGHT));
+  const itemHeight = 80; // min-height:56px + padding上下24px
+  const count = Math.max(1, Math.floor(availableHeight / itemHeight));
   itemsPerPage.value = count;
   allCharactersItemsPerPage.value = count;
 }
@@ -811,6 +918,7 @@ function openAllCharactersModal(element: ElementType) {
   const damageDict = getDamageListByElement(element);
   
   // 全キャラクターの全カード・全バフのダメージ情報を結合
+  // 手持ち設定ONの場合、計算されていないカードのダメージは自然に除外される
   allCharactersDamageList.value = characters.value
     .filter(character => character.rare === 'SSR')
     .flatMap(character => {
@@ -853,6 +961,46 @@ function getBuddyCards(cardName: string): string[] {
   }
   
   return buddyCards;
+}
+
+// 手持ち設定の切り替え関数
+function toggleHandCollection() {
+  useHandCollection.value = !useHandCollection.value;
+}
+
+// 手持ち設定の変更を監視して再計算を実行
+watch(() => useHandCollection.value, () => {
+  // 手持ち設定の変更時にダメージを再計算
+  recalculateAllDamage();
+});
+
+// 手持ちコレクションの内容変更を監視
+watch(() => handCollectionStore.handCollection, () => {
+  if (useHandCollection.value) {
+    // 手持ち設定ONの場合のみ再計算
+    recalculateAllDamage();
+  }
+}, { deep: true });
+
+// 全ダメージを再計算する関数
+function recalculateAllDamage() {
+  if (loading.value) return;
+  
+  // ダメージ辞書をリセット
+  Object.keys(maxFireDamageByCharaDict).forEach(key => delete maxFireDamageByCharaDict[key]);
+  Object.keys(maxWaterDamageByCharaDict).forEach(key => delete maxWaterDamageByCharaDict[key]);
+  Object.keys(maxFloraDamageByCharaDict).forEach(key => delete maxFloraDamageByCharaDict[key]);
+  Object.keys(maxCosmicDamageByCharaDict).forEach(key => delete maxCosmicDamageByCharaDict[key]);
+  Object.keys(fireDamageListByCardDict).forEach(key => delete fireDamageListByCardDict[key]);
+  Object.keys(waterDamageListByCardDict).forEach(key => delete waterDamageListByCardDict[key]);
+  Object.keys(floraDamageListByCardDict).forEach(key => delete floraDamageListByCardDict[key]);
+  Object.keys(cosmicDamageListByCardDict).forEach(key => delete cosmicDamageListByCardDict[key]);
+  
+  // バフ辞書を再構築
+  buildEffectDict();
+  
+  // ダメージを再計算
+  calculateDamage();
 }
 
 </script>
@@ -1143,7 +1291,6 @@ function getBuddyCards(cardName: string): string[] {
   object-fit: cover;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
   cursor: pointer;
-  transition: transform 0.2s ease;
 }
 
 .buddy-icon {
@@ -1151,7 +1298,6 @@ function getBuddyCards(cardName: string): string[] {
   object-fit: cover;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
   cursor: pointer;
-  transition: transform 0.2s ease;
 }
 
 .damage-value {
@@ -1221,5 +1367,34 @@ function getBuddyCards(cardName: string): string[] {
   min-width: 80px;
   font-weight: bold;
   letter-spacing: 1px;
+}
+
+.toggle-button {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.8em;
+  color: #666;
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.toggle-button:hover {
+  background-color: #e3f2fd;
+  border-color: #1976d2;
+  color: #1976d2;
+}
+
+.toggle-button.active {
+  background-color: #1976d2;
+  border-color: #1976d2;
+  color: white;
 }
 </style>

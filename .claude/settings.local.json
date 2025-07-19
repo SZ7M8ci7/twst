@@ -12,7 +12,9 @@
       "Bash(ls:*)",
       "Bash(npx tsc:*)",
       "Bash(curl:*)",
-      "Bash(jq:*)"
+      "Bash(jq:*)",
+      "Bash(pkill:*)",
+      "Bash(true)"
     ],
     "deny": []
   }

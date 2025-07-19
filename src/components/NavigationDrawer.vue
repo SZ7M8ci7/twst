@@ -14,6 +14,11 @@
         title="TOP"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'handCollection'}">
+      <v-list-item
+        :title="$t('tool.handCollection')"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'drop'}">
       <v-list-item
         :title="$t('tool.alchemyDropCountCalculator')"

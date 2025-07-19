@@ -85,6 +85,10 @@
                   <v-icon>mdi-database-import</v-icon>
                   <span class="ml-2">{{ $t('search.import') }}</span>
                 </v-btn>
+                <v-btn color="success" @click="applyHandCollection" class="action-btn">
+                  <v-icon>mdi-account-convert</v-icon>
+                  <span class="ml-2">{{ $t('search.applyHandCollection') }}</span>
+                </v-btn>
                 <v-btn color="grey" @click="closeDataModal" class="action-btn">
                   <v-icon>mdi-close</v-icon>
                   <span class="ml-2">{{ $t('search.close') }}</span>
@@ -115,12 +119,14 @@
 <script setup lang="ts">
 import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
+import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import charactersInfo from '@/assets/characters_info.json';
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
+const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
 const bulkLevel = ref(110);
 const loadingImgUrl = ref(true);
@@ -297,6 +303,37 @@ function importFromText() {
   } catch (error) {
     console.error('インポートエラー:', error);
     showSnackbar(t('search.importError'), 'error');
+  }
+}
+
+function applyHandCollection() {
+  try {
+    let appliedCount = 0;
+    
+    characters.value.forEach(character => {
+      // 手持ち設定から対応するカードを取得
+      const handCard = handCollectionStore.getHandCard(character.name);
+      
+      if (handCard.isOwned) {
+        // 所持している場合、手持ち設定の内容を反映
+        character.level = handCard.level;
+        character.required = false;
+        character.hasM3 = handCard.isM3;
+        appliedCount++;
+      } else {
+        // 所持していない場合、デフォルト設定
+        character.level = 0;
+        character.required = false;
+        character.hasM3 = false;
+      }
+    });
+    
+    saveLevels();
+    closeDataModal();
+    showSnackbar(t('search.applyHandCollectionSuccess', { count: appliedCount }));
+  } catch (error) {
+    console.error('手持ち設定反映エラー:', error);
+    showSnackbar(t('search.applyHandCollectionError'), 'error');
   }
 }
 
