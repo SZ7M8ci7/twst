@@ -652,12 +652,14 @@ function calculateDeckStats(candidateCharacter, sortKey) {
         if (handCard.isOwned) {
           recalculatedChara.level = Number(handCard.level);
           recalculatedChara.hasM3 = handCard.isM3;
+          recalculatedChara.isM3Selected = handCard.isM3; // M3選択状態も手持ち設定に合わせる
           recalculatedChara.hp = recalculateHP(chara, Number(handCard.level), handCard.isLimitBreak);
           recalculatedChara.atk = recalculateATK(chara, Number(handCard.level), handCard.isLimitBreak);
           recalculatedChara.isBonusSelected = handCard.isLimitBreak;
         } else {
           // 所持していない場合のhasM3設定を追加
           recalculatedChara.hasM3 = false;
+          recalculatedChara.isM3Selected = false; // M3選択状態もfalseに設定
         }
       }
       
@@ -898,6 +900,11 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       
       // M1, M2（、M3）のダメージ詳細から属性ダメージを抽出
       for (let i = 1; i <= 3; i++) {
+        // M3の場合はisM3Selectedが有効な場合のみ計算に含める
+        if (i === 3 && !chara.isM3Selected) {
+          continue;
+        }
+        
         const damageDetails = chara[`magic${i}DamageDetails`];
         if (damageDetails) {
           let damage = 0;
@@ -1350,6 +1357,7 @@ const selectImage = (character) => {
       
       // 完凸設定に基づくM3の有効/無効
       modifiedCharacter.hasM3 = handCard.isM3;
+      modifiedCharacter.isM3Selected = handCard.isM3;
       
       // キャラクターステータスを手持ち設定に基づいて調整
       // 元のフルステータス最大値を保存
