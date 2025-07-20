@@ -492,7 +492,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
   // 軽量な統計計算のためのショートカット
   if (['deckHPBuddyCount', 'deckBuddyCount', 'duoCount'].includes(sortKey)) {
     // 軽量な統計はメンバー名のみで判定可能
-    const memberNameDict = getOptimizedMemberNameSet(candidateCharacter, props.charaIndex >= 0 ? props.charaIndex : null);
+    const memberNameDict = getMemberNameSet(candidateCharacter, props.charaIndex >= 0 ? props.charaIndex : null);
     const memberNameSet = new Set(Object.keys(memberNameDict));
     
     let totalHPBuddy = 0;
@@ -1064,58 +1064,6 @@ function getMemberNameSet(candidateCharacter = null, excludeIndex = null) {
   return memberNameDict;
 }
 
-// 最適化されたメンバー名管理システム
-const memberNameCache = ref(new Map());
-
-// 高速メンバー名セット作成（最適化版）
-function getOptimizedMemberNameSet(candidateCharacter = null, excludeIndex = null) {
-  // キャッシュキーの生成
-  const deckSignature = deckCharacters.value.map(c => c.chara || '').join('|');
-  const candidateKey = candidateCharacter ? candidateCharacter.chara : '';
-  const excludeKey = excludeIndex !== null ? excludeIndex : -1;
-  const cacheKey = `${deckSignature}:${excludeKey}:${candidateKey}`;
-  
-  // キャッシュヒット確認
-  if (memberNameCache.value.has(cacheKey)) {
-    return memberNameCache.value.get(cacheKey);
-  }
-  
-  // 高速Set生成
-  const memberNameSet = new Set();
-  
-  // デッキメンバーを追加（excludeIndexを除く）
-  deckCharacters.value.forEach((char, index) => {
-    if (char.chara && index !== excludeIndex) {
-      memberNameSet.add(char.chara);
-    }
-  });
-  
-  // 候補キャラクターがある場合は追加
-  if (candidateCharacter && candidateCharacter.chara) {
-    memberNameSet.add(candidateCharacter.chara);
-  }
-  
-  // calculateCharacterStats が期待する形式（{ [key: string]: boolean }）に変換
-  const memberNameDict = {};
-  memberNameSet.forEach(name => {
-    memberNameDict[name] = true;
-  });
-  
-  // キャッシュに保存
-  memberNameCache.value.set(cacheKey, memberNameDict);
-  
-  return memberNameDict;
-}
-
-// メンバー名キャッシュのクリア関数
-const clearMemberNameCache = () => {
-  memberNameCache.value.clear();
-};
-
-// デッキ変更時にメンバー名キャッシュをクリア
-watch(() => deckCharacters.value.map(c => c.chara), () => {
-  clearMemberNameCache();
-}, { deep: true });
 
 // Props定義
 const props = defineProps({
@@ -1147,13 +1095,6 @@ const optimizedDataStructures = computed(() => {
   };
 });
 
-// ソート用計算値のキャッシュ
-const sortCache = ref(new Map());
-
-// ソートキャッシュをクリアする関数
-const clearSortCache = () => {
-  sortCache.value.clear();
-};
 
 // 画像読み込みキューをリセットする関数
 const resetImageLoadingQueue = () => {
@@ -1170,27 +1111,11 @@ const resetImageLoadingQueue = () => {
   }
 };
 
-// watchでソート条件が変更されたらキャッシュをクリア
+// watchでソート条件が変更されたら画像読み込みキューをリセット
 watch([sortBy, sortOrder, () => props.selectedAttribute], () => {
-  clearSortCache();
-  clearMemberNameCache();
   resetImageLoadingQueue();
 }, { flush: 'sync' });
 
-// デッキキャラクターが変更されたらキャッシュをクリア（デバウンス）
-let deckWatchTimer = null;
-watch(() => deckCharacters.value.map(c => ({ chara: c.chara, level: c.level, hp: c.hp, atk: c.atk })), () => {
-  if (deckWatchTimer) clearTimeout(deckWatchTimer);
-  deckWatchTimer = setTimeout(() => {
-    clearSortCache();
-    clearMemberNameCache();
-  }, 100);
-}, { deep: true });
-
-// キャラクターの画像読み込み状態を初期化
-const initializeImageState = () => {
-  // 遅延初期化でモーダル表示を高速化
-};
 
 // ソート中フラグ
 const isSorting = ref(false);
@@ -1297,13 +1222,13 @@ const updateFilteredCharacters = async () => {
         }
         case 'effectiveCardHP':
           // カード単体の計算では、置き換え対象のキャラクターを除外し、候補キャラクターを含む仮想デッキでバディ効果を計算
-          aValue = calculateEffectiveCardHP(a, getOptimizedMemberNameSet(a, props.charaIndex));
-          bValue = calculateEffectiveCardHP(b, getOptimizedMemberNameSet(b, props.charaIndex));
+          aValue = calculateEffectiveCardHP(a, getMemberNameSet(a, props.charaIndex));
+          bValue = calculateEffectiveCardHP(b, getMemberNameSet(b, props.charaIndex));
           break;
         case 'effectiveCardATK':
           // カード単体の計算では、置き換え対象のキャラクターを除外し、候補キャラクターを含む仮想デッキでバディ効果を計算
-          aValue = calculateEffectiveCardATK(a, getOptimizedMemberNameSet(a, props.charaIndex));
-          bValue = calculateEffectiveCardATK(b, getOptimizedMemberNameSet(b, props.charaIndex));
+          aValue = calculateEffectiveCardATK(a, getMemberNameSet(a, props.charaIndex));
+          bValue = calculateEffectiveCardATK(b, getMemberNameSet(b, props.charaIndex));
           break;
         default:
           aValue = a.chara || '';
@@ -1333,7 +1258,7 @@ watch([sortBy, sortOrder, () => characters.value.filter(c => c.visible).length],
   updateTimer = setTimeout(() => {
     updateFilteredCharacters();
   }, 50);
-}, { immediate: true });
+});
 
 // 手持ちコレクション設定変更時に候補キャラクターの表示を更新
 watch(() => handCollectionStore.useHandCollection, () => {
@@ -1422,12 +1347,12 @@ function getDisplayText(character) {
     case 'duoPartner':
       return character.duo || 'なし';
     case 'effectiveCardHP': {
-      const effectiveHP = calculateEffectiveCardHP(character, getOptimizedMemberNameSet(character, props.charaIndex));
+      const effectiveHP = calculateEffectiveCardHP(character, getMemberNameSet(character, props.charaIndex));
       const roundedHP = Math.round(effectiveHP);
       return roundedHP;
     }
     case 'effectiveCardATK':
-      return Math.round(calculateEffectiveCardATK(character, getOptimizedMemberNameSet(character, props.charaIndex)));
+      return Math.round(calculateEffectiveCardATK(character, getMemberNameSet(character, props.charaIndex)));
     case 'effectiveDeckHP':
     case 'deckDamage':
     case 'deckHPBuddyCount':
@@ -1670,18 +1595,13 @@ onMounted(async () => {
     
     // 高速初期化：最小限の処理のみ
     
-    // 初期フィルター・ソートを実行（フィルター処理前）
-    updateFilteredCharacters();
+    // フィルター処理を先に実行してからソート
+    initializeModalFilter();
     
-    // モーダル表示後にフィルター処理を非同期で実行（UIをブロックしない）
-    setTimeout(() => {
-      initializeModalFilter();
-      
-      // フィルター適用後にソートを更新
-      nextTick(() => {
-        updateFilteredCharacters();
-      });
-    }, 0);
+    // フィルター適用後にソートを実行
+    nextTick(() => {
+      updateFilteredCharacters();
+    });
     
     // 初期化はフィルターされたキャラクターのみに対して実行
     requestAnimationFrame(() => {
