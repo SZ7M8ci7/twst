@@ -1019,7 +1019,7 @@ select {
 /* デスクトップ（サイドパネルあり） - より保守的に */
 @media (min-width: 960px) and (max-width: 1199px) {
   .buff-list {
-    grid-template-columns: repeat(1, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
