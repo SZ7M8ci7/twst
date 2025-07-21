@@ -2,6 +2,7 @@ import { Character, useCharacterStore} from '@/store/characters'
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
+import { DeckSearchResultsManager, type DeckResult } from './TopNResultsManager';
 const searchSettingStore = useSearchSettingsStore();
 const {
   minEHP,
@@ -47,6 +48,9 @@ export interface deckStatus{
   buddyNum:number;
   HPBuddyNum:number;
 }
+// 効率的な結果管理のためのエクスポート
+export { DeckSearchResultsManager, type DeckResult };
+
 export function getAvailableSortProps(t: (key: string) => string) {
   return [  
   t('comments.HP'),
@@ -729,16 +733,11 @@ export async function calcDecks(t: (key: string) => string) {
   
   const firstSortCriteria = sortCriteria[0].order === "昇順";
   async function appendResult(){
-    // ソート基準と方向に基づいてソート
-    results.value.sort(dynamicSortMultiple(sortCriteria));
-
-    // 上位のみを保持
-    const topResults = results.value.slice(0, maxResult.value);
-
-    // リアクティブな状態を更新
-    results.value = [...topResults];
+    // 効率的な結果管理：既にソート済みの上位N件を取得
+    results.value = resultsManager.getTopDecks();
+    
     if (results.value.length > 0) {
-      currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
+      currentLimit = results.value[results.value.length - 1][sortCriteria[0].key as keyof DeckResult] as number;
     }
     await new Promise(requestAnimationFrame);
   }
@@ -770,49 +769,47 @@ export async function calcDecks(t: (key: string) => string) {
     return;
   }
   results.value = [];
+  
+  // 効率的な上位N件管理クラスを初期化
+  const resultsManager = new DeckSearchResultsManager(maxResult.value, sortCriteria);
+  
   let currentLimit = sortCriteria[0].order === '昇順' ? Infinity : -Infinity;  // 現在の上限値を保持する変数を追加
   const processCombinationCore = async (combination: Character[]) => {
     return new Promise<void>(resolve => {
       const ret: (string | number)[] | undefined = calcDeckStatus(combination);
       if (ret) {
-        const transformedRet = {
+        const transformedRet: DeckResult = {
           hp: Math.round(ret[0] as number),
           ehp: Math.round(ret[1] as number),
-          evasion: ret[2],
-          hpBuddy: ret[3],
-          increasedHpBuddy: ret[4],
-          buddy: ret[5],
-          noHpBuddy: ret[6],
-          duo: ret[7],
-          buff: ret[8],
-          debuff: ret[9],
-          maxCosmic: ret[10],
-          maxFire: ret[11],
-          maxWater: ret[12],
-          maxFlora: ret[13],
-          referenceDamage: ret[14],
-          referenceAdvantageDamage: ret[15],
-          referenceVsHiDamage: ret[16],
-          referenceVsMizuDamage: ret[17],
-          referenceVsKiDamage: ret[18],
-          healNum: ret[19],
-          chara1: ret[20],
-          chara2: ret[21],
-          chara3: ret[22],
-          chara4: ret[23],
-          chara5: ret[24],
-          simuURL: ret[25],
+          evasion: ret[2] as number,
+          hpBuddy: ret[3] as number,
+          increasedHpBuddy: ret[4] as number,
+          buddy: ret[5] as number,
+          noHpBuddy: ret[6] as number,
+          duo: ret[7] as number,
+          buff: ret[8] as number,
+          debuff: ret[9] as number,
+          maxCosmic: ret[10] as number,
+          maxFire: ret[11] as number,
+          maxWater: ret[12] as number,
+          maxFlora: ret[13] as number,
+          referenceDamage: ret[14] as number,
+          referenceAdvantageDamage: ret[15] as number,
+          referenceVsHiDamage: ret[16] as number,
+          referenceVsMizuDamage: ret[17] as number,
+          referenceVsKiDamage: ret[18] as number,
+          healNum: ret[19] as number,
+          chara1: ret[20] as string,
+          chara2: ret[21] as string,
+          chara3: ret[22] as string,
+          chara4: ret[23] as string,
+          chara5: ret[24] as string,
+          simuURL: ret[25] as string,
           detailList: ret[26],
         };
-        const score = transformedRet[sortCriteria[0].key as keyof typeof transformedRet] as number;
-        // sortCriteriaの0件目の順序が昇順の場合、現在の上限値よりも小さいか同じ場合のみpushする
-        if (firstSortCriteria && score <= currentLimit) {
-          results.value.push(transformedRet);
-        }
-        // sortCriteriaの0件目の順序が降順の場合、現在の上限値よりも大きいか同じ場合のみpushする
-        else if ((!firstSortCriteria) && score >= currentLimit ) {
-          results.value.push(transformedRet);
-        }
+        
+        // 効率的な上位N件管理：上位に入る場合のみ追加
+        resultsManager.addDeck(transformedRet);
       }
       nowResults.value += 1;
       resolve();
@@ -912,16 +909,11 @@ export async function calcDecks(t: (key: string) => string) {
       }
     }
   }
-  // ソート基準と方向に基づいてソート
-  results.value.sort(dynamicSortMultiple(sortCriteria));
-
-  // 上位のみを保持
-  const topResults = results.value.slice(0, maxResult.value);
-
-  // リアクティブな状態を更新
-  results.value = [...topResults];
+  // 最終結果を取得（既にソート済み）
+  results.value = resultsManager.getTopDecks();
+  
   if (results.value.length > 0) {
-    currentLimit = results.value[results.value.length - 1][sortCriteria[0].key];
+    currentLimit = results.value[results.value.length - 1][sortCriteria[0].key as keyof DeckResult] as number;
   }
 
 }

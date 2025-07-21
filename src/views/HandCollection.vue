@@ -400,12 +400,13 @@ const filteredCharacters = computed(() => {
             aValue = a.level;
             bValue = b.level;
             break;
-          case 'rare':
+          case 'rare': {
             // SSR > SR > R の順序で数値化
             const rareOrder = { 'SSR': 3, 'SR': 2, 'R': 1 };
             aValue = rareOrder[a.rare as keyof typeof rareOrder] || 0;
             bValue = rareOrder[b.rare as keyof typeof rareOrder] || 0;
             break;
+          }
           case 'costume':
             aValue = a.costume;
             bValue = b.costume;
