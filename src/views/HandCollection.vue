@@ -352,8 +352,6 @@ const filteredCharacters = computed(() => {
     return [];
   }
   
-  // 手持ち設定のデータを参照（常にtrueなので最適化可能）
-  const handCollectionData = handCollectionStore.handCollection;
   const order = characterOrder.value;
   
   const result = characters.value

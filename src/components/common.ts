@@ -189,22 +189,6 @@ function getBuddyRates(status: string): { hp: number; atk: number; heal: number;
   return buddyRatesCache[status];
 }
 
-function calcHPBuddyRate(status: string): number {
-  return getBuddyRates(status).hp;
-}
-
-function calcATKBuddyRate(status: string): number {
-  return getBuddyRates(status).atk;
-}
-
-function calcHealRate(status: string): number {
-  return getBuddyRates(status).heal;
-}
-
-function calcConHealRate(status: string): number {
-  return getBuddyRates(status).conHeal;
-}
-
 function isHealCard(healStatus: string): boolean {
   return healStatus !== '' && buddyRateMap[healStatus] && 
          (buddyRateMap[healStatus].heal > 0 || buddyRateMap[healStatus].conHeal > 0);
@@ -625,27 +609,6 @@ interface SortCriterion {
   order: '昇順' | '降順'|'ASC' | 'DESC';
 }
 
-function dynamicSortMultiple(criteria: SortCriterion[]) {
-  return function(a:any, b:any) {
-      for (let i = 0; i < criteria.length; i++) {
-          const { key, order } = criteria[i];
-          if (!Object.prototype.hasOwnProperty.call(a, key) || !Object.prototype.hasOwnProperty.call(b, key)) {
-            continue; // オブジェクトがキーを持っていない場合は比較をスキップ
-          }
-          let comparison = 0;
-          if (a[key] < b[key]) {
-              comparison = -1;
-          } else if (a[key] > b[key]) {
-              comparison = 1;
-          }
-          if (comparison !== 0) {
-              return order === '降順' ? comparison * -1 : comparison;
-          }
-          // このキーでは同値だった場合、次のキーでの比較に移る
-      }
-      return 0; // すべてのキーで比較しても差がない場合
-  };
-}
 function factorialize(num:number) :number {
   if (num <= 0) { return 1; }
   return num * factorialize(num-1);
@@ -731,14 +694,10 @@ export async function calcDecks(t: (key: string) => string) {
     return;
   }
   
-  const firstSortCriteria = sortCriteria[0].order === "昇順";
   async function appendResult(){
     // 効率的な結果管理：既にソート済みの上位N件を取得
     results.value = resultsManager.getTopDecks();
     
-    if (results.value.length > 0) {
-      currentLimit = results.value[results.value.length - 1][sortCriteria[0].key as keyof DeckResult] as number;
-    }
     await new Promise(requestAnimationFrame);
   }
   const atkSortKey = new Set([
@@ -773,7 +732,6 @@ export async function calcDecks(t: (key: string) => string) {
   // 効率的な上位N件管理クラスを初期化
   const resultsManager = new DeckSearchResultsManager(maxResult.value, sortCriteria);
   
-  let currentLimit = sortCriteria[0].order === '昇順' ? Infinity : -Infinity;  // 現在の上限値を保持する変数を追加
   const processCombinationCore = async (combination: Character[]) => {
     return new Promise<void>(resolve => {
       const ret: (string | number)[] | undefined = calcDeckStatus(combination);
@@ -912,10 +870,6 @@ export async function calcDecks(t: (key: string) => string) {
   // 最終結果を取得（既にソート済み）
   results.value = resultsManager.getTopDecks();
   
-  if (results.value.length > 0) {
-    currentLimit = results.value[results.value.length - 1][sortCriteria[0].key as keyof DeckResult] as number;
-  }
-
 }
 
 // キャッシュされた画像URLの辞書 (モジュールスコープ)
