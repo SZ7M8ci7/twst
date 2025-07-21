@@ -170,20 +170,35 @@ const buddyRateMap: { [key: string]: { hp: number; atk: number; heal: number; co
   '継続回復(中)': { hp: 0, atk: 0, heal: 0, conHeal: 0.25 * 3 },
 };
 
+// バディレートキャッシュ
+const buddyRatesCache: { [key: string]: { hp: number; atk: number; heal: number; conHeal: number } } = {};
+
+function getBuddyRates(status: string): { hp: number; atk: number; heal: number; conHeal: number } {
+  if (!buddyRatesCache[status]) {
+    buddyRatesCache[status] = {
+      hp: buddyRateMap[status]?.hp || 0,
+      atk: buddyRateMap[status]?.atk || 0,
+      heal: buddyRateMap[status]?.heal || 0,
+      conHeal: buddyRateMap[status]?.conHeal || 0
+    };
+  }
+  return buddyRatesCache[status];
+}
+
 function calcHPBuddyRate(status: string): number {
-  return buddyRateMap[status]?.hp || 0;
+  return getBuddyRates(status).hp;
 }
 
 function calcATKBuddyRate(status: string): number {
-  return buddyRateMap[status]?.atk || 0;
+  return getBuddyRates(status).atk;
 }
 
 function calcHealRate(status: string): number {
-  return buddyRateMap[status]?.heal || 0;
+  return getBuddyRates(status).heal;
 }
 
 function calcConHealRate(status: string): number {
-  return buddyRateMap[status]?.conHeal || 0;
+  return getBuddyRates(status).conHeal;
 }
 
 function isHealCard(healStatus: string): boolean {
@@ -240,9 +255,16 @@ function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: 
   return calcDamageAfterCalcAtk(magicBuff, magicPow, magicAtr=='無' ? '無':'無以外', atk);
 }
 function calcTopDamage(damage1: number, damage2: number, damage3: number): number[] {
-  const damages = [damage1, damage2, damage3];
-  damages.sort((a, b) => b - a);
-  return [damages[0], damages[1]];
+  const max = Math.max(damage1, damage2, damage3);
+  let second: number;
+  if (max === damage1) {
+    second = Math.max(damage2, damage3);
+  } else if (max === damage2) {
+    second = Math.max(damage1, damage3);
+  } else {
+    second = Math.max(damage1, damage2);
+  }
+  return [max, second];
 }
 export function calcDeckStatus(characters:Character[]) : Array<number | string| any> | undefined {
   const memberNameSet: Set<string> = new Set();
@@ -326,63 +348,45 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     let atkBuddyRate = 0;
     // バディHP増加分加算
     let increasedHP = 0;
-    if (memberNameSet.has(chara.buddy1c)) {
-      deckTotalBuddy += 1;
-      const hpRate = calcHPBuddyRate(chara.buddy1s);
-      atkBuddyRate += calcATKBuddyRate(chara.buddy1s);
-      if (hpRate != 0) {
-        deckTotalHPBuddy += 1;
-        hasHpBuddy = true;
-        deckTotalHP += chara.calcBaseHP * hpRate;
-        increasedHP += chara.calcBaseHP * hpRate;
-      }
-    }
-    if (memberNameSet.has(chara.buddy2c)) {
-      deckTotalBuddy += 1;
-      const hpRate = calcHPBuddyRate(chara.buddy2s);
-      atkBuddyRate += calcATKBuddyRate(chara.buddy2s);
-      if (hpRate != 0) {
-        deckTotalHPBuddy += 1;
-        hasHpBuddy = true;
-        deckTotalHP += chara.calcBaseHP * hpRate;
-        increasedHP += chara.calcBaseHP * hpRate;
-      }
-    }
-    if (memberNameSet.has(chara.buddy3c)) {
-      deckTotalBuddy += 1;
-      const hpRate = calcHPBuddyRate(chara.buddy3s);
-      atkBuddyRate += calcATKBuddyRate(chara.buddy3s);
-      if (hpRate != 0) {
-        deckTotalHPBuddy += 1;
-        hasHpBuddy = true;
-        deckTotalHP += chara.calcBaseHP * hpRate;
-        increasedHP += chara.calcBaseHP * hpRate;
+    const buddies = [
+      { c: chara.buddy1c, s: chara.buddy1s },
+      { c: chara.buddy2c, s: chara.buddy2s },
+      { c: chara.buddy3c, s: chara.buddy3s }
+    ];
+    
+    for (const buddy of buddies) {
+      if (memberNameSet.has(buddy.c)) {
+        deckTotalBuddy += 1;
+        const rates = getBuddyRates(buddy.s);
+        atkBuddyRate += rates.atk;
+        if (rates.hp !== 0) {
+          deckTotalHPBuddy += 1;
+          hasHpBuddy = true;
+          const hpIncrease = chara.calcBaseHP * rates.hp;
+          deckTotalHP += hpIncrease;
+          increasedHP += hpIncrease;
+        }
       }
     }
     deckMinIncreasedHPBuddy = Math.min(deckMinIncreasedHPBuddy, increasedHP);
     // HP回復分加算
-    const hpHeal =
-      (calcHealRate(chara.magic1heal) +
-        calcHealRate(chara.magic2heal) +
-        (chara.hasM3 ? calcHealRate(chara.magic3heal) : 0)) *
-      chara.calcBaseATK;
-    const hpConHeal =
-      (calcConHealRate(chara.magic1heal) +
-        calcConHealRate(chara.magic2heal) +
-        (chara.hasM3 ? calcConHealRate(chara.magic3heal) : 0)) *
-      chara.calcBaseHP;
+    const magic1Rates = getBuddyRates(chara.magic1heal);
+    const magic2Rates = getBuddyRates(chara.magic2heal);
+    const magic3Rates = chara.hasM3 ? getBuddyRates(chara.magic3heal) : { heal: 0, conHeal: 0 };
+    
+    const hpHeal = (magic1Rates.heal + magic2Rates.heal + magic3Rates.heal) * chara.calcBaseATK;
+    const hpConHeal = (magic1Rates.conHeal + magic2Rates.conHeal + magic3Rates.conHeal) * chara.calcBaseHP;
     deckTotalHeal += hpHeal + hpConHeal
     healList.push(hpHeal + hpConHeal);
       
     // 回復手札数をカウント
-    if (isHealCard(chara.magic1heal)) {
-      deckHealCards += 1;
-    }
-    if (isHealCard(chara.magic2heal)) {
-      deckHealCards += 1;
-    }
-    if (chara.hasM3 && isHealCard(chara.magic3heal)) {
-      deckHealCards += 1;
+    const healMagics = [chara.magic1heal, chara.magic2heal];
+    if (chara.hasM3) healMagics.push(chara.magic3heal);
+    
+    for (const healMagic of healMagics) {
+      if (isHealCard(healMagic)) {
+        deckHealCards += 1;
+      }
     }
     
     // 回避数加算
