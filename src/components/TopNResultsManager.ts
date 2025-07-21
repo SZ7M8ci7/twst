@@ -89,11 +89,8 @@ export class TopNResultsManager<T> {
    * 現在の結果を取得
    */
   getResults(): T[] {
-    if (this.results.length < this.maxSize) {
-      // まだソートされていない場合はソート
-      return [...this.results].sort(this.compareFunc);
-    }
-    return [...this.results];
+    // 常にソート済みの結果を返す
+    return [...this.results].sort(this.compareFunc);
   }
 
   /**
