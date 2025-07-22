@@ -166,157 +166,24 @@ const closeDetailModal = () => {
   isDetailModalOpen.value = false;
 };
 
-const levelDict = {'R':70,'SR':90,'SSR':110}
 // 画像を選択したときに呼ばれる
-const selectCharaImage = (chara) => {
+const selectCharaImage = async (chara) => {
+  // 共通関数を使用してキャラクター選択処理を実行
+  const processedChara = await processCharacterSelection(chara);
   
-  // 手持ちコレクション設定を確認
-  let characterLevel = levelDict[chara.rare];
-  let hasM3 = false;
-  let bonusSelected = true;
-  
-  if (handCollectionStore.useHandCollection) {
-    const handCard = handCollectionStore.getHandCard(chara.name);
-    if (handCard.isOwned) {
-      characterLevel = handCard.level;
-      hasM3 = handCard.isM3;
-      bonusSelected = handCard.isLimitBreak; // 完凸状態をボーナス選択に反映
-    } else {
-      // 未所持の場合はデフォルト設定
-      characterLevel = 1;
-      hasM3 = false;
-      bonusSelected = false;
-    }
-  }
-  
-  // 初期設定の処理
-  const initialSettings = {
-    chara: chara.chara || '',
-    level: characterLevel,
-    hp: chara.hp || 0,
-    atk: chara.atk || 0,
-    isM1Selected: true,
-    isM2Selected: true,
-    isM3Selected: false,
-    isBonusSelected: bonusSelected,
-    magic1Lv: chara.magic1Lv || 10,
-    magic2Lv: chara.magic2Lv || 10,
-    magic3Lv: chara.magic3Lv || 10,
-    buddy1c: chara.buddy1c || '',
-    buddy2c: chara.buddy2c || '',
-    buddy3c: chara.buddy3c || '',
-    buddy1s: chara.buddy1s || '',
-    buddy2s: chara.buddy2s || '',
-    buddy3s: chara.buddy3s || '',
-    buddy1Lv: chara.buddy1Lv || 10,
-    buddy2Lv: chara.buddy2Lv || 10,
-    buddy3Lv: chara.buddy3Lv || 10,
-    buffs: []
-  };
-
-  // 各魔法の初期設定をループで処理
-  for (let i = 1; i <= 3; i++) {
-    const magicKey = `magic${i}`;
-    // バフと回復の設定
-    chara[`${magicKey}buf`] = chara[`${magicKey}buf`] || '';
-    chara[`${magicKey}heal`] = chara[`${magicKey}heal`] || '';
-    // マジックの属性と威力の設定
-    chara[`${magicKey}Attribute`] = chara[`${magicKey}atr`] || '';
-    chara[`${magicKey}Power`] = chara[`${magicKey}pow`] || '単発(弱)';
-
-    // バフと回復の自動設定
-    const buffValue = chara[`${magicKey}buf`];
-    const healValue = chara[`${magicKey}heal`];
-    
-    // バフの追加
-    if (buffValue) {
-      const buffType = buffValue.includes('ATKUP') ? 'ATKUP' :
-                      buffValue.includes('属性ダメUP') ? '属性ダメUP' :
-                      buffValue.includes('ダメUP') ? 'ダメージUP' :
-                      buffValue.includes('クリティカル') ? 'クリティカル' : '';
-      
-      if (buffType) {
-        const buff = {
-          magicOption: `M${i}`,
-          buffOption: buffType,
-          powerOption: getPowerOption(buffValue),
-          levelOption: buffType === 'クリティカル' ? 1 : 10 // クリティカルはレベル無効
-        };
-        initialSettings.buffs.push(buff);
-      }
-    }
-    
-    // etcフィールドから被ダメージUPの相手対象をチェック
-    if (chara.etc) {
-      const etcEffects = chara.etc.split(',').map(effect => effect.trim());
-      
-      // 該当する魔法番号を含む効果をフィルタリング
-      const magicEffects = etcEffects.filter(effect => effect.includes(`(M${i})`));
-      
-      // 被ダメージUPで相手対象のものを探す
-      for (const effect of magicEffects) {
-        if (effect.includes('被ダメージUP') && effect.includes('相手')) {
-          // 被ダメージUPのバフを追加
-          const buff = {
-            magicOption: `M${i}`,
-            buffOption: 'ダメージUP',
-            powerOption: getPowerOption(effect),
-            levelOption: 10
-          };
-          initialSettings.buffs.push(buff);
-          break; // 同じ魔法で複数の被ダメージUPはないはずなので最初の1つで終了
-        }
-      }
-    }
-    
-    // 回復の追加
-    if (healValue) {
-      if (healValue.includes('回復&継続回復')) {
-        initialSettings.buffs.push({
-          magicOption: `M${i}`,
-          buffOption: '継続回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-        initialSettings.buffs.push({
-          magicOption: `M${i}`,
-          buffOption: '回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-      } else if (healValue.includes('継続回復')) {
-        initialSettings.buffs.push({
-          magicOption: `M${i}`,
-          buffOption: '継続回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-      } else if (healValue.includes('回復')) {
-        initialSettings.buffs.push({
-          magicOption: `M${i}`,
-          buffOption: '回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-      }
-    }
-  }
-  // 初期設定を適用
-  Object.assign(chara, initialSettings);
-
   // デュオキャラクターの効果を設定（初期設定後に実行して上書きを防ぐ）
-  if (chara.duo && simulatorStore.charaDict[chara.duo]) {
-    chara.magic2Power = 'デュオ';
+  if (processedChara.duo && simulatorStore.charaDict[processedChara.duo]) {
+    processedChara.magic2Power = 'デュオ';
   }
 
   // キャラクター選択時にselectCharacterを呼び出す
-  simulatorStore.selectCharacter(props.charaIndex, chara);
+  simulatorStore.selectCharacter(props.charaIndex, processedChara);
   
   // 手持ちコレクション設定に基づいてレベルとボーナス状態を更新
   if (handCollectionStore.useHandCollection) {
     // deckCharactersのレベルとボーナス状態を更新
-    simulatorStore.deckCharacters[props.charaIndex].level = chara.level;
-    simulatorStore.deckCharacters[props.charaIndex].isBonusSelected = chara.isBonusSelected;
+    simulatorStore.deckCharacters[props.charaIndex].level = processedChara.level;
+    simulatorStore.deckCharacters[props.charaIndex].isBonusSelected = processedChara.isBonusSelected;
     
     // ステータスを再計算して更新
     const newStats = simulatorStore.calculateBaseStats(simulatorStore.deckCharacters[props.charaIndex]);
@@ -327,15 +194,15 @@ const selectCharaImage = (chara) => {
   // 全ステータスを再計算
   simulatorStore.recalculateStats();
   
-  // 画像を更新 - エラーハンドリングを追加
-  if (chara.imgUrl) {
-    imgpath.value = chara.imgUrl;
+  // 画像を更新
+  if (processedChara.imgUrl) {
+    imgpath.value = processedChara.imgUrl;
   } else {
     imgpath.value = defaultImg;
   }
   
   // ボーナス選択状態を更新
-  isBonusSelected.value = bonusSelected;
+  isBonusSelected.value = processedChara.isBonusSelected;
   closeCharaModal();
 };
 
@@ -351,32 +218,8 @@ const shakingStates = ref( {
       });
 let shakeTimeout = null;
 
-// バフの強さを判定するヘルパー関数
-const getPowerOption = (buffString) => {
-  // クリティカル分数形式の確認（旧シミュレータ形式）
-  if (buffString.includes('(1/1)')) return '1/1';
-  if (buffString.includes('(1/2)')) return '1/2';
-  if (buffString.includes('(1/3)')) return '1/3';
-  if (buffString.includes('(2/3)')) return '2/3';
-  
-  // クリティカルサイズ形式から分数形式への変換
-  if (buffString.includes('クリティカル')) {
-    if (buffString.includes('(小)')) return '1/2';
-    if (buffString.includes('(中)')) return '1/1';
-    if (buffString.includes('(大)')) return '2/3';
-    if (buffString.includes('(極大)')) return '1/1';
-    return '1/1'; // デフォルトのクリティカル値
-  }
-  
-  // 通常のバフ形式の確認
-  if (buffString.includes('極小')) return '極小';
-  if (buffString.includes('極大')) return '極大';
-  if (buffString.includes('小')) return '小';
-  if (buffString.includes('中')) return '中';
-  if (buffString.includes('大')) return '大';
-  
-  return '中'; // デフォルト値
-};
+// 共通関数をインポート
+import { processCharacterSelection } from '@/utils/characterSelection';
 
 const addBuff = () => {
   const character = simulatorStore.deckCharacters[props.charaIndex];
@@ -652,6 +495,7 @@ const toggleM = (index) => {
 
 // 最大レベルを取得する関数
 const getMaxLevel = (rare) => {
+  const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
   return levelDict[rare] || 110;
 };
 
@@ -703,6 +547,13 @@ watch(() => simulatorStore.deckCharacters[props.charaIndex]?.chara, (newChara) =
   } else {
     imgpath.value = defaultImg;
     isBonusSelected.value = false;
+  }
+}, { immediate: true });
+
+// imgUrlの変更も監視して画像を更新（URL復元時など）
+watch(() => simulatorStore.deckCharacters[props.charaIndex]?.imgUrl, (newImgUrl) => {
+  if (newImgUrl) {
+    imgpath.value = newImgUrl;
   }
 }, { immediate: true });
 

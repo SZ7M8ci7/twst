@@ -156,7 +156,9 @@ const headers = computed<DataTableHeader[]>(() => [
   { title: 'SIM', value: 'simuURL', sortable: false },
 ]);
 function openInNewTab(url: string){
-  window.open('https://sz7m8ci7.github.io/simulator/?restoreURL=true' + url, '_blank');
+  // 現在のオリジンを使用して新しいシミュレータに遷移
+  const baseUrl = window.location.origin;
+  window.open(`${baseUrl}/twst/sim?restoreFromSearch=true${url}`, '_blank');
 }
 </script>
 

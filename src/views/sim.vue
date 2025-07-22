@@ -99,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import SimChara from '@/components/SimChara.vue';
 import SimChart from '@/components/SimChart.vue';
 import SimHeader from '@/components/SimHeader.vue';
@@ -138,9 +138,15 @@ function handleResize() {
 }
 
 // 状態を復元する関数
-function restoreState() {
+async function restoreState() {
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('restoreState') === 'true') {
+  
+  // デッキ探索結果からの復元
+  if (urlParams.get('restoreFromSearch') === 'true') {
+    await restoreFromSearchParams(urlParams);
+  }
+  // 既存の状態復元
+  else if (urlParams.get('restoreState') === 'true') {
     const savedState = localStorage.getItem('twstSimulatorState');
     if (savedState) {
       try {
@@ -169,12 +175,51 @@ function restoreState() {
   }
 }
 
-onMounted(() => {
+// デッキ探索結果からキャラクターを復元する関数
+async function restoreFromSearchParams(urlParams: URLSearchParams) {
+  const { useCharacterStore } = await import('@/store/characters');
+  const characterStore = useCharacterStore();
+  const { processCharacterSelection } = await import('@/utils/characterSelection');
+  
+  try {
+    // 5つのキャラクター情報を復元
+    for (let i = 1; i <= 5; i++) {
+      const characterName = urlParams.get(`name${i}`);
+      const characterLevel = parseInt(urlParams.get(`level${i}`) || '0');
+      
+      if (characterName && characterLevel > 0) {
+        const foundCharacter = characterStore.characters.find((char: any) => char.name === characterName);
+        
+        if (foundCharacter) {
+          // 共通関数を使用してキャラクター選択処理を実行（カスタムレベル付き）
+          const processedChara = await processCharacterSelection({ ...foundCharacter }, characterLevel);
+          
+          // デュオキャラクターの効果を設定
+          if (processedChara.duo && simulatorStore.charaDict[processedChara.duo]) {
+            processedChara.magic2Power = 'デュオ';
+          }
+          
+          // キャラクター選択
+          simulatorStore.selectCharacter(i - 1, processedChara);
+        }
+      }
+    }
+    
+    // 全体を再計算
+    await nextTick();
+    simulatorStore.recalculateStats();
+    
+  } catch (error) {
+    console.error('デッキ探索結果からの復元に失敗しました:', error);
+  }
+}
+
+onMounted(async () => {
     // コンポーネントがマウントされた後、リサイズイベントリスナーを追加
     window.addEventListener('resize', handleResize);
     
     // 状態復元のチェック
-    restoreState();
+    await restoreState();
 });
 </script>
 
