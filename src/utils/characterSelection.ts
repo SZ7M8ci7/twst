@@ -123,7 +123,7 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
     // etcフィールドから被ダメージUPの相手対象をチェック
     if (chara.etc) {
       const etcEffects = chara.etc.split(',').map((effect: string) => effect.trim());
-      const magicEffects = etcEffects.filter(effect => effect.includes(`(M${magicIndex})`));
+      const magicEffects = etcEffects.filter((effect: string) => effect.includes(`(M${magicIndex})`));
       
       for (const effect of magicEffects) {
         if (effect.includes('被ダメージUP') && effect.includes('相手')) {
