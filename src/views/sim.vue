@@ -141,12 +141,8 @@ function handleResize() {
 async function restoreState() {
   const urlParams = new URLSearchParams(window.location.search);
   
-  // デッキ探索結果からの復元
-  if (urlParams.get('restoreFromSearch') === 'true') {
-    await restoreFromSearchParams(urlParams);
-  }
   // 既存の状態復元
-  else if (urlParams.get('restoreState') === 'true') {
+  if (urlParams.get('restoreState') === 'true') {
     const savedState = localStorage.getItem('twstSimulatorState');
     if (savedState) {
       try {
@@ -172,6 +168,10 @@ async function restoreState() {
         // Error handling
       }
     }
+  }
+  // デッキ探索結果からの復元
+  else if (urlParams.get('restoreFromSearch') === 'true') {
+    await restoreFromSearchParams(urlParams);
   }
 }
 
