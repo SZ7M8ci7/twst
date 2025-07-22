@@ -414,15 +414,17 @@ export const useSimulatorStore = defineStore('simulator', () => {
   }
 
   // キャラクター選択時の処理 - 最適化: 個別キャラクターの更新
-  function selectCharacter(index: number, character: any) {
+  function selectCharacter(index: number, character: any, ignoreHandCollection = false) {
     // 最大HPと最大ATKを保存（常にフルステータスの最大値を使用）
     // originalMaxHP/originalMaxATKがある場合はそれを使用、なければ現在の値を使用
     character.max_hp = character.originalMaxHP || character.hp;
     character.max_atk = character.originalMaxATK || character.atk;
     
+    const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
     // 現在の手持ち設定に基づいてHP/ATKを再計算
     // これにより、手持ち設定が変更された後の置き換えでも正しいステータスが適用される
-    if (handCollectionStore.useHandCollection) {
+    // ignoreHandCollectionがtrueの場合は手持ち設定を無視
+    if (!ignoreHandCollection && handCollectionStore.useHandCollection) {
       const handCard = handCollectionStore.getHandCard(character.name);
       if (handCard.isOwned) {
         // 手持ち設定ONで所持している場合、手持ちレベルで再計算
@@ -432,15 +434,15 @@ export const useSimulatorStore = defineStore('simulator', () => {
         character.isBonusSelected = handCard.isLimitBreak;
         character.hasM3 = handCard.isM3;
       } else {
-        // 手持ち設定ONで所持していない場合、レベル1・未凸で計算
-        character.level = 1;
-        character.hp = recalculateHP(character, 1, false);
-        character.atk = recalculateATK(character, 1, false);
-        character.isBonusSelected = false;
-        character.hasM3 = false;
+        // 手持ち設定ONで所持していない場合、完凸で計算
+        character.level = levelDict[character.rare as keyof typeof levelDict] || 110;
+        character.hp = recalculateHP(character, character.level, true);
+        character.atk = recalculateATK(character, character.level, true);
+        character.isBonusSelected = true;
+        character.hasM3 = true;
       }
-    } else {
-      // 手持ち設定OFFの場合、フルステータスを使用
+    } else if (!ignoreHandCollection) {
+      // 手持ち設定OFFの場合のみ、フルステータスを使用
       // originalMaxHP/ATKがある場合はそれを使用
       if (character.originalMaxHP) {
         character.hp = character.originalMaxHP;
@@ -449,10 +451,14 @@ export const useSimulatorStore = defineStore('simulator', () => {
         character.atk = character.originalMaxATK;
       }
       // フルステータスの場合の設定
-      const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
       character.level = levelDict[character.rare as keyof typeof levelDict] || 110;
       character.isBonusSelected = true;
       character.hasM3 = true;
+    }
+    // ignoreHandCollectionがtrueの場合は、既に設定されているレベルでHP/ATKを再計算
+    else if (ignoreHandCollection) {
+      character.hp = recalculateHP(character, character.level, character.isBonusSelected);
+      character.atk = recalculateATK(character, character.level, character.isBonusSelected);
     }
     
     const oldChara = deckCharacters[index].chara;

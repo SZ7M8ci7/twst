@@ -39,7 +39,7 @@ export const loadCharacterImage = async (characterName: string) => {
 };
 
 // キャラクター選択時の共通処理
-export const processCharacterSelection = async (chara: any, customLevel?: number) => {
+export const processCharacterSelection = async (chara: any, customLevel?: number, ignoreHandCollection = false) => {
   const { useHandCollectionStore } = await import('@/store/handCollection');
   const handCollectionStore = useHandCollectionStore();
   
@@ -50,7 +50,8 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
   let hasM3 = chara.rare === 'SSR';
   let bonusSelected = true;
   
-  if (handCollectionStore.useHandCollection) {
+  // デッキ探索からの復元時は手持ち設定を無視
+  if (!ignoreHandCollection && handCollectionStore.useHandCollection) {
     const handCard = handCollectionStore.getHandCard(chara.name);
     if (handCard.isOwned) {
       characterLevel = Number(handCard.level);
@@ -62,7 +63,6 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
       bonusSelected = false;
     }
   }
-  
   // 初期設定の処理
   const initialSettings = {
     chara: chara.chara || '',

@@ -191,16 +191,16 @@ async function restoreFromSearchParams(urlParams: URLSearchParams) {
         const foundCharacter = characterStore.characters.find((char: any) => char.name === characterName);
         
         if (foundCharacter) {
-          // 共通関数を使用してキャラクター選択処理を実行（カスタムレベル付き）
-          const processedChara = await processCharacterSelection({ ...foundCharacter }, characterLevel);
+          // 共通関数を使用してキャラクター選択処理を実行（手持ち設定を無視してカスタムレベル使用）
+          const processedChara = await processCharacterSelection({ ...foundCharacter }, characterLevel, true);
           
           // デュオキャラクターの効果を設定
           if (processedChara.duo && simulatorStore.charaDict[processedChara.duo]) {
             processedChara.magic2Power = 'デュオ';
           }
           
-          // キャラクター選択
-          simulatorStore.selectCharacter(i - 1, processedChara);
+          // キャラクター選択（手持ち設定を無視）
+          simulatorStore.selectCharacter(i - 1, processedChara, true);
         }
       }
     }
