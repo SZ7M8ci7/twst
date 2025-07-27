@@ -9,14 +9,30 @@
       </div>
     </v-col>
     <v-col cols="3">
-      <button class="button" @click="openInNewTab">別タブ<span class="dli-external-link"><span></span></span></button>
+      <div class="button-group-horizontal">
+        <button class="button save-button-with-text" @click="openSavedDeckModal">
+          <v-icon size="small">mdi-content-save</v-icon>
+          <span class="button-text">編成保存</span>
+        </button>
+        <button class="button" @click="openInNewTab">
+          <span class="dli-external-link"><span></span></span>
+          <span class="button-text">別タブ</span>
+        </button>
+      </div>
     </v-col>
   </v-row>
+  
+  <!-- 保存編成モーダル -->
+  <SavedDeckModal 
+    v-if="showSavedDeckModal" 
+    @close="closeSavedDeckModal"
+  />
 </template>
   
 <script setup>
 import { ref, watch } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import SavedDeckModal from '@/components/SavedDeckModal.vue';
 
 const props = defineProps({
   modelValue: {
@@ -28,6 +44,7 @@ const props = defineProps({
 const options = ['対全', '対火', '対水', '対木', '対無'];
 const selectedOption = ref(props.modelValue);
 const simulatorStore = useSimulatorStore();
+const showSavedDeckModal = ref(false);
 
 // 外部からの値の変更を監視
 watch(() => props.modelValue, (newValue) => {
@@ -113,6 +130,14 @@ const openInNewTab = () => {
   
   window.open(newUrl, '_blank');
 };
+
+const openSavedDeckModal = () => {
+  showSavedDeckModal.value = true;
+};
+
+const closeSavedDeckModal = () => {
+  showSavedDeckModal.value = false;
+};
 </script>
 
 <style scoped>
@@ -180,5 +205,24 @@ const openInNewTab = () => {
   background: currentColor;
   transform: rotate(45deg);
   transform-origin: top center;
+}
+
+.button-group-horizontal {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.save-button-with-text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* スマホではテキストを非表示 */
+@media (max-width: 767px) {
+  .button-text {
+    display: none;
+  }
 }
 </style>
