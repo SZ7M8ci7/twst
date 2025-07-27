@@ -23,11 +23,13 @@
 import { Doughnut } from 'vue-chartjs'
 import { Chart, ChartData, registerables } from 'chart.js';
 Chart.register(...registerables);
+
 // チャート描画のオプション
 const options = {
   responsive: true,
   maintainAspectRatio: false,
   aspectRatio: 1.2,
+  animation: false, // アニメーションを無効化
   plugins: {
     title: {
       display: true,
@@ -50,7 +52,6 @@ const options = {
     tooltip: {
       enabled: false // ツールチップを無効化
     }
-
   },
   layout: {
     padding: {

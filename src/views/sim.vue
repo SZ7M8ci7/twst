@@ -49,11 +49,11 @@
             </v-btn>
           </div>
           <div class="calc-wrapper">
-            <BuddyInfo v-if="carouselModel === 0" />
-            <CharacterEtc v-else-if="carouselModel === 1" />
-            <CalcBASIC v-else-if="carouselModel === 2" :selected-attribute="selectedAttribute" />
-            <CalcDEF v-else-if="carouselModel === 3" :selected-attribute="selectedAttribute" />
-            <CalcATK v-else-if="carouselModel === 4" :selected-attribute="selectedAttribute" />
+            <BuddyInfo v-show="carouselModel === 0" />
+            <CharacterEtc v-show="carouselModel === 1" />
+            <CalcBASIC v-show="carouselModel === 2" :selected-attribute="selectedAttribute" />
+            <CalcDEF v-show="carouselModel === 3" :selected-attribute="selectedAttribute" />
+            <CalcATK v-show="carouselModel === 4" :selected-attribute="selectedAttribute" />
           </div>
         </div>
         </div>
@@ -86,11 +86,11 @@
           </v-btn>
         </div>
         <div class="carousel-content">
-          <BuddyInfo v-if="carouselModel === 0" />
-          <CharacterEtc v-else-if="carouselModel === 1" />
-          <CalcBASIC v-else-if="carouselModel === 2" :selected-attribute="selectedAttribute" />
-          <CalcDEF v-else-if="carouselModel === 3" :selected-attribute="selectedAttribute" />
-          <CalcATK v-else-if="carouselModel === 4" :selected-attribute="selectedAttribute" />
+          <BuddyInfo v-show="carouselModel === 0" />
+          <CharacterEtc v-show="carouselModel === 1" />
+          <CalcBASIC v-show="carouselModel === 2" :selected-attribute="selectedAttribute" />
+          <CalcDEF v-show="carouselModel === 3" :selected-attribute="selectedAttribute" />
+          <CalcATK v-show="carouselModel === 4" :selected-attribute="selectedAttribute" />
         </div>
       </div>
       </div>
