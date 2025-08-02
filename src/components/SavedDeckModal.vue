@@ -49,8 +49,8 @@
                       class="icon-slot"
                     >
                       <img 
-                        v-if="char && char.chara && char.imgUrl"
-                        :src="findActualImageUrl(char.imgUrl) || char.imgUrl" 
+                        v-if="char && char.chara && char.imgUrl && getCachedImageUrl(char.imgUrl)"
+                        :src="getCachedImageUrl(char.imgUrl)" 
                         :alt="char.name"
                         class="icon"
                       />
@@ -88,7 +88,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { useCharacterStore } from '@/store/characters';
+import { loadCharacterImage } from '@/utils/characterSelection';
 
 interface SavedDeck {
   id: string;
@@ -100,11 +100,38 @@ interface SavedDeck {
 
 const emit = defineEmits(['close']);
 const simulatorStore = useSimulatorStore();
-const characterStore = useCharacterStore();
 
 const newDeckName = ref('');
 const saveError = ref('');
 const savedDecks = ref<SavedDeck[]>([]);
+
+// 各編成の画像URLをキャッシュするための reactive map
+const imageUrlCache = ref<Map<string, string>>(new Map());
+
+// キャッシュから画像URLを取得する関数
+const getCachedImageUrl = (cleanFileName: string): string => {
+  return imageUrlCache.value.get(cleanFileName) || '';
+};
+
+// 保存済み編成の画像URLを事前に読み込んでキャッシュする関数
+const preloadDeckImages = async () => {
+  const imagePromises: Promise<void>[] = [];
+  
+  savedDecks.value.forEach(deck => {
+    deck.deckCharacters.forEach(char => {
+      if (char?.imgUrl && !imageUrlCache.value.has(char.imgUrl)) {
+        const promise = findActualImageUrl(char.imgUrl).then(url => {
+          if (url) {
+            imageUrlCache.value.set(char.imgUrl, url);
+          }
+        });
+        imagePromises.push(promise);
+      }
+    });
+  });
+  
+  await Promise.all(imagePromises);
+};
 
 const STORAGE_KEY = 'twst_saved_decks';
 
@@ -113,7 +140,10 @@ const extractCleanImageName = (imgUrl: string): string => {
   if (!imgUrl) return '';
   
   // ファイル名部分を抽出（最後の/以降）
-  const fileName = imgUrl.split('/').pop() || '';
+  let fileName = imgUrl.split('/').pop() || '';
+  
+  // クエリパラメータを除去（?以降）
+  fileName = fileName.split('?')[0];
   
   // ハッシュ部分を除去（-で始まり.pngで終わる部分）
   const cleanFileName = fileName.replace(/-[a-zA-Z0-9_-]+\.png$/, '.png');
@@ -121,21 +151,19 @@ const extractCleanImageName = (imgUrl: string): string => {
   return cleanFileName;
 };
 
-// クリーンなファイル名から実際のimgUrlを見つける共通関数
-const findActualImageUrl = (cleanFileName: string): string => {
+// クリーンなファイル名から実際のimgUrlを見つける共通関数  
+const findActualImageUrl = async (cleanFileName: string): Promise<string> => {
   if (!cleanFileName) return '';
   
-  // キャラクターストアから一致するimgUrlを検索
-  const character = characterStore.characters.find(char => {
-    if (!char.imgUrl) return false;
-    
-    // 共通関数を使用してクリーンなファイル名を生成
-    const cleanActualFileName = extractCleanImageName(char.imgUrl);
-    
-    return cleanActualFileName === cleanFileName;
-  });
-  
-  return character?.imgUrl || '';
+  // 既存のloadCharacterImage関数を使用
+  try {
+    // .pngを除去してキャラクター名にする
+    const characterName = cleanFileName.replace('.png', '');
+    const imageUrl = await loadCharacterImage(characterName);
+    return imageUrl;
+  } catch (error) {
+    return '';
+  }
 };
 
 function closeModal() {
@@ -153,7 +181,7 @@ function loadSavedDecks() {
   }
 }
 
-function saveDeck() {
+async function saveDeck() {
   saveError.value = '';
   
   const deckName = newDeckName.value.trim() || getCurrentDateTime();
@@ -174,7 +202,6 @@ function saveDeck() {
     const cleanedDeckCharacters = simulatorStore.deckCharacters.map(char => {
       const charCopy = JSON.parse(JSON.stringify(char));
       if (charCopy.imgUrl) {
-        charCopy.originalImgUrl = charCopy.imgUrl; // 元のURLを保持（デバッグ用）
         charCopy.imgUrl = extractCleanImageName(charCopy.imgUrl);
       }
       return charCopy;
@@ -193,6 +220,9 @@ function saveDeck() {
     newDeckName.value = '';
     saveError.value = '';
     
+    // 保存後にキャッシュを更新
+    await preloadDeckImages();
+    
   } catch (error) {
     console.error('編成の保存に失敗しました:', error);
     saveError.value = '編成の保存に失敗しました';
@@ -209,16 +239,16 @@ function getCurrentDateTime(): string {
   });
 }
 
-function restoreDeck(deckId: string) {
+async function restoreDeck(deckId: string) {
   const deck = savedDecks.value.find(d => d.id === deckId);
   if (!deck || !deck.deckCharacters) return;
 
   // 編成データを復元
-  deck.deckCharacters.forEach((char, index) => {
+  for (const [index, char] of deck.deckCharacters.entries()) {
     if (char && simulatorStore.deckCharacters[index]) {
       // クリーンなファイル名から実際のimgUrlを復元
       if (char.imgUrl) {
-        const actualImgUrl = findActualImageUrl(char.imgUrl);
+        const actualImgUrl = await findActualImageUrl(char.imgUrl);
         if (actualImgUrl) {
           char.imgUrl = actualImgUrl;
         }
@@ -226,7 +256,7 @@ function restoreDeck(deckId: string) {
       
       Object.assign(simulatorStore.deckCharacters[index], char);
     }
-  });
+  }
   
   if (deck.selectedAttribute) {
     simulatorStore.selectedAttribute = deck.selectedAttribute;
@@ -247,8 +277,9 @@ function deleteDeck(deckId: string) {
 }
 
 
-onMounted(() => {
+onMounted(async () => {
   loadSavedDecks();
+  await preloadDeckImages();
 });
 </script>
 
