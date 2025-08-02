@@ -138,10 +138,33 @@ function saveDeck() {
       return;
     }
 
+    // ハッシュなしのファイル名を抽出する関数
+    const extractCleanImageName = (imgUrl: string): string => {
+      if (!imgUrl) return '';
+      
+      // ファイル名部分を抽出（最後の/以降）
+      const fileName = imgUrl.split('/').pop() || '';
+      
+      // ハッシュ部分を除去（-で始まり.pngで終わる部分）
+      const cleanFileName = fileName.replace(/-[a-zA-Z0-9_-]+\.png$/, '.png');
+      
+      return cleanFileName;
+    };
+
+    // キャラクターデータをコピーし、imgUrlをクリーンなファイル名に変換
+    const cleanedDeckCharacters = simulatorStore.deckCharacters.map(char => {
+      const charCopy = JSON.parse(JSON.stringify(char));
+      if (charCopy.imgUrl) {
+        charCopy.originalImgUrl = charCopy.imgUrl; // 元のURLを保持（デバッグ用）
+        charCopy.imgUrl = extractCleanImageName(charCopy.imgUrl);
+      }
+      return charCopy;
+    });
+
     const newDeck: SavedDeck = {
       id: Date.now().toString(),
       name: deckName,
-      deckCharacters: JSON.parse(JSON.stringify(simulatorStore.deckCharacters)),
+      deckCharacters: cleanedDeckCharacters,
       selectedAttribute: simulatorStore.selectedAttribute,
       savedAt: new Date().toISOString()
     };
