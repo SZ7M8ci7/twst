@@ -152,12 +152,13 @@ const extractCleanImageName = (imgUrl: string): string => {
 };
 
 // クリーンなファイル名から実際のimgUrlを見つける共通関数  
-const findActualImageUrl = async (cleanFileName: string): Promise<string> => {
-  if (!cleanFileName) return '';
+const findActualImageUrl = async (imgUrl: string): Promise<string> => {
+  if (!imgUrl) return '';
   
-  // 既存のloadCharacterImage関数を使用
+  // 旧形式の場合はクリーンなファイル名に変換、新形式はそのまま使用
+  const cleanFileName = imgUrl.includes('-') && imgUrl.includes('.png') ? extractCleanImageName(imgUrl) : imgUrl;
+  
   try {
-    // .pngを除去してキャラクター名にする
     const characterName = cleanFileName.replace('.png', '');
     const imageUrl = await loadCharacterImage(characterName);
     return imageUrl;
