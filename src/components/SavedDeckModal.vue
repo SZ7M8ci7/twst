@@ -50,7 +50,7 @@
                     >
                       <img 
                         v-if="char && char.chara && char.imgUrl"
-                        :src="char.imgUrl" 
+                        :src="findActualImageUrl(char.imgUrl) || char.imgUrl" 
                         :alt="char.name"
                         class="icon"
                       />
@@ -88,6 +88,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { useCharacterStore } from '@/store/characters';
 
 interface SavedDeck {
   id: string;
@@ -99,12 +100,43 @@ interface SavedDeck {
 
 const emit = defineEmits(['close']);
 const simulatorStore = useSimulatorStore();
+const characterStore = useCharacterStore();
 
 const newDeckName = ref('');
 const saveError = ref('');
 const savedDecks = ref<SavedDeck[]>([]);
 
 const STORAGE_KEY = 'twst_saved_decks';
+
+// ハッシュなしのファイル名を抽出する共通関数
+const extractCleanImageName = (imgUrl: string): string => {
+  if (!imgUrl) return '';
+  
+  // ファイル名部分を抽出（最後の/以降）
+  const fileName = imgUrl.split('/').pop() || '';
+  
+  // ハッシュ部分を除去（-で始まり.pngで終わる部分）
+  const cleanFileName = fileName.replace(/-[a-zA-Z0-9_-]+\.png$/, '.png');
+  
+  return cleanFileName;
+};
+
+// クリーンなファイル名から実際のimgUrlを見つける共通関数
+const findActualImageUrl = (cleanFileName: string): string => {
+  if (!cleanFileName) return '';
+  
+  // キャラクターストアから一致するimgUrlを検索
+  const character = characterStore.characters.find(char => {
+    if (!char.imgUrl) return false;
+    
+    // 共通関数を使用してクリーンなファイル名を生成
+    const cleanActualFileName = extractCleanImageName(char.imgUrl);
+    
+    return cleanActualFileName === cleanFileName;
+  });
+  
+  return character?.imgUrl || '';
+};
 
 function closeModal() {
   emit('close');
@@ -137,19 +169,6 @@ function saveDeck() {
       saveError.value = '編成データが見つかりません';
       return;
     }
-
-    // ハッシュなしのファイル名を抽出する関数
-    const extractCleanImageName = (imgUrl: string): string => {
-      if (!imgUrl) return '';
-      
-      // ファイル名部分を抽出（最後の/以降）
-      const fileName = imgUrl.split('/').pop() || '';
-      
-      // ハッシュ部分を除去（-で始まり.pngで終わる部分）
-      const cleanFileName = fileName.replace(/-[a-zA-Z0-9_-]+\.png$/, '.png');
-      
-      return cleanFileName;
-    };
 
     // キャラクターデータをコピーし、imgUrlをクリーンなファイル名に変換
     const cleanedDeckCharacters = simulatorStore.deckCharacters.map(char => {
@@ -197,6 +216,14 @@ function restoreDeck(deckId: string) {
   // 編成データを復元
   deck.deckCharacters.forEach((char, index) => {
     if (char && simulatorStore.deckCharacters[index]) {
+      // クリーンなファイル名から実際のimgUrlを復元
+      if (char.imgUrl) {
+        const actualImgUrl = findActualImageUrl(char.imgUrl);
+        if (actualImgUrl) {
+          char.imgUrl = actualImgUrl;
+        }
+      }
+      
       Object.assign(simulatorStore.deckCharacters[index], char);
     }
   });
