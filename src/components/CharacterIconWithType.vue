@@ -19,7 +19,7 @@ const props = defineProps<{
   iconDictionary?: Record<string, string>; // 新規:アイコンURL辞書
 }>();
 
-const DEFAULT_ICON_SIZE = 40;
+const DEFAULT_ICON_SIZE = 60;
 const MIN_SIZE_TO_SHOW_TYPE = 30; // カードタイプを表示する最小アイコンサイズ
 
 const rootTag = computed(() => (props.wikiUrl ? 'a' : 'div'));

@@ -87,5 +87,12 @@ onBeforeMount(() => {
   align-items: center; /* Align items vertically */
 }
 
+.character-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
 
 </style>

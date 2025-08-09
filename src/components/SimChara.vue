@@ -610,12 +610,12 @@ onUnmounted(() => {
   position: relative;
   display: inline-block;
   width: 100%;
-  max-width: 80px;
+  max-width: 60px;
 }
 
 .character-image {
   width: 100%;
-  max-width: 80px;
+  max-width: 60px;
   height: 100%;
   object-fit: cover;
   border-radius: 1px; /* アイコンに角丸を追加 */

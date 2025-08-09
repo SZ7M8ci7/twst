@@ -247,6 +247,13 @@ onMounted(() => {
 .right-align {
   margin-left: auto;
 }
+.character-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
 .controls-container {
   display: flex;
   flex-wrap: wrap;

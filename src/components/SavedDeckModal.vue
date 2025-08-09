@@ -145,8 +145,13 @@ const extractCleanImageName = (imgUrl: string): string => {
   // クエリパラメータを除去（?以降）
   fileName = fileName.split('?')[0];
   
-  // ハッシュ部分を除去（-で始まり.webpで終わる部分）
-  const cleanFileName = fileName.replace(/-[a-zA-Z0-9_-]+\.webp$/, '.webp');
+  // ハッシュ部分を除去（-で始まり.png/.webpで終わる部分）
+  let cleanFileName = fileName.replace(/-[a-zA-Z0-9_-]+\.(png|webp)$/, '.$1');
+  
+  // .pngの場合は.webpに変換（実際の読み込みはwebpで行うため）
+  if (cleanFileName.endsWith('.png')) {
+    cleanFileName = cleanFileName.replace('.png', '.webp');
+  }
   
   return cleanFileName;
 };
@@ -156,10 +161,12 @@ const findActualImageUrl = async (imgUrl: string): Promise<string> => {
   if (!imgUrl) return '';
   
   // 旧形式の場合はクリーンなファイル名に変換、新形式はそのまま使用
-  const cleanFileName = imgUrl.includes('-') && imgUrl.includes('.webp') ? extractCleanImageName(imgUrl) : imgUrl;
+  // .pngと.webpの両方に対応
+  const cleanFileName = (imgUrl.includes('-') && (imgUrl.includes('.webp') || imgUrl.includes('.png'))) ? extractCleanImageName(imgUrl) : imgUrl;
   
   try {
-    const characterName = cleanFileName.replace('.webp', '');
+    // .pngと.webpの両方から拡張子を除去
+    const characterName = cleanFileName.replace(/\.(png|webp)$/, '');
     const imageUrl = await loadCharacterImage(characterName);
     return imageUrl;
   } catch (error) {

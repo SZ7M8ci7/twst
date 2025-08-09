@@ -164,6 +164,13 @@ onBeforeMount(() => {
 });
 </script>
 <style scoped>
+.character-image {
+  width: 45px;
+  height: 45px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
 .table-top {
   display: flex;
   align-items: center;
