@@ -26,11 +26,11 @@ export const getPowerOption = (buffString: string) => {
 // キャラクター画像の動的読み込み
 export const loadCharacterImage = async (characterName: string) => {
   try {
-    const imageModule = await import(`@/assets/img/${characterName}.png`);
+    const imageModule = await import(`@/assets/img/${characterName}.webp`);
     return imageModule.default;
   } catch (error) {
     try {
-      const defaultModule = await import(`@/assets/img/notyet.png`);
+      const defaultModule = await import(`@/assets/img/notyet.webp`);
       return defaultModule.default;
     } catch {
       return '';

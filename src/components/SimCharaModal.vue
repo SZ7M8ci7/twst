@@ -171,7 +171,7 @@ import { useSimulatorStore } from '@/store/simulatorStore';
 import { useFilterdStore } from '@/store/filterd';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
-import defaultImg from '@/assets/img/default.png';
+import defaultImg from '@/assets/img/default.webp';
 import FilterModal from '@/components/FilterModal.vue';
 import characterData from '@/assets/characters_info.json';
 import charactersInfo from '@/assets/characters_info.json';
@@ -209,7 +209,7 @@ const getDuoIcon = async (duoCharaName) => {
   
   try {
     // 動的インポートを使用してアイコンを取得
-    const module = await import(`@/assets/img/icon/${enName}.png`);
+    const module = await import(`@/assets/img/icon/${enName}.webp`);
     duoIconCache.value[duoCharaName] = module.default;
     return module.default;
   } catch (error) {
@@ -1399,7 +1399,7 @@ const loadImagesInParallel = (charactersToLoad, batchSize = MAX_CONCURRENT) => {
     const batch = toLoad.slice(startIndex, startIndex + batchSize);
     
     const promises = batch.map(character => {
-      return import(`@/assets/img/${character.name}.png`)
+      return import(`@/assets/img/${character.name}.webp`)
         .then(module => {
           character.imgUrl = module.default;
           character.imageLoaded = true;

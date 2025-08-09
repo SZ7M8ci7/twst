@@ -15,10 +15,10 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue';
-import fire from "@/assets/img/fire.png"
-import water from "@/assets/img/water.png"
-import flora from "@/assets/img/flora.png"
-import cosmic from "@/assets/img/cosmic.png"
+import fire from "@/assets/img/fire.webp"
+import water from "@/assets/img/water.webp"
+import flora from "@/assets/img/flora.webp"
+import cosmic from "@/assets/img/cosmic.webp"
 import { useSimulatorStore } from '@/store/simulatorStore';
 const simulatorStore = useSimulatorStore();
 

@@ -86,7 +86,7 @@ import { onMounted, onBeforeUnmount, ref, computed, Ref, watch} from 'vue';
 import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
 import { loadImageUrls } from '@/components/common';
-import defaultImg from '@/assets/img/default.png';
+import defaultImg from '@/assets/img/default.webp';
 import { effects } from '@/store/searchResult';
 
 const { t } = useI18n();

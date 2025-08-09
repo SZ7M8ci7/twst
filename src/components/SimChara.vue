@@ -125,7 +125,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
-import defaultImg from '@/assets/img/default.png';
+import defaultImg from '@/assets/img/default.webp';
 import ElementDropdown from './ElementDropdown.vue';
 import SimCharaModal from './SimCharaModal.vue';
 import MagicDropdown from './MagicDropdown.vue';
@@ -280,7 +280,7 @@ const getBuddyIcon = async (buddyCharaName) => {
   
   try {
     // 動的インポートを使用してアイコンを取得
-    const module = await import(`@/assets/img/icon/${enName}.png`);
+    const module = await import(`@/assets/img/icon/${enName}.webp`);
     buddyIconCache.value[buddyCharaName] = module.default;
     return module.default;
   } catch (error) {
@@ -411,7 +411,7 @@ const loadDuoPartnerIcon = async (duoPartnerName) => {
   }
   
   try {
-    const module = await import(`@/assets/img/icon/${jpName2enName[duoPartnerName]}.png`);
+    const module = await import(`@/assets/img/icon/${jpName2enName[duoPartnerName]}.webp`);
     duoPartnerIcon.value = module.default;
   } catch (error) {
     duoPartnerIcon.value = defaultImg;

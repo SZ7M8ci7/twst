@@ -890,12 +890,12 @@ export async function loadImageUrls(
     imageUrlDictionary[notYetImageName] = cachedImageUrls[notYetCacheKey];
   } else {
     try {
-      const module = await import(`@/assets/img/${notYetImageName}.png`) as { default: string };
+      const module = await import(`@/assets/img/${notYetImageName}.webp`) as { default: string };
       const imageUrl = module.default;
       cachedImageUrls[notYetCacheKey] = imageUrl;
       imageUrlDictionary[notYetImageName] = imageUrl;
     } catch (error) {
-      console.error(`[loadImageUrls] Error loading ${notYetImageName}.png:`, error);
+      console.error(`[loadImageUrls] Error loading ${notYetImageName}.webp:`, error);
       imageUrlDictionary[notYetImageName] = ''; // Set empty string on error
     }
   }
@@ -918,12 +918,12 @@ export async function loadImageUrls(
 
       let module;
       if (prefix === 'icon/') {
-        module = await import(`@/assets/img/icon/${itemName}.png`) as { default: string };
+        module = await import(`@/assets/img/icon/${itemName}.webp`) as { default: string };
       } else if (prefix === '') {
-        module = await import(`@/assets/img/${itemName}.png`) as { default: string };
+        module = await import(`@/assets/img/${itemName}.webp`) as { default: string };
       } else {
         console.error(`[loadImageUrls] Unsupported or unknown prefix '${prefix}' for item '${itemName}'. Trying a generic path that might fail.`);
-        module = await import(`@/assets/img/${prefix}${itemName}.png`) as { default: string };
+        module = await import(`@/assets/img/${prefix}${itemName}.webp`) as { default: string };
       }
       const imageUrl = module.default;
       cachedImageUrls[cacheKey] = imageUrl;
@@ -947,15 +947,15 @@ export async function loadCachedImageUrl(imageName: string, prefix: string = '')
   try {
     let module;
     if (prefix === 'icon/') {
-      imagePathForLog = `@/assets/img/icon/${imageName}.png`;
-      module = await import(`@/assets/img/icon/${imageName}.png`) as { default: string };
+      imagePathForLog = `@/assets/img/icon/${imageName}.webp`;
+      module = await import(`@/assets/img/icon/${imageName}.webp`) as { default: string };
     } else if (prefix === '') {
-      imagePathForLog = `@/assets/img/${imageName}.png`;
-      module = await import(`@/assets/img/${imageName}.png`) as { default: string };
+      imagePathForLog = `@/assets/img/${imageName}.webp`;
+      module = await import(`@/assets/img/${imageName}.webp`) as { default: string };
     } else {
       console.error(`[loadCachedImageUrl] Unsupported or unknown prefix '${prefix}' for item '${imageName}'. Trying a generic path that might fail.`);
-      imagePathForLog = `@/assets/img/${prefix}${imageName}.png`;
-      module = await import(`@/assets/img/${prefix}${imageName}.png`) as { default: string };
+      imagePathForLog = `@/assets/img/${prefix}${imageName}.webp`;
+      module = await import(`@/assets/img/${prefix}${imageName}.webp`) as { default: string };
     }
     const imageUrl = module.default;
     cachedImageUrls[cacheKey] = imageUrl;

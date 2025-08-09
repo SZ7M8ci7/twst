@@ -203,12 +203,12 @@ watch(() => handCollectionStore.handCollection, () => {
 
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
-    return import(`@/assets/img/${character.name}.png`)
+    return import(`@/assets/img/${character.name}.webp`)
       .then(module => {
         character.imgUrl = module.default;
       })
       .catch(async () => {
-        const module = await import(`@/assets/img/notyet.png`);
+        const module = await import(`@/assets/img/notyet.webp`);
         character.imgUrl = module.default;
       });
   });

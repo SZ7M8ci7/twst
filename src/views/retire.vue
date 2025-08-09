@@ -528,7 +528,7 @@ onMounted(async () => {
   try {
     // 属性アイコンの読み込み
     await Promise.all(attributes.value.map(async (attr) => {
-      const module = await import(`@/assets/img/icon/${attr.value}.png`);
+      const module = await import(`@/assets/img/icon/${attr.value}.webp`);
       attr.icon = module.default;
     }));
 
@@ -537,7 +537,7 @@ onMounted(async () => {
 
     // キャラクター画像の読み込み
     await Promise.all((charactersInfo as CharacterInfo[]).map(character => {
-      return import(`@/assets/img/icon/${character.name_en}.png`)
+      return import(`@/assets/img/icon/${character.name_en}.webp`)
         .then(module => {
           character.imgUrl = module.default;
         })

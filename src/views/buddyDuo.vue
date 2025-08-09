@@ -167,12 +167,12 @@ const totals = computed(() => {
 
 onMounted(async () => {
   const imageLoadPromises = characters.value.map((char: Character) => {
-    return import(`@/assets/img/${char.name}.png`)
+    return import(`@/assets/img/${char.name}.webp`)
       .then(module => {
         char.imgUrl = module.default;
       })
       .catch(async () => {
-        const module = await import(`@/assets/img/notyet.png`);
+        const module = await import(`@/assets/img/notyet.webp`);
         char.imgUrl = module.default;
       });
   });

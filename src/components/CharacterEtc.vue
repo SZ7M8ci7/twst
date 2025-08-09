@@ -45,7 +45,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import defaultImg from '@/assets/img/default.png';
+import defaultImg from '@/assets/img/default.webp';
 import charaData from '@/assets/chara.json';
 
 const simulatorStore = useSimulatorStore();

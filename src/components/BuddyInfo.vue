@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import defaultImg from '@/assets/img/default.png';
+import defaultImg from '@/assets/img/default.webp';
 import charactersInfo from '@/assets/characters_info.json';
 
 const simulatorStore = useSimulatorStore();
@@ -162,7 +162,7 @@ async function loadCharacterIcon(charaCode: string): Promise<void> {
   
   try {
     // 動的インポートを使用してアイコンを読み込む
-    const module = await import(`@/assets/img/icon/${englishName}.png`);
+    const module = await import(`@/assets/img/icon/${englishName}.webp`);
     characterIcons.value[charaCode] = module.default;
   } catch (error) {
     console.error(`Error loading icon for ${charaCode} (${englishName}):`, error);
