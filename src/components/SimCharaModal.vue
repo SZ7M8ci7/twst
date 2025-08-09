@@ -1590,6 +1590,9 @@ const ensureVisiblePropertiesInitialized = (character) => {
 // コンポーネントがマウントされた後に初期化
 onMounted(async () => {
   try {
+    // 手持ち設定の初期化：未設定の場合はOFF、設定済みの場合はONに設定
+    handCollectionStore.setUseHandCollection(handCollectionStore.hasAnyHandSettings);
+    
     // フィルター適用前に全キャラクターのvisibleを初期化（非表示から開始）
     characters.value.forEach(ensureVisiblePropertiesInitialized);
     

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed, triggerRef, reactive } from 'vue';
+import { ref, computed, reactive } from 'vue';
 
 // 手持ちカードの設定インターフェース
 export interface HandCard {
@@ -34,16 +34,6 @@ function createDefaultHandCard(cardName: string): HandCard {
   };
 }
 
-// レア度に応じた最大レベルを取得
-function getMaxLevel(rare: string): number {
-  switch (rare) {
-    case 'SSR': return 110;
-    case 'SR': return 90;
-    case 'R': return 70;
-    default: return 70;
-  }
-}
-
 // localStorageから手持ちコレクションを読み込み
 function loadHandCollection(): HandCollection {
   try {
@@ -69,7 +59,8 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
   const handCollection = reactive<HandCollection>(loadHandCollection());
   
   // 手持ちから選択するかフルステータスから選択するかの設定
-  const useHandCollection = ref<boolean>(true);
+  // 初期値は手持ち設定の有無に基づいて決定される（SimCharaModalで設定）
+  const useHandCollection = ref<boolean>(false);
 
   // 指定されたカード名の手持ち設定を取得
   function getHandCard(cardName: string): HandCard {
@@ -116,6 +107,12 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
     saveHandCollection(handCollection);
   }
 
+  // 手持ち設定が何も設定されていないかを判定
+  const hasAnyHandSettings = computed(() => {
+    // 所持カードが1枚以上あるかをチェック
+    return ownedCards.value.length > 0;
+  });
+
   // エクスポート用の統計情報
   const stats = computed(() => ({
     totalCards: Object.keys(handCollection).length,
@@ -131,6 +128,7 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
     
     // Computed
     ownedCards,
+    hasAnyHandSettings,
     stats,
     
     // Actions
