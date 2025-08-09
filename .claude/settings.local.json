@@ -28,7 +28,8 @@
       "Bash(for f in *.png)",
       "Bash(do cwebp:*)",
       "Bash(done)",
-      "Bash(do ffmpeg -i \"$f\" -c:v libwebp -quality 80 \"$f%.png.webp\")"
+      "Bash(do ffmpeg -i \"$f\" -c:v libwebp -quality 80 \"$f%.png.webp\")",
+      "Bash(bash:*)"
     ],
     "deny": []
   }
