@@ -24,7 +24,11 @@
       "mcp__serena__search_for_pattern",
       "mcp__serena__think_about_collected_information",
       "mcp__serena__replace_symbol_body",
-      "mcp__serena__replace_regex"
+      "mcp__serena__replace_regex",
+      "Bash(for f in *.png)",
+      "Bash(do cwebp:*)",
+      "Bash(done)",
+      "Bash(do ffmpeg -i \"$f\" -c:v libwebp -quality 80 \"$f%.png.webp\")"
     ],
     "deny": []
   }
