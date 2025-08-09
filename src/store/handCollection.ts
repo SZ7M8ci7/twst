@@ -54,13 +54,16 @@ function saveHandCollection(collection: HandCollection): void {
   }
 }
 
+
 export const useHandCollectionStore = defineStore('handCollection', () => {
   // 手持ちコレクションのstate - reactiveを使用してdeep reactivityを確保
   const handCollection = reactive<HandCollection>(loadHandCollection());
   
   // 手持ちから選択するかフルステータスから選択するかの設定
-  // 初期値は手持ち設定の有無に基づいて決定される（SimCharaModalで設定）
   const useHandCollection = ref<boolean>(false);
+  
+  // 同一セッション内でのモーダル表示回数を追跡
+  let modalOpenCount = 0;
 
   // 指定されたカード名の手持ち設定を取得
   function getHandCard(cardName: string): HandCard {
@@ -101,6 +104,16 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
   function setUseHandCollection(use: boolean): void {
     useHandCollection.value = use;
   }
+  
+  // モーダル表示回数をインクリメント
+  function incrementModalOpenCount(): void {
+    modalOpenCount++;
+  }
+  
+  // 初回モーダル表示かどうかを判定
+  function isFirstModalOpen(): boolean {
+    return modalOpenCount === 0;
+  }
 
   // 手持ちコレクションを手動で保存
   function saveHandCollectionManually(): void {
@@ -112,6 +125,7 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
     // 所持カードが1枚以上あるかをチェック
     return ownedCards.value.length > 0;
   });
+
 
   // エクスポート用の統計情報
   const stats = computed(() => ({
@@ -137,5 +151,7 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
     isCharacterOwned,
     setUseHandCollection,
     saveHandCollectionManually,
+    incrementModalOpenCount,
+    isFirstModalOpen,
   };
 });

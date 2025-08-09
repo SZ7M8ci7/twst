@@ -1590,8 +1590,13 @@ const ensureVisiblePropertiesInitialized = (character) => {
 // コンポーネントがマウントされた後に初期化
 onMounted(async () => {
   try {
-    // 手持ち設定の初期化：未設定の場合はOFF、設定済みの場合はONに設定
-    handCollectionStore.setUseHandCollection(handCollectionStore.hasAnyHandSettings);
+    // 手持ち設定の初期化：同一セッション内の初回表示時のみ手持ち設定の有無で判定、2回目以降は前回の値を使用
+    if (handCollectionStore.isFirstModalOpen()) {
+      handCollectionStore.setUseHandCollection(handCollectionStore.hasAnyHandSettings);
+    }
+    
+    // モーダル表示回数をインクリメント
+    handCollectionStore.incrementModalOpenCount();
     
     // フィルター適用前に全キャラクターのvisibleを初期化（非表示から開始）
     characters.value.forEach(ensureVisiblePropertiesInitialized);

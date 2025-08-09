@@ -714,8 +714,6 @@ onMounted(async () => {
   window.addEventListener('resize', handleResize);
   loading.value = true;
   
-  // 手持ち設定画面では常に手持ち設定を有効にする
-  handCollectionStore.setUseHandCollection(true);
   
   try {
     // characterStoreの初期化を確実に待つ
