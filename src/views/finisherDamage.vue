@@ -615,6 +615,13 @@ function calculateDamage() {
     }
     // 味方バフ無しで計算
     calcDamage(character.magic2atr, '', getEnglishName(character.duo), '');
+    // calcDamage(character.magic2atr, 'ATKUP(小)', getEnglishName(character.duo), 'ATK小');
+    // calcDamage(character.magic2atr, 'ATKUP(中)', getEnglishName(character.duo), 'ATK中');
+    // calcDamage(character.magic2atr, 'ATKUP(大)', getEnglishName(character.duo), 'ATK大');
+    // calcDamage(character.magic2atr, '火属性ダメージUP(大)', getEnglishName(character.duo), '属性大');
+    // calcDamage(character.magic2atr, '水属性ダメージUP(大)', getEnglishName(character.duo), '属性大');
+    // calcDamage(character.magic2atr, '木属性ダメージUP(大)', getEnglishName(character.duo), '属性大');
+    // calcDamage(character.magic2atr, '無属性ダメージUP(大)', getEnglishName(character.duo), '属性大');
     // 味方バフ有りで計算
     effectDict[character.duo].forEach(duoPartner => {
       // M3バフの場合、デュオ相手のレア度制限をチェック
