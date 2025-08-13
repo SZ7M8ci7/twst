@@ -273,9 +273,9 @@ async function main() {
       }
     }
 
-    // Sort desc and keep top 100 (but we'll also carry forward values for continuity)
+    // Sort desc and keep top 300 (but we'll also carry forward values for continuity)
     entries.sort((a, b) => b.damage - a.damage);
-    const top10 = entries.slice(0, 100);
+    const top10 = entries.slice(0, 300);
 
     // Record values and ensure icons
     for (const e of top10) {
@@ -297,7 +297,7 @@ async function main() {
       }
       seriesMap.get(e.key).values.set(dayStr, Math.floor(e.damage));
     }
-    // For continuity: fill 0 for series that already existed but are not in today's top100
+    // For continuity: fill 0 for series that already existed but are not in today's top300
     for (const [key, series] of seriesMap) {
       if (!series.values.has(dayStr)) {
         series.values.set(dayStr, 0);
