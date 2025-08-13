@@ -273,12 +273,11 @@ async function main() {
       }
     }
 
-    // Sort desc and keep top 300 (but we'll also carry forward values for continuity)
+    // Sort desc and keep ALL entries for the day
     entries.sort((a, b) => b.damage - a.damage);
-    const top10 = entries.slice(0, 300);
 
-    // Record values and ensure icons
-    for (const e of top10) {
+    // Record values and ensure icons for all entries
+    for (const e of entries) {
       if (!seriesMap.has(e.key)) {
         let iconFile = null;
         if (e.duo) {
