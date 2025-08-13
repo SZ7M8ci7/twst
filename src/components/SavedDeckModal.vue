@@ -49,9 +49,9 @@
                       class="icon-slot"
                     >
                       <img 
-                        v-if="char && char.chara && char.imgUrl && getCachedImageUrl(char.imgUrl)"
-                        :src="getCachedImageUrl(char.imgUrl)" 
-                        :alt="char.name"
+                        v-if="char && char.chara && getCharacterDisplayKey(char) && getCachedImageUrl(getCharacterDisplayKey(char))"
+                        :src="getCachedImageUrl(getCharacterDisplayKey(char))" 
+                        :alt="char.name || getCharacterNameFromImageUrl(char.imgUrl || '')"
                         class="icon"
                       />
                       <div v-else class="empty-icon">
@@ -109,33 +109,11 @@ const savedDecks = ref<SavedDeck[]>([]);
 const imageUrlCache = ref<Map<string, string>>(new Map());
 
 // キャッシュから画像URLを取得する関数
-const getCachedImageUrl = (cleanFileName: string): string => {
-  return imageUrlCache.value.get(cleanFileName) || '';
+const getCachedImageUrl = (characterName: string): string => {
+  return imageUrlCache.value.get(characterName) || '';
 };
 
-// 保存済み編成の画像URLを事前に読み込んでキャッシュする関数
-const preloadDeckImages = async () => {
-  const imagePromises: Promise<void>[] = [];
-  
-  savedDecks.value.forEach(deck => {
-    deck.deckCharacters.forEach(char => {
-      if (char?.imgUrl && !imageUrlCache.value.has(char.imgUrl)) {
-        const promise = findActualImageUrl(char.imgUrl).then(url => {
-          if (url) {
-            imageUrlCache.value.set(char.imgUrl, url);
-          }
-        });
-        imagePromises.push(promise);
-      }
-    });
-  });
-  
-  await Promise.all(imagePromises);
-};
-
-const STORAGE_KEY = 'twst_saved_decks';
-
-// ハッシュなしのファイル名を抽出する共通関数
+// ハッシュなしのファイル名を抽出する共通関数（後方互換性のため）
 const extractCleanImageName = (imgUrl: string): string => {
   if (!imgUrl) return '';
   
@@ -156,33 +134,107 @@ const extractCleanImageName = (imgUrl: string): string => {
   return cleanFileName;
 };
 
-// クリーンなファイル名から実際のimgUrlを見つける共通関数  
-const findActualImageUrl = async (imgUrl: string): Promise<string> => {
+// 画像URLからキャラクター名を推定する関数（後方互換性のため）
+const getCharacterNameFromImageUrl = (imgUrl: string): string => {
   if (!imgUrl) return '';
   
-  // 旧形式の場合はクリーンなファイル名に変換、新形式はそのまま使用
-  // .pngと.webpの両方に対応
-  const cleanFileName = (imgUrl.includes('-') && (imgUrl.includes('.webp') || imgUrl.includes('.png'))) ? extractCleanImageName(imgUrl) : imgUrl;
+  // 新形式の場合：直接ファイル名からキャラクター名を抽出
+  const cleanFileName = extractCleanImageName(imgUrl);
   
-  try {
-    // .pngと.webpの両方から拡張子を除去
-    const characterName = cleanFileName.replace(/\.(png|webp)$/, '');
-    const imageUrl = await loadCharacterImage(characterName);
-    return imageUrl;
-  } catch (error) {
-    return '';
-  }
+  // .webp/.png拡張子を除去してキャラクター名を取得
+  const characterName = cleanFileName.replace(/\.(png|webp)$/, '');
+  
+  return characterName;
 };
+
+// キャラクター表示用のキーを取得する関数（新旧両形式に対応）
+const getCharacterDisplayKey = (char: any): string => {
+  // 新形式：nameが存在する場合
+  if (char?.name) {
+    return char.name;
+  }
+  // 旧形式：imgUrlからキャラクター名を推定
+  else if (char?.imgUrl) {
+    return getCharacterNameFromImageUrl(char.imgUrl);
+  }
+  return '';
+};
+
+// 保存済み編成の画像URLを事前に読み込んでキャッシュする関数
+const preloadDeckImages = async () => {
+  const imagePromises: Promise<void>[] = [];
+  
+  savedDecks.value.forEach(deck => {
+    deck.deckCharacters.forEach(char => {
+      let cacheKey = '';
+      
+      // 新形式（nameが存在する場合）
+      if (char?.name) {
+        cacheKey = char.name;
+      }
+      // 旧形式（imgUrlのみ存在する場合）- 後方互換性
+      else if (char?.imgUrl) {
+        cacheKey = getCharacterNameFromImageUrl(char.imgUrl);
+      }
+      
+      if (cacheKey && !imageUrlCache.value.has(cacheKey)) {
+        const promise = loadCharacterImage(cacheKey).then(url => {
+          if (url) {
+            imageUrlCache.value.set(cacheKey, url);
+          }
+        }).catch(error => {
+          console.warn('画像の事前読み込みに失敗しました:', cacheKey, error);
+        });
+        imagePromises.push(promise);
+      }
+    });
+  });
+  
+  await Promise.all(imagePromises);
+};
+
+const STORAGE_KEY = 'twst_saved_decks';
+
 
 function closeModal() {
   emit('close');
+}
+
+// 旧形式のデータを新形式にマイグレーションする関数
+function migrateLegacyDecks(decks: SavedDeck[]): SavedDeck[] {
+  return decks.map(deck => {
+    const migratedCharacters = deck.deckCharacters.map(char => {
+      // 旧形式（nameがなくimgUrlのみ存在）の場合、nameを補完
+      if (!char.name && char.imgUrl) {
+        const characterName = getCharacterNameFromImageUrl(char.imgUrl);
+        return {
+          ...char,
+          name: characterName
+        };
+      }
+      return char;
+    });
+    
+    return {
+      ...deck,
+      deckCharacters: migratedCharacters
+    };
+  });
 }
 
 function loadSavedDecks() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      savedDecks.value = JSON.parse(saved);
+      let loadedDecks = JSON.parse(saved);
+      
+      // 旧形式のデータをマイグレーション
+      loadedDecks = migrateLegacyDecks(loadedDecks);
+      
+      savedDecks.value = loadedDecks;
+      
+      // マイグレーション後のデータを保存（次回以降の読み込みを高速化）
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedDecks));
     }
   } catch (error) {
     console.error('保存された編成の読み込みに失敗しました:', error);
@@ -206,12 +258,11 @@ async function saveDeck() {
       return;
     }
 
-    // キャラクターデータをコピーし、imgUrlをクリーンなファイル名に変換
+    // キャラクターデータをコピーし、imgUrlは除去（復元時に再生成する）
     const cleanedDeckCharacters = simulatorStore.deckCharacters.map(char => {
       const charCopy = JSON.parse(JSON.stringify(char));
-      if (charCopy.imgUrl) {
-        charCopy.imgUrl = extractCleanImageName(charCopy.imgUrl);
-      }
+      // imgUrlは保存せず、復元時にnameから再生成する
+      delete charCopy.imgUrl;
       return charCopy;
     });
 
@@ -254,11 +305,26 @@ async function restoreDeck(deckId: string) {
   // 編成データを復元
   for (const [index, char] of deck.deckCharacters.entries()) {
     if (char && simulatorStore.deckCharacters[index]) {
-      // クリーンなファイル名から実際のimgUrlを復元
-      if (char.imgUrl) {
-        const actualImgUrl = await findActualImageUrl(char.imgUrl);
-        if (actualImgUrl) {
+      let characterName = '';
+      
+      // 新形式：nameが存在する場合
+      if (char.name) {
+        characterName = char.name;
+      }
+      // 旧形式：imgUrlからキャラクター名を推定（後方互換性）
+      else if (char.imgUrl) {
+        characterName = getCharacterNameFromImageUrl(char.imgUrl);
+        // 旧形式の場合、nameフィールドを補完
+        char.name = characterName;
+      }
+      
+      // 現在の環境に適した画像URLを再生成
+      if (characterName) {
+        try {
+          const actualImgUrl = await loadCharacterImage(characterName);
           char.imgUrl = actualImgUrl;
+        } catch (error) {
+          console.warn('画像の読み込みに失敗しました:', characterName, error);
         }
       }
       
