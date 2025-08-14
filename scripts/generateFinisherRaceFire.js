@@ -351,11 +351,18 @@ async function generateForTarget(targetKey) {
       }
     }
 
-    // Sort desc and keep ALL entries for the day
-    entries.sort((a, b) => b.damage - a.damage);
+    // Merge duplicates by key (e.g., same finisher-card × partner-card with M1/M3); keep highest damage
+    const mergedByKey = new Map();
+    for (const e of entries) {
+      const prev = mergedByKey.get(e.key);
+      if (!prev || e.damage > prev.damage) mergedByKey.set(e.key, e);
+    }
+    const uniqueEntries = Array.from(mergedByKey.values());
+    // Sort desc and keep ALL unique entries for the day
+    uniqueEntries.sort((a, b) => b.damage - a.damage);
 
     // Record values and ensure icons for all entries
-    for (const e of entries) {
+    for (const e of uniqueEntries) {
       if (!seriesMap.has(e.key)) {
         let iconFile = null;
         if (e.duo) {
