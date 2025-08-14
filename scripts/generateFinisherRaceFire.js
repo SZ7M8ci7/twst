@@ -96,9 +96,46 @@ function buildEffectDict(characters) {
   return dict;
 }
 
-function calcFinisherVsFireDamage(ch, partnerBuff) {
+function isOnOrBefore(dateObj, y, m, d) {
+  const cmp = new Date(y, m - 1, d).getTime();
+  return dateObj.getTime() <= cmp;
+}
+
+function calculateStatFromLevel(maxStat, baseStat, rare, level, isLimitBreak) {
+  const levelDict = { 'R': 70, 'SR': 90, 'SSR': 110 };
+  const maxLevel = levelDict[rare] || 110;
+  const calculatedBaseStat = baseStat || Math.floor(maxStat / (rare === 'SSR' ? 4.7 : rare === 'SR' ? 4.3 : 4.2));
+  const bonusStat = calculatedBaseStat * 0.2;
+  const statPerLv = maxLevel > 1 ? (maxStat - 2 * bonusStat - calculatedBaseStat) / (maxLevel - 1) : 0;
+  const levelDiff = maxLevel - level;
+  const totsurate = isLimitBreak ? 0 : 1;
+  const calculatedStat = (maxStat - statPerLv * levelDiff) - bonusStat * totsurate;
+  return Math.max(0, Number(calculatedStat.toFixed(1)));
+}
+
+function computeFinisherATKAtDate(ch, dateObj) {
+  // Determine level and limit-break availability by date
+  let level = 110;
+  let isLimitBreak = true;
+  if (isOnOrBefore(dateObj, 2022, 5, 29)) {
+    level = 100;
+    isLimitBreak = false;
+  } else if (isOnOrBefore(dateObj, 2023, 3, 9)) {
+    level = 110;
+    isLimitBreak = false;
+  } else {
+    level = 110;
+    isLimitBreak = true;
+  }
+
+  const maxATK = Number(ch.originalMaxATK) || Number(ch.max_atk) || Number(ch.atk) || 0;
+  const baseATK = Number(ch.base_atk) || 0;
+  return calculateStatFromLevel(maxATK, baseATK, ch.rare || 'SSR', level, isLimitBreak);
+}
+
+function calcFinisherVsFireDamage(ch, partnerBuff, dateObj) {
   // hand OFF: use max ATK-like
-  const baseATK = Number(ch.originalMaxATK) || Number(ch.max_atk) || Number(ch.atk) || 0;
+  const baseATK = computeFinisherATKAtDate(ch, dateObj);
   const buddyBonus = ((ch.buddy1s||'').includes('ATK') ? ((ch.buddy1s.includes('中'))? atkBuddyRates.medium : atkBuddyRates.small) : 0)
                    + ((ch.buddy2s||'').includes('ATK') ? ((ch.buddy2s.includes('中'))? atkBuddyRates.medium : atkBuddyRates.small) : 0)
                    + ((ch.buddy3s||'').includes('ATK') ? ((ch.buddy3s.includes('中'))? atkBuddyRates.medium : atkBuddyRates.small) : 0);
@@ -253,7 +290,7 @@ async function main() {
     for (const fin of availableFinishers) {
       const duoJa = fin.duo || '';
       // baseline without partner buff (always available once finisher exists)
-      const dmg0 = calcFinisherVsFireDamage(fin, '');
+      const dmg0 = calcFinisherVsFireDamage(fin, '', d);
       if (dmg0 != null) {
         const finJa = toJaCardTitle(fin);
         const label = `${finJa} × ${duoJa}`;
@@ -262,7 +299,7 @@ async function main() {
       // partner buffs only from available partner cards at this date
       const partnerEffects = effectDict[duoJa] || [];
       for (const eff of partnerEffects) {
-        const dmg = calcFinisherVsFireDamage(fin, eff.buff);
+        const dmg = calcFinisherVsFireDamage(fin, eff.buff, d);
         if (dmg != null) {
           const finJa = toJaCardTitle(fin);
           const partnerCard = availableCards.find(c => c.name === eff.name) || null;
