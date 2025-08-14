@@ -66,7 +66,7 @@ const attributeModifiers = {
   '木': { fire: 0.5, water: 1.5, flora: 1, cosmic: 1 },
 };
 
-function buildEffectDict(characters) {
+function buildEffectDict(characters, dateObj) {
   const dict = {}; // key: chara (ja), val: list of {buff, name, buffSource}
   const buffValues = ['(極小)', '(小)', '(中)', '(大)', '(極大)'];
   const buffTypes = ['ATKUP', 'ダメージUP', '無属性ダメージUP', '火属性ダメージUP', '水属性ダメージUP', '木属性ダメージUP', '被ダメージUP'];
@@ -76,6 +76,8 @@ function buildEffectDict(characters) {
     for (const item of etcItems) {
       const trimmed = item.trim();
       if (!trimmed.includes('味方') && !(trimmed.includes('被ダメージUP') && trimmed.includes('相手'))) continue;
+      // Before or on 2023-03-09, ignore any M3-origin lines entirely
+      if (isOnOrBefore(dateObj, 2023, 3, 9) && /(\(M3\))/.test(trimmed)) continue;
       for (const t of buffTypes) {
         if (trimmed.startsWith(t)) {
           for (const v of buffValues) {
@@ -139,8 +141,8 @@ function calcFinisherVsFireDamage(ch, partnerBuff, dateObj) {
   const buddyBonus = ((ch.buddy1s||'').includes('ATK') ? ((ch.buddy1s.includes('中'))? atkBuddyRates.medium : atkBuddyRates.small) : 0)
                    + ((ch.buddy2s||'').includes('ATK') ? ((ch.buddy2s.includes('中'))? atkBuddyRates.medium : atkBuddyRates.small) : 0)
                    + ((ch.buddy3s||'').includes('ATK') ? ((ch.buddy3s.includes('中'))? atkBuddyRates.medium : atkBuddyRates.small) : 0);
-  const selfAtkBuff = calcSelfAtkUp(ch.etc || '');
-  const selfDamageBuff = calcSelfDamageUp(ch.etc || '');
+  const selfAtkBuff = calcSelfAtkUpByDate(ch.etc || '', dateObj);
+  const selfDamageBuff = calcSelfDamageUpByDate(ch.etc || '', dateObj);
   const atr = ch.magic2atr; // finisher attribute
   const atkPartnerBuff = atkBuffDict[partnerBuff] || 0;
   let partnerDamageBuff = 0;
@@ -164,6 +166,40 @@ function calcFinisherVsFireDamage(ch, partnerBuff, dateObj) {
   const mod = attributeModifiers[atr] || { fire: 1, water: 1, flora: 1, cosmic: 1 };
   const vsFire = baseDamage * mod.fire;
   return vsFire;
+}
+
+function calcSelfAtkUpByDate(etc, dateObj) {
+  const lines = String(etc).split('<br>').map(s => s.trim()).filter(Boolean);
+  let max = 0;
+  for (const line of lines) {
+    if (!line.includes('自/3T') || !line.includes('ATKUP')) continue;
+    if (isOnOrBefore(dateObj, 2023, 3, 9) && /(\(M3\))/.test(line)) continue;
+    if (line.includes('ATKUP(極大)')) max = Math.max(max, 0.8);
+    else if (line.includes('ATKUP(大)')) max = Math.max(max, 0.5);
+    else if (line.includes('ATKUP(中)')) max = Math.max(max, 0.35);
+    else if (line.includes('ATKUP(小)')) max = Math.max(max, 0.2);
+    else if (line.includes('ATKUP(極小)')) max = Math.max(max, 0.1);
+  }
+  return max;
+}
+
+function calcSelfDamageUpByDate(etc, dateObj) {
+  const lines = String(etc).split('<br>').map(s => s.trim()).filter(Boolean);
+  let max = 0;
+  for (const line of lines) {
+    if (line.includes('被ダメージUP(中)(相手全体/2T)')) {
+      max = Math.max(max, 0.0875);
+      continue;
+    }
+    if (!line.includes('自/3T')) continue;
+    if (isOnOrBefore(dateObj, 2023, 3, 9) && /(\(M3\))/.test(line)) continue;
+    if (line.includes('ダメージUP(極大)')) max = Math.max(max, 0.1875);
+    else if (line.includes('ダメージUP(大)')) max = Math.max(max, 0.125);
+    else if (line.includes('ダメージUP(中)')) max = Math.max(max, 0.0875);
+    else if (line.includes('ダメージUP(小)')) max = Math.max(max, 0.05);
+    else if (line.includes('ダメージUP(極小)')) max = Math.max(max, 0.02);
+  }
+  return Math.min(max, 0.125);
 }
 
 // Helpers to resolve image paths
@@ -283,7 +319,7 @@ async function main() {
     const availableFinishers = availableCards.filter(c => c.rare === 'SSR');
 
     // Build effect dict for this date only from available cards
-    const effectDict = buildEffectDict(availableCards);
+    const effectDict = buildEffectDict(availableCards, d);
 
     // Compute candidate pairs and damages vs fire
     const entries = [];
