@@ -20,10 +20,11 @@ const sharp = require('sharp');
 const ROOT = process.cwd();
 const CHAR_JSON = path.join(ROOT, 'src', 'assets', 'chara.json');
 const CHAR_INFO_JSON = path.join(ROOT, 'src', 'assets', 'characters_info.json');
-const OUT_DIR = path.join(ROOT, 'generated', 'finisher_race_fire');
-const IMG_DIR = path.join(OUT_DIR, 'img');
-const CSV_PATH = path.join(OUT_DIR, 'data.csv');
-const ICON_BASE_URL = 'https://raw.githubusercontent.com/SZ7M8ci7/twst/flourish/generated/finisher_race_fire/img/';
+// Will be set per target element
+let OUT_DIR = '';
+let IMG_DIR = '';
+let CSV_PATH = '';
+let ICON_BASE_URL = '';
 
 function readJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
 function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
@@ -135,7 +136,7 @@ function computeFinisherATKAtDate(ch, dateObj) {
   return calculateStatFromLevel(maxATK, baseATK, ch.rare || 'SSR', level, isLimitBreak);
 }
 
-function calcFinisherVsFireDamage(ch, partnerBuff, dateObj) {
+function calcFinisherVsTargetDamage(ch, partnerBuff, dateObj, targetKey) {
   // hand OFF: use max ATK-like
   const baseATK = computeFinisherATKAtDate(ch, dateObj);
   const buddyBonus = ((ch.buddy1s||'').includes('ATK') ? ((ch.buddy1s.includes('中'))? atkBuddyRates.medium : atkBuddyRates.small) : 0)
@@ -164,8 +165,8 @@ function calcFinisherVsFireDamage(ch, partnerBuff, dateObj) {
   const atk = baseATK + baseATK * buddyBonus + baseATK * selfAtkBuff + baseATK * atkPartnerBuff;
   const baseDamage = Math.floor(atk * (cosmicRatio + selfDamageBuff + partnerDamageBuff) * 2.4);
   const mod = attributeModifiers[atr] || { fire: 1, water: 1, flora: 1, cosmic: 1 };
-  const vsFire = baseDamage * mod.fire;
-  return vsFire;
+  const mult = mod[targetKey] || 1;
+  return baseDamage * mult;
 }
 
 function calcSelfAtkUpByDate(etc, dateObj) {
@@ -292,7 +293,11 @@ function toJaCardTitle(cardObj) {
   return chara || costume || '';
 }
 
-async function main() {
+async function generateForTarget(targetKey) {
+  OUT_DIR = path.join(ROOT, 'generated', `finisher_race_${targetKey}`);
+  IMG_DIR = path.join(OUT_DIR, 'img');
+  CSV_PATH = path.join(OUT_DIR, 'data.csv');
+  ICON_BASE_URL = `https://raw.githubusercontent.com/SZ7M8ci7/twst/flourish/generated/finisher_race_${targetKey}/img/`;
   ensureDir(OUT_DIR); ensureDir(IMG_DIR);
   const chars = readJson(CHAR_JSON);
   const info = readJson(CHAR_INFO_JSON);
@@ -321,12 +326,12 @@ async function main() {
     // Build effect dict for this date only from available cards
     const effectDict = buildEffectDict(availableCards, d);
 
-    // Compute candidate pairs and damages vs fire
+    // Compute candidate pairs and damages vs target
     const entries = [];
     for (const fin of availableFinishers) {
       const duoJa = fin.duo || '';
       // baseline without partner buff (always available once finisher exists)
-      const dmg0 = calcFinisherVsFireDamage(fin, '', d);
+      const dmg0 = calcFinisherVsTargetDamage(fin, '', d, targetKey);
       if (dmg0 != null) {
         const finJa = toJaCardTitle(fin);
         const label = `${finJa} × ${duoJa}`;
@@ -335,7 +340,7 @@ async function main() {
       // partner buffs only from available partner cards at this date
       const partnerEffects = effectDict[duoJa] || [];
       for (const eff of partnerEffects) {
-        const dmg = calcFinisherVsFireDamage(fin, eff.buff, d);
+        const dmg = calcFinisherVsTargetDamage(fin, eff.buff, d, targetKey);
         if (dmg != null) {
           const finJa = toJaCardTitle(fin);
           const partnerCard = availableCards.find(c => c.name === eff.name) || null;
@@ -391,7 +396,13 @@ async function main() {
   }
   fs.writeFileSync(CSV_PATH, rows.join('\n'));
 
-  console.log(`Done. Series=${seriesMap.size}, dates=${allDates.length}, out=${CSV_PATH}`);
+  console.log(`Done [${targetKey}]. Series=${seriesMap.size}, dates=${allDates.length}, out=${CSV_PATH}`);
+}
+async function main() {
+  const targets = ['fire','water','flora','cosmic'];
+  for (const t of targets) {
+    await generateForTarget(t);
+  }
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
