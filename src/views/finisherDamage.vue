@@ -154,7 +154,7 @@
                   </div>
                 </div>
                 <div class="damage-value">
-                  {{ Math.floor(entry.damage).toLocaleString() }}
+                  {{ Math.floor(isCritical ? entry.damage * 1.25 : entry.damage).toLocaleString() }}
                 </div>
               </div>
             </v-list-item>
@@ -184,6 +184,14 @@
             </v-btn>
           </div>
           <v-spacer />
+          <v-btn 
+            :color="isCritical ? 'yellow' : 'green'" 
+            :variant="isCritical ? 'tonal' : 'tonal'" 
+            class="critical-btn" 
+            @click="toggleCritical"
+          >
+            {{ isCritical ? $t('finisherDamage.critical') : $t('finisherDamage.normal') }}
+          </v-btn>
           <v-btn color="grey" variant="outlined" class="close-btn" @click="dialogVisible = false">CLOSE</v-btn>
         </v-card-actions>
       </v-card>
@@ -239,7 +247,7 @@
                   </div>
                 </div>
                 <div class="damage-value">
-                  {{ Math.floor(entry.damage).toLocaleString() }}
+                  {{ Math.floor(isAllCharactersCritical ? entry.damage * 1.25 : entry.damage).toLocaleString() }}
                 </div>
               </div>
             </v-list-item>
@@ -269,6 +277,14 @@
             </v-btn>
           </div>
           <v-spacer />
+          <v-btn 
+            :color="isAllCharactersCritical ? 'yellow' : 'green'" 
+            :variant="isAllCharactersCritical ? 'tonal' : 'tonal'" 
+            class="critical-btn" 
+            @click="toggleAllCharactersCritical"
+          >
+            {{ isAllCharactersCritical ? $t('finisherDamage.critical') : $t('finisherDamage.normal') }}
+          </v-btn>
           <v-btn color="grey" variant="outlined" class="close-btn" @click="allCharactersDialogVisible = false">CLOSE</v-btn>
         </v-card-actions>
       </v-card>
@@ -889,6 +905,10 @@ const selectedAllCharactersElement = ref<ElementType>('fire');
 const allCharactersCurrentPage = ref(1);
 const allCharactersItemsPerPage = ref(10);
 
+// クリティカル状態管理
+const isCritical = ref(false);
+const isAllCharactersCritical = ref(false);
+
 function calcItemsPerPage() {
   // モーダルの最大高さ: 95vh, ヘッダーや余白を差し引く
   const modalMaxHeight = window.innerHeight * 0.95;
@@ -980,6 +1000,15 @@ watch(() => useHandCollection.value, () => {
   // 手持ち設定の変更時にダメージを再計算
   recalculateAllDamage();
 });
+
+// クリティカル状態切り替え関数
+function toggleCritical() {
+  isCritical.value = !isCritical.value;
+}
+
+function toggleAllCharactersCritical() {
+  isAllCharactersCritical.value = !isAllCharactersCritical.value;
+}
 
 // 手持ちコレクションの内容変更を監視
 watch(() => handCollectionStore.handCollection, () => {
@@ -1374,6 +1403,13 @@ function recalculateAllDamage() {
   min-width: 80px;
   font-weight: bold;
   letter-spacing: 1px;
+}
+
+.critical-btn {
+  min-width: 90px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  margin-right: 8px;
 }
 
 .toggle-button {

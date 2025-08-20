@@ -451,7 +451,9 @@
   "finisherDamage": {
     "useHandCollection": "Use Card Settings",
     "handCollection": "Owned",
-    "allCards": "All"
+    "allCards": "All",
+    "normal": "Normal",
+    "critical": "Critical"
   },
   "handCollection": {
     "title": "Card Settings",

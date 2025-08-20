@@ -450,7 +450,9 @@
   "finisherDamage": {
     "useHandCollection": "手持ち設定を使用",
     "handCollection": "手持ち",
-    "allCards": "全て"
+    "allCards": "全て",
+    "normal": "ノーマル",
+    "critical": "クリティカル"
   },
   "handCollection": {
     "title": "手持ち設定",
