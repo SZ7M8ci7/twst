@@ -27,7 +27,7 @@
         </v-btn>
       </div>
       <div class="character-list-wrapper">
-        <div v-for="(row, rowIndex) in determineLayout()" :key="rowIndex" class="row">
+        <div v-for="(row, rowIndex) in layoutRows" :key="rowIndex" class="row">
           <!-- 各行に表示する寮ごとのキャラクターを表示 -->
           <div
             v-for="groupName in row"
@@ -43,7 +43,7 @@
                 <div v-for="characterInfo in characterGroups[groupName]" :key="characterInfo.name_en" class="character-item"
                   @click="toggleCharacterSelection(characterInfo.name_en)"
                   :class="{ selected: selectedCharactersSet.has(characterInfo.name_en) }"
-                  :style="{ ...iconStyle, opacity: selectedCharactersSet.has(characterInfo.name_en) ? 1 : 0.5 }">
+                  :style="getCharacterItemStyle(characterInfo.name_en)">
                   <img 
                     :src="imgUrlDictionary[characterInfo.name_en] || defaultImg" 
                     :alt="characterInfo.name_en" 
@@ -166,6 +166,13 @@ const characterGroups = characterData.reduce<Record<string, Character[]>>((group
   return groups;
 }, {});
 
+// キャラクター検索の最適化 - O(1)検索用Map
+const characterLookupMap = new Map<string, Character>();
+characterData.forEach(character => {
+  characterLookupMap.set(character.name_ja, character);
+  characterLookupMap.set(character.name_en, character);
+});
+
 // display-block幅の更新を行う関数
 const updateDisplayBlockWidth = () => {
   const displayBlock = document.querySelector('.display-block');
@@ -182,7 +189,7 @@ const resizeListener = () => {
 onMounted(async () => {
   // 初期化処理
   if (isFirst.value) {
-    selectedCharacters.value = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
+    selectedCharacters.value = allCharacterNames.value;
     selectedRare.value = ['SSR']; // SSRのみをデフォルトで選択
     selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
     selectedAttr.value = ['火', '水', '木', '無'];
@@ -261,7 +268,7 @@ function applyFilter() {
 // フィルターリセット機能
 function resetFilter() {
   // デフォルト状態に戻す（SSRのみ選択）
-  selectedCharacters.value = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
+  selectedCharacters.value = allCharacterNames.value;
   selectedRare.value = ['SSR']; // SSRのみをデフォルトで選択
   selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
   selectedAttr.value = ['火', '水', '木', '無'];
@@ -288,6 +295,21 @@ const selectedTypeSet = computed(() => new Set(selectedType.value));
 const selectedAttrSet = computed(() => new Set(selectedAttr.value));
 const selectedEffectsSet = computed(() => new Set(selectedEffects.value));
 
+// 全キャラクター配列 - computed property化
+const allCharacterNames = computed(() => 
+  Object.values(characterGroups).flat().map((student: Character) => student.name_en)
+);
+
+// スタイル最適化 - computed property化
+const getCharacterItemStyle = (characterName: string) => {
+  const isSelected = selectedCharactersSet.value.has(characterName);
+  return {
+    '--icon-size': `${iconSize}px`,
+    '--gap-size': `${gapSize}px`,
+    opacity: isSelected ? 1 : 0.5
+  };
+};
+
 // フィルタリング処理を分離
 function updateCharacterVisibility() {
   characters.value.forEach(character => {
@@ -297,7 +319,7 @@ function updateCharacterVisibility() {
       return
     }
     // キャラチェック
-    const characterInfo = characterData.find(char => char.name_ja === character.chara || char.name_en === character.chara);
+    const characterInfo = characterLookupMap.get(character.chara);
     if (!characterInfo || !selectedCharactersSet.value.has(characterInfo.name_en)) {
       character.visible = false;
       return;
@@ -345,7 +367,7 @@ function handleImageError(event: Event) {
 function toggleSelectAll(groupName: string) {
   if (groupName === 'statusEffects') {
     // ステータス効果の全選択/解除を処理
-    const allSelected = localEffects.value.every(effect => selectedEffects.value.includes(effect.value));
+    const allSelected = localEffects.value.every(effect => selectedEffectsSet.value.has(effect.value));
     if (allSelected) {
       // すべて選択されている場合は解除
       selectedEffects.value = [];
@@ -355,9 +377,9 @@ function toggleSelectAll(groupName: string) {
     }
   } else if (groupName === 'cardAttributes') {
     // カード属性の全選択/解除を処理
-    const allRaresSelected = ['SSR', 'SR', 'R'].every(rare => selectedRare.value.includes(rare));
-    const allTypesSelected = ['バランス', 'ディフェンス', 'アタック'].every(type => selectedType.value.includes(type));
-    const allAttrsSelected = ['火', '水', '木', '無'].every(attr => selectedAttr.value.includes(attr));
+    const allRaresSelected = ['SSR', 'SR', 'R'].every(rare => selectedRareSet.value.has(rare));
+    const allTypesSelected = ['バランス', 'ディフェンス', 'アタック'].every(type => selectedTypeSet.value.has(type));
+    const allAttrsSelected = ['火', '水', '木', '無'].every(attr => selectedAttrSet.value.has(attr));
 
     if (allRaresSelected && allTypesSelected && allAttrsSelected) {
       // すべて選択されている場合は解除
@@ -423,8 +445,8 @@ const getContainerStyle = (numberOfGroupsInRow: number) => {
   };
 };
 
-// 寮の並べ方
-const determineLayout = () => {
+// 寮の並べ方 - computed property化
+const layoutRows = computed(() => {
   const layout = [];
   let currentRow: string[] = [];
   let currentRowWidth = 0;
@@ -460,25 +482,22 @@ const determineLayout = () => {
   }
 
   return layout;
-};
+});
 
 // キャラクター全体の全選択・解除機能
 function toggleSelectAllCharacters() {
-  const allCharacters = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
-  
   if (areAllCharactersSelected()) {
     // 全て選択されている場合は全て解除
     selectedCharacters.value = [];
   } else {
     // 全てのキャラクターを選択
-    selectedCharacters.value = [...allCharacters];
+    selectedCharacters.value = [...allCharacterNames.value];
   }
 }
 
 // 全キャラクターが選択されているかチェック
 function areAllCharactersSelected(): boolean {
-  const allCharacters = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
-  return allCharacters.every(character => selectedCharacters.value.includes(character));
+  return allCharacterNames.value.every(character => selectedCharactersSet.value.has(character));
 }
 </script>
 
