@@ -518,7 +518,45 @@ const handleLevelInput = (event) => {
 
 // 詳細設定の保存
 const saveDetailChanges = (updatedCharacter) => {
-  simulatorStore.selectCharacter(props.charaIndex, updatedCharacter);
+  // 詳細設定で変更された値を直接反映（selectCharacterによる自動計算を回避）
+  const currentCharacter = simulatorStore.deckCharacters[props.charaIndex];
+  
+  // キャラクター基本情報の更新
+  Object.assign(currentCharacter, {
+    chara: updatedCharacter.chara,
+    name: updatedCharacter.name,
+    level: Number(updatedCharacter.level),
+    hp: Number(updatedCharacter.hp),
+    atk: Number(updatedCharacter.atk),
+    magic1Lv: Number(updatedCharacter.magic1Lv),
+    magic2Lv: Number(updatedCharacter.magic2Lv),
+    magic3Lv: Number(updatedCharacter.magic3Lv),
+    buddy1c: updatedCharacter.buddy1c,
+    buddy1s: updatedCharacter.buddy1s,
+    buddy1Lv: Number(updatedCharacter.buddy1Lv),
+    buddy2c: updatedCharacter.buddy2c,
+    buddy2s: updatedCharacter.buddy2s,
+    buddy2Lv: Number(updatedCharacter.buddy2Lv),
+    buddy3c: updatedCharacter.buddy3c,
+    buddy3s: updatedCharacter.buddy3s,
+    buddy3Lv: Number(updatedCharacter.buddy3Lv),
+    buffs: updatedCharacter.buffs || []
+  });
+  
+  // バフ設定の更新（詳細モーダルで設定された内容をそのまま保存）
+  if (updatedCharacter.buffs) {
+    currentCharacter.buffs = updatedCharacter.buffs.map(buff => ({
+      magicOption: buff.magicOption,
+      buffOption: buff.buffOption,
+      powerOption: buff.powerOption,
+      levelOption: Number(buff.levelOption),
+      isManuallyAdded: true
+    }));
+  }
+  
+  // ステータス再計算をトリガー
+  simulatorStore.recalculateStats();
+  
   closeDetailModal();
 };
 
