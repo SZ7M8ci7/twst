@@ -20,6 +20,12 @@
     <hr class="rare-divider" />
     <!-- キャラクタリスト -->
      <div class="display-block">
+      <!-- キャラクター全体の全選択・解除ボタン -->
+      <div class="character-global-select-container">
+        <v-btn small @click="toggleSelectAllCharacters">
+          {{ areAllCharactersSelected() ? t('filterModal.release') : t('filterModal.select') }}
+        </v-btn>
+      </div>
       <div class="character-list-wrapper">
         <div v-for="(row, rowIndex) in determineLayout()" :key="rowIndex" class="row">
           <!-- 各行に表示する寮ごとのキャラクターを表示 -->
@@ -36,8 +42,8 @@
               <div class="character-items">
                 <div v-for="characterInfo in characterGroups[groupName]" :key="characterInfo.name_en" class="character-item"
                   @click="toggleCharacterSelection(characterInfo.name_en)"
-                  :class="{ selected: selectedCharacters.includes(characterInfo.name_en) }"
-                  :style="{ ...iconStyle, opacity: selectedCharacters.includes(characterInfo.name_en) ? 1 : 0.5 }">
+                  :class="{ selected: selectedCharactersSet.has(characterInfo.name_en) }"
+                  :style="{ ...iconStyle, opacity: selectedCharactersSet.has(characterInfo.name_en) ? 1 : 0.5 }">
                   <img 
                     :src="imgUrlDictionary[characterInfo.name_en] || defaultImg" 
                     :alt="characterInfo.name_en" 
@@ -275,29 +281,36 @@ function resetFilter() {
   updateCharacterVisibility();
 }
 
+// パフォーマンス最適化のためのSet
+const selectedCharactersSet = computed(() => new Set(selectedCharacters.value));
+const selectedRareSet = computed(() => new Set(selectedRare.value));
+const selectedTypeSet = computed(() => new Set(selectedType.value));
+const selectedAttrSet = computed(() => new Set(selectedAttr.value));
+const selectedEffectsSet = computed(() => new Set(selectedEffects.value));
+
 // フィルタリング処理を分離
 function updateCharacterVisibility() {
   characters.value.forEach(character => {
     // レア度チェック
-    if (!selectedRare.value.includes(character.rare)) {
+    if (!selectedRareSet.value.has(character.rare)) {
       character.visible = false;
       return
     }
     // キャラチェック
     const characterInfo = characterData.find(char => char.name_ja === character.chara || char.name_en === character.chara);
-    if (!characterInfo || !selectedCharacters.value.includes(characterInfo.name_en)) {
+    if (!characterInfo || !selectedCharactersSet.value.has(characterInfo.name_en)) {
       character.visible = false;
       return;
     }
     // タイプチェック
-    if (!selectedType.value.includes(character.attr)) {
+    if (!selectedTypeSet.value.has(character.attr)) {
       character.visible = false;
       return
     }
     // 属性チェック
-    if ((!selectedAttr.value.includes(character.magic1atr))
-      && (!selectedAttr.value.includes(character.magic2atr))
-      && (!selectedAttr.value.includes(character.magic3atr))) {
+    if ((!selectedAttrSet.value.has(character.magic1atr))
+      && (!selectedAttrSet.value.has(character.magic2atr))
+      && (!selectedAttrSet.value.has(character.magic3atr))) {
       character.visible = false;
       return
     }
@@ -360,7 +373,8 @@ function toggleSelectAll(groupName: string) {
   } else {
     // キャラクターグループの全選択/解除を処理
     const group: Character[] = characterGroups[groupName] || [];
-    const allSelected = group.every((characterInfo: Character) => selectedCharacters.value.includes(characterInfo.name_en));
+    const currentSet = selectedCharactersSet.value;
+    const allSelected = group.every((characterInfo: Character) => currentSet.has(characterInfo.name_en));
 
     if (allSelected) {
       selectedCharacters.value = selectedCharacters.value.filter(c => !group.some(student => student.name_en === c));
@@ -372,20 +386,21 @@ function toggleSelectAll(groupName: string) {
 
 function isGroupFullySelected(groupName: string): boolean {
   if (groupName === 'cardAttributes') {
-    return rareOptions.every(rare => selectedRare.value.includes(rare)) &&
-           typeOptions.value.every(type => selectedType.value.includes(type.value)) &&
-          attrOptions.value.every(attr => selectedAttr.value.includes(attr.value));
+    return rareOptions.every(rare => selectedRareSet.value.has(rare)) &&
+           typeOptions.value.every(type => selectedTypeSet.value.has(type.value)) &&
+          attrOptions.value.every(attr => selectedAttrSet.value.has(attr.value));
   } else if (groupName === 'statusEffects') {
-    return localEffects.value.every(effect => selectedEffects.value.includes(effect.value));
+    return localEffects.value.every(effect => selectedEffectsSet.value.has(effect.value));
   }
 
   const group = characterGroups[groupName];
-  return group.every(character => selectedCharacters.value.includes(character.name_en));
+  return group.every(character => selectedCharactersSet.value.has(character.name_en));
 }
 
 // キャラクター選択の切り替え処理
 function toggleCharacterSelection(characterValue: string) {
-  selectedCharacters.value = selectedCharacters.value.includes(characterValue)
+  const currentSet = selectedCharactersSet.value;
+  selectedCharacters.value = currentSet.has(characterValue)
     ? selectedCharacters.value.filter(c => c !== characterValue)
     : [...selectedCharacters.value, characterValue];
 }
@@ -446,6 +461,25 @@ const determineLayout = () => {
 
   return layout;
 };
+
+// キャラクター全体の全選択・解除機能
+function toggleSelectAllCharacters() {
+  const allCharacters = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
+  
+  if (areAllCharactersSelected()) {
+    // 全て選択されている場合は全て解除
+    selectedCharacters.value = [];
+  } else {
+    // 全てのキャラクターを選択
+    selectedCharacters.value = [...allCharacters];
+  }
+}
+
+// 全キャラクターが選択されているかチェック
+function areAllCharactersSelected(): boolean {
+  const allCharacters = Object.values(characterGroups).flat().map((student: Character) => student.name_en);
+  return allCharacters.every(character => selectedCharacters.value.includes(character));
+}
 </script>
 
 <style scoped>
@@ -631,5 +665,15 @@ const determineLayout = () => {
   font-size: 12px;
   color: #666;
   font-style: italic;
+}
+
+.character-global-select-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.character-global-label {
+  color: #333;
 }
 </style>
