@@ -452,8 +452,10 @@
     "useHandCollection": "Use Card Settings",
     "handCollection": "Owned",
     "allCards": "All",
-    "normal": "Normal",
-    "critical": "Critical"
+    "normal": "0 Crit",
+    "critical1": "1 Crit",
+    "critical2": "2 Crit",
+    "critical3": "3 Crit"
   },
   "handCollection": {
     "title": "Card Settings",

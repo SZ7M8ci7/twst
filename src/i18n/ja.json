@@ -451,8 +451,10 @@
     "useHandCollection": "手持ち設定を使用",
     "handCollection": "手持ち",
     "allCards": "全て",
-    "normal": "ノーマル",
-    "critical": "クリティカル"
+    "normal": "0クリ",
+    "critical1": "1クリ",
+    "critical2": "2クリ",
+    "critical3": "3クリ"
   },
   "handCollection": {
     "title": "手持ち設定",

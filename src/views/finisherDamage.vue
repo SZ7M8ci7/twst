@@ -154,7 +154,7 @@
                   </div>
                 </div>
                 <div class="damage-value">
-                  {{ Math.floor(isCritical ? entry.damage * 1.25 : entry.damage).toLocaleString() }}
+                  {{ Math.floor(entry.damage * criticalMultipliers[criticalLevel]).toLocaleString() }}
                 </div>
               </div>
             </v-list-item>
@@ -185,12 +185,12 @@
           </div>
           <v-spacer />
           <v-btn 
-            :color="isCritical ? 'yellow' : 'green'" 
-            :variant="isCritical ? 'tonal' : 'tonal'" 
+            variant="outlined" 
             class="critical-btn" 
+            :style="getCriticalButtonStyle(criticalLevel)"
             @click="toggleCritical"
           >
-            {{ isCritical ? $t('finisherDamage.critical') : $t('finisherDamage.normal') }}
+            {{ getCriticalButtonText(criticalLevel) }}
           </v-btn>
           <v-btn color="grey" variant="outlined" class="close-btn" @click="dialogVisible = false">CLOSE</v-btn>
         </v-card-actions>
@@ -247,7 +247,7 @@
                   </div>
                 </div>
                 <div class="damage-value">
-                  {{ Math.floor(isAllCharactersCritical ? entry.damage * 1.25 : entry.damage).toLocaleString() }}
+                  {{ Math.floor(entry.damage * criticalMultipliers[allCharactersCriticalLevel]).toLocaleString() }}
                 </div>
               </div>
             </v-list-item>
@@ -278,12 +278,12 @@
           </div>
           <v-spacer />
           <v-btn 
-            :color="isAllCharactersCritical ? 'yellow' : 'green'" 
-            :variant="isAllCharactersCritical ? 'tonal' : 'tonal'" 
+            variant="outlined" 
             class="critical-btn" 
+            :style="getCriticalButtonStyle(allCharactersCriticalLevel)"
             @click="toggleAllCharactersCritical"
           >
-            {{ isAllCharactersCritical ? $t('finisherDamage.critical') : $t('finisherDamage.normal') }}
+            {{ getCriticalButtonText(allCharactersCriticalLevel) }}
           </v-btn>
           <v-btn color="grey" variant="outlined" class="close-btn" @click="allCharactersDialogVisible = false">CLOSE</v-btn>
         </v-card-actions>
@@ -905,9 +905,12 @@ const selectedAllCharactersElement = ref<ElementType>('fire');
 const allCharactersCurrentPage = ref(1);
 const allCharactersItemsPerPage = ref(10);
 
-// クリティカル状態管理
-const isCritical = ref(false);
-const isAllCharactersCritical = ref(false);
+// クリティカル状態管理（0: ノーマル, 1: 1クリ, 2: 2クリ, 3: 3クリ）
+const criticalLevel = ref(0);
+const allCharactersCriticalLevel = ref(0);
+
+// クリティカル倍率の定義
+const criticalMultipliers = [1.0, 1.0833, 1.1666, 1.25];
 
 function calcItemsPerPage() {
   // モーダルの最大高さ: 95vh, ヘッダーや余白を差し引く
@@ -1001,13 +1004,35 @@ watch(() => useHandCollection.value, () => {
   recalculateAllDamage();
 });
 
-// クリティカル状態切り替え関数
+// クリティカル状態切り替え関数（0→1→2→3→0のサイクル）
 function toggleCritical() {
-  isCritical.value = !isCritical.value;
+  criticalLevel.value = (criticalLevel.value + 1) % 4;
 }
 
 function toggleAllCharactersCritical() {
-  isAllCharactersCritical.value = !isAllCharactersCritical.value;
+  allCharactersCriticalLevel.value = (allCharactersCriticalLevel.value + 1) % 4;
+}
+
+// クリティカルボタンのスタイルを取得する関数（黄色の背景で徐々に濃く）
+function getCriticalButtonStyle(level: number): Record<string, string> {
+  const backgrounds = [
+    'rgba(255, 235, 59, 0.1)', // 0クリ: 最も薄い黄色背景
+    'rgba(255, 235, 59, 0.3)', // 1クリ: 薄い黄色背景
+    'rgba(255, 235, 59, 0.6)', // 2クリ: 中程度の黄色背景
+    'rgba(255, 235, 59, 0.9)'  // 3クリ: 濃い黄色背景
+  ];
+  
+  return {
+    'background-color': backgrounds[level],
+    'color': '#999999', // 薄いグレー文字
+    'border-color': '#e0e0e0' // 薄いグレーの枠線
+  };
+}
+
+// クリティカルボタンのテキストを取得する関数
+function getCriticalButtonText(level: number): string {
+  const keys = ['normal', 'critical1', 'critical2', 'critical3'];
+  return t(`finisherDamage.${keys[level]}`);
 }
 
 // 手持ちコレクションの内容変更を監視
