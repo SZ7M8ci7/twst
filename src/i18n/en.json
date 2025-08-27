@@ -242,6 +242,7 @@
     "crewel": "Crewel",
     "fellow": "Fellow",
     "train": "Train",
+    "vargas": "Vargas",
     "other": "Other",
     "balance": "Balanced",
     "defence": "Defence",
@@ -373,6 +374,7 @@
     "crewel": "Crewel",
     "fellow": "Fellow",
     "train": "Train",
+    "vargas": "Vargas",
     "healCards": "Heal Num"
   },
   "resultBody": {

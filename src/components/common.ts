@@ -103,7 +103,8 @@ export function getAvailableCharacterProps(t: (key: string) => string) {
   t('comments.crowley'),
   t('comments.crewel'),
   t('comments.fellow'),
-  t('comments.train')];
+  t('comments.train'),
+  t('comments.vargas')];
 }
 export const availableSortkeys = [
   'hp',

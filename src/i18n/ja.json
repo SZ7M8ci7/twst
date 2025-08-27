@@ -242,6 +242,7 @@
     "crewel": "クルーウェル",
     "fellow": "フェロー",
     "train": "トレイン",
+    "vargas": "バルガス",
     "other": "その他",
     "balance": "バランス",
     "defence": "ディフェンス",
@@ -372,7 +373,8 @@
     "crowley": "クロウリー",
     "crewel": "クルーウェル",
     "fellow": "フェロー",
-    "train": "トレイン"
+    "train": "トレイン",
+    "vargas": "バルガス"
   },
   "resultBody": {
     "effectiveHP": "実質HP",
