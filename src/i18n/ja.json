@@ -458,6 +458,9 @@
     "critical2": "2クリ",
     "critical3": "3クリ"
   },
+  "buddyDuo": {
+    "reflectHandSettings": "手持ち設定を使用"
+  },
   "handCollection": {
     "title": "手持ち設定",
     "unsaved": "未保存",

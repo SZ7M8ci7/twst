@@ -459,6 +459,9 @@
     "critical2": "2 Crit",
     "critical3": "3 Crit"
   },
+  "buddyDuo": {
+    "reflectHandSettings": "Reflect Card Settings"
+  },
   "handCollection": {
     "title": "Card Settings",
     "unsaved": "Unsaved",

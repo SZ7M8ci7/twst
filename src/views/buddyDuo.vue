@@ -1,43 +1,65 @@
 <template>
   <v-container>
-    <div class="matrix">
-      <table>
-        <thead>
-          <tr>
-            <th>
-              <button @click="toggleMODE" class="mode-toggle-button" v-html="formattedMode"></button>
-            </th>
-            <th v-for="(header, index) in headers" :key="index">
-              <img :src="headerImgs[index]" :alt="header" class="img" />
-            </th>
-          </tr>
-          <tr>
-            <th>Total</th>
-            <td v-for="(total, index) in totals" :key="index">
-              <button @click="showTotalCharacterModal(index)" class="cell-button">{{ total }}</button>
-            </td>
-          </tr>
-        </thead>
+    <!-- コントロールセクション -->
+    <div class="controls-section">
+      <!-- モード切り替えボタン -->
+      <button @click="toggleMODE" class="mode-toggle-button" v-html="formattedMode"></button>
+      
+      <!-- 手持ち設定トグル -->
+      <v-switch
+        v-model="handCollectionStore.useHandCollection"
+        :label="$t('buddyDuo.reflectHandSettings')"
+        density="compact"
+        hide-details
+        inset
+        :color="handCollectionStore.useHandCollection ? 'success' : 'grey'"
+        :class="{ 'hand-collection-active': handCollectionStore.useHandCollection }"
+      />
+    </div>
+    
+    <div class="matrix-container">
+      <div class="matrix-scroll">
+        <table class="matrix-table">
+          <!-- 固定ヘッダー行 -->
+          <thead>
+            <tr>
+              <th class="fixed-corner"></th>
+              <th v-for="(header, index) in headers" :key="index" class="header-cell">
+                <img :src="headerImgs[index]" :alt="header" class="img" />
+              </th>
+            </tr>
+            <tr>
+              <th class="fixed-left">Total</th>
+              <td v-for="(total, index) in totals" :key="index" 
+                  class="data-cell"
+                  :class="{ 'highlighted-col': highlightedCol === index }">
+                <button @click="showTotalCharacterModal(index, -1, index)" class="cell-button">{{ total }}</button>
+              </td>
+            </tr>
+          </thead>
 
-        <tbody>
-          <tr v-for="(row, rowIndex) in matrix" :key="rowIndex">
-            <th><img :src="headerImgs[rowIndex]" class="img" /></th>
-            <td v-for="(cell, cellIndex) in row" :key="cellIndex">
-              <button
-                v-if="cell !== null"
-                @click="showCharacterModal(currentRelations[headers[rowIndex]][headers[cellIndex]])"
-                class="cell-button"
-              >
-                {{ cell }}
-              </button>
-              <span v-else></span> 
-            </td>
-
-          </tr>
-        </tbody>
-        <tfoot>
-        </tfoot>
-      </table>
+          <tbody>
+            <tr v-for="(row, rowIndex) in matrix" :key="rowIndex">
+              <th class="fixed-left"><img :src="headerImgs[rowIndex]" class="img" /></th>
+              <td v-for="(cell, cellIndex) in row" :key="cellIndex" 
+                  class="data-cell"
+                  :class="{ 
+                    'highlighted-row': highlightedRow === rowIndex,
+                    'highlighted-col': highlightedCol === cellIndex,
+                    'highlighted-cell': highlightedRow === rowIndex && highlightedCol === cellIndex
+                  }"
+                  @click="cell !== null ? showCharacterModal(currentRelations[headers[rowIndex]][headers[cellIndex]], rowIndex, cellIndex) : showCharacterModal([], rowIndex, cellIndex)">
+                <button
+                  v-if="cell !== null"
+                  class="cell-button"
+                >
+                  {{ cell }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </v-container>
   <!-- モーダル -->
@@ -63,8 +85,9 @@
 
 </template>
 <script setup lang="ts">
-import { computed, onMounted, Ref, ref } from 'vue';
+import { computed, onMounted, Ref, ref, watch } from 'vue';
 import { useCharacterStore, Character } from '@/store/characters';
+import { useHandCollectionStore } from '@/store/handCollection';
 import charactersInfo from '@/assets/characters_info.json';
 import { storeToRefs } from 'pinia';
 import characterData from '@/assets/characters_info.json';
@@ -72,6 +95,7 @@ import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/comp
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 
 const characterStore = useCharacterStore();
+const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
 const headers: Ref<string[]> = ref([]);
 const headerImgs = ref<string[]>([]);
@@ -82,10 +106,22 @@ const HPBuddyRelations: Ref<Record<string, Record<string, any>>> = ref({});
 const ATKBuddyRelations: Ref<Record<string, Record<string, any>>> = ref({});
 const showModal = ref(false);
 const mode = ref('DUO');
+const highlightedRow = ref(-1);
+const highlightedCol = ref(-1);
 
 const characterInfoMap = ref<Map<string, CharacterCardInfo>>(new Map());
 const imgUrlDictionary: Ref<Record<string, string>> = ref({});
 const iconUrlDictionary: Ref<Record<string, string>> = ref({});
+
+// 手持ち設定でフィルタリングされたキャラクター一覧
+const filteredCharacters = computed(() => {
+  if (!handCollectionStore.useHandCollection) {
+    return characters.value;
+  }
+  return characters.value.filter(character => 
+    handCollectionStore.isCharacterOwned(character.name)
+  );
+});
 
 const formattedMode = computed(() => {
   if (mode.value === 'HP Buddy' || mode.value === 'ATK Buddy') {
@@ -117,14 +153,29 @@ const toggleMODE = () => {
   updateMatrix(currentRelations.value);
 };
 
-const showCharacterModal = (characterInfoArray: any[]) => {
+const showCharacterModal = (characterInfoArray: any[], rowIndex?: number, cellIndex?: number) => {
   selectedCharacter.value = [];
+  
+  // ハイライト設定（常に実行）
+  if (rowIndex !== undefined && cellIndex !== undefined) {
+    highlightedRow.value = rowIndex;
+    highlightedCol.value = cellIndex;
+  }
+  
+  // データがある場合のみモーダルを表示
   if (Array.isArray(characterInfoArray) && characterInfoArray.length > 0) {
-    showModal.value = true;
-    characterInfoArray.forEach((charFromRelation: { name:string; imgUrl: string; wikiURL: string; }) => {
-      const info = characterInfoMap.value.get(charFromRelation.name);
-      selectedCharacter.value.push([charFromRelation.imgUrl, charFromRelation.wikiURL, info?.type]);
-    });
+    // 手持ち設定が有効な場合は所持カードのみ表示
+    const charactersToShow = handCollectionStore.useHandCollection
+      ? characterInfoArray.filter((char: { name: string; }) => handCollectionStore.isCharacterOwned(char.name))
+      : characterInfoArray;
+    
+    if (charactersToShow.length > 0) {
+      showModal.value = true;
+      charactersToShow.forEach((charFromRelation: { name:string; imgUrl: string; wikiURL: string; }) => {
+        const info = characterInfoMap.value.get(charFromRelation.name);
+        selectedCharacter.value.push([charFromRelation.imgUrl, charFromRelation.wikiURL, info?.type]);
+      });
+    }
   }
 };
 const updateMatrix = (relations: Record<string, Record<string, any[]>>) => {
@@ -136,8 +187,15 @@ const updateMatrix = (relations: Record<string, Record<string, any[]>>) => {
     )
   );
 };
-const showTotalCharacterModal = (colIndex: number) => {
+const showTotalCharacterModal = (colIndex: number, rowIndex?: number, cellIndex?: number) => {
   selectedCharacter.value = [];
+  
+  // ハイライト設定（常に実行）
+  if (rowIndex !== undefined && cellIndex !== undefined) {
+    highlightedRow.value = rowIndex;
+    highlightedCol.value = cellIndex;
+  }
+  
   const targetColumnHeader = headers.value[colIndex];
   let charactersToShow: any[] = [];
 
@@ -147,6 +205,13 @@ const showTotalCharacterModal = (colIndex: number) => {
       charactersToShow = charactersToShow.concat(relation);
     }
   });
+
+  // 手持ち設定が有効な場合は所持カードのみ表示
+  if (handCollectionStore.useHandCollection) {
+    charactersToShow = charactersToShow.filter((char: { name: string; }) => 
+      handCollectionStore.isCharacterOwned(char.name)
+    );
+  }
 
   if (charactersToShow.length > 0) {
     showModal.value = true;
@@ -202,7 +267,24 @@ onMounted(async () => {
     });
   });
 
-  characters.value.forEach((character: Character) => {
+  // 関係性の構築処理を関数として分離
+  const buildRelations = () => {
+    // 関係性をリセット
+    headers.value.forEach((char) => {
+      duoRelations.value[char] = {};
+      buddyRelations.value[char] = {};
+      HPBuddyRelations.value[char] = {};
+      ATKBuddyRelations.value[char] = {};
+      headers.value.forEach((otherChar) => {
+        duoRelations.value[char][otherChar] = [];
+        buddyRelations.value[char][otherChar] = [];
+        HPBuddyRelations.value[char][otherChar] = [];
+        ATKBuddyRelations.value[char][otherChar] = [];
+      });
+    });
+
+    // フィルタリングされたキャラクターで関係性を構築
+    filteredCharacters.value.forEach((character: Character) => {
       if (!duoRelations.value[character.chara]) {
         duoRelations.value[character.chara] = {};
       }
@@ -254,24 +336,86 @@ onMounted(async () => {
           }
         }
       });
+    });
+  };
+
+  buildRelations();
+
+  // 手持ち設定の変更を監視して関係性を再構築
+  watch(() => handCollectionStore.useHandCollection, () => {
+    buildRelations();
+    updateMatrix(currentRelations.value);
   });
+
+  // 手持ちコレクションの変更を監視して関係性を再構築
+  watch(() => handCollectionStore.handCollection, () => {
+    if (handCollectionStore.useHandCollection) {
+      buildRelations();
+      updateMatrix(currentRelations.value);
+    }
+  }, { deep: true });
 
   updateMatrix(duoRelations.value);
 });
 </script>
 <style scoped>
-.matrix {
-  text-align: center;
+/* コンテナ全体のサイズ制限 */
+.v-container {
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 8px !important;
 }
 
-table {
+/* マトリクスコンテナ */
+.matrix-container {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* スクロール可能エリア */
+.matrix-scroll {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+}
+
+/* テーブル基本スタイル */
+.matrix-table {
   width: 100%;
   border-collapse: collapse;
+  text-align: center;
 }
 
 th,
 td {
   border: 1px solid #000;
+}
+
+/* 固定要素 */
+.fixed-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  background: #f5f5f5;
+}
+
+.header-cell {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  background: #f5f5f5;
+}
+
+.fixed-left {
+  position: sticky;
+  left: 0;
+  z-index: 15;
+  background: #f5f5f5;
 }
 
 .img {
@@ -284,13 +428,40 @@ td {
   box-shadow: 0 2px 2px rgba(0, 0, 0, .3);
   color: #3b4b27;
   border: none;
-  padding: 1px 2px;
+  padding: 8px 12px;
   cursor: pointer;
   border-radius: 8px;
-  font-size: 12px;
-  line-height: 1; 
-  min-width: 40px; 
+  font-size: 14px;
+  line-height: 1.2; 
+  min-width: 80px; 
   text-align: center;
+  white-space: nowrap;
+}
+
+.controls-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.hand-collection-active :deep(.v-label) {
+  color: #4caf50 !important;
+}
+
+/* ハイライト効果 */
+.highlighted-row {
+  background-color: rgba(76, 175, 80, 0.2) !important;
+}
+
+.highlighted-col {
+  background-color: rgba(76, 175, 80, 0.2) !important;
+}
+
+.highlighted-cell {
+  background-color: rgba(76, 175, 80, 0.4) !important;
 }
 .cell-button {
   background-color: #e0e0e0;
@@ -306,7 +477,5 @@ td {
 .cell-button:hover {
   color: #e25513; 
 }
-
-/* .character-image-container と .character-card-type は CharacterIconWithType.vue に移動したので削除 */
 
 </style>
