@@ -250,7 +250,7 @@ function calculateEvasionCount(): number {
       if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         // etcフィールドをbrタグで分割して各効果をチェック
         const etcContent = char.etc || '';
-        const effects = etcContent.split('<br>').map((effect: string) => effect.trim());
+        const effects = etcContent.split(',').map((effect: string) => effect.trim());
         
         // 該当する魔法番号を含む効果行で回避効果をチェック
         const magicEffects = effects.filter((effect: string) => effect.includes(`(M${i})`));
