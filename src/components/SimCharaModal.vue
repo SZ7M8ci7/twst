@@ -183,6 +183,7 @@ characterData.forEach(char => {
   characterDataMap.set(char.name_en, char);
 });
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict, recalculateHP, recalculateATK } from '@/utils/calculations';
+import { applyMultiLevelSort, applyDefaultSort } from '@/utils/sortUtils';
 
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
@@ -1037,9 +1038,6 @@ function getPowerOptionForBuff(buffString) {
   return '小'; // デフォルト値
 }
 
-// calculations.tsと同じダメージ計算関数
-// 未使用の関数を削除（calculations.tsのcalculateCharacterStatsを使用）
-
 // 置き換えを考慮したメンバー名セットを取得
 function getMemberNameSet(candidateCharacter = null, excludeIndex = null) {
   let memberNames = [];
@@ -1158,14 +1156,13 @@ const updateFilteredCharacters = async () => {
 
   // ソート処理
   if (currentSortBy === 'default') {
-    // デフォルト順：最適化されたインデックスマップを使用
-    filtered.sort((a, b) => {
-      const aIndex = dataStructures.characterIndexMap.get(a.chara) ?? 999999;
-      const bIndex = dataStructures.characterIndexMap.get(b.chara) ?? 999999;
-      
-      return currentSortOrder === 'desc' ? bIndex - aIndex : aIndex - bIndex;
-    });
-    filteredAndSortedCharacters.value = filtered;
+    // デフォルト順：キャラクター順序 + レアリティ + 実装日
+    if (currentSortOrder === 'asc') {
+      filteredAndSortedCharacters.value = applyDefaultSort(filtered);
+    } else {
+      // 降順の場合は逆順
+      filteredAndSortedCharacters.value = applyDefaultSort(filtered).reverse();
+    }
     isSorting.value = false;
   } else if (['effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'].includes(currentSortBy)) {
     // 高コストなソートの場合は非同期処理
@@ -1187,7 +1184,9 @@ const updateFilteredCharacters = async () => {
       // ソート
       charactersWithValues.sort((a, b) => {
         const comparison = a.value - b.value;
-        return currentSortOrder === 'desc' ? -comparison : comparison;
+        const primaryComparison = currentSortOrder === 'desc' ? -comparison : comparison;
+        
+        return applyMultiLevelSort(a.character, b.character, primaryComparison);
       });
       
       // 結果を更新
@@ -1235,7 +1234,7 @@ const updateFilteredCharacters = async () => {
           bValue = b.chara || '';
       }
       
-      // 数値の場合はそのまま比較、文字列の場合は大文字小文字を無視
+      // 第1キー：指定されたソート項目
       let comparison = 0;
       if (typeof aValue === 'number' && typeof bValue === 'number') {
         comparison = aValue - bValue;
@@ -1243,7 +1242,9 @@ const updateFilteredCharacters = async () => {
         comparison = String(aValue).localeCompare(String(bValue), 'ja');
       }
       
-      return currentSortOrder === 'desc' ? -comparison : comparison;
+      const primaryComparison = currentSortOrder === 'desc' ? -comparison : comparison;
+      
+      return applyMultiLevelSort(a, b, primaryComparison);
     });
     
     filteredAndSortedCharacters.value = filtered;

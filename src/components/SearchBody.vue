@@ -122,7 +122,7 @@ import { useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import charactersInfo from '@/assets/characters_info.json';
+import { applyDefaultSort } from '@/utils/sortUtils';
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
@@ -154,16 +154,8 @@ const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
-  const characterOrder = charactersInfo.map((info: any) => info.name_ja);
-  return characters.value
-    .filter(character => character.visible && character.imgUrl)
-    .sort((a, b) => {
-      const indexA = characterOrder.indexOf(a.chara);
-      const indexB = characterOrder.indexOf(b.chara);
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-      return indexA - indexB;
-    });
+  const filteredCharacters = characters.value.filter(character => character.visible && character.imgUrl);
+  return applyDefaultSort(filteredCharacters);
 });
 
 const headers = computed(() => [

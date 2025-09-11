@@ -58,15 +58,17 @@
 import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
+import { applyDefaultSort } from '@/utils/sortUtils';
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const loadingImgUrl = ref(true);
-// visibleプロパティがtrueのキャラクターだけを表示
+// visibleプロパティがtrueのキャラクターだけを表示（レアリティ・実装日順でソート）
 const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
-  return characters.value.filter(character => character.visible && character.imgUrl);
+  const filteredCharacters = characters.value.filter(character => character.visible && character.imgUrl);
+  return applyDefaultSort(filteredCharacters);
 });
 const search = ref('');
 const headers = [

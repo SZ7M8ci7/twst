@@ -93,18 +93,10 @@ import { computed, onBeforeMount, onMounted, Ref, ref, watch } from 'vue';
 import { Character, useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
-import characterData from '@/assets/characters_info.json';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
 import { useI18n } from 'vue-i18n';
-
-interface CharacterInfo {
-  name_ja: string;
-  name_en: string;
-  dorm: string;
-  theme_1: string;
-  theme_2: string;
-}
+import { applyDefaultSort } from '@/utils/sortUtils';
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
@@ -154,12 +146,8 @@ const filteredCharacters = computed(() => {
     });
   }
 
-  // characters_info.jsonの順序に基づいてソート
-  const sortedCharacters = [...visibleCharacters].sort((a, b) => {
-    const indexA = (characterData as CharacterInfo[]).findIndex(char => char.name_ja === a.chara);
-    const indexB = (characterData as CharacterInfo[]).findIndex(char => char.name_ja === b.chara);
-    return indexA - indexB;
-  });
+  // キャラクター順序 → レアリティ → 実装日順でソート
+  const sortedCharacters = applyDefaultSort(visibleCharacters);
 
   sortedCharacters.forEach(character => {
     name2data.value[character.name] = character;

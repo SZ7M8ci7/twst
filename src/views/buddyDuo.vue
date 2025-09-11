@@ -93,6 +93,7 @@ import { storeToRefs } from 'pinia';
 import characterData from '@/assets/characters_info.json';
 import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
+import { applyDefaultSort } from '@/utils/sortUtils';
 
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
@@ -113,14 +114,17 @@ const characterInfoMap = ref<Map<string, CharacterCardInfo>>(new Map());
 const imgUrlDictionary: Ref<Record<string, string>> = ref({});
 const iconUrlDictionary: Ref<Record<string, string>> = ref({});
 
-// 手持ち設定でフィルタリングされたキャラクター一覧
+// 手持ち設定でフィルタリングされたキャラクター一覧（ソート適用）
 const filteredCharacters = computed(() => {
+  let filtered;
   if (!handCollectionStore.useHandCollection) {
-    return characters.value;
+    filtered = characters.value;
+  } else {
+    filtered = characters.value.filter(character => 
+      handCollectionStore.isCharacterOwned(character.name)
+    );
   }
-  return characters.value.filter(character => 
-    handCollectionStore.isCharacterOwned(character.name)
-  );
+  return applyDefaultSort(filtered);
 });
 
 const formattedMode = computed(() => {
@@ -251,7 +255,11 @@ onMounted(async () => {
   characterInfoMap.value = createCharacterInfoMap(characters.value);
   imgUrlDictionary.value = await loadImageUrls(characterData, 'name_en');
   iconUrlDictionary.value = await loadImageUrls(charactersInfo, 'name_en', 'icon/');
+  
+  // キャラクター名を元々の順序で維持（charactersInfo.jsonの順序）
   headers.value = charactersInfo.map((char) => char.name_ja);
+  
+  // アイコン画像を設定
   headerImgs.value = charactersInfo.map((char) => iconUrlDictionary.value[char.name_en]);
 
   headers.value.forEach((char) => {

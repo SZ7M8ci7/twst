@@ -90,6 +90,7 @@ import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
+import { applyDefaultSort } from '@/utils/sortUtils';
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
@@ -113,7 +114,8 @@ const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
-  return characters.value.filter(character => character.visible && character.imgUrl);
+  const filteredCharacters = characters.value.filter(character => character.visible && character.imgUrl);
+  return applyDefaultSort(filteredCharacters);
 });
 
 const headers = computed(() => [

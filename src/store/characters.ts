@@ -48,6 +48,7 @@ export interface Character {
   evasion: number;
   selections: any;
   hasDuo: any;
+  implementation_date: string;
 }
 function formatEtc(etc:string) {
   // <br>をカンマに置換
@@ -66,14 +67,7 @@ function countEvasion(etc:string) {
 }
 export const useCharacterStore = defineStore('characters', {
   state: () => {
-    const sortedData = charactersData
-      .sort((a, b) => {
-        if (a.rare !== b.rare) {
-          return b.rare.localeCompare(a.rare);
-        }
-        return (a.chara || '').localeCompare(b.chara || '');
-      });
-    const processedCharacters: Character[] = sortedData
+    const processedCharacters: Character[] = charactersData
       .map((characterJsonData: any) => {
         const { imgUrl: imgUrlFromJson, ...otherJsonProps } = characterJsonData;
 
@@ -126,6 +120,7 @@ export const useCharacterStore = defineStore('characters', {
           evasion: countEvasion(otherJsonProps.etc),
           selections:[],
           hasDuo: false,
+          implementation_date: otherJsonProps.implementation_date || '',
         };
         
         // 次に characterBase と ref でラップした imgUrl を結合して Character 型オブジェクトを生成
