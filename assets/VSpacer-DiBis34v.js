@@ -1,0 +1,1 @@
+import"./VContainer-CgcqnJVi.js";import{br as r}from"./index-C-csUzvK.js";const p=r("v-spacer","div","VSpacer");export{p as V};
