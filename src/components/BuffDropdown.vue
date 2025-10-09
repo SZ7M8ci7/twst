@@ -22,6 +22,7 @@
   <div class="select-wrapper">
     <select v-model="powerOption" @change="updateValue">
       <template v-if="buffOption === 'クリティカル'">
+        <option>0</option>
         <option>1/1</option>
         <option>1/2</option>
         <option>1/3</option>
@@ -80,8 +81,8 @@ watch(() => props.modelValue, (newValue) => {
 watch(buffOption, (newBuffOption) => {
   if (newBuffOption === 'クリティカル') {
     powerOption.value = '1/1'; // デフォルトのクリティカル値
-    levelOption.value = 1; // クリティカルはレベル無効だが形式上1を設定
-  } else if (powerOption.value && ['1/1', '1/2', '1/3', '2/3'].includes(powerOption.value)) {
+    levelOption.value = 10; // クリティカルはレベル無効だが形式上1を設定
+  } else if (powerOption.value && ['0','1/1', '1/2', '1/3', '2/3'].includes(powerOption.value)) {
     powerOption.value = '小'; // 他のバフに変更時はデフォルトの'小'に戻す
   }
   updateValue();

@@ -1,4 +1,5 @@
 // キャラクター選択の共通ロジック
+import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
 
 // バフの強さを判定するヘルパー関数
 export const getPowerOption = (buffString: string) => {
@@ -87,57 +88,27 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
     buddy3Lv: chara.buddy3Lv || 10,
     buffs: [] as any[]
   };
+  
+  // etcから複数バフを抽出（magicNbufは使用しない）
+  // 手持ち設定とは無関係に、レアがSSRならM3バフも抽出対象に含める
+  const parsedEtcBuffs = parseMagicBuffsFromEtc(chara, { allowM3: chara.rare === 'SSR' });
 
   // 各魔法の初期設定をループで処理
   for (let magicIndex = 1; magicIndex <= 3; magicIndex++) {
     const magicKey = `magic${magicIndex}`;
     // バフと回復の設定
-    chara[`${magicKey}buf`] = chara[`${magicKey}buf`] || '';
     chara[`${magicKey}heal`] = chara[`${magicKey}heal`] || '';
     // マジックの属性と威力の設定
     chara[`${magicKey}Attribute`] = chara[`${magicKey}atr`] || '';
     chara[`${magicKey}Power`] = chara[`${magicKey}pow`] || '単発(弱)';
-
-    // バフと回復の自動設定
-    const buffValue = chara[`${magicKey}buf`];
+    
+    // etc由来の複数バフを取り込み（magicNbufは参照しない）
+    parsedEtcBuffs
+      .filter(b => b.magicOption === `M${magicIndex}`)
+      .forEach(b => initialSettings.buffs.push(b));
+    
+    // 回復の追加（healはmagicNhealを使用継続）
     const healValue = chara[`${magicKey}heal`];
-    
-    // バフの追加
-    if (buffValue) {
-      const buffType = buffValue.includes('ATKUP') ? 'ATKUP' :
-                      buffValue.includes('属性ダメUP') ? '属性ダメUP' :
-                      buffValue.includes('ダメUP') ? 'ダメージUP' :
-                      buffValue.includes('クリティカル') ? 'クリティカル' : '';
-      
-      if (buffType) {
-        const buff = {
-          magicOption: `M${magicIndex}`,
-          buffOption: buffType,
-          powerOption: getPowerOption(buffValue),
-          levelOption: buffType === 'クリティカル' ? 1 : 10
-        };
-        initialSettings.buffs.push(buff);
-      }
-    }
-    
-    // etcフィールドから被ダメージUPの相手対象をチェック
-    if (chara.etc) {
-      const etcEffects = chara.etc.split(',').map((effect: string) => effect.trim());
-      const magicEffects = etcEffects.filter((effect: string) => effect.includes(`(M${magicIndex})`));
-      
-      for (const effect of magicEffects) {
-        if (effect.includes('被ダメージUP') && effect.includes('相手')) {
-          const buff = {
-            magicOption: `M${magicIndex}`,
-            buffOption: 'ダメージUP',
-            powerOption: getPowerOption(effect),
-            levelOption: 10
-          };
-          initialSettings.buffs.push(buff);
-          break;
-        }
-      }
-    }
     
     // 回復の追加
     if (healValue) {

@@ -678,7 +678,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
               magicOption: `M${j}`,
               buffOption: buffType,
               powerOption: getPowerOptionForBuff(buffValue),
-              levelOption: buffType === 'クリティカル' ? 1 : 10
+              levelOption: 10
             };
             recalculatedChara.buffs.push(buff);
           }
@@ -1014,6 +1014,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
 // バフ文字列からパワーオプションを取得（SimChara.vueのgetPowerOptionと同じロジック）
 function getPowerOptionForBuff(buffString) {
   // クリティカル分数形式の確認（旧シミュレータ形式）
+  if (buffString.includes('(0)')) return '0';
   if (buffString.includes('(1/1)')) return '1/1';
   if (buffString.includes('(1/2)')) return '1/2';
   if (buffString.includes('(1/3)')) return '1/3';

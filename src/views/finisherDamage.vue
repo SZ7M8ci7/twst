@@ -543,10 +543,9 @@ function calculateDamage() {
 
     // ATKバディーボーナス値計算
     const buddyBonus = calcBuddy(character.buddy1s) + calcBuddy(character.buddy2s) + calcBuddy(character.buddy3s);
-    // 自己3TATKバフ計算
-    const selfAtkBuff = calcSelfAtkUp(character.etc);
-    // 自己3Tダメージバフ計算
-    const selfDamageBuff = calcSelfDamageUp(character.etc);
+    // 自己ATK/ダメージバフ計算（etcを解析して合算）
+    const selfAtkBuff = calcSelfAtkUpFromCharacter(character);
+    const selfDamageBuff = calcSelfDamageUpFromCharacter(character);
     // 対各属性最大ダメージ
     let maxFireDamage = 0;
     let maxWaterDamage = 0;
@@ -684,42 +683,65 @@ function calcBuddy(buddy: string) {
   return 0;
 }
 
-// 自己ATKバフ計算
-function calcSelfAtkUp(value: string) {
-  if (value.includes('ATKUP(極小)(自/3T)')) {
-    return 0.1;
+// etcパーサを用いた自己バフ合算（magicNbufは使用しない）
+import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
+
+function calcSelfAtkUpFromCharacter(character: any) {
+  // M3可否を手持ち設定に合わせて判定
+  let allowM3 = character.rare === 'SSR';
+  if (useHandCollection.value) {
+    const handCard = handCollectionStore.getHandCard(character.name);
+    if (handCard.isOwned) allowM3 = handCard.isM3;
   }
-  if (value.includes('ATKUP(小)(自/3T)')) {
-    return 0.2;
-  }
-  if (value.includes('ATKUP(中)(自/3T)')) {
-    return 0.35;
-  }
-  if (value.includes('ATKUP(大)(自/3T)')) {
-    return 0.5;
-  }
-  return 0;
+  const parsed = parseMagicBuffsFromEtc(character, { allowM3 });
+  // 対象: 自己ATKUP（全M合算）。ゲーム仕様上、2T以上のみ加算対象。
+  const powerMap: Record<string, number> = {
+    '極小': 0.1,
+    '小': 0.2,
+    '中': 0.35,
+    '大': 0.5,
+    '極大': 0.8,
+  };
+  let total = 0;
+  parsed.forEach(b => {
+    if (b.buffOption === 'ATKUP' && b.isSelf) {
+      const dur = b.durationTurns ?? 0;
+      if (dur >= 2) {
+        total += powerMap[b.powerOption] || 0;
+      }
+    }
+  });
+  return total;
 }
 
-// 自己ダメージバフ計算
-function calcSelfDamageUp(value: string) {
-  if (value.includes('ダメージUP(極小)(自/3T)')) {
-    return 0.02;
+function calcSelfDamageUpFromCharacter(character: any) {
+  let allowM3 = character.rare === 'SSR';
+  if (useHandCollection.value) {
+    const handCard = handCollectionStore.getHandCard(character.name);
+    if (handCard.isOwned) allowM3 = handCard.isM3;
   }
-  if (value.includes('ダメージUP(小)(自/3T)')) {
-    return 0.05;
+  const parsed = parseMagicBuffsFromEtc(character, { allowM3 });
+  const powerMap: Record<string, number> = {
+    '極小': 0.02,
+    '小': 0.05,
+    '中': 0.0875,
+    '大': 0.125,
+    '極大': 0.1875,
+  };
+  let total = 0;
+  parsed.forEach(b => {
+    if (b.buffOption === 'ダメージUP' && b.isSelf) {
+      const dur = b.durationTurns ?? 0;
+      if (dur >= 2) {
+        total += powerMap[b.powerOption] || 0;
+      }
+    }
+  });
+  // 既存の特例（フェロー）維持
+  if ((character.etc || '').includes('被ダメージUP(中)(相手全体/2T)')) {
+    total += 0.0875;
   }
-  if (value.includes('ダメージUP(中)(自/3T)')) {
-    return 0.0875;
-  }
-  if (value.includes('ダメージUP(大)(自/3T)')) {
-    return 0.125;
-  }
-  // フェロー用
-  if (value.includes('被ダメージUP(中)(相手全体/2T)')) {
-    return 0.0875;
-  }
-  return 0;
+  return total;
 }
 
 

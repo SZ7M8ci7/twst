@@ -1,4 +1,5 @@
 import { Character, useCharacterStore} from '@/store/characters'
+import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
@@ -243,6 +244,49 @@ function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: 
   atk = (atkBuffMap[magicBuff] || 1) * atk + atk * atkBuddyRate;  
   return calcDamageAfterCalcAtk(magicBuff, magicPow, magicAtr=='無' ? '無':'無以外', atk);
 }
+
+// etcから抽出した複数バフ合算でダメージを計算（magicNbufは不使用）
+function getMagicBuffTotalsFromEtc(chara: Character, magicIndex: 1 | 2 | 3): { atkDelta: number; dmgDelta: number } {
+  // M3可否（ストアのhasM3が信頼できない場合に備え、レアでも判断）
+  const allowM3 = (chara as any).hasM3 ?? (chara.rare === 'SSR');
+  const parsed = parseMagicBuffsFromEtc(chara as any, { allowM3 });
+  let atkDelta = 0; // 基礎ATKに対する加算率合計（0.2なら+20%）
+  let dmgDelta = 0; // ダメージ加算率合計
+
+  parsed
+    .filter(b => b.magicOption === `M${magicIndex}`)
+    .forEach(b => {
+      if (b.buffOption === 'ATKUP') {
+        const key = `ATKUP(${b.powerOption})`;
+        const factor = (atkBuffMap as any)[key] || 1;
+        atkDelta += (factor - 1);
+      } else if (b.buffOption === 'ダメージUP' || b.buffOption === '属性ダメUP') {
+        const prefix = b.buffOption === 'ダメージUP' ? 'ダメUP' : '属性ダメUP';
+        const key = `${prefix}(${b.powerOption})`;
+        const add = (damageBuffMap as any)[key] || 0;
+        dmgDelta += add;
+      }
+    });
+
+  return { atkDelta, dmgDelta };
+}
+
+function calcDamageUsingEtcTotals(magicPow: string, magicAtr: string, baseAtk: number, atkBuddyRate: number, totals: { atkDelta: number; dmgDelta: number }): number {
+  const effectiveAtk = baseAtk * (1 + atkBuddyRate + (totals.atkDelta || 0));
+  let atkRate = magicPow.includes('弱') ? 0.75 : 1;
+  atkRate *= magicAtr === '無' ? 1.1 : 1;
+  atkRate += totals.dmgDelta || 0;
+
+  let comboRate = 1;
+  if (magicPow == '連撃(弱)' || magicPow == '連撃(強)') {
+    comboRate = 1.8;
+  }
+  if (magicPow == 'デュオ魔法' || magicPow == '3連撃(弱)' || magicPow == '3連撃(強)') {
+    comboRate = 2.4;
+  }
+
+  return effectiveAtk * atkRate * comboRate;
+}
 function calcTopDamage(damage1: number, damage2: number, damage3: number): number[] {
   const max = Math.max(damage1, damage2, damage3);
   let second: number;
@@ -444,27 +488,30 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
         deckDuo += 1;
       }
     }
-    // 等倍ダメージ加算
-    const magic1Damage = calcDamage(
-      chara.magic1buf,
+    // 等倍ダメージ加算（etc→buffs[]の合算を使用）
+    const m1Totals = getMagicBuffTotalsFromEtc(chara, 1);
+    const magic1Damage = calcDamageUsingEtcTotals(
       chara.magic1pow,
       chara.magic1atr,
       chara.calcBaseATK,
-      atkBuddyRate
+      atkBuddyRate,
+      m1Totals
     );
-    const magic2Damage = calcDamage(
-      chara.magic2buf,
+    const m2Totals = getMagicBuffTotalsFromEtc(chara, 2);
+    const magic2Damage = calcDamageUsingEtcTotals(
       magic2pow,
       chara.magic2atr,
       chara.calcBaseATK,
-      atkBuddyRate
+      atkBuddyRate,
+      m2Totals
     );
-    const magic3Damage = chara.hasM3 ? calcDamage(
-      chara.magic3buf,
+    const m3Totals = chara.hasM3 ? getMagicBuffTotalsFromEtc(chara, 3) : { atkDelta: 0, dmgDelta: 0 };
+    const magic3Damage = chara.hasM3 ? calcDamageUsingEtcTotals(
       chara.magic3pow,
       chara.magic3atr,
       chara.calcBaseATK,
-      atkBuddyRate
+      atkBuddyRate,
+      m3Totals
     ) : 0;
 
     // 有利ダメージ
