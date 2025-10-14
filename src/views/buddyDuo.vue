@@ -255,12 +255,13 @@ onMounted(async () => {
   characterInfoMap.value = createCharacterInfoMap(characters.value);
   imgUrlDictionary.value = await loadImageUrls(characterData, 'name_en');
   iconUrlDictionary.value = await loadImageUrls(charactersInfo, 'name_en', 'icon/');
+
+  // アイコンが存在するキャラクターのみをヘッダーに採用（characters_info.jsonの順序を維持）
+  const headersWithIcons = charactersInfo.filter((char) => !!iconUrlDictionary.value[char.name_en]);
+  headers.value = headersWithIcons.map((char) => char.name_ja);
   
-  // キャラクター名を元々の順序で維持（charactersInfo.jsonの順序）
-  headers.value = charactersInfo.map((char) => char.name_ja);
-  
-  // アイコン画像を設定
-  headerImgs.value = charactersInfo.map((char) => iconUrlDictionary.value[char.name_en]);
+  // アイコン画像を設定（存在するもののみ）
+  headerImgs.value = headersWithIcons.map((char) => iconUrlDictionary.value[char.name_en]);
 
   headers.value.forEach((char) => {
     duoRelations.value[char] = {};

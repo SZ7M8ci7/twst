@@ -40,12 +40,12 @@
                 {{ isGroupFullySelected(groupName) ? t('filterModal.release') : t('filterModal.select') }}
               </v-btn>
               <div class="character-items">
-                <div v-for="characterInfo in characterGroups[groupName]" :key="characterInfo.name_en" class="character-item"
+                <div v-for="characterInfo in filteredCharacterGroups[groupName]" :key="characterInfo.name_en" class="character-item"
                   @click="toggleCharacterSelection(characterInfo.name_en)"
                   :class="{ selected: selectedCharactersSet.has(characterInfo.name_en) }"
                   :style="getCharacterItemStyle(characterInfo.name_en)">
                   <img 
-                    :src="imgUrlDictionary[characterInfo.name_en] || defaultImg" 
+                    :src="imgUrlDictionary[characterInfo.name_en]" 
                     :alt="characterInfo.name_en" 
                     class="character-image"
                     @error="handleImageError"
@@ -166,6 +166,15 @@ const characterGroups = characterData.reduce<Record<string, Character[]>>((group
   return groups;
 }, {});
 
+// 画像が存在するキャラクターのみを表示するためのフィルタ済みグループ
+const filteredCharacterGroups = computed(() => {
+  const result: Record<string, Character[]> = {};
+  Object.entries(characterGroups).forEach(([dorm, list]) => {
+    result[dorm] = list.filter((c) => !!imgUrlDictionary.value[c.name_en]);
+  });
+  return result;
+});
+
 // キャラクター検索の最適化 - O(1)検索用Map
 const characterLookupMap = new Map<string, Character>();
 characterData.forEach(character => {
@@ -217,6 +226,10 @@ onMounted(async () => {
   updateDisplayBlockWidth();
   window.addEventListener('resize', resizeListener);
   imgUrlDictionary.value = await loadImageUrls(characterData, (item: any) => item.name_en, 'icon/');
+  // 画像辞書読み込み後に初期選択が未設定なら、画像がある項目のみ全選択
+  if (selectedCharacters.value.length === 0) {
+    selectedCharacters.value = allCharacterNames.value;
+  }
   
   // 埋め込みモードの場合はリアルタイム更新のためのwatcherを設定
   if (props.embedded) {
@@ -295,9 +308,9 @@ const selectedTypeSet = computed(() => new Set(selectedType.value));
 const selectedAttrSet = computed(() => new Set(selectedAttr.value));
 const selectedEffectsSet = computed(() => new Set(selectedEffects.value));
 
-// 全キャラクター配列 - computed property化
+// 全キャラクター配列 - computed property化（画像があるもののみ）
 const allCharacterNames = computed(() => 
-  Object.values(characterGroups).flat().map((student: Character) => student.name_en)
+  Object.values(filteredCharacterGroups.value).flat().map((student: Character) => student.name_en)
 );
 
 // スタイル最適化 - computed property化
@@ -394,7 +407,7 @@ function toggleSelectAll(groupName: string) {
     }
   } else {
     // キャラクターグループの全選択/解除を処理
-    const group: Character[] = characterGroups[groupName] || [];
+    const group: Character[] = filteredCharacterGroups.value[groupName] || [];
     const currentSet = selectedCharactersSet.value;
     const allSelected = group.every((characterInfo: Character) => currentSet.has(characterInfo.name_en));
 
@@ -415,7 +428,7 @@ function isGroupFullySelected(groupName: string): boolean {
     return localEffects.value.every(effect => selectedEffectsSet.value.has(effect.value));
   }
 
-  const group = characterGroups[groupName];
+  const group = filteredCharacterGroups.value[groupName] || [];
   return group.every(character => selectedCharactersSet.value.has(character.name_en));
 }
 
@@ -453,7 +466,7 @@ const layoutRows = computed(() => {
   const maxWidth = displayBlockWidth.value;
   const maxGroupsPerRow = 2;
 
-  Object.entries(characterGroups).forEach(([groupName, group]) => {
+  Object.entries(filteredCharacterGroups.value).forEach(([groupName, group]) => {
     const groupWidth = calculateGroupWidth(group);
 
     // 寮の幅が display-block の幅の半分を超える場合、その寮は単独で1行にする

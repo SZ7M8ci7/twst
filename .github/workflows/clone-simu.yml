@@ -35,6 +35,7 @@ jobs:
         git config --global user.name "${GITHUB_ACTOR}"
         git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
         git add src/assets/img src/assets/chara.json
+        git add src/assets/img src/assets/characters_info.json
         # Check for any changes
         if git diff --staged --exit-code; then
           echo "No changes to commit."
