@@ -26,6 +26,7 @@ jobs:
       run: |
         cp -R ./simulator-repo/img/* ./twst-repo/src/assets/img/
         cp ./simulator-repo/chara.json ./twst-repo/src/assets/chara.json
+        cp ./simulator-repo/characters_info.json ./twst-repo/src/assets/characters_info.json
 
 
     - name: Commit and push changes to twst repository
@@ -34,8 +35,7 @@ jobs:
         git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
         git config --global user.name "${GITHUB_ACTOR}"
         git config --global user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-        git add src/assets/img src/assets/chara.json
-        git add src/assets/img src/assets/characters_info.json
+        git add src/assets/img src/assets/chara.json src/assets/characters_info.json
         # Check for any changes
         if git diff --staged --exit-code; then
           echo "No changes to commit."
