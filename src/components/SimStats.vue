@@ -367,13 +367,12 @@ const scoreBase = computed(() => {
   return scores;
 });
 
-// 各難易度のスコア計算（EXTRAの3T,4Tのみ）
 const extraScores = computed(() => [
   scoreBase.value[0] * 0.144 * 1.5,
   scoreBase.value[1] * 0.138 * 1.5,
   scoreBase.value[2] * 0.132 * 1.5,
   scoreBase.value[3] * 0.126 * 1.5,
-  scoreBase.value[4] * 0.1 * 1.5
+  scoreBase.value[4] * 0.12 * 1.5
 ]);
 
 // 数値フォーマット

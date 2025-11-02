@@ -91,7 +91,7 @@ const props = defineProps<{
 
 // 初期化フラグ
 const isInitialized = ref(false);
-const turns = [0.144,0.138,0.132,0.126,0.1];
+const turns = [0.144,0.138,0.132,0.126,0.12];
 const damage = ref(0);
 const duo = ref(0);
 const difficulty = ref(1.5);
