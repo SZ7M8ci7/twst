@@ -7,7 +7,10 @@
     </div>
     
     <!-- 合計ダメージとBasicスコア表示 -->
-    <div class="margin">合計ダメージとBasic Extraスコア</div>
+    <div class="margin stats-header">
+      <span>合計ダメージとBasic Extraスコア</span>
+      <span class="selected-magic-count">選択魔法数:{{ selectedMagicCount }}</span>
+    </div>
     <table class="damage-table">
       <thead>
         <tr>
@@ -59,6 +62,16 @@ const props = defineProps<{
 }>();
 
 const simulatorStore = useSimulatorStore();
+
+const selectedMagicCount = computed(() => {
+  let count = 0;
+  simulatorStore.deckCharacters.forEach((char) => {
+    if (char.isM1Selected) count += 1;
+    if (char.isM2Selected) count += 1;
+    if (char.isM3Selected) count += 1;
+  });
+  return count;
+});
 
 // HP統計
 const totalHP = computed(() => 
@@ -414,6 +427,21 @@ const getRankClass = (rank: string) => {
 
 .margin {
   margin: 0;
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selected-magic-count {
+  font-size: 0.9em;
+  color: #555;
+}
+
+.v-theme--dark .selected-magic-count {
+  color: #bbb;
 }
 
 /* ダメージテーブルのスタイル */

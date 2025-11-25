@@ -89,7 +89,7 @@ const createDefaultCharacter = (): Character => ({
   magic1Power: '単発(弱)',
   magic2Power: '単発(弱)',
   magic3Power: '単発(弱)',
-  selectedMagic: [1, 2, 3],
+  selectedMagic: [],
   buddy1c: '',
   buddy2c: '',
   buddy3c: '',
@@ -105,9 +105,9 @@ const createDefaultCharacter = (): Character => ({
   rare: 'SSR',
   isBonusSelected: false,
   imgUrl: '',
-  isM1Selected: true,
-  isM2Selected: true,
-  isM3Selected: true
+  isM1Selected: false,
+  isM2Selected: false,
+  isM3Selected: false
 });
 
 export const useSimulatorStore = defineStore('simulator', () => {
