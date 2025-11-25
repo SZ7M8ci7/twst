@@ -9,7 +9,9 @@
     <!-- 合計ダメージとBasicスコア表示 -->
     <div class="margin stats-header">
       <span>合計ダメージとBasic Extraスコア</span>
-      <span class="selected-magic-count">選択魔法数:{{ selectedMagicCount }}</span>
+      <span class="selected-magic-count">
+        選択魔法数:<span class="selected-magic-count-value">{{ selectedMagicCount }}</span>
+      </span>
     </div>
     <table class="damage-table">
       <thead>
@@ -440,8 +442,16 @@ const getRankClass = (rank: string) => {
   color: #555;
 }
 
+.selected-magic-count-value {
+  color: #1976d2;
+}
+
 .v-theme--dark .selected-magic-count {
   color: #bbb;
+}
+
+.v-theme--dark .selected-magic-count-value {
+  color: #1976d2;
 }
 
 /* ダメージテーブルのスタイル */
