@@ -1325,6 +1325,17 @@ select {
   padding: 2px 2px;
   border-radius: 2px;
   cursor: grab;
+  position: relative;
+}
+
+.drag-handle::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  left: -15px;
+  right: -8px;
+  background-color: transparent;
 }
 
 .drag-handle:active {
