@@ -98,7 +98,16 @@
             <button class="details-btn tall" @click="openDetailModal" title="詳細編集">
               <v-icon size="16">mdi-cog</v-icon>
             </button>
-            <button class="buff-btn bottom-aligned" @click="addBuff" title="バフ追加">
+            <button
+              class="buff-btn bottom-aligned"
+              @click="addBuff"
+              title="バフ追加"
+              :class="{ 'drop-target': isBuffDragging }"
+              @dragenter.prevent="onBuffButtonDragEnter"
+              @dragover.prevent="onBuffButtonDragOver"
+              @dragleave.prevent="onBuffButtonDragLeave"
+              @drop.prevent="onBuffButtonDrop"
+            >
               <v-icon size="16">mdi-plus</v-icon>
             </button>
           </div>
@@ -403,7 +412,9 @@ const onBuffDrop = (index, event) => {
   } else {
     // 別キャラへの移動
     const [movedBuff] = sourceCharacter.buffs.splice(fromIndex, 1);
-    targetBuffs.splice(targetIndex, 0, movedBuff);
+    const copied = JSON.parse(JSON.stringify(movedBuff));
+    copied.isManuallyAdded = true;
+    targetBuffs.splice(targetIndex, 0, copied);
   }
 
   simulatorStore.recalculateStats();
@@ -427,6 +438,44 @@ const onEmptyBuffDragLeave = () => {
 
 const onEmptyBuffDrop = (event) => {
   onBuffDrop(0, event);
+};
+
+const copyBuffToCurrent = (sourceCharaIndex, sourceBuffIndex) => {
+  const sourceCharacter = simulatorStore.deckCharacters[sourceCharaIndex];
+  if (!sourceCharacter?.buffs || sourceBuffIndex == null) return;
+  const buff = sourceCharacter.buffs[sourceBuffIndex];
+  if (!buff) return;
+
+  const targetCharacter = simulatorStore.deckCharacters[props.charaIndex];
+  if (!targetCharacter.buffs) targetCharacter.buffs = [];
+  // ディープコピーで追加
+  const copied = JSON.parse(JSON.stringify(buff));
+  copied.isManuallyAdded = true;
+  targetCharacter.buffs.push(copied);
+  simulatorStore.recalculateStats();
+};
+
+const onBuffButtonDragEnter = () => {
+  if (!hasBuffDragSource()) return;
+  dropInsertIndex.value = simulatorStore.deckCharacters[props.charaIndex].buffs.length;
+};
+
+const onBuffButtonDragOver = () => {
+  if (!hasBuffDragSource()) return;
+  dropInsertIndex.value = simulatorStore.deckCharacters[props.charaIndex].buffs.length;
+};
+
+const onBuffButtonDragLeave = () => {
+  dropInsertIndex.value = null;
+};
+
+const onBuffButtonDrop = () => {
+  if (!hasBuffDragSource()) return;
+  const fromCharaIndex = buffDragPayload.fromCharaIndex ?? props.charaIndex;
+  const sourceIndexRaw = buffDragPayload.fromBuffIndex ?? draggingBuffIndex.value;
+  if (sourceIndexRaw === null || sourceIndexRaw === undefined) return;
+  copyBuffToCurrent(fromCharaIndex, sourceIndexRaw);
+  resetBuffDragState();
 };
 
 const onBuffListDragEnter = () => {
@@ -1117,7 +1166,6 @@ select {
   left: -2px;
   border-radius: 2px;
   background-color: #8faef3;
-  animation: dropBlink 0.9s ease-in-out infinite;
 }
 
 .buff-section.drop-tail::after {
@@ -1164,6 +1212,18 @@ select {
 .buff-drop-empty.drop-blink {
   outline: 1px dashed #8faef3;
   outline-offset: 2px;
+}
+
+.buff-btn.drop-target {
+  border-color: #8faef3;
+  outline: 1px solid #8faef3;
+  outline-offset: 2px;
+}
+
+.buff-btn.drop-target {
+  outline: 1px #8faef3;
+  outline-offset: 2px;
+  animation: dropBlink 0.9s ease-in-out infinite;
 }
 
 @keyframes dropBlink {
