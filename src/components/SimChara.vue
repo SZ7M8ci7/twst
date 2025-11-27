@@ -107,14 +107,18 @@
     </div>
     <v-row dense>
       <div class="buff-list">
-        <template v-for="(buff, index) in simulatorStore.deckCharacters[props.charaIndex].buffs" :key="index">
+        <template v-for="(buff, index) in simulatorStore.deckCharacters[props.charaIndex].buffs" :key="`buff-${index}`">
           <div
             class="buff-section"
-            :class="{ 'manually-added': buff.isManuallyAdded, 'drag-over': dragOverBuffIndex === index }"
-            @dragenter.prevent="onBuffDragEnter(index)"
-            @dragover.prevent="onBuffDragOver(index)"
+            :class="{
+              'manually-added': buff.isManuallyAdded,
+              'drag-before': dropInsertIndex === index,
+              'drag-after': dropInsertIndex === index + 1
+            }"
+            @dragenter.prevent="onBuffDragEnter(index, $event)"
+            @dragover.prevent="onBuffDragOver(index, $event)"
             @dragleave.self="onBuffDragLeave(index)"
-            @drop.prevent="onBuffDrop(index)"
+            @drop.prevent="onBuffDrop(index, $event)"
           >
             <button
               class="drag-handle"
@@ -267,62 +271,82 @@ const canReorderBuffs = computed(() => {
   return !!(character?.buffs && character.buffs.length > 1);
 });
 
-// バフ並び替え用のドラッグ状態
+// Drag state for buff reorder
 const draggingBuffIndex = ref(null);
-const dragOverBuffIndex = ref(null);
+const dropInsertIndex = ref(null);
 
 const resetBuffDragState = () => {
   draggingBuffIndex.value = null;
-  dragOverBuffIndex.value = null;
+  dropInsertIndex.value = null;
 };
 
 const onBuffDragStart = (index, event) => {
   const character = simulatorStore.deckCharacters[props.charaIndex];
   if (!character?.buffs || character.buffs.length <= 1) return;
-  
+
   draggingBuffIndex.value = index;
-  dragOverBuffIndex.value = index;
-  
+  dropInsertIndex.value = null;
+
   if (event?.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', String(index));
   }
 };
 
-const onBuffDragEnter = (index) => {
+const updateDropPosition = (index, event) => {
   if (draggingBuffIndex.value === null) return;
-  dragOverBuffIndex.value = index;
+  const rect = event.currentTarget.getBoundingClientRect();
+  const isSingleColumn = windowWidth.value < 600;
+  const isAfter = isSingleColumn
+    ? (event.clientY - rect.top) > rect.height / 2
+    : (event.clientX - rect.left) > rect.width / 2;
+  dropInsertIndex.value = isAfter ? index + 1 : index;
 };
 
-const onBuffDragOver = (index) => {
-  if (draggingBuffIndex.value === null) return;
-  dragOverBuffIndex.value = index;
+const onBuffDragEnter = (index, event) => {
+  updateDropPosition(index, event);
+};
+
+const onBuffDragOver = (index, event) => {
+  updateDropPosition(index, event);
 };
 
 const onBuffDragLeave = (index) => {
-  if (dragOverBuffIndex.value === index) {
-    dragOverBuffIndex.value = null;
+  if (dropInsertIndex.value === index || dropInsertIndex.value === index + 1) {
+    dropInsertIndex.value = null;
   }
 };
 
-const onBuffDrop = (targetIndex) => {
+const onBuffDrop = (index, event) => {
   const fromIndex = draggingBuffIndex.value;
   const character = simulatorStore.deckCharacters[props.charaIndex];
-  
+
   if (fromIndex === null || !character?.buffs || character.buffs.length <= 1) {
     resetBuffDragState();
     return;
   }
-  
-  if (fromIndex === targetIndex) {
+
+  if (event) {
+    updateDropPosition(index, event);
+  }
+
+  const preferredIndex = dropInsertIndex.value !== null ? dropInsertIndex.value : index;
+  let targetIndex = Math.max(0, Math.min(preferredIndex, character.buffs.length));
+
+  // Skip if dropping to the same/adjacent position
+  if (fromIndex === targetIndex || fromIndex + 1 === targetIndex) {
     resetBuffDragState();
     return;
   }
-  
+
   const [movedBuff] = character.buffs.splice(fromIndex, 1);
-  const boundedTarget = Math.max(0, Math.min(targetIndex, character.buffs.length));
-  character.buffs.splice(boundedTarget, 0, movedBuff);
-  
+  if (fromIndex < targetIndex) {
+    targetIndex = Math.max(0, targetIndex - 1);
+  }
+  targetIndex = Math.max(0, Math.min(targetIndex, character.buffs.length));
+
+  character.buffs.splice(targetIndex, 0, movedBuff);
+
   simulatorStore.recalculateStats();
   resetBuffDragState();
 };
@@ -330,7 +354,6 @@ const onBuffDrop = (targetIndex) => {
 const onBuffDragEnd = () => {
   resetBuffDragState();
 };
-
 
 const toggleBonus = () => {
   isBonusSelected.value = !isBonusSelected.value;
@@ -937,6 +960,7 @@ select {
   gap: 2px;
   margin-bottom: 0;
   width: 100%;
+  position: relative;
 }
 
 .buff-dropdown-wrapper {
@@ -944,6 +968,49 @@ select {
   min-width: 0;
   display: flex;
   align-items: center;
+}
+
+.buff-section.drag-before::before,
+.buff-section.drag-after::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 2px;
+  background-color: #8faef3;
+  border-radius: 2px;
+}
+
+.buff-section.drag-before::before {
+  top: -4px;
+}
+
+.buff-section.drag-after::after {
+  bottom: -4px;
+}
+
+@media (min-width: 600px) {
+  .buff-section.drag-before::before,
+  .buff-section.drag-after::after {
+    top: 4px;
+    bottom: 4px;
+    height: auto;
+    width: 2px;
+    left: auto;
+    right: auto;
+  }
+
+  .buff-section.drag-before::before {
+    left: -4px;
+    top: 4px;
+    bottom: 4px;
+  }
+
+  .buff-section.drag-after::after {
+    right: -4px;
+    top: 4px;
+    bottom: 4px;
+  }
 }
 
 .remove-btn {
@@ -983,11 +1050,6 @@ select {
 
 .buff-section.manually-added {
   background-color: rgba(255, 0, 0, 0.05);
-}
-
-.buff-section.drag-over {
-  outline: 1px dashed #8faef3;
-  background-color: rgba(143, 174, 243, 0.08);
 }
 
 .drag-handle {
@@ -1082,11 +1144,6 @@ select {
 /* ダークモード対応 */
 :deep(.v-theme--dark) .buff-section.manually-added {
   background-color: rgba(255, 100, 100, 0.1);
-}
-
-:deep(.v-theme--dark) .buff-section.drag-over {
-  outline-color: #8faef3;
-  background-color: rgba(143, 174, 243, 0.15);
 }
 
 :deep(.v-theme--dark) .drag-handle {
