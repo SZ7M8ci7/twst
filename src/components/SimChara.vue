@@ -108,8 +108,30 @@
     <v-row dense>
       <div class="buff-list">
         <template v-for="(buff, index) in simulatorStore.deckCharacters[props.charaIndex].buffs" :key="index">
-          <div class="buff-section" :class="{ 'manually-added': buff.isManuallyAdded }">
-            <BuffDropdown v-model="simulatorStore.deckCharacters[props.charaIndex].buffs[index]" @buff-changed="handleBuffChanged"/>
+          <div
+            class="buff-section"
+            :class="{ 'manually-added': buff.isManuallyAdded, 'drag-over': dragOverBuffIndex === index }"
+            @dragenter.prevent="onBuffDragEnter(index)"
+            @dragover.prevent="onBuffDragOver(index)"
+            @dragleave.self="onBuffDragLeave(index)"
+            @drop.prevent="onBuffDrop(index)"
+          >
+            <button
+              class="drag-handle"
+              :draggable="canReorderBuffs"
+              @dragstart.stop="onBuffDragStart(index, $event)"
+              @dragend="onBuffDragEnd"
+              title="ドラッグで順番を変更"
+              aria-label="バフの並び替え"
+            >
+              <v-icon size="14">mdi-drag-vertical</v-icon>
+            </button>
+            <div class="buff-dropdown-wrapper">
+              <BuffDropdown
+                v-model="simulatorStore.deckCharacters[props.charaIndex].buffs[index]"
+                @buff-changed="handleBuffChanged"
+              />
+            </div>
           </div>
         </template>
       </div>
@@ -237,6 +259,76 @@ const addBuff = () => {
     levelOption: 10,
     isManuallyAdded: true // 手動追加フラグ
   });
+};
+
+// バフの並び替え可否
+const canReorderBuffs = computed(() => {
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  return !!(character?.buffs && character.buffs.length > 1);
+});
+
+// バフ並び替え用のドラッグ状態
+const draggingBuffIndex = ref(null);
+const dragOverBuffIndex = ref(null);
+
+const resetBuffDragState = () => {
+  draggingBuffIndex.value = null;
+  dragOverBuffIndex.value = null;
+};
+
+const onBuffDragStart = (index, event) => {
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  if (!character?.buffs || character.buffs.length <= 1) return;
+  
+  draggingBuffIndex.value = index;
+  dragOverBuffIndex.value = index;
+  
+  if (event?.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+  }
+};
+
+const onBuffDragEnter = (index) => {
+  if (draggingBuffIndex.value === null) return;
+  dragOverBuffIndex.value = index;
+};
+
+const onBuffDragOver = (index) => {
+  if (draggingBuffIndex.value === null) return;
+  dragOverBuffIndex.value = index;
+};
+
+const onBuffDragLeave = (index) => {
+  if (dragOverBuffIndex.value === index) {
+    dragOverBuffIndex.value = null;
+  }
+};
+
+const onBuffDrop = (targetIndex) => {
+  const fromIndex = draggingBuffIndex.value;
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  
+  if (fromIndex === null || !character?.buffs || character.buffs.length <= 1) {
+    resetBuffDragState();
+    return;
+  }
+  
+  if (fromIndex === targetIndex) {
+    resetBuffDragState();
+    return;
+  }
+  
+  const [movedBuff] = character.buffs.splice(fromIndex, 1);
+  const boundedTarget = Math.max(0, Math.min(targetIndex, character.buffs.length));
+  character.buffs.splice(boundedTarget, 0, movedBuff);
+  
+  simulatorStore.recalculateStats();
+  resetBuffDragState();
+};
+
+const onBuffDragEnd = () => {
+  resetBuffDragState();
 };
 
 
@@ -840,17 +932,18 @@ select {
 
 .buff-section {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 1px;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 2px;
+  margin-bottom: 0;
   width: 100%;
 }
 
-.buff-input {
-  margin-left: 5px;
-  margin-right: 5px;
-  border: 1px solid #ccc;
-  width: 45px;
+.buff-dropdown-wrapper {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .remove-btn {
@@ -892,16 +985,55 @@ select {
   background-color: rgba(255, 0, 0, 0.05);
 }
 
+.buff-section.drag-over {
+  outline: 1px dashed #8faef3;
+  background-color: rgba(143, 174, 243, 0.08);
+}
+
+.drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  min-width: 15px;
+  align-self: stretch;
+  padding: 2px 2px;
+  border-radius: 2px;
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
 /* モバイル（サイドパネルなし） */
-@media (min-width: 480px) and (max-width: 959px) {
+@media (min-width: 480px) and (max-width: 599px) {
+  .buff-list {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+@media (min-width: 600px) and (max-width: 899px) {
   .buff-list {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (min-width: 768px) and (max-width: 959px) {
+@media (min-width: 900px) and (max-width: 959px) {
   .buff-list {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 599px) {
+  .buff-section {
+    width: auto;
+    margin-left: auto;
+    margin-right: auto;
+    justify-content: center;
+  }
+  .buff-dropdown-wrapper {
+    width: auto;
   }
 }
 
@@ -950,5 +1082,15 @@ select {
 /* ダークモード対応 */
 :deep(.v-theme--dark) .buff-section.manually-added {
   background-color: rgba(255, 100, 100, 0.1);
+}
+
+:deep(.v-theme--dark) .buff-section.drag-over {
+  outline-color: #8faef3;
+  background-color: rgba(143, 174, 243, 0.15);
+}
+
+:deep(.v-theme--dark) .drag-handle {
+  border-color: #666;
+  color: #ddd;
 }
 </style>

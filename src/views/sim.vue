@@ -248,7 +248,7 @@ onMounted(async () => {
 }
 
 .main-content {
-  padding-right: 8px;
+  padding-right: 0px;
 }
 
 .sidebar {
@@ -315,7 +315,7 @@ onMounted(async () => {
 /* エリア別浮かせた表現 */
 .simulator-area {
   border-radius: 8px;
-  padding: 12px;
+  padding: 4px;
   margin-bottom: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: box-shadow 0.2s ease;
