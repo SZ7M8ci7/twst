@@ -106,11 +106,18 @@
       </v-row>
     </div>
     <v-row dense>
-      <div class="buff-list">
+      <div
+        class="buff-list"
+        :class="{}"
+        @dragenter.prevent="onBuffListDragEnter"
+        @dragover.prevent="onBuffListDragOver"
+        @dragleave="onBuffListDragLeave"
+        @drop.prevent="onBuffListDrop"
+      >
         <div
           v-if="!simulatorStore.deckCharacters[props.charaIndex].buffs.length"
           class="buff-drop-empty"
-          :class="{ 'active': dropInsertIndex === 0 }"
+          :class="{ 'active': dropInsertIndex === 0, 'drop-blink': isBuffDragging }"
           @dragenter.prevent="onEmptyBuffDragEnter"
           @dragover.prevent="onEmptyBuffDragEnter"
           @dragleave="onEmptyBuffDragLeave"
@@ -122,7 +129,10 @@
             :class="{
               'manually-added': buff.isManuallyAdded,
               'drag-before': dropInsertIndex === index,
-              'drag-after': dropInsertIndex === index + 1
+              'drag-after': dropInsertIndex === index + 1,
+              'drop-blink': isBuffDragging && (dropInsertIndex === index || dropInsertIndex === index + 1),
+              'drop-front': isBuffDragging,
+              'drop-tail': isBuffDragging && isBuffRowEnd(index)
             }"
             @dragenter.prevent="onBuffDragEnter(index, $event)"
             @dragover.prevent="onBuffDragOver(index, $event)"
@@ -284,6 +294,8 @@ const canReorderBuffs = computed(() => {
 const draggingBuffIndex = ref(null);
 const dropInsertIndex = ref(null);
 
+const isBuffDragging = computed(() => buffDragPayload.fromBuffIndex !== null);
+
 const resetBuffDragState = () => {
   draggingBuffIndex.value = null;
   dropInsertIndex.value = null;
@@ -298,9 +310,10 @@ const onBuffDragStart = (index, event) => {
   if (!character?.buffs || character.buffs.length === 0) return;
 
   draggingBuffIndex.value = index;
-  dropInsertIndex.value = null;
+  dropInsertIndex.value = null; // フォーカス時の挙動を変えない
   buffDragPayload.fromCharaIndex = props.charaIndex;
   buffDragPayload.fromBuffIndex = index;
+  isBuffDragging.value = true;
 
   if (event?.dataTransfer) {
     event.dataTransfer.effectAllowed = 'move';
@@ -312,9 +325,14 @@ const updateDropPosition = (index, event) => {
   if (!hasBuffDragSource()) return;
   const rect = event.currentTarget.getBoundingClientRect();
   const isSingleColumn = windowWidth.value < 600;
-  const isAfter = isSingleColumn
-    ? (event.clientY - rect.top) > rect.height / 2
-    : (event.clientX - rect.left) > rect.width / 2;
+  let isAfter;
+
+  if (isSingleColumn) {
+    isAfter = (event.clientY - rect.top) > rect.height / 2;
+  } else {
+    const leftZone = rect.width * 0.35;
+    isAfter = (event.clientX - rect.left) > leftZone;
+  }
   dropInsertIndex.value = isAfter ? index + 1 : index;
 };
 
@@ -329,6 +347,9 @@ const onBuffDragOver = (index, event) => {
 };
 
 const onBuffDragLeave = (index) => {
+  // 末尾への挿入位置（length）は消さない
+  const len = simulatorStore.deckCharacters[props.charaIndex].buffs.length;
+  if (dropInsertIndex.value === len) return;
   if (dropInsertIndex.value === index || dropInsertIndex.value === index + 1) {
     dropInsertIndex.value = null;
   }
@@ -406,6 +427,50 @@ const onEmptyBuffDragLeave = () => {
 
 const onEmptyBuffDrop = (event) => {
   onBuffDrop(0, event);
+};
+
+const onBuffListDragEnter = () => {
+  if (!hasBuffDragSource()) return;
+  const len = simulatorStore.deckCharacters[props.charaIndex].buffs.length;
+  dropInsertIndex.value = len;
+};
+
+const onBuffListDragOver = () => {
+  if (!hasBuffDragSource()) return;
+  const len = simulatorStore.deckCharacters[props.charaIndex].buffs.length;
+  dropInsertIndex.value = len;
+};
+
+const onBuffListDragLeave = () => {
+  const len = simulatorStore.deckCharacters[props.charaIndex].buffs.length;
+  if (dropInsertIndex.value === len) {
+    dropInsertIndex.value = null;
+  }
+};
+
+const onBuffListDrop = (event) => {
+  const len = simulatorStore.deckCharacters[props.charaIndex].buffs.length;
+  onBuffDrop(len, event);
+};
+
+const getBuffColumns = () => {
+  const width = windowWidth.value;
+  if (width >= 1400) return 3;
+  if (width >= 1200) return 2;
+  if (width >= 960) return 2;
+  if (width >= 900) return 3;
+  if (width >= 600) return 2;
+  return 1;
+};
+
+const isBuffRowEnd = (index) => {
+  const cols = getBuffColumns();
+  const buffs = simulatorStore.deckCharacters[props.charaIndex].buffs || [];
+  const isLast = index === buffs.length - 1;
+  if (cols <= 1) return isLast;
+  const rowEnd = (index + 1) % cols === 0;
+  // 行が埋まっていない最終行でも末尾の右側に線を出す
+  return rowEnd || isLast;
 };
 
 const toggleBonus = () => {
@@ -1014,6 +1079,7 @@ select {
   margin-bottom: 0;
   width: 100%;
   position: relative;
+  overflow: visible;
 }
 
 .buff-dropdown-wrapper {
@@ -1027,8 +1093,8 @@ select {
 .buff-section.drag-after::after {
   content: '';
   position: absolute;
-  left: 4px;
-  right: 4px;
+  left: -2px;
+  right: -2px;
   height: 2px;
   background-color: #8faef3;
   border-radius: 2px;
@@ -1040,6 +1106,35 @@ select {
 
 .buff-section.drag-after::after {
   bottom: -4px;
+}
+
+.buff-section.drop-front::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  left: -2px;
+  border-radius: 2px;
+  background-color: #8faef3;
+  animation: dropBlink 0.9s ease-in-out infinite;
+}
+
+.buff-section.drop-tail::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  right: -2px;
+  border-radius: 2px;
+  background-color: #8faef3;
+  animation: dropBlink 0.9s ease-in-out infinite;
+}
+
+.buff-section.drop-blink::before,
+.buff-section.drop-blink::after {
+  animation: dropBlink 0.9s ease-in-out infinite;
 }
 
 .buff-drop-empty {
@@ -1062,6 +1157,24 @@ select {
   color: #555;
 }
 
+.drop-blink {
+  animation: dropBlink 0.9s ease-in-out infinite;
+}
+
+.buff-drop-empty.drop-blink {
+  outline: 1px dashed #8faef3;
+  outline-offset: 2px;
+}
+
+@keyframes dropBlink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
 @media (min-width: 600px) {
   .buff-section.drag-before::before,
   .buff-section.drag-after::after {
@@ -1074,15 +1187,31 @@ select {
   }
 
   .buff-section.drag-before::before {
-    left: -4px;
+    left: -2px;
     top: 4px;
     bottom: 4px;
   }
 
   .buff-section.drag-after::after {
-    right: -4px;
+    right: -2px;
     top: 4px;
     bottom: 4px;
+  }
+
+  .buff-section.drop-front::before {
+    top: 4px;
+    bottom: 4px;
+    height: auto;
+    width: 2px;
+    left: -2px;
+  }
+
+  .buff-section.drop-tail::after {
+    top: 4px;
+    bottom: 4px;
+    height: auto;
+    width: 2px;
+    right: -1px;
   }
 }
 
@@ -1113,6 +1242,7 @@ select {
   justify-items: center;
   width: 100%;
   margin-bottom: 2px;
+  position: relative;
 }
 
 .buff-section {
@@ -1224,6 +1354,4 @@ select {
   color: #ddd;
 }
 </style>
-
-
 
