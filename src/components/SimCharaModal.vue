@@ -125,6 +125,7 @@
             :key="character.name" 
             @click="selectImage(character)" 
             class="character-item"
+            :style="{ backgroundColor: getDormColor(getDormFromCharacter(character)) }"
           >
             <div class="character-image-wrapper" :data-character-name="character.name">
               <img 
@@ -191,6 +192,36 @@ const jpName2enName = charactersInfo.reduce((map, character) => {
   map[character.name_ja] = character.name_en;
   return map;
 }, {});
+
+// 寮ごとの背景色（淡い色で可読性優先）
+const dormColorMap = {
+  'ハーツラビュル': 'rgba(173,37,21,0.62)',
+  'サバナクロー': 'rgba(204,151,56,0.65)',
+  'オクタヴィネル': 'rgba(125,121,165,0.36)',
+  'スカラビア': 'rgba(94,23,29,0.56)',
+  'ポムフィオーレ': 'rgba(44,32,109,0.45)',
+  'イグニハイド': 'rgba(88,116,171,0.66)',
+  'ディアソムニア': 'rgba(120,143,27,0.82)'
+};
+const defaultDormColor = 'rgba(199,197,207,0.25)';
+const getDormColor = (dorm) => dormColorMap[dorm || ''] || defaultDormColor;
+
+const getDormFromCharacter = (character) => {
+  if (!character) return '';
+  if (character.dorm) return character.dorm;
+  const candidates = [
+    character.chara,
+    character.name,
+    character.name_ja,
+    character.name_en
+  ];
+  for (const key of candidates) {
+    if (!key) continue;
+    const info = characterDataMap.get(key);
+    if (info?.dorm) return info.dorm;
+  }
+  return '';
+};
 
 // デュオアイコンのキャッシュ
 const duoIconCache = ref({});
