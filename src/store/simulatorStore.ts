@@ -14,6 +14,9 @@ function debounce(fn: Function, delay: number) {
   };
 }
 
+const AUTO_SAVE_STORAGE_KEY = 'twst_autosave_deck';
+const AUTO_SAVE_DECK_ID = 'autosave';
+const AUTO_SAVE_DECK_NAME = 'AutoSave';
 
 // キャラクターのインターフェースを定義
 interface Character {
@@ -110,6 +113,31 @@ const createDefaultCharacter = (): Character => ({
   isM3Selected: false
 });
 
+function serializeDeckCharactersForStorage(deckCharacters: Character[]) {
+  return deckCharacters.map(char => {
+    const charCopy = JSON.parse(JSON.stringify(char));
+    delete charCopy.imgUrl;
+    return charCopy;
+  });
+}
+
+function saveAutoDeck(deckCharacters: Character[], selectedAttribute: string) {
+  if (typeof window === 'undefined') return;
+  if (!deckCharacters.some(char => char?.chara)) return;
+  try {
+    const deck = {
+      id: AUTO_SAVE_DECK_ID,
+      name: AUTO_SAVE_DECK_NAME,
+      deckCharacters: serializeDeckCharactersForStorage(deckCharacters),
+      selectedAttribute,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(AUTO_SAVE_STORAGE_KEY, JSON.stringify(deck));
+  } catch (error) {
+    console.warn('AutoSaveの保存に失敗しました:', error);
+  }
+}
+
 export const useSimulatorStore = defineStore('simulator', () => {
   // 手持ちコレクションストアへの参照
   const handCollectionStore = useHandCollectionStore();
@@ -204,6 +232,8 @@ export const useSimulatorStore = defineStore('simulator', () => {
       
       // deckStatsの準備完了を設定
       isDeckStatsReady.value = true;
+
+      saveAutoDeck(deckCharacters, selectedAttribute.value);
     } finally {
       isCalculating.value = false;
       

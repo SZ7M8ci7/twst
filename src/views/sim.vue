@@ -99,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, watch } from 'vue';
 import SimChara from '@/components/SimChara.vue';
 import SimChart from '@/components/SimChart.vue';
 import SimHeader from '@/components/SimHeader.vue';
@@ -115,6 +115,18 @@ const isLargeScreen = ref(window.innerWidth >= 768);
 const selectedAttribute = ref('対全');
 const carouselModel = ref(0);
 const simulatorStore = useSimulatorStore();
+
+watch(selectedAttribute, (value) => {
+  if (simulatorStore.selectedAttribute !== value) {
+    simulatorStore.selectedAttribute = value;
+  }
+});
+
+watch(() => simulatorStore.selectedAttribute, (value) => {
+  if (selectedAttribute.value !== value) {
+    selectedAttribute.value = value;
+  }
+});
 
 const calcTitles = [
   'バディ情報',
@@ -144,6 +156,7 @@ async function restoreState() {
   // 既存の状態復元
   if (urlParams.get('restoreState') === 'true') {
     const savedState = localStorage.getItem('twstSimulatorState');
+    let restored = false;
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
@@ -155,8 +168,7 @@ async function restoreState() {
               Object.assign(simulatorStore.deckCharacters[index], char);
             }
           });
-          // 全体を再計算
-          simulatorStore.recalculateStats();
+          restored = true;
         }
         
         // 選択された属性を復元
@@ -168,11 +180,19 @@ async function restoreState() {
         // Error handling
       }
     }
+
+    if (restored) {
+      await nextTick();
+      simulatorStore.recalculateStats();
+    }
+    return;
   }
   // デッキ探索結果からの復元
   else if (urlParams.get('restoreFromSearch') === 'true') {
     await restoreFromSearchParams(urlParams);
+    return;
   }
+
 }
 
 // デッキ探索結果からキャラクターを復元する関数
@@ -204,7 +224,7 @@ async function restoreFromSearchParams(urlParams: URLSearchParams) {
         }
       }
     }
-    
+
     // 全体を再計算
     await nextTick();
     simulatorStore.recalculateStats();

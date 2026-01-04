@@ -27,12 +27,12 @@
 
         <!-- 保存済み編成一覧 -->
         <div class="saved-decks-section">
-          <div v-if="savedDecks.length === 0" class="no-decks">
+          <div v-if="!hasAnyDecks" class="no-decks">
             保存された編成はありません
           </div>
           <div v-else>
             <div 
-              v-for="deck in savedDecks" 
+              v-for="deck in displayedDecks" 
               :key="deck.id"
               class="deck-item"
               @click="restoreDeck(deck.id)"
@@ -61,6 +61,7 @@
                   </div>
                 </div>
                 <v-btn 
+                  v-if="deck.id !== AUTO_SAVE_DECK_ID"
                   size="x-small" 
                   @click.stop="deleteDeck(deck.id)"
                   color="error"
@@ -86,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { loadCharacterImage } from '@/utils/characterSelection';
 
@@ -104,6 +105,7 @@ const simulatorStore = useSimulatorStore();
 const newDeckName = ref('');
 const saveError = ref('');
 const savedDecks = ref<SavedDeck[]>([]);
+const autoSaveDeck = ref<SavedDeck | null>(null);
 
 // 各編成の画像URLをキャッシュするための reactive map
 const imageUrlCache = ref<Map<string, string>>(new Map());
@@ -164,7 +166,7 @@ const getCharacterDisplayKey = (char: any): string => {
 const preloadDeckImages = async () => {
   const imagePromises: Promise<void>[] = [];
   
-  savedDecks.value.forEach(deck => {
+  displayedDecks.value.forEach(deck => {
     deck.deckCharacters.forEach(char => {
       let cacheKey = '';
       
@@ -194,7 +196,64 @@ const preloadDeckImages = async () => {
 };
 
 const STORAGE_KEY = 'twst_saved_decks';
+const AUTO_SAVE_STORAGE_KEY = 'twst_autosave_deck';
+const AUTO_SAVE_DECK_ID = 'autosave';
+const AUTO_SAVE_DECK_NAME = 'AutoSave';
 
+const displayedDecks = computed(() => {
+  if (autoSaveDeck.value) {
+    return [autoSaveDeck.value, ...savedDecks.value];
+  }
+  return savedDecks.value;
+});
+
+const hasAnyDecks = computed(() => displayedDecks.value.length > 0);
+
+
+function buildDeckSnapshot(deckCharacters: any[], name: string, id: string): SavedDeck {
+  const cleanedDeckCharacters = deckCharacters.map(char => {
+    const charCopy = JSON.parse(JSON.stringify(char));
+    delete charCopy.imgUrl;
+    return charCopy;
+  });
+
+  return {
+    id,
+    name,
+    deckCharacters: cleanedDeckCharacters,
+    selectedAttribute: simulatorStore.selectedAttribute,
+    savedAt: new Date().toISOString()
+  };
+}
+
+function loadAutoSaveDeck() {
+  try {
+    const saved = localStorage.getItem(AUTO_SAVE_STORAGE_KEY);
+    if (saved) {
+      const loaded = JSON.parse(saved);
+      if (loaded && Array.isArray(loaded.deckCharacters)) {
+        autoSaveDeck.value = {
+          ...loaded,
+          id: AUTO_SAVE_DECK_ID,
+          name: AUTO_SAVE_DECK_NAME
+        };
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('AutoSaveの読み込みに失敗しました:', error);
+  }
+
+  if (simulatorStore.deckCharacters.some(char => char?.chara)) {
+    autoSaveDeck.value = buildDeckSnapshot(
+      simulatorStore.deckCharacters,
+      AUTO_SAVE_DECK_NAME,
+      AUTO_SAVE_DECK_ID
+    );
+  } else {
+    autoSaveDeck.value = null;
+  }
+}
 
 function closeModal() {
   emit('close');
@@ -258,21 +317,11 @@ async function saveDeck() {
       return;
     }
 
-    // キャラクターデータをコピーし、imgUrlは除去（復元時に再生成する）
-    const cleanedDeckCharacters = simulatorStore.deckCharacters.map(char => {
-      const charCopy = JSON.parse(JSON.stringify(char));
-      // imgUrlは保存せず、復元時にnameから再生成する
-      delete charCopy.imgUrl;
-      return charCopy;
-    });
-
-    const newDeck: SavedDeck = {
-      id: Date.now().toString(),
-      name: deckName,
-      deckCharacters: cleanedDeckCharacters,
-      selectedAttribute: simulatorStore.selectedAttribute,
-      savedAt: new Date().toISOString()
-    };
+    const newDeck = buildDeckSnapshot(
+      simulatorStore.deckCharacters,
+      deckName,
+      Date.now().toString()
+    );
 
     savedDecks.value.unshift(newDeck);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDecks.value));
@@ -299,7 +348,9 @@ function getCurrentDateTime(): string {
 }
 
 async function restoreDeck(deckId: string) {
-  const deck = savedDecks.value.find(d => d.id === deckId);
+  const deck = deckId === AUTO_SAVE_DECK_ID
+    ? autoSaveDeck.value
+    : savedDecks.value.find(d => d.id === deckId);
   if (!deck || !deck.deckCharacters) return;
 
   // 編成データを復元
@@ -341,6 +392,7 @@ async function restoreDeck(deckId: string) {
 }
 
 function deleteDeck(deckId: string) {
+  if (deckId === AUTO_SAVE_DECK_ID) return;
   savedDecks.value = savedDecks.value.filter(deck => deck.id !== deckId);
   
   try {
@@ -353,6 +405,7 @@ function deleteDeck(deckId: string) {
 
 onMounted(async () => {
   loadSavedDecks();
+  loadAutoSaveDeck();
   await preloadDeckImages();
 });
 </script>
