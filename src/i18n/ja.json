@@ -156,6 +156,9 @@
     "evasion": "回避",
     "debuff": "デバフ"
   },
+  "data": {
+    "useHandCollection": "手持ち設定を使用"
+  },
   "search": {
     "characterList": "キャラ一覧",
     "result": "検索結果",

@@ -7,23 +7,33 @@
 
   <!-- ロード完了後に表示するメインコンテンツ -->
   <div v-else>
-    <v-container class="container">
-      <v-row class="controls-container" no-gutters>
-  <v-col cols="12" md="8">
-    <v-text-field
-      v-model="search"
-      label="Search"
-      prepend-inner-icon="mdi-magnify"
-      variant="outlined"
-      hide-details
-      single-line
-      style="max-height: 60px">
-    </v-text-field>
-  </v-col>
-  <v-col cols="12" md="3" class="d-flex justify-end">
-    <v-btn color="green" @click="exportToExcel">Excelでダウンロード</v-btn>
-  </v-col>
-</v-row>
+  <v-container class="container">
+    <v-row class="controls-container" no-gutters>
+      <v-col class="controls-search flex-grow-1">
+        <v-text-field
+          v-model="search"
+          label="Search"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          hide-details
+          single-line
+          style="max-height: 60px">
+        </v-text-field>
+      </v-col>
+      <v-col cols="auto" class="controls-toggle d-flex justify-end align-center">
+        <v-switch
+          v-model="useHandCollectionFilter"
+          :label="t('data.useHandCollection')"
+          density="compact"
+          hide-details
+          inset
+          :color="useHandCollectionFilter ? 'success' : 'grey'"
+        />
+      </v-col>
+      <v-col cols="auto" class="controls-download d-flex justify-end">
+        <v-btn color="green" @click="exportToExcel">Excelでダウンロード</v-btn>
+      </v-col>
+    </v-row>
 
 
 
@@ -57,17 +67,31 @@
 <script setup lang="ts">
 import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
+import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import { applyDefaultSort } from '@/utils/sortUtils';
+import { useI18n } from 'vue-i18n';
 const characterStore = useCharacterStore();
+const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
+const { t } = useI18n();
 const loadingImgUrl = ref(true);
+const useHandCollectionFilter = ref(false);
 // visibleプロパティがtrueのキャラクターだけを表示（レアリティ・実装日順でソート）
 const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
     return []; // 画像URLの読み込み中は空の配列を返す
   }
-  const filteredCharacters = characters.value.filter(character => character.visible && character.imgUrl);
+  const filteredCharacters = characters.value.filter(character => {
+    if (!character.visible || !character.imgUrl) {
+      return false;
+    }
+    if (!useHandCollectionFilter.value) {
+      return true;
+    }
+    const handCard = handCollectionStore.getHandCard(character.name);
+    return handCard.isOwned;
+  });
   return applyDefaultSort(filteredCharacters);
 });
 const search = ref('');
@@ -181,9 +205,12 @@ onBeforeMount(() => {
 
 .controls-container {
   display: flex;
-  flex-wrap: wrap; /* Allow wrapping as necessary */
-  gap: 10px; /* Space between items */
-  align-items: center; /* Align items vertically */
+  flex-wrap: nowrap;
+  gap: 10px;
+  align-items: center;
+}
+.controls-search {
+  min-width: 200px;
 }
 .container {
   height: 100vh;

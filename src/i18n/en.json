@@ -156,6 +156,9 @@
     "evasion": "Evasion",
     "debuff": "Debuff"
   },
+  "data": {
+    "useHandCollection": "Use Card Settings"
+  },
   "search": {
     "characterList": "Character List",
     "result": "Result",
