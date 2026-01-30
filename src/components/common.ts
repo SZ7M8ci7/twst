@@ -83,7 +83,7 @@ function getBuffDebuffCountsByMagic(chara: any) {
   }
 
   // etcは「,」区切りに整形済みなので分割してM番号ごとにカウント
-  const effects = etc.split(',').map(effect => effect.trim()).filter(Boolean);
+  const effects = etc.split(',').map((effect: string) => effect.trim()).filter(Boolean);
   for (const effect of effects) {
     const mMatch = effect.match(/\(M([123])\)/);
     if (!mMatch) continue;
