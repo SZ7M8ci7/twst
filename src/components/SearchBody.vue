@@ -54,7 +54,6 @@
               v-if="item.rare === 'SSR'"
               :model-value="item.hasM3"
               hide-details
-              :disabled="item.rare !== 'SSR'"
               @update:modelValue="(val) => handleMagicToggle(item, 'hasM3', val)"
             ></v-checkbox>
           </template>
@@ -211,7 +210,7 @@ function countSelectedMagics(character: any): number {
 }
 
 // M1/M2/M3の初期化と「最低2つON」を強制する
-function normalizeMagicUsage(character: any, options: { warnOnFix?: boolean } = {}) {
+function normalizeMagicUsage(character: any) {
   if (character.rare !== 'SSR') {
     character.hasM3 = false;
   } else if (character.hasM3 === undefined) {
@@ -250,10 +249,6 @@ function handleMagicToggle(
     next.hasM1 = key === 'hasM1' ? false : true;
     next.hasM2 = key === 'hasM2' ? false : true;
     next.hasM3 = key === 'hasM3' ? false : true;
-  } else if ([next.hasM1, next.hasM2, next.hasM3].filter(Boolean).length < 2) {
-    next.hasM1 = true;
-    next.hasM2 = true;
-    next.hasM3 = true;
   }
 
   character.hasM1 = next.hasM1;
@@ -409,7 +404,7 @@ function importFromText() {
         character.required = required.toLowerCase() === 'true';
         character.hasM3 = hasM3.toLowerCase() === 'true';
         // TSVはM3のみなので、M1/M2を含めた使用可否を補正
-        normalizeMagicUsage(character, { warnOnFix: false });
+        normalizeMagicUsage(character);
         importedCount++;
       }
     });
@@ -436,7 +431,7 @@ function applyHandCollection() {
         character.required = false;
         character.hasM3 = handCard.isM3;
         // 手持ち設定はM3のみなので、M1/M2を含めた使用可否を補正
-        normalizeMagicUsage(character, { warnOnFix: false });
+        normalizeMagicUsage(character);
         appliedCount++;
       } else {
         // 所持していない場合、デフォルト設定
@@ -444,7 +439,7 @@ function applyHandCollection() {
         character.required = false;
         character.hasM3 = false;
         // 未所持は最低2つONの初期状態に合わせる
-        normalizeMagicUsage(character, { warnOnFix: false });
+        normalizeMagicUsage(character);
       }
     });
     

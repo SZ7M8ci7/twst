@@ -408,8 +408,7 @@
   },
   "error": {
     "requiredCharacter": "必須キャラのレベルは1以上にして下さい",
-    "fewCharacter": "レベル設定されたキャラが少なすぎます",
-    "magicSelectionMinTwo": "使用する魔法（M1/M2/M3）は最低2つ選択してください"
+    "fewCharacter": "レベル設定されたキャラが少なすぎます"
   },
   "hand": {
     "filter": "フィルター",

@@ -409,8 +409,7 @@
   },
   "error": {
     "requiredCharacter": "Required character level must be at least 1",
-    "fewCharacter": "Too few level-set characters.",
-    "magicSelectionMinTwo": "Select at least two magic cards (M1/M2/M3)."
+    "fewCharacter": "Too few level-set characters."
   },
   "hand": {
     "filter": "Filter",

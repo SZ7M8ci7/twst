@@ -42,13 +42,6 @@ export function checkNumber(input:KeyboardEvent){
     input.preventDefault();
   }
 }
-export interface deckStatus{
-  EHP:number;
-  HP:number;
-  evasion:number;
-  buddyNum:number;
-  HPBuddyNum:number;
-}
 // etc文字列からのバフ/デバフ数はM1/M2/M3のON/OFFに連動させるため、
 // 1キャラ単位で解析結果をキャッシュして再利用する。
 const buffDebuffCache = new WeakMap<any, { etc: string; buffByMagic: number[]; debuffByMagic: number[] }>();
@@ -296,33 +289,6 @@ const damageBuffMap: { [key: string]: number } = {
   "属性ダメUP(極大)": 0.27,
 };
 
-const damageCache: Record<string, number> = {};
-function calcDamageAfterCalcAtk(magicBuff: string, magicPow: string, magicAtr: string, atk: number): number {
-  const cacheKey = `${magicBuff},${magicPow},${magicAtr},${atk}`;
-  
-  if (cacheKey in damageCache) {
-    return damageCache[cacheKey];
-  }
-  let atkRate = magicPow.includes("弱") ? 0.75 : 1;
-  atkRate *= magicAtr === '無' ? 1.1 : 1;
-  atkRate += damageBuffMap[magicBuff] || 0;
-
-  let comboRate = 1;
-  if (magicPow == "連撃(弱)" || magicPow == "連撃(強)") {
-    comboRate = 1.8;
-  }
-  if (magicPow == "デュオ魔法" || magicPow == "3連撃(弱)") {
-    comboRate = 2.4;
-  }
-
-  const damage = atk * atkRate * comboRate;
-  damageCache[cacheKey] = damage;
-  return damage;
-}
-function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: number, atkBuddyRate: number): number {
-  atk = (atkBuffMap[magicBuff] || 1) * atk + atk * atkBuddyRate;  
-  return calcDamageAfterCalcAtk(magicBuff, magicPow, magicAtr=='無' ? '無':'無以外', atk);
-}
 
 // etcから抽出した複数バフ合算でダメージを計算（magicNbufは不使用）
 // allowM3Overrideは「使用可否」でM3を無効にした場合に解析から外すための上書き
@@ -439,19 +405,16 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     name2MotherUsed[index] = false;
     name2DuoUsed[index] = false;
   })
-  function count_attr(chara:Character, attr: string){
+  function count_attr(chara: Character, attr: string, useM1: boolean, useM2: boolean, useM3: boolean) {
     // 属性枚数も使用可否(M1/M2/M3)を反映して数える
     let count = 0;
-    const useM1 = (chara as any).hasM1 ?? true;
-    const useM2 = (chara as any).hasM2 ?? true;
-    const useM3 = chara.rare === 'SSR' ? ((chara as any).hasM3 ?? true) : false;
     if (useM1 && chara.magic1atr == attr) {
       count+=1;
     }
     if (useM2 && chara.magic2atr == attr) {
       count+=1;
     }
-    if (useM3 && chara.magic3atr == attr && chara.hasM3) {
+    if (useM3 && chara.magic3atr == attr) {
       count+=1;
     }
     return Math.min(count, 2);
@@ -478,10 +441,10 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       deckTotalBuff += buffByMagic[3];
       deckTotalDebuff += debuffByMagic[3];
     }
-    deckCosmic += count_attr(chara, '無');
-    deckFire += count_attr(chara, '火');
-    deckWater += count_attr(chara, '水');
-    deckFlora += count_attr(chara, '木');
+    deckCosmic += count_attr(chara, '無', useM1, useM2, useM3);
+    deckFire += count_attr(chara, '火', useM1, useM2, useM3);
+    deckWater += count_attr(chara, '水', useM1, useM2, useM3);
+    deckFlora += count_attr(chara, '木', useM1, useM2, useM3);
     let hasHpBuddy = false;
     let atkBuddyRate = 0;
     // バディHP増加分加算
