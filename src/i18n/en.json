@@ -169,6 +169,9 @@
     "startSearch": "Start Search",
     "batchSetting": "Batch setting levels",
     "saveLevels": "Save levels to cache",
+    "useM1": "M1",
+    "useM2": "M2",
+    "useM3": "M3",
     "required": "Required",
     "character": "Character",
     "rarity": "Rarity",
@@ -406,7 +409,8 @@
   },
   "error": {
     "requiredCharacter": "Required character level must be at least 1",
-    "fewCharacter": "Too few level-set characters."
+    "fewCharacter": "Too few level-set characters.",
+    "magicSelectionMinTwo": "Select at least two magic cards (M1/M2/M3)."
   },
   "hand": {
     "filter": "Filter",

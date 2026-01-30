@@ -141,6 +141,3 @@ watch(errorMessage, (newVal, oldVal) => {
   }
 });
 </script>
-
-<style scoped>
-</style>

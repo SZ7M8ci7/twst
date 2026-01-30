@@ -17,7 +17,15 @@
 
       <!-- ロード完了後に表示するメインコンテンツ -->
       <div v-else>
-        <v-data-table :headers="headers" :items="visibleCharacters" class="elevation-1" :items-per-page="-1">
+        <!-- 表示件数が多いので仮想スクロールを使う -->
+        <v-data-table-virtual
+          :headers="headers"
+          :items="visibleCharacters"
+          item-value="id"
+          item-height="52"
+          height="70vh"
+          class="elevation-1"
+        >
           <!-- level列のカスタムテンプレート定義 -->
           <template v-slot:[`item.level`]="{ item }">
             <v-text-field type="number" v-model="item.level" class="mt-0 pt-0 level-input" hide-details="auto" dense solo :min="0" :max="110" />
@@ -25,8 +33,30 @@
           <template v-slot:[`item.required`]="{ item }">
             <v-checkbox v-model="item.required" hide-details></v-checkbox>
           </template>
+          <!-- M1/M2/M3の使用可否はここで制御し、最低2つONを維持する -->
+          <template v-slot:[`item.hasM1`]="{ item }">
+            <v-checkbox
+              :model-value="item.hasM1"
+              hide-details
+              @update:modelValue="(val) => handleMagicToggle(item, 'hasM1', val)"
+            ></v-checkbox>
+          </template>
+          <template v-slot:[`item.hasM2`]="{ item }">
+            <v-checkbox
+              :model-value="item.hasM2"
+              hide-details
+              @update:modelValue="(val) => handleMagicToggle(item, 'hasM2', val)"
+            ></v-checkbox>
+          </template>
           <template v-slot:[`item.hasM3`]="{ item }">
-            <v-checkbox v-model="item.hasM3" hide-details v-if="item.rare === 'SSR'"></v-checkbox>
+            <!-- SR以下はM3自体が存在しないため、チェック欄を表示しない -->
+            <v-checkbox
+              v-if="item.rare === 'SSR'"
+              :model-value="item.hasM3"
+              hide-details
+              :disabled="item.rare !== 'SSR'"
+              @update:modelValue="(val) => handleMagicToggle(item, 'hasM3', val)"
+            ></v-checkbox>
           </template>
           <template v-slot:[`item.name`]="{ item }">
             <img :src="item.imgUrl" :alt="item.name" class="character-image" />
@@ -34,7 +64,7 @@
           <template v-slot:[`item.edit`]="{ item }">
             <v-btn @click="openEditModal(item)">Edit</v-btn>
           </template>
-        </v-data-table>
+        </v-data-table-virtual>
 
         <!-- 編集モーダル -->
         <v-dialog v-model="editModal" max-width="500px">
@@ -149,6 +179,8 @@ const snackbar = ref({
   text: '',
   color: 'success'
 });
+// デッキ探索専用：マジックの使用可否(はずす/使う)を保存
+const MAGIC_USAGE_STORAGE_KEY = 'characterMagicUsage';
 
 const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
@@ -161,7 +193,9 @@ const visibleCharacters = computed(() => {
 const headers = computed(() => [
   { title: 'Lv', value: 'level', sortable: true },
   { title: t('search.required'), value: 'required', sortable: true },
-  { title: 'M3', value: 'hasM3', sortable: true, show: (item: any) => item.rare === 'SSR' },
+  { title: t('search.useM1'), value: 'hasM1', sortable: false },
+  { title: t('search.useM2'), value: 'hasM2', sortable: false },
+  { title: t('search.useM3'), value: 'hasM3', sortable: false },
   { title: t('search.character'), value: 'name', sortable: false },
   { title: t('search.rarity'), value: 'rare', sortable: true },
   { title: 'HP', value: 'hp', sortable: true },
@@ -169,6 +203,63 @@ const headers = computed(() => [
   { title: t('search.other'), value: 'etc', sortable: false },
   { title: 'edit', value: 'edit', sortable: false },
 ]);
+
+// SSRのM3有無を考慮して選択数を数える
+function countSelectedMagics(character: any): number {
+  const useM3 = character.rare === 'SSR' ? character.hasM3 : false;
+  return [character.hasM1, character.hasM2, useM3].filter(Boolean).length;
+}
+
+// M1/M2/M3の初期化と「最低2つON」を強制する
+function normalizeMagicUsage(character: any, options: { warnOnFix?: boolean } = {}) {
+  if (character.rare !== 'SSR') {
+    character.hasM3 = false;
+  } else if (character.hasM3 === undefined) {
+    character.hasM3 = true;
+  }
+
+  if (countSelectedMagics(character) < 2) {
+    character.hasM1 = true;
+    character.hasM2 = true;
+    character.hasM3 = character.rare === 'SSR';
+  }
+}
+
+function handleMagicToggle(
+  character: any,
+  key: 'hasM1' | 'hasM2' | 'hasM3',
+  nextValue: boolean
+) {
+  // 1つ外したら残り2つを必ずONにする（SSR以外はM1/M2固定ON）
+  const isSSR = character.rare === 'SSR';
+  const next = {
+    hasM1: !!character.hasM1,
+    hasM2: !!character.hasM2,
+    hasM3: isSSR ? !!character.hasM3 : false
+  };
+
+  if (key === 'hasM1') next.hasM1 = !!nextValue;
+  if (key === 'hasM2') next.hasM2 = !!nextValue;
+  if (key === 'hasM3') next.hasM3 = isSSR ? !!nextValue : false;
+
+  if (!isSSR) {
+    next.hasM1 = true;
+    next.hasM2 = true;
+    next.hasM3 = false;
+  } else if (!nextValue) {
+    next.hasM1 = key === 'hasM1' ? false : true;
+    next.hasM2 = key === 'hasM2' ? false : true;
+    next.hasM3 = key === 'hasM3' ? false : true;
+  } else if ([next.hasM1, next.hasM2, next.hasM3].filter(Boolean).length < 2) {
+    next.hasM1 = true;
+    next.hasM2 = true;
+    next.hasM3 = true;
+  }
+
+  character.hasM1 = next.hasM1;
+  character.hasM2 = next.hasM2;
+  character.hasM3 = next.hasM3;
+}
 
 function applyBulkLevel() {
   visibleCharacters.value.forEach(character => {
@@ -196,17 +287,26 @@ function applyBulkLevel() {
 function saveLevels() {
   const levelsCache: { [name: string]: number } = {};
   const hasM3Cache: { [name: string]: boolean } = {};
+  const magicUsageCache: { [name: string]: { hasM1: boolean; hasM2: boolean; hasM3: boolean } } = {};
+  // M1/M2/M3の使用可否も保存（TSVの出力形式は従来通り）
   characters.value.forEach(character => {
     levelsCache[character.name] = character.level;
     hasM3Cache[character.name] = character.hasM3;
+    magicUsageCache[character.name] = {
+      hasM1: !!character.hasM1,
+      hasM2: !!character.hasM2,
+      hasM3: !!character.hasM3
+    };
   });
   localStorage.setItem('characterLevels', JSON.stringify(levelsCache));
   localStorage.setItem('characterM3', JSON.stringify(hasM3Cache));
+  localStorage.setItem(MAGIC_USAGE_STORAGE_KEY, JSON.stringify(magicUsageCache));
 }
 
 function loadLevels() {
   const levelsCache = localStorage.getItem('characterLevels');
   const hasM3Cache = localStorage.getItem('characterM3');
+  const magicUsageCache = localStorage.getItem(MAGIC_USAGE_STORAGE_KEY);
   if (levelsCache) {
     const levels = JSON.parse(levelsCache);
     characters.value.forEach(character => {
@@ -223,6 +323,28 @@ function loadLevels() {
       }
     });
   }
+  if (magicUsageCache) {
+    const usage = JSON.parse(magicUsageCache);
+    characters.value.forEach(character => {
+      if (usage[character.name] !== undefined) {
+        const entry = usage[character.name];
+        // 旧キー(useM*)にも対応して読み込む
+        if ('hasM1' in entry || 'hasM2' in entry || 'hasM3' in entry) {
+          character.hasM1 = !!entry.hasM1;
+          character.hasM2 = !!entry.hasM2;
+          character.hasM3 = !!entry.hasM3;
+        } else if ('useM1' in entry || 'useM2' in entry || 'useM3' in entry) {
+          character.hasM1 = !!entry.useM1;
+          character.hasM2 = !!entry.useM2;
+          character.hasM3 = !!entry.useM3;
+        }
+      }
+    });
+  }
+  // 読み込み後に必ず最低2つON/SSRのみM3可を補正
+  characters.value.forEach(character => {
+    normalizeMagicUsage(character);
+  });
 }
 
 function openEditModal(character: any) {
@@ -286,6 +408,8 @@ function importFromText() {
         character.level = parseInt(level) || 0;
         character.required = required.toLowerCase() === 'true';
         character.hasM3 = hasM3.toLowerCase() === 'true';
+        // TSVはM3のみなので、M1/M2を含めた使用可否を補正
+        normalizeMagicUsage(character, { warnOnFix: false });
         importedCount++;
       }
     });
@@ -311,12 +435,16 @@ function applyHandCollection() {
         character.level = handCard.level;
         character.required = false;
         character.hasM3 = handCard.isM3;
+        // 手持ち設定はM3のみなので、M1/M2を含めた使用可否を補正
+        normalizeMagicUsage(character, { warnOnFix: false });
         appliedCount++;
       } else {
         // 所持していない場合、デフォルト設定
         character.level = 0;
         character.required = false;
         character.hasM3 = false;
+        // 未所持は最低2つONの初期状態に合わせる
+        normalizeMagicUsage(character, { warnOnFix: false });
       }
     });
     
@@ -351,7 +479,10 @@ onBeforeMount(() => {
 
 onMounted(() => {
   characters.value.forEach(character => {
+    // M1/M2が未定義の古いデータに合わせた初期化
     character.hasM3 = true; // M3をデフォルトでチェック
+    if (character.hasM1 === undefined) character.hasM1 = true;
+    if (character.hasM2 === undefined) character.hasM2 = true;
   });
   loadLevels(); // 画面を開いた時にlocalStorageからレベルを復元
 });

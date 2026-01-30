@@ -45,6 +45,9 @@ export interface Character {
   wikiURL: string;
   required: boolean;
   hasM3: boolean;
+  // デッキ探索での使用可否（M1/M2は全カードに存在する前提）
+  hasM1: boolean;
+  hasM2: boolean;
   evasion: number;
   selections: any;
   hasDuo: any;
@@ -117,6 +120,9 @@ export const useCharacterStore = defineStore('characters', {
           wikiURL: otherJsonProps.wikiURL || '',
           required: false,
           hasM3: true,
+          // 初期状態はM1/M2を使用可にする
+          hasM1: true,
+          hasM2: true,
           evasion: countEvasion(otherJsonProps.etc),
           selections:[],
           hasDuo: false,

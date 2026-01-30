@@ -49,6 +49,85 @@ export interface deckStatus{
   buddyNum:number;
   HPBuddyNum:number;
 }
+// etc文字列からのバフ/デバフ数はM1/M2/M3のON/OFFに連動させるため、
+// 1キャラ単位で解析結果をキャッシュして再利用する。
+const buffDebuffCache = new WeakMap<any, { etc: string; buffByMagic: number[]; debuffByMagic: number[] }>();
+// バフ判定の対象（calcATK.vueのロジックと揃える）
+const buffPatterns = [
+  '火属性ダメージUP',
+  '水属性ダメージUP',
+  '木属性ダメージUP',
+  '無属性ダメージUP',
+  'ダメージUP',
+  'ATKUP',
+  'クリティカル',
+];
+// デバフ判定の対象（calcDEF.vueのロジックと揃える）
+const debuffPatterns = [
+  '火属性ダメージDOWN',
+  '水属性ダメージDOWN',
+  '木属性ダメージDOWN',
+  '無属性ダメージDOWN',
+  'ダメージDOWN',
+  'ATKDOWN',
+  '被ダメージDOWN',
+];
+
+function getBuffDebuffCountsByMagic(chara: any) {
+  const etc = (chara?.etc || '').toString();
+  const cached = buffDebuffCache.get(chara);
+  if (cached && cached.etc === etc) {
+    return cached;
+  }
+
+  // indexはM1/M2/M3に合わせて1..3を使用（0は未使用）
+  const buffByMagic = [0, 0, 0, 0];
+  const debuffByMagic = [0, 0, 0, 0];
+  if (!etc) {
+    const entry = { etc, buffByMagic, debuffByMagic };
+    buffDebuffCache.set(chara, entry);
+    return entry;
+  }
+
+  // etcは「,」区切りに整形済みなので分割してM番号ごとにカウント
+  const effects = etc.split(',').map(effect => effect.trim()).filter(Boolean);
+  for (const effect of effects) {
+    const mMatch = effect.match(/\(M([123])\)/);
+    if (!mMatch) continue;
+    const magicIndex = Number(mMatch[1]);
+    if (Number.isNaN(magicIndex) || magicIndex < 1 || magicIndex > 3) continue;
+
+    for (const pattern of buffPatterns) {
+      if (!effect.includes(pattern)) continue;
+      // 被ダメージUPはバフとして扱わない
+      if (effect.includes('被ダメージUP')) break;
+      // バフは自分/味方対象のみをカウント
+      if (effect.includes('自') || effect.includes('味方')) {
+        buffByMagic[magicIndex] += 1;
+        break;
+      }
+    }
+
+    for (const pattern of debuffPatterns) {
+      if (!effect.includes(pattern)) continue;
+      if (pattern === '被ダメージDOWN') {
+        // 被ダメージDOWNは自分/味方対象のみをデバフとしてカウント
+        if (effect.includes('自') || effect.includes('味方')) {
+          debuffByMagic[magicIndex] += 1;
+          break;
+        }
+      // それ以外のデバフは相手対象のみをカウント
+      } else if (effect.includes('相手')) {
+        debuffByMagic[magicIndex] += 1;
+        break;
+      }
+    }
+  }
+
+  const entry = { etc, buffByMagic, debuffByMagic };
+  buffDebuffCache.set(chara, entry);
+  return entry;
+}
 // 効率的な結果管理のためのエクスポート
 export { DeckSearchResultsManager, type DeckResult };
 
@@ -246,9 +325,16 @@ function calcDamage(magicBuff: string, magicPow: string, magicAtr: string, atk: 
 }
 
 // etcから抽出した複数バフ合算でダメージを計算（magicNbufは不使用）
-function getMagicBuffTotalsFromEtc(chara: Character, magicIndex: 1 | 2 | 3): { atkDelta: number; dmgDelta: number } {
+// allowM3Overrideは「使用可否」でM3を無効にした場合に解析から外すための上書き
+function getMagicBuffTotalsFromEtc(
+  chara: Character,
+  magicIndex: 1 | 2 | 3,
+  allowM3Override?: boolean
+): { atkDelta: number; dmgDelta: number } {
   // M3可否（ストアのhasM3が信頼できない場合に備え、レアでも判断）
-  const allowM3 = (chara as any).hasM3 ?? (chara.rare === 'SSR');
+  const allowM3 = allowM3Override !== undefined
+    ? allowM3Override
+    : ((chara as any).hasM3 ?? (chara.rare === 'SSR'));
   const parsed = parseMagicBuffsFromEtc(chara as any, { allowM3 });
   let atkDelta = 0; // 基礎ATKに対する加算率合計（0.2なら+20%）
   let dmgDelta = 0; // ダメージ加算率合計
@@ -354,25 +440,44 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
     name2DuoUsed[index] = false;
   })
   function count_attr(chara:Character, attr: string){
+    // 属性枚数も使用可否(M1/M2/M3)を反映して数える
     let count = 0;
-    if (chara.magic1atr == attr) {
+    const useM1 = (chara as any).hasM1 ?? true;
+    const useM2 = (chara as any).hasM2 ?? true;
+    const useM3 = chara.rare === 'SSR' ? ((chara as any).hasM3 ?? true) : false;
+    if (useM1 && chara.magic1atr == attr) {
       count+=1;
     }
-    if (chara.magic2atr == attr) {
+    if (useM2 && chara.magic2atr == attr) {
       count+=1;
     }
-    if (chara.magic3atr == attr && chara.hasM3) {
+    if (useM3 && chara.magic3atr == attr && chara.hasM3) {
       count+=1;
     }
     return Math.min(count, 2);
   }
   characters.forEach((chara, index) => {
+    const useM1 = (chara as any).hasM1 ?? true;
+    const useM2 = (chara as any).hasM2 ?? true;
+    const useM3 = chara.rare === 'SSR' ? ((chara as any).hasM3 ?? true) : false;
+    // バフ/デバフ数は使用可能マジックのみ反映する
+    const { buffByMagic, debuffByMagic } = getBuffDebuffCountsByMagic(chara);
     deckList.push(chara.imgUrl);
     simuURL += '&name' + (index + 1) + '=' + encodeURIComponent(chara.name);
     simuURL += '&level' + (index + 1) + '=' + chara.level;
     deckTotalHP += chara.calcBaseHP;
-    deckTotalBuff += chara.buff_count;
-    deckTotalDebuff += chara.debuff_count;
+    if (useM1) {
+      deckTotalBuff += buffByMagic[1];
+      deckTotalDebuff += debuffByMagic[1];
+    }
+    if (useM2) {
+      deckTotalBuff += buffByMagic[2];
+      deckTotalDebuff += debuffByMagic[2];
+    }
+    if (useM3) {
+      deckTotalBuff += buffByMagic[3];
+      deckTotalDebuff += debuffByMagic[3];
+    }
     deckCosmic += count_attr(chara, '無');
     deckFire += count_attr(chara, '火');
     deckWater += count_attr(chara, '水');
@@ -402,19 +507,21 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       }
     }
     deckMinIncreasedHPBuddy = Math.min(deckMinIncreasedHPBuddy, increasedHP);
-    // HP回復分加算
-    const magic1Rates = getBuddyRates(chara.magic1heal);
-    const magic2Rates = getBuddyRates(chara.magic2heal);
-    const magic3Rates = chara.hasM3 ? getBuddyRates(chara.magic3heal) : { heal: 0, conHeal: 0 };
+    // HP回復分加算（使用可否を反映）
+    const magic1Rates = useM1 ? getBuddyRates(chara.magic1heal) : { heal: 0, conHeal: 0 };
+    const magic2Rates = useM2 ? getBuddyRates(chara.magic2heal) : { heal: 0, conHeal: 0 };
+    const magic3Rates = useM3 ? getBuddyRates(chara.magic3heal) : { heal: 0, conHeal: 0 };
     
     const hpHeal = (magic1Rates.heal + magic2Rates.heal + magic3Rates.heal) * chara.calcBaseATK;
     const hpConHeal = (magic1Rates.conHeal + magic2Rates.conHeal + magic3Rates.conHeal) * chara.calcBaseHP;
     deckTotalHeal += hpHeal + hpConHeal
     healList.push(hpHeal + hpConHeal);
       
-    // 回復手札数をカウント
-    const healMagics = [chara.magic1heal, chara.magic2heal];
-    if (chara.hasM3) healMagics.push(chara.magic3heal);
+    // 回復手札数をカウント（使用可否を反映）
+    const healMagics = [];
+    if (useM1) healMagics.push(chara.magic1heal);
+    if (useM2) healMagics.push(chara.magic2heal);
+    if (useM3) healMagics.push(chara.magic3heal);
     
     for (const healMagic of healMagics) {
       if (isHealCard(healMagic)) {
@@ -428,11 +535,12 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
       deckNoHPBuddy += 1;
     }
     let magic2pow = chara.magic2pow;
-    if (name2DuoUsed[index]) {
-      magic2pow = "デュオ魔法";
-      deckDuo += 1;
-    } else {
-      if (!name2DuoUsed[index]) {
+    if (useM2) {
+      // M2が無効なら自身のデュオ判定をしない
+      if (name2DuoUsed[index]) {
+        magic2pow = "デュオ魔法";
+        deckDuo += 1;
+      } else {
         // 相互デュオチェック
         for (const [index2, pair] of characters.entries()) {
           if (pair.duo == chara.chara && chara.duo == pair.chara) {
@@ -481,32 +589,32 @@ export function calcDeckStatus(characters:Character[]) : Array<number | string| 
             }
           }
         }
-      }
 
-      if (name2DuoUsed[index]) {
-        magic2pow = "デュオ魔法";
-        deckDuo += 1;
+        if (name2DuoUsed[index]) {
+          magic2pow = "デュオ魔法";
+          deckDuo += 1;
+        }
       }
     }
-    // 等倍ダメージ加算（etc→buffs[]の合算を使用）
-    const m1Totals = getMagicBuffTotalsFromEtc(chara, 1);
-    const magic1Damage = calcDamageUsingEtcTotals(
+    // 等倍ダメージ加算（使用可能なマジックのみ・etc→buffs[]の合算を使用）
+    const m1Totals = useM1 ? getMagicBuffTotalsFromEtc(chara, 1, useM3) : { atkDelta: 0, dmgDelta: 0 };
+    const magic1Damage = useM1 ? calcDamageUsingEtcTotals(
       chara.magic1pow,
       chara.magic1atr,
       chara.calcBaseATK,
       atkBuddyRate,
       m1Totals
-    );
-    const m2Totals = getMagicBuffTotalsFromEtc(chara, 2);
-    const magic2Damage = calcDamageUsingEtcTotals(
+    ) : 0;
+    const m2Totals = useM2 ? getMagicBuffTotalsFromEtc(chara, 2, useM3) : { atkDelta: 0, dmgDelta: 0 };
+    const magic2Damage = useM2 ? calcDamageUsingEtcTotals(
       magic2pow,
       chara.magic2atr,
       chara.calcBaseATK,
       atkBuddyRate,
       m2Totals
-    );
-    const m3Totals = chara.hasM3 ? getMagicBuffTotalsFromEtc(chara, 3) : { atkDelta: 0, dmgDelta: 0 };
-    const magic3Damage = chara.hasM3 ? calcDamageUsingEtcTotals(
+    ) : 0;
+    const m3Totals = useM3 ? getMagicBuffTotalsFromEtc(chara, 3, useM3) : { atkDelta: 0, dmgDelta: 0 };
+    const magic3Damage = useM3 ? calcDamageUsingEtcTotals(
       chara.magic3pow,
       chara.magic3atr,
       chara.calcBaseATK,
