@@ -1,15 +1,7 @@
 <template>
   <v-app>
     <v-container>
-      <v-data-table-virtual
-        :headers="headers"
-        :items="results"
-        item-value="simuURL"
-        item-height="56"
-        height="70vh"
-        class="elevation-1"
-        :mobile-breakpoint="0"
-      >
+      <v-data-table :headers="headers" :items="results" class="elevation-1" :items-per-page="-1" :mobile-breakpoint="0">
         <!-- カスタムコンテンツのスロットを使用 -->
         <template v-slot:item="{ item }">
           <tr>
@@ -100,7 +92,7 @@
             <td><v-btn variant="text" v-on:click="openInNewTab(item.simuURL)" icon="mdi-open-in-new" size="x-small"></v-btn></td>
           </tr>
         </template>
-      </v-data-table-virtual>
+      </v-data-table>
     </v-container>
   </v-app>
 </template>
