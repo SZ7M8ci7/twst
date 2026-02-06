@@ -7,6 +7,7 @@ export class TopNResultsManager<T> {
   private thresholdScore: number;
   private readonly getScore: (item: T) => number;
   private readonly isDescending: boolean; // 降順かどうか
+  private isSorted: boolean = true; // Opt-31: ソート済みフラグで再ソートを抑制
 
   constructor(
     maxSize: number, 
@@ -29,16 +30,19 @@ export class TopNResultsManager<T> {
    */
   addResult(item: T): boolean {
     const score = this.getScore(item);
+    const results = this.results;
 
     // まだ最大サイズに達していない場合
-    if (this.results.length < this.maxSize) {
-      this.results.push(item);
+    if (results.length < this.maxSize) {
+      results.push(item);
+      this.isSorted = false;
       
       // 最大サイズに達した時点で初回ソート
-      if (this.results.length === this.maxSize) {
-        this.results.sort(this.compareFunc);
+      if (results.length === this.maxSize) {
+        results.sort(this.compareFunc);
+        this.isSorted = true;
         // 閾値は最後の要素（最悪の要素）のスコア
-        this.thresholdScore = this.getScore(this.results[this.results.length - 1]);
+        this.thresholdScore = this.getScore(results[results.length - 1]);
       }
       return true;
     }
@@ -56,11 +60,12 @@ export class TopNResultsManager<T> {
     const insertIndex = this.findInsertIndex(item);
     
     // 挿入して末尾を削除
-    this.results.splice(insertIndex, 0, item);
-    this.results.pop();
+    results.splice(insertIndex, 0, item);
+    results.pop();
+    this.isSorted = true;
     
     // 新しい閾値スコアを更新
-    this.thresholdScore = this.getScore(this.results[this.results.length - 1]);
+    this.thresholdScore = this.getScore(results[results.length - 1]);
     
     return true;
   }
@@ -89,8 +94,12 @@ export class TopNResultsManager<T> {
    * 現在の結果を取得
    */
   getResults(): T[] {
-    // 常にソート済みの結果を返す
-    return [...this.results].sort(this.compareFunc);
+    // Opt-31: 未ソート時のみソートして返す
+    if (!this.isSorted) {
+      this.results.sort(this.compareFunc);
+      this.isSorted = true;
+    }
+    return this.results.slice();
   }
 
   /**
@@ -113,6 +122,7 @@ export class TopNResultsManager<T> {
   clear(): void {
     this.results = [];
     this.thresholdScore = this.isDescending ? -Infinity : Infinity;
+    this.isSorted = true;
   }
 }
 

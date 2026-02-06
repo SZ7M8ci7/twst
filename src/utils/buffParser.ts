@@ -38,6 +38,7 @@ export type ParseOptions = {
   allowM3?: boolean; // SSRかつM3所持のときtrue、それ以外はfalse
 };
 
+
 // etcから(M1)/(M2)/(M3)付きの自己/相手効果を抽出
 export function parseMagicBuffsFromEtc(chara: any, opts: ParseOptions = {}): ParsedBuff[] {
   const etcRaw: string = (chara?.etc || '').toString();
