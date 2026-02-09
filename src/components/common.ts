@@ -2007,7 +2007,9 @@ export async function calcDecks(t: (key: string) => string) {
     // 効率的な結果管理：既にソート済みの上位N件を取得
     const topDecks = resultsManager.getTopDecks();
     finalizeTopDecksForRender(topDecks);
-    results.value = topDecks;
+    const displayDecks = buildDisplayDecks(topDecks);
+    sortTopDecksForDisplay(displayDecks);
+    results.value = displayDecks;
     nowResults.value = nowResultsCount;
     await new Promise(requestAnimationFrame);
   }
@@ -2038,10 +2040,7 @@ export async function calcDecks(t: (key: string) => string) {
   results.value = [];
   
   // 効率的な上位N件管理クラスを初期化
-  const allowThresholdTieForConsider = false;
-  const resultsManager = new DeckSearchResultsManager(maxResult.value, sortCriteria, {
-    allowThresholdTieForConsider,
-  });
+  const resultsManager = new DeckSearchResultsManager(maxResult.value, sortCriteria);
   const mustIds = Array.from(convertedMustCharacters.value).map(name => getCharaId(name as string));
   const skipMustCheckForCalcDeckStatus = mustIds.length === 0;
 
@@ -2077,16 +2076,38 @@ export async function calcDecks(t: (key: string) => string) {
   const sortCompareLen = sortCriteria.length;
   const sortCompareRetIndices = new Int8Array(sortCompareLen);
   const sortCompareKeys = new Array<string>(sortCompareLen);
+  const sortCompareDirs = new Int8Array(sortCompareLen);
   for (let i = 0; i < sortCompareLen; i++) {
     const key = sortCriteria[i].key;
     sortCompareKeys[i] = key;
     sortCompareRetIndices[i] = sortKeyToRetIndex[key] ?? 0;
+    sortCompareDirs[i] = sortCriteria[i].order === '昇順' ? 1 : -1;
   }
   const fillDeckResultSortValues = (ret: (string | number)[], target: DeckResult) => {
     const targetAny = target as any;
     for (let i = 0; i < sortCompareLen; i++) {
       targetAny[sortCompareKeys[i]] = ret[sortCompareRetIndices[i]] as number;
     }
+  };
+  const compareDeckForDisplay = (a: DeckResult, b: DeckResult): number => {
+    const aAny = a as any;
+    const bAny = b as any;
+    for (let i = 0; i < sortCompareLen; i++) {
+      const key = sortCompareKeys[i];
+      const aValue = aAny[key];
+      const bValue = bAny[key];
+      if (aValue === bValue) continue;
+      const comparison = aValue < bValue ? -1 : 1;
+      return comparison * sortCompareDirs[i];
+    }
+    const aKey = (aAny._deckKey as string | undefined) ?? a.simuURL ?? '';
+    const bKey = (bAny._deckKey as string | undefined) ?? b.simuURL ?? '';
+    if (aKey !== bKey) return aKey < bKey ? -1 : 1;
+    return 0;
+  };
+  const sortTopDecksForDisplay = (decks: DeckResult[]) => {
+    // detail化でソートキー値が更新されるため、表示直前に最終順序を確定する。
+    decks.sort(compareDeckForDisplay);
   };
   const usesDamageInSort = sortCriteria.some(criteria => DAMAGE_SORT_KEYS.has(criteria.key));
   const hasDamageThreshold =
@@ -2182,6 +2203,7 @@ export async function calcDecks(t: (key: string) => string) {
     for (let i = 0; i < topDecks.length; i++) {
       const target = topDecks[i];
       const targetAny = target as any;
+      if (targetAny._detailReady === true) continue;
       const c0 = targetAny._combo0 as Character | undefined;
       if (!c0) continue;
       const combo = detailFinalizeCombinationScratch!;
@@ -2196,11 +2218,16 @@ export async function calcDecks(t: (key: string) => string) {
       );
       if (!detailRet) continue;
       const detailRetArray = detailRet as (string | number)[];
-      fillDeckResultFromArray(detailRetArray, target);
       const detailLen = detailRetArray.length;
-      target.simuURL = detailRetArray[detailLen - 2] as string;
-      target.detailList = detailRetArray[detailLen - 1];
-      fillDeckResultCharacters(combo, target);
+      targetAny._detailRet = detailRetArray;
+      targetAny._detailSimuURL = detailRetArray[detailLen - 2] as string;
+      targetAny._detailList = detailRetArray[detailLen - 1];
+      targetAny._detailChara1 = combo[0].imgUrl;
+      targetAny._detailChara2 = combo[1].imgUrl;
+      targetAny._detailChara3 = combo[2].imgUrl;
+      targetAny._detailChara4 = combo[3].imgUrl;
+      targetAny._detailChara5 = combo[4].imgUrl;
+      targetAny._detailReady = true;
       // 1度詳細化した deck は再計算対象から除外
       // （中間レンダリングが複数回走っても、同一 deck の詳細を使い回す）
       targetAny._combo0 = undefined;
@@ -2209,6 +2236,29 @@ export async function calcDecks(t: (key: string) => string) {
       targetAny._combo3 = undefined;
       targetAny._combo4 = undefined;
     }
+  };
+  const buildDisplayDecks = (topDecks: DeckResult[]): DeckResult[] => {
+    const displayDecks = new Array<DeckResult>(topDecks.length);
+    for (let i = 0; i < topDecks.length; i++) {
+      const source = topDecks[i];
+      const sourceAny = source as any;
+      const display = ({ ...source } as DeckResult);
+      if (sourceAny._detailReady === true) {
+        const detailRet = sourceAny._detailRet as (string | number)[] | undefined;
+        if (detailRet) {
+          fillDeckResultFromArray(detailRet, display);
+        }
+        display.simuURL = (sourceAny._detailSimuURL as string | undefined) ?? source.simuURL;
+        display.detailList = sourceAny._detailList ?? source.detailList;
+        display.chara1 = (sourceAny._detailChara1 as string | undefined) ?? source.chara1;
+        display.chara2 = (sourceAny._detailChara2 as string | undefined) ?? source.chara2;
+        display.chara3 = (sourceAny._detailChara3 as string | undefined) ?? source.chara3;
+        display.chara4 = (sourceAny._detailChara4 as string | undefined) ?? source.chara4;
+        display.chara5 = (sourceAny._detailChara5 as string | undefined) ?? source.chara5;
+      }
+      displayDecks[i] = display;
+    }
+    return displayDecks;
   };
   const processCombinationCore = (currentCombination: Character[]) => {
     // まず軽量計算で「上位Nに入る可能性」を判定し、
@@ -2225,10 +2275,16 @@ export async function calcDecks(t: (key: string) => string) {
       }
       const transformedRet = ({ simuURL: '', detailList: emptyDetailList } as DeckResult);
       fillDeckResultSortValues(ret, transformedRet);
+      const transformedRetAny = transformedRet as any;
+      transformedRetAny._deckKey =
+        currentCombination[0].name + '|' +
+        currentCombination[1].name + '|' +
+        currentCombination[2].name + '|' +
+        currentCombination[3].name + '|' +
+        currentCombination[4].name;
 
       const added = resultsManager.addDeck(transformedRet);
       if (added) {
-        const transformedRetAny = transformedRet as any;
         transformedRetAny._combo0 = currentCombination[0];
         transformedRetAny._combo1 = currentCombination[1];
         transformedRetAny._combo2 = currentCombination[2];
@@ -2370,7 +2426,9 @@ export async function calcDecks(t: (key: string) => string) {
   nowResults.value = nowResultsCount;
   const topDecks = resultsManager.getTopDecks();
   finalizeTopDecksForRender(topDecks);
-  results.value = topDecks;
+  const displayDecks = buildDisplayDecks(topDecks);
+  sortTopDecksForDisplay(displayDecks);
+  results.value = displayDecks;
   
 }
 

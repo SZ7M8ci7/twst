@@ -1,10 +1,17 @@
 <template>
   <v-app>
     <v-container>
-      <v-data-table :headers="headers" :items="results" class="elevation-1" :items-per-page="-1" :mobile-breakpoint="0">
+      <v-data-table
+        :headers="headers"
+        :items="results"
+        item-value="simuURL"
+        class="elevation-1"
+        :items-per-page="-1"
+        :mobile-breakpoint="0"
+      >
         <!-- カスタムコンテンツのスロットを使用 -->
         <template v-slot:item="{ item }">
-          <tr>
+          <tr :key="item.simuURL">
             <td>{{ item.hp }}</td>
             <td style="position: relative;">
               <div class="css-fukidashi">

@@ -117,18 +117,27 @@ watch(nowResults, () => {
 });
 
 const emit = defineEmits(['search-started']);
-function startSearch(){
+let searchRunToken = 0;
+async function startSearch(){
+  if (isSearching.value) return;
+  const runToken = ++searchRunToken;
   isSearching.value = true;
   startTime.value = Date.now();
   processingSpeed.value = '0';
   remainingTime.value = '';
   emit('search-started',)
   event('search start')
-  setTimeout(() => {
-    calcDecks(t);
-  }, 300); // 300 ミリ秒の遅延
+  await new Promise(resolve => setTimeout(resolve, 300)); // UI反映待ち
+  try {
+    await calcDecks(t);
+  } finally {
+    if (runToken === searchRunToken) {
+      isSearching.value = false;
+    }
+  }
 }
 function stopSearch(){
+  searchRunToken += 1;
   isSearching.value = false; // 検索中状態をfalseに設定してループを中止
   startTime.value = 0;
   processingSpeed.value = '0';
