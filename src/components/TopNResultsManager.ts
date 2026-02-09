@@ -1,7 +1,4 @@
 // 効率的な上位N件結果管理クラス
-let hasLoggedTopNMaxSizeTypeWarning = false;
-let hasLoggedTopNMaxSizeNormalizeWarning = false;
-let hasLoggedTopNZeroCapacityWarning = false;
 
 export class TopNResultsManager<T> {
   private results: T[] = [];
@@ -23,34 +20,10 @@ export class TopNResultsManager<T> {
     allowThresholdTieForConsider: boolean = true
   ) {
     // UI入力由来で文字列が混入しても壊れないように、ここで整数へ正規化する。
-    if (!hasLoggedTopNMaxSizeTypeWarning && typeof maxSize !== 'number') {
-      hasLoggedTopNMaxSizeTypeWarning = true;
-      console.warn('[TopNResultsManager][diagnostic] maxSize is not number', {
-        rawValue: maxSize as unknown,
-        rawType: typeof maxSize,
-      });
-    }
     const normalizedMaxSize = Number(maxSize);
-    if (
-      !hasLoggedTopNMaxSizeNormalizeWarning &&
-      (!Number.isFinite(normalizedMaxSize) || Math.trunc(normalizedMaxSize) !== normalizedMaxSize)
-    ) {
-      hasLoggedTopNMaxSizeNormalizeWarning = true;
-      console.warn('[TopNResultsManager][diagnostic] maxSize was normalized', {
-        rawValue: maxSize as unknown,
-        normalizedNumeric: normalizedMaxSize,
-      });
-    }
     this.maxSize = Number.isFinite(normalizedMaxSize)
       ? Math.max(0, Math.trunc(normalizedMaxSize))
       : 0;
-    if (!hasLoggedTopNZeroCapacityWarning && this.maxSize <= 0) {
-      hasLoggedTopNZeroCapacityWarning = true;
-      console.warn('[TopNResultsManager][diagnostic] maxSize became 0, no result will be kept', {
-        rawValue: maxSize as unknown,
-        normalizedValue: this.maxSize,
-      });
-    }
     this.compareFunc = compareFunc;
     this.getScore = getScore;
     this.isDescending = isDescending;
