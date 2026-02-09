@@ -327,7 +327,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
       totalDamage: {} as { [key: string]: number }
     };
 
-    characterStats.value.forEach((charStats, index) => {
+    characterStats.value.forEach((charStats) => {
       stats.totalHP += charStats.hp;
       stats.totalBuddyHP += charStats.buddyHP;
       stats.totalHeal += charStats.heal;

@@ -123,11 +123,6 @@ const props = defineProps({
 const iconSize = 50;
 const gapSize = 10;
 
-const iconStyle = ref({
-  '--icon-size': `${iconSize}px`,
-  '--gap-size': `${gapSize}px`
-});
-
 const rareOptions = ['SSR', 'SR', 'R'];
 
 const typeOptions = computed(() => [

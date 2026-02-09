@@ -110,6 +110,7 @@ import CalcATK from '@/views/calcATK.vue';
 import BuddyInfo from '@/components/BuddyInfo.vue';
 import CharacterEtc from '@/components/CharacterEtc.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { processCharacterSelection } from '@/utils/characterSelection';
 
 const isLargeScreen = ref(window.innerWidth >= 768);
 const selectedAttribute = ref('対全');
@@ -199,7 +200,6 @@ async function restoreState() {
 async function restoreFromSearchParams(urlParams: URLSearchParams) {
   const { useCharacterStore } = await import('@/store/characters');
   const characterStore = useCharacterStore();
-  const { processCharacterSelection } = await import('@/utils/characterSelection');
   
   try {
     // 5つのキャラクター情報を復元

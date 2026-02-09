@@ -227,7 +227,7 @@ function normalizeMagicUsage(character: any) {
 function handleMagicToggle(
   character: any,
   key: 'hasM1' | 'hasM2' | 'hasM3',
-  nextValue: boolean
+  nextValue: boolean | null
 ) {
   // 1つ外したら残り2つを必ずONにする（SSR以外はM1/M2固定ON）
   const isSSR = character.rare === 'SSR';

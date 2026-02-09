@@ -36,8 +36,24 @@ const { characters } = storeToRefs(characterStore);
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, results, isSearching, errorMessage} = storeToRefs(searchResultStore);
 const charaIdMap = new Map<string, number>();
+// 探索ループ内で毎回 new すると GC が増えるため、作業用バッファはモジュールスコープで再利用する。
 let memberFlags = new Uint32Array(0); // Opt-296: memberFlags を再利用して割り当てを削減
 let memberFlagsStamp = 0; // Opt-296: スタンプ方式で初期化コストを削減
+let charaIdsScratch = new Int16Array(0);
+let duoIdsScratch = new Int16Array(0);
+let name2M2UsedScratch = new Uint8Array(0);
+let name2MotherUsedScratch = new Uint8Array(0);
+let name2DuoUsedScratch = new Uint8Array(0);
+const fixedDuoCandidateMasksScratch = new Int32Array(5);
+const fixedDuoMutualMasksScratch = new Int32Array(5);
+
+// ループ毎に `if` 判定するとオーバーヘッドになるため、
+// ビットマスクで「一定回数ごとにだけ」中断/描画更新チェックを行う。
+const SEARCH_CHECK_MASK: number = 4095;
+const RENDER_UPDATE_INTERVAL_MS: number = 2000;
+const RENDER_CHECK_MASK: number = 4095;
+const APPEND_INTERMEDIATE_RESULTS: boolean = true;
+const APPEND_MIN_RESULT_DELTA: number = 0;
 
 type SearchSnapshot = {
   minEHP: number;
@@ -61,6 +77,8 @@ type SearchSnapshot = {
   attackNum: number;
 };
 
+type BitPair = { low: number; high: number };
+
 function getCharaId(name: string): number {
   let id = charaIdMap.get(name);
   if (id === undefined) {
@@ -68,6 +86,12 @@ function getCharaId(name: string): number {
     charaIdMap.set(name, id);
   }
   return id;
+}
+
+function getBitPairById(id: number): BitPair {
+  if (id < 0) return { low: 0, high: 0 };
+  if (id < 32) return { low: (1 << id) >>> 0, high: 0 };
+  return { low: 0, high: (1 << (id - 32)) >>> 0 };
 }
 
 
@@ -79,9 +103,10 @@ export function checkNumber(input:KeyboardEvent){
 }
 // etc文字列からのバフ/デバフ数はM1/M2/M3のON/OFFに連動させるため、
 // 1キャラ単位で解析結果をキャッシュして再利用する。
-const buffDebuffCache = new WeakMap<any, { etc: string; buffByMagic: number[]; debuffByMagic: number[] }>();
+const buffDebuffCache = new WeakMap<any, { etc: string; buffByMagic: Uint8Array; debuffByMagic: Uint8Array }>();
 const emptyHealRates = { heal: 0, conHeal: 0 }; // Opt-2: 空オブジェクトの使い回しで生成回数を削減
 const emptyDetailList: any[] = []; // Opt-247: 詳細なし時の空配列を共有
+const zeroMagicTotals = { atkDelta: 0, dmgDelta: 0 };
 // バフ判定の対象（calcATK.vueのロジックと揃える）
 const buffPatterns = [
   '火属性ダメージUP',
@@ -103,7 +128,6 @@ const debuffPatterns = [
   '被ダメージDOWN',
 ];
 const magicBuffTotalsCache = new WeakMap<any, { allowM3: boolean; totals: Array<{ atkDelta: number; dmgDelta: number }> }>();
-const buddyPairsCache = new WeakMap<any, Array<{ c: string; s: string; id: number }>>();
 // Opt-250: magic heal の buddyRates をキャッシュ
 const magicHealRatesCache = new WeakMap<any, { m1: { hp: number; atk: number; heal: number; conHeal: number }; m2: { hp: number; atk: number; heal: number; conHeal: number }; m3: { hp: number; atk: number; heal: number; conHeal: number } }>();
 
@@ -118,19 +142,9 @@ function getMagicHealRates(chara: Character) {
   magicHealRatesCache.set(chara as any, rates);
   return rates;
 }
-function getBuddyPairs(chara: Character): Array<{ c: string; s: string; id: number }> {
-  const cached = buddyPairsCache.get(chara as any);
-  if (cached) return cached;
-  const pairs = [
-    { c: chara.buddy1c, s: chara.buddy1s, id: chara.buddy1c ? getCharaId(chara.buddy1c) : -1 },
-    { c: chara.buddy2c, s: chara.buddy2s, id: chara.buddy2c ? getCharaId(chara.buddy2c) : -1 },
-    { c: chara.buddy3c, s: chara.buddy3s, id: chara.buddy3c ? getCharaId(chara.buddy3c) : -1 },
-  ];
-  buddyPairsCache.set(chara as any, pairs);
-  return pairs;
-}
-
 function buildSearchSnapshot(): SearchSnapshot {
+  // リアクティブ参照（ref.value）を探索内で都度読むとコストが積み上がるため、
+  // 探索開始時点の値をスナップショット化して使い回す。
   return {
     minEHP: minEHP.value,
     minHP: minHP.value,
@@ -428,32 +442,131 @@ function getMagicBuffTotalsAll(
   return totals;
 }
 
-function getMagicBuffTotalsFromEtc(
-  chara: Character,
-  magicIndex: 1 | 2 | 3,
-  allowM3Override?: boolean
-): { atkDelta: number; dmgDelta: number } {
-  // Opt-129: 全マジック分を一度に取得して参照
-  const totals = getMagicBuffTotalsAll(chara, allowM3Override);
-  return totals[magicIndex] || { atkDelta: 0, dmgDelta: 0 };
+function getComboRateFromPow(magicPow: string): number {
+  if (magicPow === '連撃(弱)' || magicPow === '連撃(強)') return 1.8;
+  if (magicPow === 'デュオ魔法' || magicPow === '3連撃(弱)' || magicPow === '3連撃(強)') return 2.4;
+  return 1;
 }
 
-function calcDamageUsingEtcTotals(magicPow: string, magicAtr: string, baseAtk: number, atkBuddyRate: number, totals: { atkDelta: number; dmgDelta: number }): number {
-  const effectiveAtk = baseAtk * (1 + atkBuddyRate + (totals.atkDelta || 0));
-  let atkRate = magicPow.includes('弱') ? 0.75 : 1;
-  atkRate *= magicAtr === '無' ? 1.1 : 1;
-  atkRate += totals.dmgDelta || 0;
-
-  let comboRate = 1;
-  if (magicPow == '連撃(弱)' || magicPow == '連撃(強)') {
-    comboRate = 1.8;
-  }
-  if (magicPow == 'デュオ魔法' || magicPow == '3連撃(弱)' || magicPow == '3連撃(強)') {
-    comboRate = 2.4;
-  }
-
-  return effectiveAtk * atkRate * comboRate;
+function getBaseRateFromPowAndAtr(magicPow: string, magicAtr: string): number {
+  let rate = magicPow.includes('弱') ? 0.75 : 1;
+  rate *= magicAtr === '無' ? 1.1 : 1;
+  return rate;
 }
+
+function getVsRatesFromAtr(magicAtr: string): { fire: number; water: number; wood: number } {
+  if (magicAtr === '火') return { fire: 1, water: 0.5, wood: 1.5 };
+  if (magicAtr === '水') return { fire: 1.5, water: 1, wood: 0.5 };
+  if (magicAtr === '木') return { fire: 0.5, water: 1.5, wood: 1 };
+  return { fire: 1, water: 1, wood: 1 };
+}
+
+const topNSumScratch = new Array<number>(10);
+const noMetaResultScratch = new Array<number>(20);
+const topTwoDamageScratch: number[] = [0, 0];
+const AUX_METRIC_EVASION = 1 << 0;
+const AUX_METRIC_HP_BUDDY = 1 << 1;
+const AUX_METRIC_INCREASED_HP_BUDDY = 1 << 2;
+const AUX_METRIC_BUDDY = 1 << 3;
+const AUX_METRIC_NO_HP_BUDDY = 1 << 4;
+const AUX_METRIC_DUO = 1 << 5;
+const AUX_METRIC_BUFF = 1 << 6;
+const AUX_METRIC_DEBUFF = 1 << 7;
+const AUX_METRIC_COSMIC = 1 << 8;
+const AUX_METRIC_FIRE = 1 << 9;
+const AUX_METRIC_WATER = 1 << 10;
+const AUX_METRIC_FLORA = 1 << 11;
+const AUX_METRIC_HEAL_NUM = 1 << 12;
+const AUX_METRIC_ALL =
+  AUX_METRIC_EVASION |
+  AUX_METRIC_HP_BUDDY |
+  AUX_METRIC_INCREASED_HP_BUDDY |
+  AUX_METRIC_BUDDY |
+  AUX_METRIC_NO_HP_BUDDY |
+  AUX_METRIC_DUO |
+  AUX_METRIC_BUFF |
+  AUX_METRIC_DEBUFF |
+  AUX_METRIC_COSMIC |
+  AUX_METRIC_FIRE |
+  AUX_METRIC_WATER |
+  AUX_METRIC_FLORA |
+  AUX_METRIC_HEAL_NUM;
+const DAMAGE_METRIC_REFERENCE = 1 << 0;
+const DAMAGE_METRIC_ADVANTAGE = 1 << 1;
+const DAMAGE_METRIC_VS_HI = 1 << 2;
+const DAMAGE_METRIC_VS_MIZU = 1 << 3;
+const DAMAGE_METRIC_VS_KI = 1 << 4;
+const DAMAGE_METRIC_ALL =
+  DAMAGE_METRIC_REFERENCE |
+  DAMAGE_METRIC_ADVANTAGE |
+  DAMAGE_METRIC_VS_HI |
+  DAMAGE_METRIC_VS_MIZU |
+  DAMAGE_METRIC_VS_KI;
+
+function sumTopNByInsertion(values: number[], topN: number): number {
+  const len = values.length;
+  if (topN <= 0 || len === 0) return 0;
+  if (len === 10 && topN >= 8) {
+    let total = 0;
+    let min1 = Infinity;
+    let min2 = Infinity;
+    for (let i = 0; i < 10; i++) {
+      const v = values[i];
+      total += v;
+      if (v < min1) {
+        min2 = min1;
+        min1 = v;
+      } else if (v < min2) {
+        min2 = v;
+      }
+    }
+    if (topN >= 10) return total;
+    if (topN === 9) return total - min1;
+    if (topN === 8) return total - min1 - min2;
+  }
+  if (topN >= len) {
+    let total = 0;
+    for (let i = 0; i < len; i++) total += values[i];
+    return total;
+  }
+
+  // 初期topNを作り、最小要素を差し替える方式で部分選択する。
+  // topN<=10 のケースでは sort より高速になりやすい。
+  let total = 0;
+  for (let i = 0; i < topN; i++) {
+    const v = values[i];
+    topNSumScratch[i] = v;
+    total += v;
+  }
+  let minIdx = 0;
+  let minVal = topNSumScratch[0];
+  for (let i = 1; i < topN; i++) {
+    const v = topNSumScratch[i];
+    if (v < minVal) {
+      minVal = v;
+      minIdx = i;
+    }
+  }
+
+  for (let i = topN; i < len; i++) {
+    const v = values[i];
+    if (v <= minVal) continue;
+    total += v - minVal;
+    topNSumScratch[minIdx] = v;
+    minIdx = 0;
+    minVal = topNSumScratch[0];
+    for (let j = 1; j < topN; j++) {
+      const c = topNSumScratch[j];
+      if (c < minVal) {
+        minVal = c;
+        minIdx = j;
+      }
+    }
+  }
+
+  return total;
+}
+
 // 配列生成を避けるため、最大2件を出力配列に書き込む
 function fillTopTwoDamage(damage1: number, damage2: number, damage3: number, out: number[]): void {
   let max = damage1;
@@ -472,56 +585,163 @@ function fillTopTwoDamage(damage1: number, damage2: number, damage3: number, out
   out[0] = max;
   out[1] = second;
 }
+
+function clearUsedScratch(mask: Uint8Array, len: number): void {
+  if (len === 5) {
+    mask[0] = 0;
+    mask[1] = 0;
+    mask[2] = 0;
+    mask[3] = 0;
+    mask[4] = 0;
+    return;
+  }
+  mask.fill(0, 0, len);
+}
+
 export function calcDeckStatus(
   characters: Character[],
-  options: { includeDetails?: boolean; mustIds?: number[]; snapshot?: SearchSnapshot } = {}
+  options: {
+    includeDetails?: boolean;
+    includeDeckMeta?: boolean;
+    skipDamageMetrics?: boolean;
+    skipAuxMetrics?: boolean;
+    skipMustCheck?: boolean;
+    assumePreparedCache?: boolean;
+    auxMetricMask?: number;
+    damageMetricMask?: number;
+    mustIds?: number[];
+    snapshot?: SearchSnapshot;
+  } = {}
 ): Array<number | string | any> | undefined {
+  /*
+   * calcDeckStatus の実行方針（高速化版）
+   * 1. 事前キャッシュ済みメタ情報を使って、文字列処理をできるだけ回避する
+   * 2. 現在デッキの「在籍判定」をビット集合で持ち、バディ/デュオ判定を高速化する
+   * 3. 必要な指標だけを計算する（mask + skip フラグ）
+   * 4. 結果しきい値に届かないものは早期 return する
+   *
+   * 注意: ここは探索ループから極めて高頻度で呼ばれるため、
+   * 可読性より分岐削減・割り当て削減を優先している。
+   */
   const includeDetails = options.includeDetails !== false;
+  const includeDeckMeta = options.includeDeckMeta ?? includeDetails;
+  const skipDamageMetrics = options.skipDamageMetrics === true;
+  const skipAuxMetrics = options.skipAuxMetrics === true;
+  const skipMustCheck = options.skipMustCheck === true;
+  const auxMetricMask = options.auxMetricMask ?? AUX_METRIC_ALL;
+  const damageMetricMask = options.damageMetricMask ?? DAMAGE_METRIC_ALL;
+  const needsDuoCalc = !skipAuxMetrics || !skipDamageMetrics;
+  // デュオ解決（M2デュオ化/duo指標）が不要な経路では ID 配列準備を省く
+  const needsDuoResolution =
+    needsDuoCalc &&
+    (
+      !skipDamageMetrics ||
+      includeDetails ||
+      (!skipAuxMetrics && (auxMetricMask & AUX_METRIC_DUO) !== 0)
+    );
+  const useBuddyBitPresence = true;
   const snapshot = options.snapshot ?? buildSearchSnapshot();
   const charaLen = characters.length; // Opt-266: length参照をローカル化
-  // Opt-296: memberFlags をスタンプ方式で再利用
-  if (memberFlags.length < charaIdMap.size + 1) {
-    memberFlags = new Uint32Array(charaIdMap.size + 1);
-    memberFlagsStamp = 0;
-  }
-  memberFlagsStamp = (memberFlagsStamp + 1) >>> 0;
-  if (memberFlagsStamp === 0) {
-    memberFlagsStamp = 1;
-    memberFlags.fill(0);
-  }
-  const charaIds: number[] = new Array(charaLen);
-  const duoIds: number[] = new Array(charaLen);
-  for (let i = 0; i < charaLen; i++) {
-    const chara = characters[i];
-    // Opt-232: charaId をキャッシュして Map 参照を削減
-    let charaId = (chara as any).charaId;
-    if (charaId === undefined) {
-      charaId = getCharaId(chara.chara);
-      (chara as any).charaId = charaId;
-    }
-    // Opt-234: duoId をキャッシュして文字列比較を削減
-    let duoId = (chara as any).duoId;
-    if (duoId === undefined) {
-      duoId = chara.duo ? getCharaId(chara.duo) : -1;
-      (chara as any).duoId = duoId;
-    }
-    charaIds[i] = charaId;
-    duoIds[i] = duoId;
-    memberFlags[charaId] = memberFlagsStamp;
-  }
-  const mustIds = options.mustIds ?? Array.from(convertedMustCharacters.value).map(name => getCharaId(name as string));
-  if (mustIds.length > 0) {
-    // Opt-60: every を for ループに置換
-    let allMustCharactersIncluded = true;
-    for (let i = 0; i < mustIds.length; i++) {
-      if (memberFlags[mustIds[i]] !== memberFlagsStamp) {
-        allMustCharactersIncluded = false;
-        break;
+  const assumePreparedCache = options.assumePreparedCache === true;
+  if (!assumePreparedCache) {
+    const firstCharaAny = characters[0] as any;
+    if (
+      firstCharaAny.charaId === undefined ||
+      firstCharaAny.duoId === undefined ||
+      firstCharaAny.useM1Cached === undefined
+    ) {
+      for (let i = 0; i < charaLen; i++) {
+        prepareCharacterSearchCache(characters[i]);
       }
     }
-    if (!allMustCharactersIncluded) {
-      // もし mustCharactersSet に存在するすべての名前が memberNameSet にない場合、undefined を返す
-      return;
+  }
+  const needMemberFlags = !skipMustCheck;
+  // Opt-296: memberFlags をスタンプ方式で再利用
+  if (needMemberFlags) {
+    if (memberFlags.length < charaIdMap.size + 1) {
+      memberFlags = new Uint32Array(charaIdMap.size + 1);
+      memberFlagsStamp = 0;
+    }
+    // clear() を毎回走らせる代わりに世代番号で「今回の探索で立った印」を判定する。
+    // stamp がオーバーフローしたときだけ全クリアする。
+    memberFlagsStamp = (memberFlagsStamp + 1) >>> 0;
+    if (memberFlagsStamp === 0) {
+      memberFlagsStamp = 1;
+      memberFlags.fill(0);
+    }
+  }
+  const charaIds: Int16Array | null = needsDuoResolution
+    ? (charaIdsScratch.length >= charaLen ? charaIdsScratch : (charaIdsScratch = new Int16Array(charaLen)))
+    : null;
+  const duoIds: Int16Array | null = needsDuoResolution
+    ? (duoIdsScratch.length >= charaLen ? duoIdsScratch : (duoIdsScratch = new Int16Array(charaLen)))
+    : null;
+  let presenceLow = 0;
+  let presenceHigh = 0;
+  if (needsDuoResolution) {
+    if (needMemberFlags) {
+      for (let i = 0; i < charaLen; i++) {
+        const charaAny = characters[i] as any;
+        const charaId = charaAny.charaId as number;
+        const duoId = charaAny.duoId as number;
+        const charaBitLow = charaAny.charaBitLowCached as number;
+        const charaBitHigh = charaAny.charaBitHighCached as number;
+        presenceLow = (presenceLow | charaBitLow) >>> 0;
+        presenceHigh = (presenceHigh | charaBitHigh) >>> 0;
+        charaIds![i] = charaId;
+        duoIds![i] = duoId;
+        memberFlags[charaId] = memberFlagsStamp;
+      }
+    } else {
+      for (let i = 0; i < charaLen; i++) {
+        const charaAny = characters[i] as any;
+        const charaId = charaAny.charaId as number;
+        const duoId = charaAny.duoId as number;
+        const charaBitLow = charaAny.charaBitLowCached as number;
+        const charaBitHigh = charaAny.charaBitHighCached as number;
+        presenceLow = (presenceLow | charaBitLow) >>> 0;
+        presenceHigh = (presenceHigh | charaBitHigh) >>> 0;
+        charaIds![i] = charaId;
+        duoIds![i] = duoId;
+      }
+    }
+  } else {
+    if (needMemberFlags) {
+      for (let i = 0; i < charaLen; i++) {
+        const charaAny = characters[i] as any;
+        const charaId = charaAny.charaId as number;
+        const charaBitLow = charaAny.charaBitLowCached as number;
+        const charaBitHigh = charaAny.charaBitHighCached as number;
+        presenceLow = (presenceLow | charaBitLow) >>> 0;
+        presenceHigh = (presenceHigh | charaBitHigh) >>> 0;
+        memberFlags[charaId] = memberFlagsStamp;
+      }
+    } else {
+      for (let i = 0; i < charaLen; i++) {
+        const charaAny = characters[i] as any;
+        const charaBitLow = charaAny.charaBitLowCached as number;
+        const charaBitHigh = charaAny.charaBitHighCached as number;
+        presenceLow = (presenceLow | charaBitLow) >>> 0;
+        presenceHigh = (presenceHigh | charaBitHigh) >>> 0;
+      }
+    }
+  }
+  if (!skipMustCheck) {
+    // mustIds は呼び出し側で渡すのが本来の高速経路。
+    // 未指定時だけ store から生成する（互換用フォールバック）。
+    const mustIds = options.mustIds ?? Array.from(convertedMustCharacters.value).map(name => getCharaId(name as string));
+    const mustLen = mustIds.length;
+    if (mustLen === 1) {
+      if (memberFlags[mustIds[0]] !== memberFlagsStamp) return;
+    } else if (mustLen === 2) {
+      if (memberFlags[mustIds[0]] !== memberFlagsStamp || memberFlags[mustIds[1]] !== memberFlagsStamp) return;
+    } else if (mustLen > 2) {
+      // Opt-60: every を for ループに置換
+      for (let i = 0; i < mustLen; i++) {
+        if (memberFlags[mustIds[i]] !== memberFlagsStamp) {
+          return;
+        }
+      }
     }
   }
   let deckTotalHP = 0;
@@ -543,21 +763,112 @@ export function calcDeckStatus(
   const totalAttacks = characters.length * 2;
   const attackNumValue = snapshot.attackNum;
   const useFullSum = attackNumValue >= totalAttacks;
-  const deckReferenceDamageList: number[] | null = useFullSum ? null : [];
-  const deckReferenceAdvantageDamageList: number[] | null = useFullSum ? null : [];
-  const deckReferenceVsHiDamageList: number[] | null = useFullSum ? null : [];
-  const deckReferenceVsMizuDamageList: number[] | null = useFullSum ? null : [];
-  const deckReferenceVsKiDamageList: number[] | null = useFullSum ? null : [];
+  const shouldCollectDamage = !skipDamageMetrics;
+  const needEvasion = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_EVASION) !== 0;
+  const needHPBuddy = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_HP_BUDDY) !== 0;
+  const needIncreasedHPBuddy = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_INCREASED_HP_BUDDY) !== 0;
+  const needBuddy = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_BUDDY) !== 0;
+  const needNoHPBuddy = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_NO_HP_BUDDY) !== 0;
+  const needDuo = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_DUO) !== 0;
+  const needBuff = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_BUFF) !== 0;
+  const needDebuff = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_DEBUFF) !== 0;
+  const needCosmic = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_COSMIC) !== 0;
+  const needFire = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_FIRE) !== 0;
+  const needWater = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_WATER) !== 0;
+  const needFlora = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_FLORA) !== 0;
+  const needHealNum = !skipAuxMetrics && (auxMetricMask & AUX_METRIC_HEAL_NUM) !== 0;
+  const needBuddyInc = needBuddy ? 1 : 0;
+  const needHPBuddyInc = needHPBuddy ? 1 : 0;
+  const needIncreasedHPBuddyMul = needIncreasedHPBuddy ? 1 : 0;
+  const needReferenceDamage = shouldCollectDamage && (damageMetricMask & DAMAGE_METRIC_REFERENCE) !== 0;
+  const needReferenceAdvantageDamage = shouldCollectDamage && (damageMetricMask & DAMAGE_METRIC_ADVANTAGE) !== 0;
+  const needReferenceVsHiDamage = shouldCollectDamage && (damageMetricMask & DAMAGE_METRIC_VS_HI) !== 0;
+  const needReferenceVsMizuDamage = shouldCollectDamage && (damageMetricMask & DAMAGE_METRIC_VS_MIZU) !== 0;
+  const needReferenceVsKiDamage = shouldCollectDamage && (damageMetricMask & DAMAGE_METRIC_VS_KI) !== 0;
+  const needAnyDamageMetric =
+    needReferenceDamage ||
+    needReferenceAdvantageDamage ||
+    needReferenceVsHiDamage ||
+    needReferenceVsMizuDamage ||
+    needReferenceVsKiDamage;
+  const needAttackRateFromBuddy = needAnyDamageMetric;
+  const needsAnyBuddyAuxCounter = needBuddy || needHPBuddy || needNoHPBuddy || needIncreasedHPBuddy;
+  const usePreparedLinearDamagePath = assumePreparedCache;
+  // 5枚編成(=10打点) かつ attackNum が 8〜10 のときだけ使える軽量経路。
+  // 各打点を配列に積まず「合計 + 最小2件」だけ保持して上位和を復元する。
+  // これにより push / sort 相当のコストを避ける。
+  const useTopNStreamingFastPath = shouldCollectDamage && !useFullSum && totalAttacks === 10 && attackNumValue >= 8;
+  const deckReferenceDamageList: number[] | null = (needReferenceDamage && !useFullSum && !useTopNStreamingFastPath) ? [] : null;
+  const deckReferenceAdvantageDamageList: number[] | null = (needReferenceAdvantageDamage && !useFullSum && !useTopNStreamingFastPath) ? [] : null;
+  const deckReferenceVsHiDamageList: number[] | null = (needReferenceVsHiDamage && !useFullSum && !useTopNStreamingFastPath) ? [] : null;
+  const deckReferenceVsMizuDamageList: number[] | null = (needReferenceVsMizuDamage && !useFullSum && !useTopNStreamingFastPath) ? [] : null;
+  const deckReferenceVsKiDamageList: number[] | null = (needReferenceVsKiDamage && !useFullSum && !useTopNStreamingFastPath) ? [] : null;
   let deckReferenceDamage = 0;
   let deckReferenceAdvantageDamage = 0;
   let deckReferenceVsHiDamage = 0;
   let deckReferenceVsMizuDamage = 0;
   let deckReferenceVsKiDamage = 0;
+  let refDamageTotal = 0;
+  let refDamageMin1 = Infinity;
+  let refDamageMin2 = Infinity;
+  let refAdvTotal = 0;
+  let refAdvMin1 = Infinity;
+  let refAdvMin2 = Infinity;
+  let refHiTotal = 0;
+  let refHiMin1 = Infinity;
+  let refHiMin2 = Infinity;
+  let refMizuTotal = 0;
+  let refMizuMin1 = Infinity;
+  let refMizuMin2 = Infinity;
+  let refKiTotal = 0;
+  let refKiMin1 = Infinity;
+  let refKiMin2 = Infinity;
+  const useFixedFiveDuoBitsetFastPath =
+    needsDuoResolution &&
+    charaLen === 5;
   // Opt-44: 使用済みフラグを Uint8Array 化
-  const name2M2Used = new Uint8Array(characters.length);
-  const name2MotherUsed = new Uint8Array(characters.length);
-  const name2DuoUsed = new Uint8Array(characters.length);
-  const deckList: string[] = [];
+  const name2M2Used = needsDuoResolution && !useFixedFiveDuoBitsetFastPath
+    ? (name2M2UsedScratch.length >= charaLen ? name2M2UsedScratch : (name2M2UsedScratch = new Uint8Array(charaLen)))
+    : null;
+  const name2MotherUsed = needsDuoResolution && !useFixedFiveDuoBitsetFastPath
+    ? (name2MotherUsedScratch.length >= charaLen ? name2MotherUsedScratch : (name2MotherUsedScratch = new Uint8Array(charaLen)))
+    : null;
+  const name2DuoUsed = needsDuoResolution && !useFixedFiveDuoBitsetFastPath
+    ? (name2DuoUsedScratch.length >= charaLen ? name2DuoUsedScratch : (name2DuoUsedScratch = new Uint8Array(charaLen)))
+    : null;
+  if (needsDuoResolution && !useFixedFiveDuoBitsetFastPath) {
+    clearUsedScratch(name2M2Used!, charaLen);
+    clearUsedScratch(name2MotherUsed!, charaLen);
+    clearUsedScratch(name2DuoUsed!, charaLen);
+  }
+  let fixedDuoUsedMask = 0;
+  let fixedM2UsedMask = 0;
+  let fixedMotherUsedMask = 0;
+  let fixedDuoCandidateMasks: Int32Array | null = null;
+  let fixedDuoMutualMasks: Int32Array | null = null;
+  if (useFixedFiveDuoBitsetFastPath) {
+    // 5枚固定時は「どのスロットがデュオ候補か」を先に bit 化しておくと、
+    // 後段の探索で線形探索を減らせる。
+    fixedDuoCandidateMasks = fixedDuoCandidateMasksScratch;
+    fixedDuoMutualMasks = fixedDuoMutualMasksScratch;
+    for (let i = 0; i < 5; i++) {
+      const duoId = duoIds![i];
+      const charaId = charaIds![i];
+      let candidateMask = 0;
+      let mutualMask = 0;
+      for (let j = 0; j < 5; j++) {
+        if (charaIds![j] !== duoId) continue;
+        const bit = (1 << j);
+        candidateMask |= bit;
+        if (duoIds![j] === charaId) {
+          mutualMask |= bit;
+        }
+      }
+      fixedDuoCandidateMasks[i] = candidateMask;
+      fixedDuoMutualMasks[i] = mutualMask;
+    }
+  }
+  const deckList: string[] | null = includeDeckMeta ? [] : null;
   let simuURL = '';
   const detailList: any[] | null = includeDetails ? [] : null;
   const healList: number[] | null = includeDetails ? [] : null;
@@ -566,356 +877,668 @@ export function calcDeckStatus(
   const hiDamageList: number[] | null = includeDetails ? [] : null;
   const mizuDamageList: number[] | null = includeDetails ? [] : null;
   const kiDamageList: number[] | null = includeDetails ? [] : null;
-  const topTwoScratch: number[] = [0, 0];
-
-  characters.forEach((chara, index) => {
+  const topTwoScratch: number[] | null = needAnyDamageMetric
+    ? topTwoDamageScratch
+    : null;
+  const zeroTotalsRefForDisabledMagic = { atkDelta: 0, dmgDelta: 0 };
+  for (let index = 0; index < charaLen; index++) {
+    const chara = characters[index];
     const charaAny = chara as any; // Opt-248: any参照の重複取得を削減
-    const useM1 = charaAny.hasM1 ?? true;
-    const useM2 = charaAny.hasM2 ?? true;
-    const useM3 = chara.rare === 'SSR' ? (charaAny.hasM3 ?? true) : false;
-    deckList.push(chara.imgUrl);
+    const baseHP = chara.calcBaseHP;
+    const baseATK = chara.calcBaseATK;
+    const useM1 = charaAny.useM1Cached as boolean;
+    const useM2 = charaAny.useM2Cached as boolean;
+    const useM3 = charaAny.useM3Cached as boolean;
+    if (includeDeckMeta) {
+      deckList!.push(chara.imgUrl);
+    }
     if (includeDetails) {
       // Opt-43: encodeURIComponent をキャッシュ
       const encodedName = charaAny.encodedName ?? (charaAny.encodedName = encodeURIComponent(chara.name));
       simuURL += '&name' + (index + 1) + '=' + encodedName;
       simuURL += '&level' + (index + 1) + '=' + chara.level;
     }
-    deckTotalHP += chara.calcBaseHP;
-    // バフ/デバフ数は使用可能マジックのみ反映する
-    const { buffByMagic, debuffByMagic } = getBuffDebuffCountsByMagic(chara);
-    if (useM1) {
-      deckTotalBuff += buffByMagic[1];
-      deckTotalDebuff += debuffByMagic[1];
+    deckTotalHP += baseHP;
+    if (!skipAuxMetrics) {
+      if (needBuff) deckTotalBuff += (charaAny.totalBuffCached as number) ?? 0;
+      if (needDebuff) deckTotalDebuff += (charaAny.totalDebuffCached as number) ?? 0;
+      if (needCosmic) deckCosmic += (charaAny.magicCosmicCountCached as number) ?? 0;
+      if (needFire) deckFire += (charaAny.magicFireCountCached as number) ?? 0;
+      if (needWater) deckWater += (charaAny.magicWaterCountCached as number) ?? 0;
+      if (needFlora) deckFlora += (charaAny.magicFloraCountCached as number) ?? 0;
     }
-    if (useM2) {
-      deckTotalBuff += buffByMagic[2];
-      deckTotalDebuff += debuffByMagic[2];
-    }
-    if (useM3) {
-      deckTotalBuff += buffByMagic[3];
-      deckTotalDebuff += debuffByMagic[3];
-    }
-    // Opt-39: 属性カウントを単一パスで集計
-    let cosmic = 0;
-    let fire = 0;
-    let water = 0;
-    let flora = 0;
-    if (useM1) {
-      switch (chara.magic1atr) {
-        case '無': cosmic += 1; break;
-        case '火': fire += 1; break;
-        case '水': water += 1; break;
-        case '木': flora += 1; break;
-      }
-    }
-    if (useM2) {
-      switch (chara.magic2atr) {
-        case '無': cosmic += 1; break;
-        case '火': fire += 1; break;
-        case '水': water += 1; break;
-        case '木': flora += 1; break;
-      }
-    }
-    if (useM3) {
-      switch (chara.magic3atr) {
-        case '無': cosmic += 1; break;
-        case '火': fire += 1; break;
-        case '水': water += 1; break;
-        case '木': flora += 1; break;
-      }
-    }
-    if (cosmic > 2) cosmic = 2;
-    if (fire > 2) fire = 2;
-    if (water > 2) water = 2;
-    if (flora > 2) flora = 2;
-    deckCosmic += cosmic;
-    deckFire += fire;
-    deckWater += water;
-    deckFlora += flora;
     let hasHpBuddy = false;
     let atkBuddyRate = 0;
     // バディHP増加分加算
     let increasedHP = 0;
-    const buddies = getBuddyPairs(chara);
-    for (const buddy of buddies) {
-      // Opt-11: buddy id をキャッシュして判定に使用
-      if (buddy.id >= 0 && memberFlags[buddy.id] === memberFlagsStamp) {
-        deckTotalBuddy += 1;
-        const rates = getBuddyRates(buddy.s);
-        atkBuddyRate += rates.atk;
-        if (rates.hp !== 0) {
-          deckTotalHPBuddy += 1;
-          hasHpBuddy = true;
-          const hpIncrease = chara.calcBaseHP * rates.hp;
-          deckTotalHP += hpIncrease;
-          increasedHP += hpIncrease;
+    const buddy1Id = charaAny.buddy1IdCached as number;
+    const buddy2Id = charaAny.buddy2IdCached as number;
+    const buddy3Id = charaAny.buddy3IdCached as number;
+    const buddy1HpIncrease = charaAny.buddy1HpIncreaseCached as number;
+    const buddy2HpIncrease = charaAny.buddy2HpIncreaseCached as number;
+    const buddy3HpIncrease = charaAny.buddy3HpIncreaseCached as number;
+    const buddy1AtkRate = needAttackRateFromBuddy ? (charaAny.buddy1AtkRateCached as number) : 0;
+    const buddy2AtkRate = needAttackRateFromBuddy ? (charaAny.buddy2AtkRateCached as number) : 0;
+    const buddy3AtkRate = needAttackRateFromBuddy ? (charaAny.buddy3AtkRateCached as number) : 0;
+    if (useBuddyBitPresence) {
+      if (assumePreparedCache) {
+        if (!needsAnyBuddyAuxCounter) {
+          if (needAttackRateFromBuddy) {
+            const b1Low = charaAny.buddy1BitLowCached as number;
+            const b1High = charaAny.buddy1BitHighCached as number;
+            if (((b1Low & presenceLow) | (b1High & presenceHigh)) !== 0) {
+              if (buddy1AtkRate !== 0) atkBuddyRate += buddy1AtkRate;
+              if (buddy1HpIncrease !== 0) deckTotalHP += buddy1HpIncrease;
+            }
+
+            const b2Low = charaAny.buddy2BitLowCached as number;
+            const b2High = charaAny.buddy2BitHighCached as number;
+            if (((b2Low & presenceLow) | (b2High & presenceHigh)) !== 0) {
+              if (buddy2AtkRate !== 0) atkBuddyRate += buddy2AtkRate;
+              if (buddy2HpIncrease !== 0) deckTotalHP += buddy2HpIncrease;
+            }
+
+            const b3Low = charaAny.buddy3BitLowCached as number;
+            const b3High = charaAny.buddy3BitHighCached as number;
+            if (((b3Low & presenceLow) | (b3High & presenceHigh)) !== 0) {
+              if (buddy3AtkRate !== 0) atkBuddyRate += buddy3AtkRate;
+              if (buddy3HpIncrease !== 0) deckTotalHP += buddy3HpIncrease;
+            }
+          } else {
+            const b1Low = charaAny.buddy1BitLowCached as number;
+            const b1High = charaAny.buddy1BitHighCached as number;
+            if (((b1Low & presenceLow) | (b1High & presenceHigh)) !== 0) {
+              if (buddy1HpIncrease !== 0) deckTotalHP += buddy1HpIncrease;
+            }
+
+            const b2Low = charaAny.buddy2BitLowCached as number;
+            const b2High = charaAny.buddy2BitHighCached as number;
+            if (((b2Low & presenceLow) | (b2High & presenceHigh)) !== 0) {
+              if (buddy2HpIncrease !== 0) deckTotalHP += buddy2HpIncrease;
+            }
+
+            const b3Low = charaAny.buddy3BitLowCached as number;
+            const b3High = charaAny.buddy3BitHighCached as number;
+            if (((b3Low & presenceLow) | (b3High & presenceHigh)) !== 0) {
+              if (buddy3HpIncrease !== 0) deckTotalHP += buddy3HpIncrease;
+            }
+          }
+        } else if (needAttackRateFromBuddy) {
+          const b1Low = charaAny.buddy1BitLowCached as number;
+          const b1High = charaAny.buddy1BitHighCached as number;
+          if (((b1Low & presenceLow) | (b1High & presenceHigh)) !== 0) {
+            deckTotalBuddy += needBuddyInc;
+            if (buddy1AtkRate !== 0) atkBuddyRate += buddy1AtkRate;
+            if (buddy1HpIncrease !== 0) {
+              deckTotalHPBuddy += needHPBuddyInc;
+              hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+              const hpIncrease = buddy1HpIncrease;
+              deckTotalHP += hpIncrease;
+              increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+            }
+          }
+
+          const b2Low = charaAny.buddy2BitLowCached as number;
+          const b2High = charaAny.buddy2BitHighCached as number;
+          if (((b2Low & presenceLow) | (b2High & presenceHigh)) !== 0) {
+            deckTotalBuddy += needBuddyInc;
+            if (buddy2AtkRate !== 0) atkBuddyRate += buddy2AtkRate;
+            if (buddy2HpIncrease !== 0) {
+              deckTotalHPBuddy += needHPBuddyInc;
+              hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+              const hpIncrease = buddy2HpIncrease;
+              deckTotalHP += hpIncrease;
+              increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+            }
+          }
+
+          const b3Low = charaAny.buddy3BitLowCached as number;
+          const b3High = charaAny.buddy3BitHighCached as number;
+          if (((b3Low & presenceLow) | (b3High & presenceHigh)) !== 0) {
+            deckTotalBuddy += needBuddyInc;
+            if (buddy3AtkRate !== 0) atkBuddyRate += buddy3AtkRate;
+            if (buddy3HpIncrease !== 0) {
+              deckTotalHPBuddy += needHPBuddyInc;
+              hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+              const hpIncrease = buddy3HpIncrease;
+              deckTotalHP += hpIncrease;
+              increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+            }
+          }
+        } else {
+          const b1Low = charaAny.buddy1BitLowCached as number;
+          const b1High = charaAny.buddy1BitHighCached as number;
+          if (((b1Low & presenceLow) | (b1High & presenceHigh)) !== 0) {
+            deckTotalBuddy += needBuddyInc;
+            if (buddy1HpIncrease !== 0) {
+              deckTotalHPBuddy += needHPBuddyInc;
+              hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+              const hpIncrease = buddy1HpIncrease;
+              deckTotalHP += hpIncrease;
+              increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+            }
+          }
+
+          const b2Low = charaAny.buddy2BitLowCached as number;
+          const b2High = charaAny.buddy2BitHighCached as number;
+          if (((b2Low & presenceLow) | (b2High & presenceHigh)) !== 0) {
+            deckTotalBuddy += needBuddyInc;
+            if (buddy2HpIncrease !== 0) {
+              deckTotalHPBuddy += needHPBuddyInc;
+              hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+              const hpIncrease = buddy2HpIncrease;
+              deckTotalHP += hpIncrease;
+              increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+            }
+          }
+
+          const b3Low = charaAny.buddy3BitLowCached as number;
+          const b3High = charaAny.buddy3BitHighCached as number;
+          if (((b3Low & presenceLow) | (b3High & presenceHigh)) !== 0) {
+            deckTotalBuddy += needBuddyInc;
+            if (buddy3HpIncrease !== 0) {
+              deckTotalHPBuddy += needHPBuddyInc;
+              hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+              const hpIncrease = buddy3HpIncrease;
+              deckTotalHP += hpIncrease;
+              increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+            }
+          }
+        }
+      } else {
+        let b1Low = charaAny.buddy1BitLowCached as number | undefined;
+        let b1High = charaAny.buddy1BitHighCached as number | undefined;
+        if (b1Low === undefined || b1High === undefined) {
+          const pair = getBitPairById(buddy1Id);
+          b1Low = pair.low;
+          b1High = pair.high;
+          charaAny.buddy1BitLowCached = b1Low;
+          charaAny.buddy1BitHighCached = b1High;
+        }
+        if (((b1Low & presenceLow) | (b1High & presenceHigh)) !== 0) {
+          deckTotalBuddy += needBuddyInc;
+          if (buddy1AtkRate !== 0) atkBuddyRate += buddy1AtkRate;
+          if (buddy1HpIncrease !== 0) {
+            deckTotalHPBuddy += needHPBuddyInc;
+            hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+            const hpIncrease = buddy1HpIncrease;
+            deckTotalHP += hpIncrease;
+            increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+          }
+        }
+
+        let b2Low = charaAny.buddy2BitLowCached as number | undefined;
+        let b2High = charaAny.buddy2BitHighCached as number | undefined;
+        if (b2Low === undefined || b2High === undefined) {
+          const pair = getBitPairById(buddy2Id);
+          b2Low = pair.low;
+          b2High = pair.high;
+          charaAny.buddy2BitLowCached = b2Low;
+          charaAny.buddy2BitHighCached = b2High;
+        }
+        if (((b2Low & presenceLow) | (b2High & presenceHigh)) !== 0) {
+          deckTotalBuddy += needBuddyInc;
+          if (buddy2AtkRate !== 0) atkBuddyRate += buddy2AtkRate;
+          if (buddy2HpIncrease !== 0) {
+            deckTotalHPBuddy += needHPBuddyInc;
+            hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+            const hpIncrease = buddy2HpIncrease;
+            deckTotalHP += hpIncrease;
+            increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+          }
+        }
+
+        let b3Low = charaAny.buddy3BitLowCached as number | undefined;
+        let b3High = charaAny.buddy3BitHighCached as number | undefined;
+        if (b3Low === undefined || b3High === undefined) {
+          const pair = getBitPairById(buddy3Id);
+          b3Low = pair.low;
+          b3High = pair.high;
+          charaAny.buddy3BitLowCached = b3Low;
+          charaAny.buddy3BitHighCached = b3High;
+        }
+        if (((b3Low & presenceLow) | (b3High & presenceHigh)) !== 0) {
+          deckTotalBuddy += needBuddyInc;
+          if (buddy3AtkRate !== 0) atkBuddyRate += buddy3AtkRate;
+          if (buddy3HpIncrease !== 0) {
+            deckTotalHPBuddy += needHPBuddyInc;
+            hasHpBuddy = hasHpBuddy || needNoHPBuddy;
+            const hpIncrease = buddy3HpIncrease;
+            deckTotalHP += hpIncrease;
+            increasedHP += hpIncrease * needIncreasedHPBuddyMul;
+          }
         }
       }
     }
     // Opt-33: Math.min を分岐で置換
-    if (increasedHP < deckMinIncreasedHPBuddy) {
+    if (needIncreasedHPBuddy && increasedHP < deckMinIncreasedHPBuddy) {
       deckMinIncreasedHPBuddy = increasedHP;
     }
-    // HP回復分加算（使用可否を反映）
-    const healRates = getMagicHealRates(chara);
-    const magic1Rates = useM1 ? healRates.m1 : emptyHealRates;
-    const magic2Rates = useM2 ? healRates.m2 : emptyHealRates;
-    const magic3Rates = useM3 ? healRates.m3 : emptyHealRates;
-    // Opt-85: 合計回復量の再計算を回避
-    const hpHeal = (magic1Rates.heal + magic2Rates.heal + magic3Rates.heal) * chara.calcBaseATK;
-    const hpConHeal = (magic1Rates.conHeal + magic2Rates.conHeal + magic3Rates.conHeal) * chara.calcBaseHP;
-    const totalHeal = hpHeal + hpConHeal;
+    // HP回復分はキャラ単位で事前計算した値を加算
+    const totalHeal = charaAny.totalHealCached as number;
     deckTotalHeal += totalHeal;
     if (includeDetails) {
       healList!.push(totalHeal);
     }
       
     // Opt-1: 回復手札数の判定で配列生成を避ける
-    if (useM1 && isHealCard(chara.magic1heal)) deckHealCards += 1;
-    if (useM2 && isHealCard(chara.magic2heal)) deckHealCards += 1;
-    if (useM3 && isHealCard(chara.magic3heal)) deckHealCards += 1;
+    if (needHealNum) {
+      deckHealCards += (charaAny.healCardCountCached as number);
+    }
     
     // 回避数加算
-    deckTotalEvasion += chara.evasion;
-    if (!hasHpBuddy) {
+    if (needEvasion) {
+      deckTotalEvasion += chara.evasion;
+    }
+    if (needNoHPBuddy && !hasHpBuddy) {
       deckNoHPBuddy += 1;
     }
-    let magic2pow = chara.magic2pow;
-    if (useM2) {
-      const charaId = charaIds[index];
-      const duoId = duoIds[index];
-      // M2が無効なら自身のデュオ判定をしない
-      if (name2DuoUsed[index]) {
-        magic2pow = "デュオ魔法";
-        deckDuo += 1;
+    let useDuoPow = (charaAny.magic2IsDuoBaseCached as boolean) === true;
+    if (needsDuoResolution && useM2) {
+      const duoId = duoIds![index];
+      if (useFixedFiveDuoBitsetFastPath) {
+        const selfBit = 1 << index;
+        if ((fixedDuoUsedMask & selfBit) !== 0) {
+          useDuoPow = true;
+          if (needDuo) deckDuo += 1;
+        } else {
+          const candidateMask = fixedDuoCandidateMasks![index];
+          const mutualMask = fixedDuoMutualMasks![index];
+
+          // 優先1: 相互デュオ（A↔B）を最優先で確保
+          const availableMutualMask = mutualMask & ~fixedDuoUsedMask;
+          if (availableMutualMask !== 0) {
+            const pairBit = availableMutualMask & -availableMutualMask;
+            fixedDuoUsedMask |= selfBit | pairBit;
+            fixedM2UsedMask |= selfBit | pairBit;
+          }
+
+          // 優先2: 相手のM2使用を消費しない「母体のみ使用」で確保
+          if ((fixedM2UsedMask & selfBit) === 0) {
+            let scanMask = candidateMask;
+            while (scanMask !== 0) {
+              const pickBit = scanMask & -scanMask;
+              if ((fixedMotherUsedMask & pickBit) === 0) {
+                fixedDuoUsedMask |= selfBit;
+                fixedM2UsedMask |= selfBit;
+                fixedMotherUsedMask |= pickBit;
+                break;
+              }
+              scanMask ^= pickBit;
+            }
+          }
+
+          // 優先3: 最後に通常のM2競合ルールで確保
+          if ((fixedM2UsedMask & selfBit) === 0) {
+            let scanMask = candidateMask;
+            while (scanMask !== 0) {
+              const pickBit = scanMask & -scanMask;
+              if ((fixedM2UsedMask & pickBit) === 0) {
+                fixedDuoUsedMask |= selfBit;
+                fixedM2UsedMask |= selfBit | pickBit;
+                break;
+              }
+              scanMask ^= pickBit;
+            }
+          }
+
+          if ((fixedDuoUsedMask & selfBit) !== 0) {
+            useDuoPow = true;
+            if (needDuo) deckDuo += 1;
+          }
+        }
       } else {
-        // Opt-45: entries を for ループへ
-        for (let index2 = 0; index2 < charaLen; index2++) {
-          if (duoIds[index2] === charaId && duoId === charaIds[index2]) {
-            if (!name2DuoUsed[index] && !name2DuoUsed[index2]) {
-              name2DuoUsed[index] = 1;
-              name2DuoUsed[index2] = 1;
-              name2M2Used[index] = 1;
-              name2M2Used[index2] = 1;
-              break;
-            }
-          }
-        }
-
-        if (!name2M2Used[index]) {
+        // M2が無効なら自身のデュオ判定をしない
+        if (name2DuoUsed![index]) {
+          useDuoPow = true;
+          if (needDuo) deckDuo += 1;
+        } else {
+          const charaId = charaIds![index];
           // Opt-45: entries を for ループへ
           for (let index2 = 0; index2 < charaLen; index2++) {
-            if (duoId === charaIds[index2]) {
-              if (
-                !name2DuoUsed[index] &&
-                !name2M2Used[index] &&
-                !name2MotherUsed[index2]
-              ) {
-                name2DuoUsed[index] = 1;
-                name2M2Used[index] = 1;
-                name2MotherUsed[index2] = 1;
+            if (duoIds![index2] === charaId && duoId === charaIds![index2]) {
+              if (!name2DuoUsed![index] && !name2DuoUsed![index2]) {
+                name2DuoUsed![index] = 1;
+                name2DuoUsed![index2] = 1;
+                name2M2Used![index] = 1;
+                name2M2Used![index2] = 1;
                 break;
               }
             }
           }
-        }
 
-        if (!name2M2Used[index]) {
-          // Opt-45: entries を for ループへ
-          for (let index2 = 0; index2 < charaLen; index2++) {
-            if (duoId === charaIds[index2]) {
-              if (
-                !name2DuoUsed[index] &&
-                !name2M2Used[index] &&
-                !name2M2Used[index2]
-              ) {
-                name2DuoUsed[index] = 1;
-                name2M2Used[index] = 1;
-                name2M2Used[index2] = 1;
-                break;
+          if (!name2M2Used![index]) {
+            // Opt-45: entries を for ループへ
+            for (let index2 = 0; index2 < charaLen; index2++) {
+              if (duoId === charaIds![index2]) {
+                if (
+                  !name2DuoUsed![index] &&
+                  !name2M2Used![index] &&
+                  !name2MotherUsed![index2]
+                ) {
+                  name2DuoUsed![index] = 1;
+                  name2M2Used![index] = 1;
+                  name2MotherUsed![index2] = 1;
+                  break;
+                }
               }
             }
           }
+
+          if (!name2M2Used![index]) {
+            // Opt-45: entries を for ループへ
+            for (let index2 = 0; index2 < charaLen; index2++) {
+              if (duoId === charaIds![index2]) {
+                if (
+                  !name2DuoUsed![index] &&
+                  !name2M2Used![index] &&
+                  !name2M2Used![index2]
+                ) {
+                  name2DuoUsed![index] = 1;
+                  name2M2Used![index] = 1;
+                  name2M2Used![index2] = 1;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (name2DuoUsed![index]) {
+            useDuoPow = true;
+            if (needDuo) deckDuo += 1;
+          }
+        }
+      }
+    }
+    if (needAnyDamageMetric) {
+      let magic1Damage = 0;
+      let magic2Damage = 0;
+      let magic3Damage = 0;
+      let magic1AdvantageDamage = 0;
+      let magic2AdvantageDamage = 0;
+      let magic3AdvantageDamage = 0;
+      let magic1vsHiDamage = 0;
+      let magic2vsHiDamage = 0;
+      let magic3vsHiDamage = 0;
+      let magic1vsMizuDamage = 0;
+      let magic2vsMizuDamage = 0;
+      let magic3vsMizuDamage = 0;
+      let magic1vsKiDamage = 0;
+      let magic2vsKiDamage = 0;
+      let magic3vsKiDamage = 0;
+
+      if (usePreparedLinearDamagePath) {
+        // 高速経路:
+        // ダメージ式を `base + buddyRate * coeff` に事前展開したキャッシュを利用する。
+        // ここでは buddyRate を掛けるだけで済むため、文字列パースや分岐を最小化できる。
+        if (useM1) {
+          magic1Damage =
+            (charaAny.m1DamageBaseCached as number) +
+            (charaAny.m1DamageBuddyCoeffCached as number) * atkBuddyRate;
+          if (needReferenceAdvantageDamage) magic1AdvantageDamage = magic1Damage * (charaAny.m1AdvantageRateCached as number);
+          if (needReferenceVsHiDamage) magic1vsHiDamage = magic1Damage * (charaAny.m1VsFireCached as number);
+          if (needReferenceVsMizuDamage) magic1vsMizuDamage = magic1Damage * (charaAny.m1VsWaterCached as number);
+          if (needReferenceVsKiDamage) magic1vsKiDamage = magic1Damage * (charaAny.m1VsWoodCached as number);
+        }
+        if (useM2) {
+          const isDuoPow = useDuoPow;
+          magic2Damage = isDuoPow
+            ? (
+              (charaAny.m2DuoDamageBaseCached as number) +
+              (charaAny.m2DuoDamageBuddyCoeffCached as number) * atkBuddyRate
+            )
+            : (
+              (charaAny.m2DamageBaseCached as number) +
+              (charaAny.m2DamageBuddyCoeffCached as number) * atkBuddyRate
+            );
+          if (needReferenceAdvantageDamage) magic2AdvantageDamage = magic2Damage * (charaAny.m2AdvantageRateCached as number);
+          if (needReferenceVsHiDamage) magic2vsHiDamage = magic2Damage * (charaAny.m2VsFireCached as number);
+          if (needReferenceVsMizuDamage) magic2vsMizuDamage = magic2Damage * (charaAny.m2VsWaterCached as number);
+          if (needReferenceVsKiDamage) magic2vsKiDamage = magic2Damage * (charaAny.m2VsWoodCached as number);
+        }
+        if (useM3) {
+          magic3Damage =
+            (charaAny.m3DamageBaseCached as number) +
+            (charaAny.m3DamageBuddyCoeffCached as number) * atkBuddyRate;
+          if (needReferenceAdvantageDamage) magic3AdvantageDamage = magic3Damage * (charaAny.m3AdvantageRateCached as number);
+          if (needReferenceVsHiDamage) magic3vsHiDamage = magic3Damage * (charaAny.m3VsFireCached as number);
+          if (needReferenceVsMizuDamage) magic3vsMizuDamage = magic3Damage * (charaAny.m3VsWaterCached as number);
+          if (needReferenceVsKiDamage) magic3vsKiDamage = magic3Damage * (charaAny.m3VsWoodCached as number);
+        }
+      } else {
+        // 互換経路:
+        // 事前展開キャッシュが無いケースでも同一結果を返すため、従来式をそのまま計算する。
+        // 等倍ダメージ加算（使用可能なマジックのみ・etc→buffs[]の合算を使用）
+        // Opt-129: バフ合算を一度だけ取得
+        const totalsAll = (useM1 || useM2 || useM3)
+          ? (
+            (charaAny.magicBuffTotalsCached as Array<{ atkDelta: number; dmgDelta: number }> | undefined)
+            ?? getMagicBuffTotalsAll(chara, useM3)
+          )
+          : null;
+        const m1Totals = useM1 ? totalsAll![1] : zeroTotalsRefForDisabledMagic;
+        const m2Totals = useM2 ? totalsAll![2] : zeroTotalsRefForDisabledMagic;
+        const m3Totals = useM3 ? totalsAll![3] : zeroTotalsRefForDisabledMagic;
+
+        const m1AtkDelta = m1Totals.atkDelta;
+        const m1DmgDelta = m1Totals.dmgDelta;
+        const m2AtkDelta = m2Totals.atkDelta;
+        const m2DmgDelta = m2Totals.dmgDelta;
+        const m3AtkDelta = m3Totals.atkDelta;
+        const m3DmgDelta = m3Totals.dmgDelta;
+        if (useM1) {
+          const effectiveAtk = baseATK * (1 + atkBuddyRate + m1AtkDelta);
+          const atkRate = (charaAny.m1BaseRateCached as number) + m1DmgDelta;
+          magic1Damage = effectiveAtk * atkRate * (charaAny.m1ComboRateCached as number);
+          if (needReferenceAdvantageDamage) magic1AdvantageDamage = magic1Damage * (charaAny.m1AdvantageRateCached as number);
+          if (needReferenceVsHiDamage) magic1vsHiDamage = magic1Damage * (charaAny.m1VsFireCached as number);
+          if (needReferenceVsMizuDamage) magic1vsMizuDamage = magic1Damage * (charaAny.m1VsWaterCached as number);
+          if (needReferenceVsKiDamage) magic1vsKiDamage = magic1Damage * (charaAny.m1VsWoodCached as number);
+        }
+        if (useM2) {
+          const effectiveAtk = baseATK * (1 + atkBuddyRate + m2AtkDelta);
+          const isDuoPow = useDuoPow;
+          const baseRate = isDuoPow ? (charaAny.m2DuoBaseRateCached as number) : (charaAny.m2BaseRateCached as number);
+          const comboRate = isDuoPow ? (charaAny.m2DuoComboRateCached as number) : (charaAny.m2ComboRateCached as number);
+          const atkRate = baseRate + m2DmgDelta;
+          magic2Damage = effectiveAtk * atkRate * comboRate;
+          if (needReferenceAdvantageDamage) magic2AdvantageDamage = magic2Damage * (charaAny.m2AdvantageRateCached as number);
+          if (needReferenceVsHiDamage) magic2vsHiDamage = magic2Damage * (charaAny.m2VsFireCached as number);
+          if (needReferenceVsMizuDamage) magic2vsMizuDamage = magic2Damage * (charaAny.m2VsWaterCached as number);
+          if (needReferenceVsKiDamage) magic2vsKiDamage = magic2Damage * (charaAny.m2VsWoodCached as number);
+        }
+        if (useM3) {
+          const effectiveAtk = baseATK * (1 + atkBuddyRate + m3AtkDelta);
+          const atkRate = (charaAny.m3BaseRateCached as number) + m3DmgDelta;
+          magic3Damage = effectiveAtk * atkRate * (charaAny.m3ComboRateCached as number);
+          if (needReferenceAdvantageDamage) magic3AdvantageDamage = magic3Damage * (charaAny.m3AdvantageRateCached as number);
+          if (needReferenceVsHiDamage) magic3vsHiDamage = magic3Damage * (charaAny.m3VsFireCached as number);
+          if (needReferenceVsMizuDamage) magic3vsMizuDamage = magic3Damage * (charaAny.m3VsWaterCached as number);
+          if (needReferenceVsKiDamage) magic3vsKiDamage = magic3Damage * (charaAny.m3VsWoodCached as number);
+        }
+      }
+      if (needReferenceDamage) {
+          fillTopTwoDamage(magic1Damage, magic2Damage, magic3Damage, topTwoScratch!);
+          const damageTop1 = topTwoScratch![0];
+          const damageTop2 = topTwoScratch![1];
+          if (useFullSum) {
+            deckReferenceDamage += damageTop1 + damageTop2;
+          } else if (useTopNStreamingFastPath) {
+            refDamageTotal += damageTop1 + damageTop2;
+            if (damageTop1 < refDamageMin1) {
+              refDamageMin2 = refDamageMin1;
+              refDamageMin1 = damageTop1;
+            } else if (damageTop1 < refDamageMin2) {
+              refDamageMin2 = damageTop1;
+            }
+            if (damageTop2 < refDamageMin1) {
+              refDamageMin2 = refDamageMin1;
+              refDamageMin1 = damageTop2;
+            } else if (damageTop2 < refDamageMin2) {
+              refDamageMin2 = damageTop2;
+            }
+          } else {
+            deckReferenceDamageList!.push(damageTop1, damageTop2);
+          }
+          if (includeDetails) {
+            damageList!.push(damageTop1 + damageTop2);
+          }
         }
 
-        if (name2DuoUsed[index]) {
-          magic2pow = "デュオ魔法";
-          deckDuo += 1;
+      if (needReferenceAdvantageDamage) {
+          fillTopTwoDamage(magic1AdvantageDamage, magic2AdvantageDamage, magic3AdvantageDamage, topTwoScratch!);
+          const advantageTop1 = topTwoScratch![0];
+          const advantageTop2 = topTwoScratch![1];
+          if (useFullSum) {
+            deckReferenceAdvantageDamage += advantageTop1 + advantageTop2;
+          } else if (useTopNStreamingFastPath) {
+            refAdvTotal += advantageTop1 + advantageTop2;
+            if (advantageTop1 < refAdvMin1) {
+              refAdvMin2 = refAdvMin1;
+              refAdvMin1 = advantageTop1;
+            } else if (advantageTop1 < refAdvMin2) {
+              refAdvMin2 = advantageTop1;
+            }
+            if (advantageTop2 < refAdvMin1) {
+              refAdvMin2 = refAdvMin1;
+              refAdvMin1 = advantageTop2;
+            } else if (advantageTop2 < refAdvMin2) {
+              refAdvMin2 = advantageTop2;
+            }
+          } else {
+            deckReferenceAdvantageDamageList!.push(advantageTop1, advantageTop2);
+          }
+          if (includeDetails) {
+            advantageDamageList!.push(advantageTop1 + advantageTop2);
+          }
         }
+
+      if (needReferenceVsHiDamage) {
+          fillTopTwoDamage(magic1vsHiDamage, magic2vsHiDamage, magic3vsHiDamage, topTwoScratch!);
+          const hiTop1 = topTwoScratch![0];
+          const hiTop2 = topTwoScratch![1];
+          if (useFullSum) {
+            deckReferenceVsHiDamage += hiTop1 + hiTop2;
+          } else if (useTopNStreamingFastPath) {
+            refHiTotal += hiTop1 + hiTop2;
+            if (hiTop1 < refHiMin1) {
+              refHiMin2 = refHiMin1;
+              refHiMin1 = hiTop1;
+            } else if (hiTop1 < refHiMin2) {
+              refHiMin2 = hiTop1;
+            }
+            if (hiTop2 < refHiMin1) {
+              refHiMin2 = refHiMin1;
+              refHiMin1 = hiTop2;
+            } else if (hiTop2 < refHiMin2) {
+              refHiMin2 = hiTop2;
+            }
+          } else {
+            deckReferenceVsHiDamageList!.push(hiTop1, hiTop2);
+          }
+          if (includeDetails) {
+            hiDamageList!.push(hiTop1 + hiTop2);
+          }
+        }
+
+      if (needReferenceVsMizuDamage) {
+          fillTopTwoDamage(magic1vsMizuDamage, magic2vsMizuDamage, magic3vsMizuDamage, topTwoScratch!);
+          const mizuTop1 = topTwoScratch![0];
+          const mizuTop2 = topTwoScratch![1];
+          if (useFullSum) {
+            deckReferenceVsMizuDamage += mizuTop1 + mizuTop2;
+          } else if (useTopNStreamingFastPath) {
+            refMizuTotal += mizuTop1 + mizuTop2;
+            if (mizuTop1 < refMizuMin1) {
+              refMizuMin2 = refMizuMin1;
+              refMizuMin1 = mizuTop1;
+            } else if (mizuTop1 < refMizuMin2) {
+              refMizuMin2 = mizuTop1;
+            }
+            if (mizuTop2 < refMizuMin1) {
+              refMizuMin2 = refMizuMin1;
+              refMizuMin1 = mizuTop2;
+            } else if (mizuTop2 < refMizuMin2) {
+              refMizuMin2 = mizuTop2;
+            }
+          } else {
+            deckReferenceVsMizuDamageList!.push(mizuTop1, mizuTop2);
+          }
+          if (includeDetails) {
+            mizuDamageList!.push(mizuTop1 + mizuTop2);
+          }
+        }
+
+      if (needReferenceVsKiDamage) {
+          fillTopTwoDamage(magic1vsKiDamage, magic2vsKiDamage, magic3vsKiDamage, topTwoScratch!);
+          const kiTop1 = topTwoScratch![0];
+          const kiTop2 = topTwoScratch![1];
+          if (useFullSum) {
+            deckReferenceVsKiDamage += kiTop1 + kiTop2;
+          } else if (useTopNStreamingFastPath) {
+            refKiTotal += kiTop1 + kiTop2;
+            if (kiTop1 < refKiMin1) {
+              refKiMin2 = refKiMin1;
+              refKiMin1 = kiTop1;
+            } else if (kiTop1 < refKiMin2) {
+              refKiMin2 = kiTop1;
+            }
+            if (kiTop2 < refKiMin1) {
+              refKiMin2 = refKiMin1;
+              refKiMin1 = kiTop2;
+            } else if (kiTop2 < refKiMin2) {
+              refKiMin2 = kiTop2;
+            }
+          } else {
+            deckReferenceVsKiDamageList!.push(kiTop1, kiTop2);
+          }
+          if (includeDetails) {
+            kiDamageList!.push(kiTop1 + kiTop2);
+          }
       }
     }
-    // 等倍ダメージ加算（使用可能なマジックのみ・etc→buffs[]の合算を使用）
-    // Opt-129: バフ合算を一度だけ取得
-    const totalsAll = (useM1 || useM2 || useM3) ? getMagicBuffTotalsAll(chara, useM3) : null;
-    const m1Totals = useM1 ? totalsAll![1] : { atkDelta: 0, dmgDelta: 0 };
-      const magic1Damage = useM1 ? calcDamageUsingEtcTotals(
-        chara.magic1pow,
-        chara.magic1atr,
-        chara.calcBaseATK,
-        atkBuddyRate,
-        m1Totals
-      ) : 0;
-    const m2Totals = useM2 ? totalsAll![2] : { atkDelta: 0, dmgDelta: 0 };
-      const magic2Damage = useM2 ? calcDamageUsingEtcTotals(
-        magic2pow,
-        chara.magic2atr,
-        chara.calcBaseATK,
-        atkBuddyRate,
-        m2Totals
-      ) : 0;
-    const m3Totals = useM3 ? totalsAll![3] : { atkDelta: 0, dmgDelta: 0 };
-      const magic3Damage = useM3 ? calcDamageUsingEtcTotals(
-        chara.magic3pow,
-        chara.magic3atr,
-        chara.calcBaseATK,
-        atkBuddyRate,
-        m3Totals
-      ) : 0;
-
-    // Opt-264: 属性相性の倍率を事前計算
-    let m1VsFire = 1;
-    let m1VsWater = 1;
-    let m1VsWood = 1;
-    if (useM1) {
-      switch (chara.magic1atr) {
-        case '火': m1VsWater = 0.5; m1VsWood = 1.5; break;
-        case '水': m1VsFire = 1.5; m1VsWood = 0.5; break;
-        case '木': m1VsFire = 0.5; m1VsWater = 1.5; break;
-      }
-    }
-    let m2VsFire = 1;
-    let m2VsWater = 1;
-    let m2VsWood = 1;
-    if (useM2) {
-      switch (chara.magic2atr) {
-        case '火': m2VsWater = 0.5; m2VsWood = 1.5; break;
-        case '水': m2VsFire = 1.5; m2VsWood = 0.5; break;
-        case '木': m2VsFire = 0.5; m2VsWater = 1.5; break;
-      }
-    }
-    let m3VsFire = 1;
-    let m3VsWater = 1;
-    let m3VsWood = 1;
-    if (useM3) {
-      switch (chara.magic3atr) {
-        case '火': m3VsWater = 0.5; m3VsWood = 1.5; break;
-        case '水': m3VsFire = 1.5; m3VsWood = 0.5; break;
-        case '木': m3VsFire = 0.5; m3VsWater = 1.5; break;
-      }
-    }
-
-    // 有利ダメージ
-      const magic1AdvantageDamage = useM1
-        ? (chara.magic1atr == "無" ? magic1Damage : magic1Damage * 1.5)
-        : 0;
-      const magic2AdvantageDamage = useM2
-        ? (chara.magic2atr == "無" ? magic2Damage : magic2Damage * 1.5)
-        : 0;
-      const magic3AdvantageDamage = useM3
-        ? (chara.magic3atr == "無" ? magic3Damage : magic3Damage * 1.5)
-        : 0;
-
-    // 対火ダメージ
-      const magic1vsHiDamage = useM1
-        ? magic1Damage * m1VsFire
-        : 0;
-      const magic2vsHiDamage = useM2
-        ? magic2Damage * m2VsFire
-        : 0;
-      const magic3vsHiDamage = useM3
-        ? magic3Damage * m3VsFire
-        : 0;
-    // 対水ダメージ
-      const magic1vsMizuDamage = useM1
-        ? magic1Damage * m1VsWater
-        : 0;
-      const magic2vsMizuDamage = useM2
-        ? magic2Damage * m2VsWater
-        : 0;
-      const magic3vsMizuDamage = useM3
-        ? magic3Damage * m3VsWater
-        : 0;
-    // 対木ダメージ
-      const magic1vsKiDamage = useM1
-        ? magic1Damage * m1VsWood
-        : 0;
-      const magic2vsKiDamage = useM2
-        ? magic2Damage * m2VsWood
-        : 0;
-      const magic3vsKiDamage = useM3
-        ? magic3Damage * m3VsWood
-        : 0;
-    fillTopTwoDamage(magic1Damage, magic2Damage, magic3Damage, topTwoScratch);
-    const damageTop1 = topTwoScratch[0];
-    const damageTop2 = topTwoScratch[1];
-    if (useFullSum) {
-      deckReferenceDamage += damageTop1 + damageTop2;
-    } else {
-      deckReferenceDamageList!.push(damageTop1, damageTop2);
-    }
-    if (includeDetails) {
-      damageList!.push(damageTop1 + damageTop2);
-    }
-
-    fillTopTwoDamage(magic1AdvantageDamage, magic2AdvantageDamage, magic3AdvantageDamage, topTwoScratch);
-    const advantageTop1 = topTwoScratch[0];
-    const advantageTop2 = topTwoScratch[1];
-    if (useFullSum) {
-      deckReferenceAdvantageDamage += advantageTop1 + advantageTop2;
-    } else {
-      deckReferenceAdvantageDamageList!.push(advantageTop1, advantageTop2);
-    }
-    if (includeDetails) {
-      advantageDamageList!.push(advantageTop1 + advantageTop2);
-    }
-
-    fillTopTwoDamage(magic1vsHiDamage, magic2vsHiDamage, magic3vsHiDamage, topTwoScratch);
-    const hiTop1 = topTwoScratch[0];
-    const hiTop2 = topTwoScratch[1];
-    if (useFullSum) {
-      deckReferenceVsHiDamage += hiTop1 + hiTop2;
-    } else {
-      deckReferenceVsHiDamageList!.push(hiTop1, hiTop2);
-    }
-    if (includeDetails) {
-      hiDamageList!.push(hiTop1 + hiTop2);
-    }
-
-    fillTopTwoDamage(magic1vsMizuDamage, magic2vsMizuDamage, magic3vsMizuDamage, topTwoScratch);
-    const mizuTop1 = topTwoScratch[0];
-    const mizuTop2 = topTwoScratch[1];
-    if (useFullSum) {
-      deckReferenceVsMizuDamage += mizuTop1 + mizuTop2;
-    } else {
-      deckReferenceVsMizuDamageList!.push(mizuTop1, mizuTop2);
-    }
-    if (includeDetails) {
-      mizuDamageList!.push(mizuTop1 + mizuTop2);
-    }
-
-    fillTopTwoDamage(magic1vsKiDamage, magic2vsKiDamage, magic3vsKiDamage, topTwoScratch);
-    const kiTop1 = topTwoScratch[0];
-    const kiTop2 = topTwoScratch[1];
-    if (useFullSum) {
-      deckReferenceVsKiDamage += kiTop1 + kiTop2;
-    } else {
-      deckReferenceVsKiDamageList!.push(kiTop1, kiTop2);
-    }
-    if (includeDetails) {
-      kiDamageList!.push(kiTop1 + kiTop2);
-    }
-  });
-
-  if (!useFullSum) {
-    deckReferenceDamage = deckReferenceDamageList!.sort((a, b) => b - a).slice(0, attackNumValue).reduce((acc, curr) => acc + curr, 0);
-    deckReferenceAdvantageDamage = deckReferenceAdvantageDamageList!.sort((a, b) => b - a).slice(0, attackNumValue).reduce((acc, curr) => acc + curr, 0);
-    deckReferenceVsHiDamage = deckReferenceVsHiDamageList!.sort((a, b) => b - a).slice(0, attackNumValue).reduce((acc, curr) => acc + curr, 0);
-    deckReferenceVsMizuDamage = deckReferenceVsMizuDamageList!.sort((a, b) => b - a).slice(0, attackNumValue).reduce((acc, curr) => acc + curr, 0);
-    deckReferenceVsKiDamage = deckReferenceVsKiDamageList!.sort((a, b) => b - a).slice(0, attackNumValue).reduce((acc, curr) => acc + curr, 0);
   }
 
+  if (needAnyDamageMetric && !useFullSum) {
+    if (useTopNStreamingFastPath) {
+      // 10打点のうち不要分（最小1件または2件）だけを引いて上位和を再構成する。
+      // attackNum=10: 全加算
+      // attackNum=9 : 最小1件を除外
+      // attackNum=8 : 最小2件を除外
+      if (attackNumValue >= 10) {
+        if (needReferenceDamage) deckReferenceDamage = refDamageTotal;
+        if (needReferenceAdvantageDamage) deckReferenceAdvantageDamage = refAdvTotal;
+        if (needReferenceVsHiDamage) deckReferenceVsHiDamage = refHiTotal;
+        if (needReferenceVsMizuDamage) deckReferenceVsMizuDamage = refMizuTotal;
+        if (needReferenceVsKiDamage) deckReferenceVsKiDamage = refKiTotal;
+      } else if (attackNumValue === 9) {
+        if (needReferenceDamage) deckReferenceDamage = refDamageTotal - refDamageMin1;
+        if (needReferenceAdvantageDamage) deckReferenceAdvantageDamage = refAdvTotal - refAdvMin1;
+        if (needReferenceVsHiDamage) deckReferenceVsHiDamage = refHiTotal - refHiMin1;
+        if (needReferenceVsMizuDamage) deckReferenceVsMizuDamage = refMizuTotal - refMizuMin1;
+        if (needReferenceVsKiDamage) deckReferenceVsKiDamage = refKiTotal - refKiMin1;
+      } else {
+        if (needReferenceDamage) deckReferenceDamage = refDamageTotal - refDamageMin1 - refDamageMin2;
+        if (needReferenceAdvantageDamage) deckReferenceAdvantageDamage = refAdvTotal - refAdvMin1 - refAdvMin2;
+        if (needReferenceVsHiDamage) deckReferenceVsHiDamage = refHiTotal - refHiMin1 - refHiMin2;
+        if (needReferenceVsMizuDamage) deckReferenceVsMizuDamage = refMizuTotal - refMizuMin1 - refMizuMin2;
+        if (needReferenceVsKiDamage) deckReferenceVsKiDamage = refKiTotal - refKiMin1 - refKiMin2;
+      }
+    } else {
+      if (needReferenceDamage) deckReferenceDamage = sumTopNByInsertion(deckReferenceDamageList!, attackNumValue);
+      if (needReferenceAdvantageDamage) deckReferenceAdvantageDamage = sumTopNByInsertion(deckReferenceAdvantageDamageList!, attackNumValue);
+      if (needReferenceVsHiDamage) deckReferenceVsHiDamage = sumTopNByInsertion(deckReferenceVsHiDamageList!, attackNumValue);
+      if (needReferenceVsMizuDamage) deckReferenceVsMizuDamage = sumTopNByInsertion(deckReferenceVsMizuDamageList!, attackNumValue);
+      if (needReferenceVsKiDamage) deckReferenceVsKiDamage = sumTopNByInsertion(deckReferenceVsKiDamageList!, attackNumValue);
+    }
+  }
+
+  if (!needIncreasedHPBuddy) {
+    deckMinIncreasedHPBuddy = 0;
+  }
+  const deckEHP = deckTotalHP + deckTotalHeal;
   if (deckTotalHP < snapshot.minHP) { return; }
-  if (deckTotalHP + deckTotalHeal < snapshot.minEHP) { return; }
+  if (deckEHP < snapshot.minEHP) { return; }
   if (deckTotalHPBuddy < snapshot.minHPBuddy) { return; }
   if (deckMinIncreasedHPBuddy < snapshot.minIncreasedHPBuddy) { return; }
   if (deckTotalEvasion < snapshot.minEvasion) { return; }
@@ -946,8 +1569,55 @@ export function calcDeckStatus(
     detailList!.push(mizuDamageList);
     detailList!.push(kiDamageList);
   }
+  if (!includeDeckMeta) {
+    if (!includeDetails) {
+      noMetaResultScratch[0] = deckTotalHP;
+      noMetaResultScratch[1] = deckEHP;
+      noMetaResultScratch[2] = deckTotalEvasion;
+      noMetaResultScratch[3] = deckTotalHPBuddy;
+      noMetaResultScratch[4] = deckMinIncreasedHPBuddy;
+      noMetaResultScratch[5] = deckTotalBuddy;
+      noMetaResultScratch[6] = deckNoHPBuddy;
+      noMetaResultScratch[7] = deckDuo;
+      noMetaResultScratch[8] = deckTotalBuff;
+      noMetaResultScratch[9] = deckTotalDebuff;
+      noMetaResultScratch[10] = deckCosmic;
+      noMetaResultScratch[11] = deckFire;
+      noMetaResultScratch[12] = deckWater;
+      noMetaResultScratch[13] = deckFlora;
+      noMetaResultScratch[14] = deckReferenceDamage;
+      noMetaResultScratch[15] = deckReferenceAdvantageDamage;
+      noMetaResultScratch[16] = deckReferenceVsHiDamage;
+      noMetaResultScratch[17] = deckReferenceVsMizuDamage;
+      noMetaResultScratch[18] = deckReferenceVsKiDamage;
+      noMetaResultScratch[19] = deckHealCards;
+      return noMetaResultScratch;
+    }
+    return [deckTotalHP
+      , deckEHP
+      , deckTotalEvasion
+      , deckTotalHPBuddy
+      , deckMinIncreasedHPBuddy
+      , deckTotalBuddy
+      , deckNoHPBuddy
+      , deckDuo
+      , deckTotalBuff
+      , deckTotalDebuff
+      , deckCosmic
+      , deckFire
+      , deckWater
+      , deckFlora
+      , deckReferenceDamage
+      , deckReferenceAdvantageDamage
+      , deckReferenceVsHiDamage
+      , deckReferenceVsMizuDamage
+      , deckReferenceVsKiDamage
+      , deckHealCards
+      , simuURL
+      , detailList ?? emptyDetailList];
+  }
   return [deckTotalHP
-    , deckTotalHP+deckTotalHeal
+    , deckEHP
     , deckTotalEvasion
     , deckTotalHPBuddy
     , deckMinIncreasedHPBuddy
@@ -966,50 +1636,285 @@ export function calcDeckStatus(
     , deckReferenceVsMizuDamage
     , deckReferenceVsKiDamage
     , deckHealCards
-    , ...deckList
+    , ...deckList!
     , simuURL
     , detailList ?? emptyDetailList];
-}
-function calcAttributeDamage(magicAtr: string, targetAtr: string, damage: number): number {
-  // Opt-46: 属性相性の判定を分岐に置換
-  if (magicAtr === '水') {
-    if (targetAtr === '火') return damage * 1.5;
-    if (targetAtr === '木') return damage * 0.5;
-  } else if (magicAtr === '木') {
-    if (targetAtr === '水') return damage * 1.5;
-    if (targetAtr === '火') return damage * 0.5;
-  } else if (magicAtr === '火') {
-    if (targetAtr === '木') return damage * 1.5;
-    if (targetAtr === '水') return damage * 0.5;
-  }
-  return damage;
 }
 interface SortCriterion {
   key: string;
   order: '昇順' | '降順'|'ASC' | 'DESC';
 }
+const sortKeyToRetIndex: Record<string, number> = {
+  hp: 0,
+  ehp: 1,
+  evasion: 2,
+  hpBuddy: 3,
+  increasedHpBuddy: 4,
+  buddy: 5,
+  noHpBuddy: 6,
+  duo: 7,
+  buff: 8,
+  debuff: 9,
+  maxCosmic: 10,
+  maxFire: 11,
+  maxWater: 12,
+  maxFlora: 13,
+  referenceDamage: 14,
+  referenceAdvantageDamage: 15,
+  referenceVsHiDamage: 16,
+  referenceVsMizuDamage: 17,
+  referenceVsKiDamage: 18,
+  healNum: 19,
+};
+
+const ATK_SORT_KEYS = new Set<string>([
+  'referenceDamage',
+  'referenceAdvantageDamage',
+  'referenceVsHiDamage',
+  'referenceVsMizuDamage',
+  'referenceVsKiDamage',
+]);
+
+const DAMAGE_SORT_KEYS = new Set<string>([
+  'referenceDamage',
+  'referenceAdvantageDamage',
+  'referenceVsHiDamage',
+  'referenceVsMizuDamage',
+  'referenceVsKiDamage',
+]);
+
+const AUX_SORT_KEYS = new Set<string>([
+  'hpBuddy',
+  'increasedHpBuddy',
+  'buddy',
+  'noHpBuddy',
+  'evasion',
+  'duo',
+  'buff',
+  'debuff',
+  'maxCosmic',
+  'maxFire',
+  'maxWater',
+  'maxFlora',
+  'healNum',
+]);
+
+const DAMAGE_SORT_KEY_TO_MASK: Record<string, number> = {
+  referenceDamage: DAMAGE_METRIC_REFERENCE,
+  referenceAdvantageDamage: DAMAGE_METRIC_ADVANTAGE,
+  referenceVsHiDamage: DAMAGE_METRIC_VS_HI,
+  referenceVsMizuDamage: DAMAGE_METRIC_VS_MIZU,
+  referenceVsKiDamage: DAMAGE_METRIC_VS_KI,
+};
+
+const AUX_SORT_KEY_TO_MASK: Record<string, number> = {
+  hpBuddy: AUX_METRIC_HP_BUDDY,
+  increasedHpBuddy: AUX_METRIC_INCREASED_HP_BUDDY,
+  buddy: AUX_METRIC_BUDDY,
+  noHpBuddy: AUX_METRIC_NO_HP_BUDDY,
+  evasion: AUX_METRIC_EVASION,
+  duo: AUX_METRIC_DUO,
+  buff: AUX_METRIC_BUFF,
+  debuff: AUX_METRIC_DEBUFF,
+  maxCosmic: AUX_METRIC_COSMIC,
+  maxFire: AUX_METRIC_FIRE,
+  maxWater: AUX_METRIC_WATER,
+  maxFlora: AUX_METRIC_FLORA,
+  healNum: AUX_METRIC_HEAL_NUM,
+};
 
 // Opt-154: 小さな階乗はテーブル参照
 const factorialTable = [1, 1, 2, 6, 24, 120];
 function factorialize(num:number) :number {
   return factorialTable[num] ?? 1;
 }
+
+function prepareCharacterSearchCache(chara: Character): void {
+  const charaAny = chara as any;
+  if (charaAny.charaId === undefined) {
+    charaAny.charaId = getCharaId(chara.chara);
+  }
+  if (charaAny.duoId === undefined) {
+    charaAny.duoId = chara.duo ? getCharaId(chara.duo) : -1;
+  }
+  const charaBit = getBitPairById(charaAny.charaId as number);
+  charaAny.charaBitLowCached = charaBit.low;
+  charaAny.charaBitHighCached = charaBit.high;
+  const useM1 = charaAny.hasM1 ?? true;
+  const useM2 = charaAny.hasM2 ?? true;
+  const useM3 = chara.rare === 'SSR' ? (charaAny.hasM3 ?? true) : false;
+  charaAny.useM1Cached = useM1;
+  charaAny.useM2Cached = useM2;
+  charaAny.useM3Cached = useM3;
+
+  const healRates = getMagicHealRates(chara);
+  const magic1Rates = useM1 ? healRates.m1 : emptyHealRates;
+  const magic2Rates = useM2 ? healRates.m2 : emptyHealRates;
+  const magic3Rates = useM3 ? healRates.m3 : emptyHealRates;
+  const hpHeal = (magic1Rates.heal + magic2Rates.heal + magic3Rates.heal) * chara.calcBaseATK;
+  const hpConHeal = (magic1Rates.conHeal + magic2Rates.conHeal + magic3Rates.conHeal) * chara.calcBaseHP;
+  charaAny.totalHealCached = hpHeal + hpConHeal;
+  charaAny.healCardCountCached =
+    (useM1 && isHealCard(chara.magic1heal) ? 1 : 0) +
+    (useM2 && isHealCard(chara.magic2heal) ? 1 : 0) +
+    (useM3 && isHealCard(chara.magic3heal) ? 1 : 0);
+
+  const buddy1Rates = getBuddyRates(chara.buddy1s);
+  const buddy2Rates = getBuddyRates(chara.buddy2s);
+  const buddy3Rates = getBuddyRates(chara.buddy3s);
+  charaAny.buddy1IdCached = chara.buddy1c ? getCharaId(chara.buddy1c) : -1;
+  charaAny.buddy2IdCached = chara.buddy2c ? getCharaId(chara.buddy2c) : -1;
+  charaAny.buddy3IdCached = chara.buddy3c ? getCharaId(chara.buddy3c) : -1;
+  const buddy1Bit = getBitPairById(charaAny.buddy1IdCached as number);
+  const buddy2Bit = getBitPairById(charaAny.buddy2IdCached as number);
+  const buddy3Bit = getBitPairById(charaAny.buddy3IdCached as number);
+  charaAny.buddy1BitLowCached = buddy1Bit.low;
+  charaAny.buddy1BitHighCached = buddy1Bit.high;
+  charaAny.buddy2BitLowCached = buddy2Bit.low;
+  charaAny.buddy2BitHighCached = buddy2Bit.high;
+  charaAny.buddy3BitLowCached = buddy3Bit.low;
+  charaAny.buddy3BitHighCached = buddy3Bit.high;
+  charaAny.buddy1HpRateCached = buddy1Rates.hp;
+  charaAny.buddy2HpRateCached = buddy2Rates.hp;
+  charaAny.buddy3HpRateCached = buddy3Rates.hp;
+  const baseHP = chara.calcBaseHP;
+  charaAny.buddy1HpIncreaseCached = baseHP * buddy1Rates.hp;
+  charaAny.buddy2HpIncreaseCached = baseHP * buddy2Rates.hp;
+  charaAny.buddy3HpIncreaseCached = baseHP * buddy3Rates.hp;
+  charaAny.buddy1AtkRateCached = buddy1Rates.atk;
+  charaAny.buddy2AtkRateCached = buddy2Rates.atk;
+  charaAny.buddy3AtkRateCached = buddy3Rates.atk;
+
+  const { buffByMagic, debuffByMagic } = getBuffDebuffCountsByMagic(chara);
+  charaAny.totalBuffCached =
+    (useM1 ? buffByMagic[1] : 0) +
+    (useM2 ? buffByMagic[2] : 0) +
+    (useM3 ? buffByMagic[3] : 0);
+  charaAny.totalDebuffCached =
+    (useM1 ? debuffByMagic[1] : 0) +
+    (useM2 ? debuffByMagic[2] : 0) +
+    (useM3 ? debuffByMagic[3] : 0);
+  let cosmic = 0;
+  let fire = 0;
+  let water = 0;
+  let flora = 0;
+  if (useM1) {
+    switch (chara.magic1atr) {
+      case '無': cosmic += 1; break;
+      case '火': fire += 1; break;
+      case '水': water += 1; break;
+      case '木': flora += 1; break;
+    }
+  }
+  if (useM2) {
+    switch (chara.magic2atr) {
+      case '無': cosmic += 1; break;
+      case '火': fire += 1; break;
+      case '水': water += 1; break;
+      case '木': flora += 1; break;
+    }
+  }
+  if (useM3) {
+    switch (chara.magic3atr) {
+      case '無': cosmic += 1; break;
+      case '火': fire += 1; break;
+      case '水': water += 1; break;
+      case '木': flora += 1; break;
+    }
+  }
+  if (cosmic > 2) cosmic = 2;
+  if (fire > 2) fire = 2;
+  if (water > 2) water = 2;
+  if (flora > 2) flora = 2;
+  charaAny.magicCosmicCountCached = cosmic;
+  charaAny.magicFireCountCached = fire;
+  charaAny.magicWaterCountCached = water;
+  charaAny.magicFloraCountCached = flora;
+
+  // ダメージ計算メタ:
+  // 探索中に毎回 `magicXpow` / `magicXatr` の文字列分岐を行うと重いため、
+  // 係数化できる情報をここで数値に変換してキャッシュしておく。
+  charaAny.m1BaseRateCached = getBaseRateFromPowAndAtr(chara.magic1pow, chara.magic1atr);
+  charaAny.m2BaseRateCached = getBaseRateFromPowAndAtr(chara.magic2pow, chara.magic2atr);
+  charaAny.m2DuoBaseRateCached = getBaseRateFromPowAndAtr('デュオ魔法', chara.magic2atr);
+  charaAny.magic2IsDuoBaseCached = chara.magic2pow === 'デュオ魔法';
+  charaAny.m3BaseRateCached = getBaseRateFromPowAndAtr(chara.magic3pow, chara.magic3atr);
+  charaAny.m1ComboRateCached = getComboRateFromPow(chara.magic1pow);
+  charaAny.m2ComboRateCached = getComboRateFromPow(chara.magic2pow);
+  charaAny.m2DuoComboRateCached = getComboRateFromPow('デュオ魔法');
+  charaAny.m3ComboRateCached = getComboRateFromPow(chara.magic3pow);
+  charaAny.m1AdvantageRateCached = chara.magic1atr === '無' ? 1 : 1.5;
+  charaAny.m2AdvantageRateCached = chara.magic2atr === '無' ? 1 : 1.5;
+  charaAny.m3AdvantageRateCached = chara.magic3atr === '無' ? 1 : 1.5;
+  const m1Vs = getVsRatesFromAtr(chara.magic1atr);
+  const m2Vs = getVsRatesFromAtr(chara.magic2atr);
+  const m3Vs = getVsRatesFromAtr(chara.magic3atr);
+  charaAny.m1VsFireCached = m1Vs.fire;
+  charaAny.m1VsWaterCached = m1Vs.water;
+  charaAny.m1VsWoodCached = m1Vs.wood;
+  charaAny.m2VsFireCached = m2Vs.fire;
+  charaAny.m2VsWaterCached = m2Vs.water;
+  charaAny.m2VsWoodCached = m2Vs.wood;
+  charaAny.m3VsFireCached = m3Vs.fire;
+  charaAny.m3VsWaterCached = m3Vs.water;
+  charaAny.m3VsWoodCached = m3Vs.wood;
+
+  const totalsAllowM3 = getMagicBuffTotalsAll(chara, true);
+  const totalsNoM3 = getMagicBuffTotalsAll(chara, false);
+  charaAny.magicBuffTotalsAllowM3Cached = totalsAllowM3;
+  charaAny.magicBuffTotalsNoM3Cached = totalsNoM3;
+  charaAny.magicBuffTotalsCached = useM3 ? totalsAllowM3 : totalsNoM3;
+
+  // ダメージ式を次の形に事前変換する:
+  //   damage = base + buddyRate * coeff
+  // これにより calcDeckStatus 側では「加算 + 乗算1回」中心になり、
+  // 同じ結果を保ったまま CPU コストを抑えられる。
+  const totals = charaAny.magicBuffTotalsCached as Array<{ atkDelta: number; dmgDelta: number }> | undefined;
+  const m1Totals = totals?.[1] ?? zeroMagicTotals;
+  const m2Totals = totals?.[2] ?? zeroMagicTotals;
+  const m3Totals = totals?.[3] ?? zeroMagicTotals;
+  const baseATK = chara.calcBaseATK;
+
+  const m1Rate = (charaAny.m1BaseRateCached as number) + m1Totals.dmgDelta;
+  const m1Common = baseATK * m1Rate * (charaAny.m1ComboRateCached as number);
+  charaAny.m1DamageBuddyCoeffCached = m1Common;
+  charaAny.m1DamageBaseCached = m1Common * (1 + m1Totals.atkDelta);
+
+  const m2Rate = (charaAny.m2BaseRateCached as number) + m2Totals.dmgDelta;
+  const m2Common = baseATK * m2Rate * (charaAny.m2ComboRateCached as number);
+  charaAny.m2DamageBuddyCoeffCached = m2Common;
+  charaAny.m2DamageBaseCached = m2Common * (1 + m2Totals.atkDelta);
+
+  const m2DuoRate = (charaAny.m2DuoBaseRateCached as number) + m2Totals.dmgDelta;
+  const m2DuoCommon = baseATK * m2DuoRate * (charaAny.m2DuoComboRateCached as number);
+  charaAny.m2DuoDamageBuddyCoeffCached = m2DuoCommon;
+  charaAny.m2DuoDamageBaseCached = m2DuoCommon * (1 + m2Totals.atkDelta);
+
+  const m3Rate = (charaAny.m3BaseRateCached as number) + m3Totals.dmgDelta;
+  const m3Common = baseATK * m3Rate * (charaAny.m3ComboRateCached as number);
+  charaAny.m3DamageBuddyCoeffCached = m3Common;
+  charaAny.m3DamageBaseCached = m3Common * (1 + m3Totals.atkDelta);
+}
+
 export async function calcDecks(t: (key: string) => string) {
-  for (const i of characters.value){
-    if (i.required && i.level == 0) {
+  const charactersValue = characters.value;
+  for (let i = 0; i < charactersValue.length; i++) {
+    const chara = charactersValue[i];
+    if (chara.required && chara.level == 0) {
       errorMessage.value = t('error.requiredCharacter');
       return
     }
   }
-  const nonZeroLevelCharacters = characters.value
+  const nonZeroLevelCharacters = charactersValue
     .filter(character => character.level > 0)
     .map(chara => ({
       ...chara,
       calcBaseHP: 0,
       calcBaseATK: 0
     }));
-  const maxLevelCharacters = characters.value
-    .filter(character => character.rare == 'SSR' && selectedSupportCharacters.value.includes(character.name))
+  const selectedSupportCharactersValue = selectedSupportCharacters.value;
+  const maxLevelCharacters = charactersValue
+    .filter(character => character.rare == 'SSR' && selectedSupportCharactersValue.includes(character.name))
     .map(chara => ({
       ...chara,
       level: 110,
@@ -1020,7 +1925,8 @@ export async function calcDecks(t: (key: string) => string) {
   const nonZero = nonZeroLevelCharacters;
   const maxLevel = maxLevelCharacters;
 
-  nonZero.forEach((chara) => {
+  for (let i = 0; i < nonZero.length; i++) {
+    const chara = nonZero[i];
     let maxLevel = 110;  // Default max level for SSR
     if (chara.rare == 'SR') {
       maxLevel = 90;     // Max level for SR
@@ -1034,12 +1940,19 @@ export async function calcDecks(t: (key: string) => string) {
     const leveldiff = maxLevel - chara.level;
     chara.calcBaseHP = chara.hp - HPperLv * leveldiff;
     chara.calcBaseATK = chara.atk - ATKperLv * leveldiff;
-  });
+  }
 
-  maxLevel.forEach((chara) => {
+  for (let i = 0; i < maxLevel.length; i++) {
+    const chara = maxLevel[i];
     chara.calcBaseHP = chara.hp;
     chara.calcBaseATK = chara.atk;
-  });
+  }
+  for (let i = 0; i < nonZero.length; i++) {
+    prepareCharacterSearchCache(nonZero[i]);
+  }
+  for (let i = 0; i < maxLevel.length; i++) {
+    prepareCharacterSearchCache(maxLevel[i]);
+  }
 
   const listLength = nonZero.length;
   if (listLength < 5) {
@@ -1053,15 +1966,16 @@ export async function calcDecks(t: (key: string) => string) {
   let nowResultsCount = 0;
   const availableSortProps = getAvailableSortProps(t);
   // Opt-101: ソート項目のインデックスを辞書化
-  const sortPropIndexMap = new Map<string, number>();
+  const sortPropIndexMap: Record<string, number> = Object.create(null);
   for (let i = 0; i < availableSortProps.length; i++) {
-    sortPropIndexMap.set(availableSortProps[i], i);
+    sortPropIndexMap[availableSortProps[i]] = i;
   }
   // Opt-102: sortOptions の参照をローカル化
   const sortOptionsValue = sortOptions.value;
   const sortCriteria: SortCriterion[] = [];
-  for (const key of sortOptionsValue) {
-    const idx = sortPropIndexMap.get(key.prop);
+  for (let i = 0; i < sortOptionsValue.length; i++) {
+    const key = sortOptionsValue[i];
+    const idx = sortPropIndexMap[key.prop];
     if (idx === undefined) continue;
     let order = '降順';
     switch (key.order) {
@@ -1088,18 +2002,16 @@ export async function calcDecks(t: (key: string) => string) {
   }
   
   async function appendResult(){
+    // 中間描画では上位N件のみを更新する。
+    // 全候補を配列化してから描画すると、探索より描画の方がボトルネックになりやすい。
     // 効率的な結果管理：既にソート済みの上位N件を取得
-    results.value = resultsManager.getTopDecks();
+    const topDecks = resultsManager.getTopDecks();
+    finalizeTopDecksForRender(topDecks);
+    results.value = topDecks;
     nowResults.value = nowResultsCount;
     await new Promise(requestAnimationFrame);
   }
-  const atkSortKey = new Set([
-    'referenceDamage',
-    'referenceAdvantageDamage',
-    'referenceVsHiDamage',
-    'referenceVsMizuDamage',
-    'referenceVsKiDamage']);
-  if (sortCriteria[0]['key'] in atkSortKey) {
+  if (ATK_SORT_KEYS.has(sortCriteria[0].key)) {
     // requiredがtrueの順、ATKの降順でソート
     nonZero.sort((a, b) => {
       if (a.required && !b.required) return -1;
@@ -1115,7 +2027,10 @@ export async function calcDecks(t: (key: string) => string) {
     });
   }
   // requiredがtrueの数を数える
-  const requiredCount = nonZero.filter(character => character.required).length;
+  let requiredCount = 0;
+  for (let i = 0; i < nonZero.length; i++) {
+    if (nonZero[i].required) requiredCount += 1;
+  }
   if (requiredCount > 5) {
     errorMessage.value = '必須設定されたキャラが多すぎます';
     return;
@@ -1123,8 +2038,12 @@ export async function calcDecks(t: (key: string) => string) {
   results.value = [];
   
   // 効率的な上位N件管理クラスを初期化
-  const resultsManager = new DeckSearchResultsManager(maxResult.value, sortCriteria);
+  const allowThresholdTieForConsider = false;
+  const resultsManager = new DeckSearchResultsManager(maxResult.value, sortCriteria, {
+    allowThresholdTieForConsider,
+  });
   const mustIds = Array.from(convertedMustCharacters.value).map(name => getCharaId(name as string));
+  const skipMustCheckForCalcDeckStatus = mustIds.length === 0;
 
   const fillDeckResultFromArray = (ret: (string | number)[], target: DeckResult) => {
     target.hp = Math.round(ret[0] as number);
@@ -1147,92 +2066,199 @@ export async function calcDecks(t: (key: string) => string) {
     target.referenceVsMizuDamage = ret[17] as number;
     target.referenceVsKiDamage = ret[18] as number;
     target.healNum = ret[19] as number;
-    target.chara1 = ret[20] as string;
-    target.chara2 = ret[21] as string;
-    target.chara3 = ret[22] as string;
-    target.chara4 = ret[23] as string;
-    target.chara5 = ret[24] as string;
   };
-  const processCombinationCore = (combination: Character[]) => {
-    const ret: (string | number)[] | undefined = calcDeckStatus(combination, { includeDetails: false, mustIds, snapshot });
+  const fillDeckResultCharacters = (combination: Character[], target: DeckResult) => {
+    target.chara1 = combination[0].imgUrl;
+    target.chara2 = combination[1].imgUrl;
+    target.chara3 = combination[2].imgUrl;
+    target.chara4 = combination[3].imgUrl;
+    target.chara5 = combination[4].imgUrl;
+  };
+  const sortCompareLen = sortCriteria.length;
+  const sortCompareRetIndices = new Int8Array(sortCompareLen);
+  const sortCompareKeys = new Array<string>(sortCompareLen);
+  for (let i = 0; i < sortCompareLen; i++) {
+    const key = sortCriteria[i].key;
+    sortCompareKeys[i] = key;
+    sortCompareRetIndices[i] = sortKeyToRetIndex[key] ?? 0;
+  }
+  const fillDeckResultSortValues = (ret: (string | number)[], target: DeckResult) => {
+    const targetAny = target as any;
+    for (let i = 0; i < sortCompareLen; i++) {
+      targetAny[sortCompareKeys[i]] = ret[sortCompareRetIndices[i]] as number;
+    }
+  };
+  const usesDamageInSort = sortCriteria.some(criteria => DAMAGE_SORT_KEYS.has(criteria.key));
+  const hasDamageThreshold =
+    snapshot.minReferenceDamage > 0 ||
+    snapshot.minReferenceAdvantageDamage > 0 ||
+    snapshot.minReferenceVsHiDamage > 0 ||
+    snapshot.minReferenceVsMizuDamage > 0 ||
+    snapshot.minReferenceVsKiDamage > 0;
+  const usesAuxInSort = sortCriteria.some(criteria => AUX_SORT_KEYS.has(criteria.key));
+  const hasAuxThreshold =
+    snapshot.minHPBuddy > 0 ||
+    snapshot.minIncreasedHPBuddy > 0 ||
+    snapshot.minEvasion > 0 ||
+    snapshot.minDuo > 0 ||
+    snapshot.minBuff > 0 ||
+    snapshot.minDebuff > 0 ||
+    snapshot.minCosmic > 0 ||
+    snapshot.minFire > 0 ||
+    snapshot.minWater > 0 ||
+    snapshot.minFlora > 0 ||
+    snapshot.minHealNum > 0;
+  // Primary pass で不要な指標は計算自体を省く。
+  // 「ソートにも閾値にも使わない値」はここで落とすのが最も効果的。
+  const skipDamageMetricsForPrimaryPass = !usesDamageInSort && !hasDamageThreshold;
+  const skipAuxMetricsForPrimaryPass = !usesAuxInSort && !hasAuxThreshold;
+  let damageMetricMaskForPrimaryPass = DAMAGE_METRIC_ALL;
+  if (skipDamageMetricsForPrimaryPass) {
+    damageMetricMaskForPrimaryPass = 0;
+  } else {
+    let mask = 0;
+    if (snapshot.minReferenceDamage > 0) mask |= DAMAGE_METRIC_REFERENCE;
+    if (snapshot.minReferenceAdvantageDamage > 0) mask |= DAMAGE_METRIC_ADVANTAGE;
+    if (snapshot.minReferenceVsHiDamage > 0) mask |= DAMAGE_METRIC_VS_HI;
+    if (snapshot.minReferenceVsMizuDamage > 0) mask |= DAMAGE_METRIC_VS_MIZU;
+    if (snapshot.minReferenceVsKiDamage > 0) mask |= DAMAGE_METRIC_VS_KI;
+    for (let i = 0; i < sortCriteria.length; i++) {
+      const bit = DAMAGE_SORT_KEY_TO_MASK[sortCriteria[i].key];
+      if (bit !== undefined) mask |= bit;
+    }
+    damageMetricMaskForPrimaryPass = mask === 0 ? DAMAGE_METRIC_ALL : mask;
+  }
+  let auxMetricMaskForPrimaryPass = AUX_METRIC_ALL;
+  if (skipAuxMetricsForPrimaryPass) {
+    auxMetricMaskForPrimaryPass = 0;
+  } else {
+    let mask = 0;
+    if (snapshot.minHPBuddy > 0) mask |= AUX_METRIC_HP_BUDDY;
+    if (snapshot.minIncreasedHPBuddy > 0) mask |= AUX_METRIC_INCREASED_HP_BUDDY;
+    if (snapshot.minEvasion > 0) mask |= AUX_METRIC_EVASION;
+    if (snapshot.minDuo > 0) mask |= AUX_METRIC_DUO;
+    if (snapshot.minBuff > 0) mask |= AUX_METRIC_BUFF;
+    if (snapshot.minDebuff > 0) mask |= AUX_METRIC_DEBUFF;
+    if (snapshot.minCosmic > 0) mask |= AUX_METRIC_COSMIC;
+    if (snapshot.minFire > 0) mask |= AUX_METRIC_FIRE;
+    if (snapshot.minWater > 0) mask |= AUX_METRIC_WATER;
+    if (snapshot.minFlora > 0) mask |= AUX_METRIC_FLORA;
+    if (snapshot.minHealNum > 0) mask |= AUX_METRIC_HEAL_NUM;
+    for (let i = 0; i < sortCriteria.length; i++) {
+      const bit = AUX_SORT_KEY_TO_MASK[sortCriteria[i].key];
+      if (bit !== undefined) mask |= bit;
+    }
+    auxMetricMaskForPrimaryPass = mask === 0 ? AUX_METRIC_ALL : mask;
+  }
+  const primarySortRetIndex = sortKeyToRetIndex[sortCriteria[0].key] ?? 0;
+
+  const combination: Character[] = new Array(5);
+  const primaryPassOptions = {
+    includeDetails: false,
+    includeDeckMeta: false,
+    skipDamageMetrics: skipDamageMetricsForPrimaryPass,
+    skipAuxMetrics: skipAuxMetricsForPrimaryPass,
+    skipMustCheck: skipMustCheckForCalcDeckStatus,
+    assumePreparedCache: true,
+    auxMetricMask: auxMetricMaskForPrimaryPass,
+    damageMetricMask: damageMetricMaskForPrimaryPass,
+    mustIds,
+    snapshot,
+  };
+  const detailPassOptions = {
+    includeDetails: true,
+    includeDeckMeta: false,
+    skipMustCheck: skipMustCheckForCalcDeckStatus,
+    assumePreparedCache: true,
+    mustIds,
+    snapshot,
+  };
+  const detailFinalizeCombinationScratch = new Array<Character>(5);
+  const finalizeTopDecksForRender = (topDecks: DeckResult[]) => {
+    // 二段階評価:
+    // 1st pass ではソートに必要な最小指標だけ計算して高速に絞る
+    // 2nd pass では「画面に出る上位N件のみ」detail/simuURL を生成する
+    // これにより出力品質を維持したまま総計算量を削減する。
+    for (let i = 0; i < topDecks.length; i++) {
+      const target = topDecks[i];
+      const targetAny = target as any;
+      const c0 = targetAny._combo0 as Character | undefined;
+      if (!c0) continue;
+      const combo = detailFinalizeCombinationScratch!;
+      combo[0] = c0;
+      combo[1] = targetAny._combo1 as Character;
+      combo[2] = targetAny._combo2 as Character;
+      combo[3] = targetAny._combo3 as Character;
+      combo[4] = targetAny._combo4 as Character;
+      const detailRet = calcDeckStatus(
+        combo,
+        detailPassOptions
+      );
+      if (!detailRet) continue;
+      const detailRetArray = detailRet as (string | number)[];
+      fillDeckResultFromArray(detailRetArray, target);
+      const detailLen = detailRetArray.length;
+      target.simuURL = detailRetArray[detailLen - 2] as string;
+      target.detailList = detailRetArray[detailLen - 1];
+      fillDeckResultCharacters(combo, target);
+      // 1度詳細化した deck は再計算対象から除外
+      // （中間レンダリングが複数回走っても、同一 deck の詳細を使い回す）
+      targetAny._combo0 = undefined;
+      targetAny._combo1 = undefined;
+      targetAny._combo2 = undefined;
+      targetAny._combo3 = undefined;
+      targetAny._combo4 = undefined;
+    }
+  };
+  const processCombinationCore = (currentCombination: Character[]) => {
+    // まず軽量計算で「上位Nに入る可能性」を判定し、
+    // 可能性がある候補だけを resultsManager に投入する。
+    const ret: (string | number)[] | undefined = calcDeckStatus(
+      currentCombination,
+      primaryPassOptions
+    );
     if (ret) {
-      const transformedRet: DeckResult = {
-        hp: 0,
-        ehp: 0,
-        evasion: 0,
-        hpBuddy: 0,
-        increasedHpBuddy: 0,
-        buddy: 0,
-        noHpBuddy: 0,
-        duo: 0,
-        buff: 0,
-        debuff: 0,
-        maxCosmic: 0,
-        maxFire: 0,
-        maxWater: 0,
-        maxFlora: 0,
-        referenceDamage: 0,
-        referenceAdvantageDamage: 0,
-        referenceVsHiDamage: 0,
-        referenceVsMizuDamage: 0,
-        referenceVsKiDamage: 0,
-        healNum: 0,
-        chara1: '',
-        chara2: '',
-        chara3: '',
-        chara4: '',
-        chara5: '',
-        simuURL: '',
-        detailList: emptyDetailList,
-      };
-      fillDeckResultFromArray(ret, transformedRet);
-      
-      // 効率的な上位N件管理：上位に入る場合のみ追加
+      const primaryScore = ret[primarySortRetIndex] as number;
+      if (!resultsManager.shouldConsider(primaryScore)) {
+        nowResultsCount += 1;
+        return;
+      }
+      const transformedRet = ({ simuURL: '', detailList: emptyDetailList } as DeckResult);
+      fillDeckResultSortValues(ret, transformedRet);
+
       const added = resultsManager.addDeck(transformedRet);
       if (added) {
-        // Opt-247: 詳細情報は上位に入ったデッキのみ再計算で付与
-        const detailRet = calcDeckStatus(combination, { includeDetails: true, mustIds, snapshot });
-        if (detailRet) {
-          transformedRet.simuURL = detailRet[25] as string;
-          transformedRet.detailList = detailRet[26];
-        }
+        const transformedRetAny = transformedRet as any;
+        transformedRetAny._combo0 = currentCombination[0];
+        transformedRetAny._combo1 = currentCombination[1];
+        transformedRetAny._combo2 = currentCombination[2];
+        transformedRetAny._combo3 = currentCombination[3];
+        transformedRetAny._combo4 = currentCombination[4];
       }
     }
     nowResultsCount += 1;
   };
 
-  const combination: Character[] = new Array(5);
-  const processCombination = (i: number, j: number, k: number, l: number, m: number) => {
-    combination[0] = nonZero[i];
-    combination[1] = nonZero[j];
-    combination[2] = nonZero[k];
-    combination[3] = nonZero[l];
-    combination[4] = nonZero[m];
-    processCombinationCore(combination);
-  };
-
-  const processCombinationWithSupport = (i: number, j: number, k: number, l: number, m: number) => {
-    combination[0] = nonZero[i];
-    combination[1] = nonZero[j];
-    combination[2] = nonZero[k];
-    combination[3] = nonZero[l];
-    combination[4] = maxLevel[m];
-    processCombinationCore(combination);
-  };
-
-  const lengthes: number[] = new Array(5).fill(listLength);
+  const lengthes: number[] = [listLength, listLength, listLength, listLength, listLength];
   for(let i = 0; i < requiredCount; i++) {
     lengthes[i] = i+1;
   }
   // 同キャラ編成有り
   if (allowSameCharacter.value) {
     let lastRenderTime = Date.now();
-    
+    let lastAppendedResultsCount = 0;
+    let renderCheckCounter = 0;
+    let searchCheckCounter = 0;
     const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
     totalResults.value = beforeLastLoops*(maxLevel.length)/factorialize(4-requiredCount);
     if (requiredCount == 5) {
       totalResults.value = 1;
-      processCombination(0, 1, 2, 3, 4);
+      combination[0] = nonZero[0];
+      combination[1] = nonZero[1];
+      combination[2] = nonZero[2];
+      combination[3] = nonZero[3];
+      combination[4] = nonZero[4];
+      processCombinationCore(combination);
       nowResults.value = nowResultsCount;
       await new Promise(requestAnimationFrame);
       return
@@ -1241,17 +2267,39 @@ export async function calcDecks(t: (key: string) => string) {
     for (let i = 0; i < lengthes[0]; i++) {
       for (let j = i + 1; j < lengthes[1]; j++) {
         for (let k = j + 1; k < lengthes[2]; k++) {
-          if (!isSearching.value) {
-            nowResults.value = nowResultsCount;
-            return;
+          searchCheckCounter += 1;
+          if ((searchCheckCounter & SEARCH_CHECK_MASK) === 0) {
+            if (!isSearching.value) {
+              nowResults.value = nowResultsCount;
+              return;
+            }
           }
           for (let l = k + 1; l < lengthes[3]; l++) {
+            combination[0] = nonZero[i];
+            combination[1] = nonZero[j];
+            combination[2] = nonZero[k];
+            combination[3] = nonZero[l];
             for (let m = 0; m < maxLevel.length; m++) {
-              processCombinationWithSupport(i, j, k, l, m);
+              combination[4] = maxLevel[m];
+              processCombinationCore(combination);
 
-              if (Date.now() - lastRenderTime > 2000) {
-                lastRenderTime = Date.now();
-                await appendResult();
+              if (APPEND_INTERMEDIATE_RESULTS) {
+                renderCheckCounter += 1;
+                // 描画判定は回数+時間の2段ゲートで間引く。
+                // 目的: 探索中の体感更新を維持しつつ、描画負荷で探索速度を落とさない。
+                if (RENDER_CHECK_MASK === 0 || (renderCheckCounter & RENDER_CHECK_MASK) === 0) {
+                  const now = Date.now();
+                  if (now - lastRenderTime > RENDER_UPDATE_INTERVAL_MS) {
+                    if (
+                      APPEND_MIN_RESULT_DELTA === 0 ||
+                      nowResultsCount - lastAppendedResultsCount >= APPEND_MIN_RESULT_DELTA
+                    ) {
+                      lastRenderTime = now;
+                      lastAppendedResultsCount = nowResultsCount;
+                      await appendResult();
+                    }
+                  }
+                }
               }
             }
           }
@@ -1263,28 +2311,55 @@ export async function calcDecks(t: (key: string) => string) {
     totalResults.value = (beforeLastLoops*(lengthes[4]-4)/factorialize(5-requiredCount));
     if (requiredCount == 5) {
       totalResults.value = 1;
-      processCombination(0, 1, 2, 3, 4);
+      combination[0] = nonZero[0];
+      combination[1] = nonZero[1];
+      combination[2] = nonZero[2];
+      combination[3] = nonZero[3];
+      combination[4] = nonZero[4];
+      processCombinationCore(combination);
       nowResults.value = nowResultsCount;
       await new Promise(requestAnimationFrame);
       return
     }
     let lastRenderTime = Date.now();
+    let lastAppendedResultsCount = 0;
+    let renderCheckCounter = 0;
+    let searchCheckCounter = 0;
 
     for (let i = 0; i < lengthes[0]; i++) {
       for (let j = i + 1; j < lengthes[1]; j++) {
         for (let k = j + 1; k < lengthes[2]; k++) {
-          if (!isSearching.value) {
-            nowResults.value = nowResultsCount;
-            return;
+          searchCheckCounter += 1;
+          if ((searchCheckCounter & SEARCH_CHECK_MASK) === 0) {
+            if (!isSearching.value) {
+              nowResults.value = nowResultsCount;
+              return;
+            }
           }
           for (let l = k + 1; l < lengthes[3]; l++) {
+            combination[0] = nonZero[i];
+            combination[1] = nonZero[j];
+            combination[2] = nonZero[k];
+            combination[3] = nonZero[l];
             for (let m = l + 1; m < lengthes[4]; m++) {
-              processCombination(i, j, k, l, m);
+              combination[4] = nonZero[m];
+              processCombinationCore(combination);
 
-              // 1秒に1回だけ描画を更新
-              if (Date.now() - lastRenderTime > 2000) {
-                lastRenderTime = Date.now();
-                await appendResult();
+              if (APPEND_INTERMEDIATE_RESULTS) {
+                renderCheckCounter += 1;
+                if (RENDER_CHECK_MASK === 0 || (renderCheckCounter & RENDER_CHECK_MASK) === 0) {
+                  const now = Date.now();
+                  if (now - lastRenderTime > RENDER_UPDATE_INTERVAL_MS) {
+                    if (
+                      APPEND_MIN_RESULT_DELTA === 0 ||
+                      nowResultsCount - lastAppendedResultsCount >= APPEND_MIN_RESULT_DELTA
+                    ) {
+                      lastRenderTime = now;
+                      lastAppendedResultsCount = nowResultsCount;
+                      await appendResult();
+                    }
+                  }
+                }
               }
             }
           }
@@ -1293,8 +2368,9 @@ export async function calcDecks(t: (key: string) => string) {
     }
   }
   nowResults.value = nowResultsCount;
-  // 最終結果を取得（既にソート済み）
-  results.value = resultsManager.getTopDecks();
+  const topDecks = resultsManager.getTopDecks();
+  finalizeTopDecksForRender(topDecks);
+  results.value = topDecks;
   
 }
 
@@ -1450,3 +2526,4 @@ export function createCharacterInfoMap(
 
   return infoMap;
 }
+

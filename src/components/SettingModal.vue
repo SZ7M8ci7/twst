@@ -23,7 +23,7 @@
     <v-card-title>{{ $t('settingModal.sortSettings') }}</v-card-title>
       <v-card-text class="ma-0 pa-0">
         <div v-for="(option, index) in sortOptions" :key="index" class="ma-0 pa-0 sort-option">
-          <span class="sort-rank">{{ index + 1 }}.</span>
+          <span class="sort-rank">{{ toDisplayIndex(index) }}.</span>
           <v-select
             v-model="option.prop"
             :items="availableSortProps"
@@ -299,7 +299,7 @@
       <v-card-title>{{ $t('settingModal.mustCharacter') }}</v-card-title>
       <v-card-text class="ma-0 pa-0">
         <div v-for="(option, index) in mustCharacters" :key="index" class="ma-0 pa-0 sort-option">
-          <span class="sort-rank">{{ index + 1 }}.</span>
+          <span class="sort-rank">{{ toDisplayIndex(index) }}.</span>
           <v-select
             v-model="option.prop"
             :items="availableCharacterProps"
@@ -340,176 +340,15 @@ import { cloneDeep } from 'lodash';
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 import { enName2jpName, getAvailableCharacterProps, getAvailableSortProps } from '@/components/common'
+import { SEARCH_PRESET_CONFIGURATIONS as PRESET_CONFIGURATIONS, type SearchPreset } from '@/constants/searchPresets';
 
 interface SortOption {
   prop: string;
   order: string;
 }
-
-// プリセットデータ構造
-interface SearchPreset {
-  name: string;
-  sortOptions: SortOption[];
-  minSettings: {
-    minEHP?: number;
-    minHP?: number;
-    minHPBuddy?: number;
-    minIncreasedHPBuddy?: number;
-    minEvasion?: number;
-    minDuo?: number;
-    minBuff?: number;
-    minDebuff?: number;
-    minCosmic?: number;
-    minFire?: number;
-    minWater?: number;
-    minFlora?: number;
-    minReferenceDamage?: number;
-    minReferenceAdvantageDamage?: number;
-    minReferenceVsHiDamage?: number;
-    minReferenceVsMizuDamage?: number;
-    minReferenceVsKiDamage?: number;
-  };
-  attackNum?: number;
-  allowSameCharacter?: boolean;
+interface MustCharacterOption {
+  prop: string;
 }
-
-// 事前定義プリセット
-const PRESET_CONFIGURATIONS: SearchPreset[] = [
-  {
-    name: 'settingModal.preset.fireBasicExam',
-    sortOptions: [{ prop: 'comments.duo', order: 'settingModal.desc'},
-                  { prop: 'comments.damageAgainstFire', order: 'settingModal.desc'}],
-    minSettings: {
-      minWater: 3,
-      minReferenceVsHiDamage: 100000
-    },
-    attackNum: 8
-  },
-  {
-    name: 'settingModal.preset.waterBasicExam',
-    sortOptions: [{ prop: 'comments.duo', order: 'settingModal.desc'},
-                  { prop: 'comments.damageAgainstWater', order: 'settingModal.desc'}],
-    minSettings: {
-      minFlora: 3,
-      minReferenceVsMizuDamage: 100000
-    },
-    attackNum: 8
-  },
-  {
-    name: 'settingModal.preset.floraBasicExam',
-    sortOptions: [{ prop: 'comments.duo', order: 'settingModal.desc'},
-                  { prop: 'comments.damageAgainstFlora', order: 'settingModal.desc'}],
-    minSettings: {
-      minFire: 3,
-      minReferenceVsKiDamage: 100000
-    },
-    attackNum: 8
-  },
-  {
-    name: 'settingModal.preset.allBasicExam',
-    sortOptions: [{ prop: 'comments.duo', order: 'settingModal.desc'},
-                  { prop: 'comments.advantageDamage', order: 'settingModal.desc'}],
-    minSettings: {
-      minReferenceAdvantageDamage: 90000
-    },
-    attackNum: 8
-  },
-  {
-    name: 'settingModal.preset.neutralBasicExam',
-    sortOptions: [{ prop: 'comments.duo', order: 'settingModal.desc'},
-                  { prop: 'comments.neutralDamage', order: 'settingModal.desc'}],
-    minSettings: {
-      minReferenceDamage: 90000
-    },
-    attackNum: 8
-  },
-  {
-    name: 'settingModal.preset.fireDefenseExam',
-    sortOptions: [{ prop: 'comments.effectiveHP', order: 'settingModal.desc' }],
-    minSettings: {
-      minWater: 6,
-      minReferenceVsHiDamage: 100000
-    },
-    attackNum: 9
-  },
-  {
-    name: 'settingModal.preset.waterDefenseExam',
-    sortOptions: [{ prop: 'comments.effectiveHP', order: 'settingModal.desc' }],
-    minSettings: {
-      minFlora: 6,
-      minReferenceVsMizuDamage: 100000
-    },
-    attackNum: 9
-  },
-  {
-    name: 'settingModal.preset.floraDefenseExam',
-    sortOptions: [{ prop: 'comments.effectiveHP', order: 'settingModal.desc' }],
-    minSettings: {
-      minFire: 6,
-      minReferenceVsKiDamage: 100000
-    },
-    attackNum: 9
-  },
-  {
-    name: 'settingModal.preset.allDefenseExam',
-    sortOptions: [{ prop: 'comments.effectiveHP', order: 'settingModal.desc' }],
-    minSettings: {
-      minReferenceAdvantageDamage: 100000
-    },
-    attackNum: 9
-  },
-  {
-    name: 'settingModal.preset.neutralDefenseExam',
-    sortOptions: [{ prop: 'comments.effectiveHP', order: 'settingModal.desc' }],
-    minSettings: {
-      minReferenceDamage: 90000
-    },
-    attackNum: 9
-  },
-  {
-    name: 'settingModal.preset.fireAttackExam',
-    sortOptions: [{ prop: 'comments.damageAgainstFire', order: 'settingModal.desc' }],
-    minSettings: {
-      minWater: 6,
-    },
-    attackNum: 10
-  },
-  {
-    name: 'settingModal.preset.waterAttackExam',
-    sortOptions: [{ prop: 'comments.damageAgainstWater', order: 'settingModal.desc' }],
-    minSettings: {
-      minFlora: 6,
-    },
-    attackNum: 10
-  },
-  {
-    name: 'settingModal.preset.floraAttackExam',
-    sortOptions: [{ prop: 'comments.damageAgainstFlora', order: 'settingModal.desc' }],
-    minSettings: {
-      minFire: 6,
-    },
-    attackNum: 10
-  },
-  {
-    name: 'settingModal.preset.allAttackExam',
-    sortOptions: [{ prop: 'comments.advantageDamage', order: 'settingModal.desc' }],
-    minSettings: {},
-    attackNum: 10
-  },
-  {
-    name: 'settingModal.preset.neutralAttackExam',
-    sortOptions: [{ prop: 'comments.neutralDamage', order: 'settingModal.desc' }],
-    minSettings: {},
-    attackNum: 10
-  },
-  {
-    name: 'settingModal.preset.practicalClass',
-    sortOptions: [{ prop: 'comments.increasedHPBuddy', order: 'settingModal.desc' },
-                  { prop: 'comments.effectiveHP', order: 'settingModal.desc' }],
-    minSettings: {},
-    attackNum: 10
-  },
-];
 
 const searchSettingsStore = useSearchSettingsStore();
 const minEHP = ref(searchSettingsStore.minEHP);
@@ -532,24 +371,24 @@ const minReferenceVsMizuDamage = ref(searchSettingsStore.minReferenceVsMizuDamag
 const minReferenceVsKiDamage = ref(searchSettingsStore.minReferenceVsKiDamage);
 const maxResult = ref(searchSettingsStore.maxResult)
 const attackNum = ref(searchSettingsStore.attackNum)
-let initialSortOptions: any = undefined;
-let sortOptions = ref();
-let initialMustCharacters: any = undefined;
-let mustCharacters = ref([] as any);
+let initialSortOptions: SortOption[] = [];
+const sortOptions = ref<SortOption[]>([]);
+let initialMustCharacters: MustCharacterOption[] = [];
+const mustCharacters = ref<MustCharacterOption[]>([]);
 
 const availableSortProps = getAvailableSortProps(t);
 const availableCharacterProps = getAvailableCharacterProps(t);
 onBeforeMount(()=>{
   // sortOptionsの初期状態を保持するためのリアクティブな参照
-  initialSortOptions = cloneDeep(searchSettingsStore.sortOptions);
+  initialSortOptions = cloneDeep(searchSettingsStore.sortOptions ?? []);
   // ユーザーによる変更を保持するためのリアクティブな参照
-  sortOptions = ref(cloneDeep(initialSortOptions).map((option: SortOption) => ({
+  sortOptions.value = cloneDeep(initialSortOptions).map((option: SortOption) => ({
     ...option,
     prop: t(option.prop),
     order: t(option.order)
-  })));
-  initialMustCharacters = cloneDeep(searchSettingsStore.mustCharacters);
-  mustCharacters = ref(cloneDeep(initialMustCharacters));
+  }));
+  initialMustCharacters = cloneDeep(searchSettingsStore.mustCharacters ?? []);
+  mustCharacters.value = cloneDeep(initialMustCharacters);
 })
 
 const allowSameCharacter = ref(searchSettingsStore.allowSameCharacter);
@@ -636,11 +475,11 @@ function addSortOption() {
 function addCharacterOption() {
   mustCharacters.value.push({ prop: ''});
 }
-function removeSortOption(index:number) {
-  sortOptions.value.splice(index, 1);
+function removeSortOption(index: string | number) {
+  sortOptions.value.splice(Number(index), 1);
 }
-function removeCharacterOption(index:number) {
-  mustCharacters.value.splice(index, 1);
+function removeCharacterOption(index: string | number) {
+  mustCharacters.value.splice(Number(index), 1);
 }
 const emit = defineEmits(['close']);
 
@@ -711,6 +550,10 @@ function cancel() {
   searchSettingsStore.sortOptions = [...initialSortOptions]; 
   emit('close'); // モーダルを閉じる
 }
+
+function toDisplayIndex(index: string | number): number {
+  return Number(index) + 1;
+}
 </script>
 <style scoped>
 .character-list > .character-item {
@@ -751,7 +594,7 @@ function cancel() {
 .min-label {
   min-width: 120px;
 }
-::v-deep .v-card-text {
+:deep(.v-card-text) {
   padding: 5px;
 }
 .add-button-container {

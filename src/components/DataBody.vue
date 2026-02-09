@@ -217,12 +217,12 @@ onBeforeMount(() => {
   padding: 0;
   margin: 0;
 }
-.v-data-table ::v-deep tbody tr td {
+.v-data-table :deep(tbody tr td) {
   white-space: nowrap;
   border-left: 1px solid #ddd;
   border-right: 1px solid #ddd;
 }
-.v-data-table ::v-deep thead th {
+.v-data-table :deep(thead th) {
   white-space: nowrap;
   border-left: 1px solid #ddd;
   border-right: 1px solid #ddd;

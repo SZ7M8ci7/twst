@@ -4,21 +4,26 @@ export class TopNResultsManager<T> {
   private results: T[] = [];
   private readonly maxSize: number;
   private readonly compareFunc: (a: T, b: T) => number;
+  // 現在の上位N件に入るための一次判定境界値。
+  // 降順なら「これより大きければ候補」、昇順なら「これより小さければ候補」。
   private thresholdScore: number;
   private readonly getScore: (item: T) => number;
   private readonly isDescending: boolean; // 降順かどうか
+  private readonly allowThresholdTieForConsider: boolean;
   private isSorted: boolean = true; // Opt-31: ソート済みフラグで再ソートを抑制
 
   constructor(
     maxSize: number, 
     compareFunc: (a: T, b: T) => number,
     getScore: (item: T) => number,
-    isDescending: boolean = true // デフォルトは降順（大きい値が良い）
+    isDescending: boolean = true, // デフォルトは降順（大きい値が良い）
+    allowThresholdTieForConsider: boolean = true
   ) {
     this.maxSize = maxSize;
     this.compareFunc = compareFunc;
     this.getScore = getScore;
     this.isDescending = isDescending;
+    this.allowThresholdTieForConsider = allowThresholdTieForConsider;
     // 昇順と降順で初期値を変える
     this.thresholdScore = isDescending ? -Infinity : Infinity;
   }
@@ -47,7 +52,9 @@ export class TopNResultsManager<T> {
       return true;
     }
 
-    // 上位N件に入るかどうかの判定（昇順と降順で条件が異なる）
+    // まず第一ソート値だけで粗く足切りする。
+    // ここで落とすことで、比較関数の多段比較や挿入処理を最小化する。
+    // （同値の扱いは canPossiblyAddScore 側で制御）
     const shouldAdd = this.isDescending 
       ? score > this.thresholdScore  // 降順：より大きい値が良い
       : score < this.thresholdScore; // 昇順：より小さい値が良い
@@ -56,12 +63,19 @@ export class TopNResultsManager<T> {
       return false;
     }
 
-    // 二分探索で挿入位置を特定
-    const insertIndex = this.findInsertIndex(item);
-    
-    // 挿入して末尾を削除
-    results.splice(insertIndex, 0, item);
-    results.pop();
+    let insertIndex = 0;
+    if (this.compareFunc(item, results[0]) < 0) {
+      insertIndex = 0;
+    } else {
+      insertIndex = this.findInsertIndex(item, results);
+    }
+
+    // splice は配列再確保/境界チェックのコストが高くなりやすいため、
+    // 固定長運用では手動シフトで入れ替える。
+    for (let i = this.maxSize - 1; i > insertIndex; i--) {
+      results[i] = results[i - 1];
+    }
+    results[insertIndex] = item;
     this.isSorted = true;
     
     // 新しい閾値スコアを更新
@@ -71,16 +85,32 @@ export class TopNResultsManager<T> {
   }
 
   /**
+   * 第一ソート値だけで「追加の可能性があるか」を判定する。
+   * 同値は二次キーで逆転し得るため許可する。
+   */
+  canPossiblyAddScore(score: number): boolean {
+    if (this.results.length < this.maxSize) {
+      return true;
+    }
+    // 複数キーソートでは、第一キーが同値でも第二キー以下で順位が逆転する。
+    // そのため「同値を候補に残すか」を外から切り替え可能にしている。
+    if (this.allowThresholdTieForConsider) {
+      return this.isDescending ? score >= this.thresholdScore : score <= this.thresholdScore;
+    }
+    return this.isDescending ? score > this.thresholdScore : score < this.thresholdScore;
+  }
+
+  /**
    * 二分探索で挿入位置を特定
    */
-  private findInsertIndex(item: T): number {
+  private findInsertIndex(item: T, results: T[]): number {
     let left = 0;
-    let right = this.results.length;
+    let right = results.length;
 
     while (left < right) {
-      const mid = Math.floor((left + right) / 2);
+      const mid = (left + right) >>> 1;
       // compareFunc(a, b) > 0 means a should come after b in the sorted order
-      if (this.compareFunc(item, this.results[mid]) < 0) {
+      if (this.compareFunc(item, results[mid]) < 0) {
         right = mid;
       } else {
         left = mid + 1;
@@ -94,7 +124,8 @@ export class TopNResultsManager<T> {
    * 現在の結果を取得
    */
   getResults(): T[] {
-    // Opt-31: 未ソート時のみソートして返す
+    // 追加時に毎回 sort しない代わりに、参照時に必要な時だけ sort する。
+    // 探索中に addResult が大量に呼ばれるケースで効果が大きい。
     if (!this.isSorted) {
       this.results.sort(this.compareFunc);
       this.isSorted = true;
@@ -163,30 +194,49 @@ export interface DeckResult {
 export class DeckSearchResultsManager {
   private manager: TopNResultsManager<DeckResult>;
   
-  constructor(maxResults: number, sortCriteria: Array<{key: string, order: string}>) {
-    // 複数ソート条件に対応した比較関数
+  constructor(
+    maxResults: number,
+    sortCriteria: Array<{key: string, order: string}>,
+    options?: { allowThresholdTieForConsider?: boolean }
+  ) {
+    const sortLen = sortCriteria.length;
+    const sortKeys = new Array<string>(sortLen);
+    const sortDirs = new Int8Array(sortLen);
+    for (let i = 0; i < sortLen; i++) {
+      sortKeys[i] = sortCriteria[i].key;
+      sortDirs[i] = sortCriteria[i].order === '昇順' ? 1 : -1;
+    }
+    const primarySortKey = sortKeys[0];
+    const isDescending = sortDirs[0] === -1;
+    // 複数ソート条件に対応した比較関数。
+    // 各キーを順に比較し、差が出た時点で確定する（一般的な辞書順比較）。
     const compareFunc = (a: DeckResult, b: DeckResult): number => {
-      for (const criteria of sortCriteria) {
-        const aValue = (a as any)[criteria.key];
-        const bValue = (b as any)[criteria.key];
-        
+      for (let i = 0; i < sortLen; i++) {
+        const key = sortKeys[i];
+        const aValue = (a as any)[key];
+        const bValue = (b as any)[key];
+
         if (aValue === bValue) continue;
-        
+
         const comparison = aValue < bValue ? -1 : 1;
-        return criteria.order === '昇順' ? comparison : -comparison;
+        return comparison * sortDirs[i];
       }
       return 0;
     };
 
-    // 第一ソート基準のスコア取得関数
+    // TopNResultsManager 側の閾値判定に使う一次キー値を抽出。
+    // 二次キー以降の厳密順序は compareFunc が担保する。
     const getScore = (item: DeckResult): number => {
-      return (item as any)[sortCriteria[0].key];
+      return (item as any)[primarySortKey];
     };
 
-    // 第一ソート基準が降順かどうかを判定
-    const isDescending = sortCriteria[0].order === '降順';
-
-    this.manager = new TopNResultsManager(maxResults, compareFunc, getScore, isDescending);
+    this.manager = new TopNResultsManager(
+      maxResults,
+      compareFunc,
+      getScore,
+      isDescending,
+      options?.allowThresholdTieForConsider ?? true
+    );
   }
 
   /**
@@ -196,6 +246,10 @@ export class DeckSearchResultsManager {
    */
   addDeck(deck: DeckResult): boolean {
     return this.manager.addResult(deck);
+  }
+
+  shouldConsider(primaryScore: number): boolean {
+    return this.manager.canPossiblyAddScore(primaryScore);
   }
 
   /**

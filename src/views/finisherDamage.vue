@@ -535,7 +535,15 @@ function calculateDamage() {
       }
     } else {
       // 手持ち設定OFFの場合、フルステータスを使用
-      characterAtk = Number(character.originalMaxATK) || Number(character.max_atk) || Number(character.atk) || 0;
+      const legacyAtkCharacter = character as typeof character & {
+        originalMaxATK?: number | string;
+        max_atk?: number | string;
+      };
+      characterAtk =
+        Number(legacyAtkCharacter.originalMaxATK) ||
+        Number(legacyAtkCharacter.max_atk) ||
+        Number(character.atk) ||
+        0;
     }
 
     // 所持していないカードは計算をスキップ

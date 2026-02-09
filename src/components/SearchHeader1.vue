@@ -54,13 +54,11 @@ import ErrorModal from "@/components/ErrorModal.vue";
 import { storeToRefs } from "pinia";
 import { calcDecks } from "./common";
 import { useSearchResultStore } from '@/store/searchResult';
-import { useCharacterStore } from '@/store/characters';
 import { useLevelStore } from "@/store/app";
 import { event } from 'vue-gtag'
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 
-const characterStore = useCharacterStore();
 const levelStore = useLevelStore();
 
 const searchResultStore = useSearchResultStore();

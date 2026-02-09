@@ -185,7 +185,7 @@ function createChart() {
               const value = Math.ceil(context.parsed.y);
               return `${label}: ${value}`;
             },
-            title: function(context) {
+            title: function() {
               return ''; // タイトルを空にして数字を表示しない
             },
             afterBody: function(context) {

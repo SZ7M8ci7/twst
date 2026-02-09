@@ -12,7 +12,7 @@
                 <div class="fukidashi">
                   <div>{{ $t('resultBody.healDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[0]" :key="index">
-                    {{ index + 1 }}: {{ Math.round(detail) }}
+                    {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
                   </div>
                 </div>
               </div>
@@ -36,7 +36,7 @@
                 <div class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[1]" :key="index">
-                    {{ index + 1 }}: {{ Math.round(detail) }}
+                    {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
                   </div>
                 </div>
               </div>
@@ -47,7 +47,7 @@
                 <div class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[2]" :key="index">
-                    {{ index + 1 }}: {{ Math.round(detail) }}
+                    {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
                   </div>
                 </div>
               </div>
@@ -58,7 +58,7 @@
                 <div class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[3]" :key="index">
-                    {{ index + 1 }}: {{ Math.round(detail) }}
+                    {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
                   </div>
                 </div>
               </div>
@@ -69,7 +69,7 @@
                 <div class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[4]" :key="index">
-                    {{ index + 1 }}: {{ Math.round(detail) }}
+                    {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
                   </div>
                 </div>
               </div>
@@ -80,7 +80,7 @@
                 <div class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[5]" :key="index">
-                    {{ index + 1 }}: {{ Math.round(detail) }}
+                    {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
                   </div>
                 </div>
               </div>
@@ -160,6 +160,10 @@ function openInNewTab(url: string){
   const baseUrl = window.location.origin;
   window.open(`${baseUrl}/twst/sim?restoreFromSearch=true${url}`, '_blank');
 }
+
+function toDisplayIndex(index: string | number): number {
+  return Number(index) + 1;
+}
 </script>
 
 <style scoped>
@@ -186,34 +190,34 @@ function openInNewTab(url: string){
   /* 左側の余白を自動で最大にして右寄せにする */
 }
 
-::v-deep .v-data-table td {
+:deep(.v-data-table td) {
   padding: 1px 1px !important;
   text-align: center;
 }
 
-::v-deep .v-data-table__td,
-::v-deep .v-data-table-column--align-start,
-::v-deep .v-data-table__th {
+:deep(.v-data-table__td),
+:deep(.v-data-table-column--align-start),
+:deep(.v-data-table__th) {
   padding: 1px 1px !important;
 }
 
-::v-deep .v-data-table thead tr th {
+:deep(.v-data-table thead tr th) {
   text-align: center !important;
   justify-content: center !important;
 }
 
-::v-deep .v-data-table thead tr th .v-data-table-header__content {
+:deep(.v-data-table thead tr th .v-data-table-header__content) {
   justify-content: center !important;
   text-align: center !important;
 }
 
-::v-deep .v-data-table tr td:nth-child(odd),
-::v-deep .v-data-table thead tr th:nth-child(odd) {
+:deep(.v-data-table tr td:nth-child(odd)),
+:deep(.v-data-table thead tr th:nth-child(odd)) {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-::v-deep .v-data-table tr td:nth-child(even),
-::v-deep .v-data-table thead tr th:nth-child(even) {
+:deep(.v-data-table tr td:nth-child(even)),
+:deep(.v-data-table thead tr th:nth-child(even)) {
   background-color: rgba(0, 0, 0, 0.02);
 }
 

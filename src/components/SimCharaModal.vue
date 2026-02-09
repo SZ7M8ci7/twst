@@ -537,7 +537,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     const name2M2Used = {}; // M2として使用済み
     
     // 最適化：バディとデュオの高速カウント
-    virtualDeck.forEach((chara, index) => {
+    virtualDeck.forEach((chara) => {
       // バディ数カウント（高速化）
       const buddies = [chara.buddy1c, chara.buddy2c, chara.buddy3c];
       const buddyStates = [chara.buddy1s, chara.buddy2s, chara.buddy3s];

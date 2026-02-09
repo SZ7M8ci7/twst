@@ -7,6 +7,10 @@ export interface SortOption {
   order: string;
 }
 
+export interface MustCharacterOption {
+  prop: string;
+}
+
 export interface SearchSettingsState {
   minEHP: number;
   minHP: number;
@@ -29,8 +33,8 @@ export interface SearchSettingsState {
   maxResult: number;
   attackNum: number;
   sortOptions: SortOption[];
-  mustCharacters: [];
-  convertedMustCharacters: [];
+  mustCharacters: MustCharacterOption[];
+  convertedMustCharacters: string[];
   allowSameCharacter: boolean;
   selectedSupportCharacters: string[];
 }
