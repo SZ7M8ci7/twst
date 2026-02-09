@@ -482,6 +482,16 @@ function removeCharacterOption(index: string | number) {
   mustCharacters.value.splice(Number(index), 1);
 }
 const emit = defineEmits(['close']);
+let hasLoggedMaxResultNormalization = false;
+let hasLoggedAttackNumNormalization = false;
+
+function toFiniteInt(value: unknown, fallback: number, min?: number, max?: number): number {
+  const parsed = Number(value);
+  let normalized = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+  if (min !== undefined && normalized < min) normalized = min;
+  if (max !== undefined && normalized > max) normalized = max;
+  return normalized;
+}
 
 function applyFilter() {
   const convertedMustCharacters = mustCharacters.value
@@ -517,6 +527,34 @@ function applyFilter() {
     };
   });
 
+  const rawMaxResult = maxResult.value;
+  const normalizedMaxResult = toFiniteInt(rawMaxResult, 10, 0);
+  if (
+    !hasLoggedMaxResultNormalization &&
+    (typeof rawMaxResult !== 'number' || normalizedMaxResult !== rawMaxResult)
+  ) {
+    hasLoggedMaxResultNormalization = true;
+    console.warn('[SearchSettings][diagnostic] maxResult was normalized', {
+      rawValue: rawMaxResult,
+      rawType: typeof rawMaxResult,
+      normalizedValue: normalizedMaxResult,
+    });
+  }
+
+  const rawAttackNum = attackNum.value;
+  const normalizedAttackNum = toFiniteInt(rawAttackNum, 10, 1, 10);
+  if (
+    !hasLoggedAttackNumNormalization &&
+    (typeof rawAttackNum !== 'number' || normalizedAttackNum !== rawAttackNum)
+  ) {
+    hasLoggedAttackNumNormalization = true;
+    console.warn('[SearchSettings][diagnostic] attackNum was normalized', {
+      rawValue: rawAttackNum,
+      rawType: typeof rawAttackNum,
+      normalizedValue: normalizedAttackNum,
+    });
+  }
+
   searchSettingsStore.updateSearchSettings({
     minEHP: minEHP.value,
     minHP: minHP.value,
@@ -537,8 +575,8 @@ function applyFilter() {
     minReferenceVsMizuDamage: minReferenceVsMizuDamage.value,
     minReferenceVsKiDamage: minReferenceVsKiDamage.value,
     sortOptions: convertedSortOptions,
-    maxResult: maxResult.value,
-    attackNum: attackNum.value,
+    maxResult: normalizedMaxResult,
+    attackNum: normalizedAttackNum,
     allowSameCharacter: allowSameCharacter.value,
     mustCharacters: mustCharacters.value,
     convertedMustCharacters: convertedMustCharacters,

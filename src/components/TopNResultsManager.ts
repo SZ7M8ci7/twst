@@ -1,4 +1,7 @@
 // 効率的な上位N件結果管理クラス
+let hasLoggedTopNMaxSizeTypeWarning = false;
+let hasLoggedTopNMaxSizeNormalizeWarning = false;
+let hasLoggedTopNZeroCapacityWarning = false;
 
 export class TopNResultsManager<T> {
   private results: T[] = [];
@@ -19,7 +22,35 @@ export class TopNResultsManager<T> {
     isDescending: boolean = true, // デフォルトは降順（大きい値が良い）
     allowThresholdTieForConsider: boolean = true
   ) {
-    this.maxSize = maxSize;
+    // UI入力由来で文字列が混入しても壊れないように、ここで整数へ正規化する。
+    if (!hasLoggedTopNMaxSizeTypeWarning && typeof maxSize !== 'number') {
+      hasLoggedTopNMaxSizeTypeWarning = true;
+      console.warn('[TopNResultsManager][diagnostic] maxSize is not number', {
+        rawValue: maxSize as unknown,
+        rawType: typeof maxSize,
+      });
+    }
+    const normalizedMaxSize = Number(maxSize);
+    if (
+      !hasLoggedTopNMaxSizeNormalizeWarning &&
+      (!Number.isFinite(normalizedMaxSize) || Math.trunc(normalizedMaxSize) !== normalizedMaxSize)
+    ) {
+      hasLoggedTopNMaxSizeNormalizeWarning = true;
+      console.warn('[TopNResultsManager][diagnostic] maxSize was normalized', {
+        rawValue: maxSize as unknown,
+        normalizedNumeric: normalizedMaxSize,
+      });
+    }
+    this.maxSize = Number.isFinite(normalizedMaxSize)
+      ? Math.max(0, Math.trunc(normalizedMaxSize))
+      : 0;
+    if (!hasLoggedTopNZeroCapacityWarning && this.maxSize <= 0) {
+      hasLoggedTopNZeroCapacityWarning = true;
+      console.warn('[TopNResultsManager][diagnostic] maxSize became 0, no result will be kept', {
+        rawValue: maxSize as unknown,
+        normalizedValue: this.maxSize,
+      });
+    }
     this.compareFunc = compareFunc;
     this.getScore = getScore;
     this.isDescending = isDescending;
@@ -34,6 +65,7 @@ export class TopNResultsManager<T> {
    * @returns 追加された場合true、スキップされた場合false
    */
   addResult(item: T): boolean {
+    if (this.maxSize <= 0) return false;
     const score = this.getScore(item);
     const results = this.results;
 
@@ -55,13 +87,22 @@ export class TopNResultsManager<T> {
     // まず第一ソート値だけで粗く足切りする。
     // ここで落とすことで、比較関数の多段比較や挿入処理を最小化する。
     // （同値の扱いは canPossiblyAddScore 側で制御）
-    const shouldAdd = this.isDescending 
-      ? score > this.thresholdScore  // 降順：より大きい値が良い
-      : score < this.thresholdScore; // 昇順：より小さい値が良い
-    
-    if (!shouldAdd) {
-      return false;
+    let shouldAdd = false;
+    if (this.isDescending) {
+      if (score > this.thresholdScore) {
+        shouldAdd = true;
+      } else if (score === this.thresholdScore && this.allowThresholdTieForConsider) {
+        // 第一キー同値のときは最下位要素と厳密比較し、実際に順位が上がる場合のみ採用する。
+        shouldAdd = this.compareFunc(item, results[results.length - 1]) < 0;
+      }
+    } else {
+      if (score < this.thresholdScore) {
+        shouldAdd = true;
+      } else if (score === this.thresholdScore && this.allowThresholdTieForConsider) {
+        shouldAdd = this.compareFunc(item, results[results.length - 1]) < 0;
+      }
     }
+    if (!shouldAdd) return false;
 
     let insertIndex = 0;
     if (this.compareFunc(item, results[0]) < 0) {
@@ -72,6 +113,9 @@ export class TopNResultsManager<T> {
 
     // splice は配列再確保/境界チェックのコストが高くなりやすいため、
     // 固定長運用では手動シフトで入れ替える。
+    if (insertIndex >= this.maxSize) {
+      return false;
+    }
     for (let i = this.maxSize - 1; i > insertIndex; i--) {
       results[i] = results[i - 1];
     }
@@ -89,6 +133,7 @@ export class TopNResultsManager<T> {
    * 同値は二次キーで逆転し得るため許可する。
    */
   canPossiblyAddScore(score: number): boolean {
+    if (this.maxSize <= 0) return false;
     if (this.results.length < this.maxSize) {
       return true;
     }
@@ -221,7 +266,14 @@ export class DeckSearchResultsManager {
         const comparison = aValue < bValue ? -1 : 1;
         return comparison * sortDirs[i];
       }
-      return 0;
+      // 全ソートキー同値時は deckKey で安定順序を作る。
+      // これにより maxResult の違いによる同点時の順位揺れを抑える。
+      const aKey = (a as any)._deckKey as string | undefined;
+      const bKey = (b as any)._deckKey as string | undefined;
+      if (aKey === bKey) return 0;
+      if (aKey === undefined) return 1;
+      if (bKey === undefined) return -1;
+      return aKey < bKey ? -1 : 1;
     };
 
     // TopNResultsManager 側の閾値判定に使う一次キー値を抽出。
