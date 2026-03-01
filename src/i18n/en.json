@@ -463,7 +463,16 @@
     "normal": "0 Crit",
     "critical1": "1 Crit",
     "critical2": "2 Crit",
-    "critical3": "3 Crit"
+    "critical3": "3 Crit",
+    "openDeckSearch": "Search",
+    "deckSearchDescription": "Open the deck search tool with the following settings.",
+    "finisherLabel": "Finisher",
+    "bufferLabel": "Buffer",
+    "supportLabel": "Support",
+    "openLabel": "Open",
+    "deckSearchHandHand": "Finisher: Hand Buffer: Hand",
+    "deckSearchSupportHand": "Finisher: Support Buffer: Hand",
+    "deckSearchHandSupport": "Finisher: Hand Buffer: Support"
   },
   "buddyDuo": {
     "reflectHandSettings": "Reflect Card Settings"

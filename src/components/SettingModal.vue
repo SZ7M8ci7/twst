@@ -455,7 +455,7 @@ function resetAllSettings() {
   minReferenceVsHiDamage.value = 0;
   minReferenceVsMizuDamage.value = 0;
   minReferenceVsKiDamage.value = 0;
-  maxResult.value = 10;
+  maxResult.value = 30;
   attackNum.value = 10;
   allowSameCharacter.value = false;
   
@@ -528,7 +528,7 @@ function applyFilter() {
   });
 
   const rawMaxResult = maxResult.value;
-  const normalizedMaxResult = toFiniteInt(rawMaxResult, 10, 0);
+  const normalizedMaxResult = toFiniteInt(rawMaxResult, 30, 0);
   if (
     !hasLoggedMaxResultNormalization &&
     (typeof rawMaxResult !== 'number' || normalizedMaxResult !== rawMaxResult)

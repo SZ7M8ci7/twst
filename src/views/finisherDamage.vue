@@ -154,7 +154,66 @@
                   </div>
                 </div>
                 <div class="damage-value">
-                  {{ Math.floor(entry.damage * criticalMultipliers[criticalLevel]).toLocaleString() }}
+                  <div class="damage-value-actions">
+                    <span>{{ Math.floor(entry.damage * criticalMultipliers[criticalLevel]).toLocaleString() }}</span>
+                    <v-menu
+                      location="bottom end"
+                      content-class="deck-search-menu-overlay"
+                    >
+                      <template #activator="{ props }">
+                        <v-btn
+                          v-bind="props"
+                          variant="text"
+                          size="x-small"
+                          icon="mdi-magnify"
+                          class="deck-search-button"
+                        />
+                      </template>
+                      <v-list density="compact" class="deck-search-menu-list">
+                        <div class="deck-search-menu-description">
+                          {{ t('finisherDamage.deckSearchDescription') }}
+                        </div>
+                        <div class="deck-search-table">
+                          <div class="deck-search-table-header">
+                            <span>{{ t('finisherDamage.finisherLabel') }}</span>
+                            <span>{{ t('finisherDamage.bufferLabel') }}</span>
+                            <span class="deck-search-table-icon-header">
+                              <v-icon size="16">mdi-magnify</v-icon>
+                            </span>
+                          </div>
+                          <button
+                            v-for="option in deckSearchOptions"
+                            :key="option.key"
+                            type="button"
+                            class="deck-search-table-row"
+                            :disabled="isDeckSearchOptionDisabled(
+                              {
+                                finisherCardName: entry.cardName || '',
+                                bufferName: entry.name,
+                                bufferSource: entry.buffSource || ''
+                              },
+                              option
+                            )"
+                            @click="openDeckSearchFromDamageEntry(
+                              {
+                                finisherCardName: entry.cardName || '',
+                                bufferName: entry.name,
+                                bufferSource: entry.buffSource || ''
+                              },
+                              selectedElement,
+                              option
+                            )"
+                          >
+                            <span>{{ getPlacementLabel(option.finisherPlacement) }}</span>
+                            <span>{{ getPlacementLabel(option.bufferPlacement) }}</span>
+                            <span class="deck-search-table-open">
+                              <v-icon size="16">mdi-magnify</v-icon>
+                            </span>
+                          </button>
+                        </div>
+                      </v-list>
+                    </v-menu>
+                  </div>
                 </div>
               </div>
             </v-list-item>
@@ -247,7 +306,66 @@
                   </div>
                 </div>
                 <div class="damage-value">
-                  {{ Math.floor(entry.damage * criticalMultipliers[allCharactersCriticalLevel]).toLocaleString() }}
+                  <div class="damage-value-actions">
+                    <span>{{ Math.floor(entry.damage * criticalMultipliers[allCharactersCriticalLevel]).toLocaleString() }}</span>
+                    <v-menu
+                      location="bottom end"
+                      content-class="deck-search-menu-overlay"
+                    >
+                      <template #activator="{ props }">
+                        <v-btn
+                          v-bind="props"
+                          variant="text"
+                          size="x-small"
+                          icon="mdi-magnify"
+                          class="deck-search-button"
+                        />
+                      </template>
+                      <v-list density="compact" class="deck-search-menu-list">
+                        <div class="deck-search-menu-description">
+                          {{ t('finisherDamage.deckSearchDescription') }}
+                        </div>
+                        <div class="deck-search-table">
+                          <div class="deck-search-table-header">
+                            <span>{{ t('finisherDamage.finisherLabel') }}</span>
+                            <span>{{ t('finisherDamage.bufferLabel') }}</span>
+                            <span class="deck-search-table-icon-header">
+                              <v-icon size="16">mdi-magnify</v-icon>
+                            </span>
+                          </div>
+                          <button
+                            v-for="option in deckSearchOptions"
+                            :key="option.key"
+                            type="button"
+                            class="deck-search-table-row"
+                            :disabled="isDeckSearchOptionDisabled(
+                              {
+                                finisherCardName: entry.cardName,
+                                bufferName: entry.buffName,
+                                bufferSource: entry.buffSource || ''
+                              },
+                              option
+                            )"
+                            @click="openDeckSearchFromDamageEntry(
+                              {
+                                finisherCardName: entry.cardName,
+                                bufferName: entry.buffName,
+                                bufferSource: entry.buffSource || ''
+                              },
+                              selectedAllCharactersElement,
+                              option
+                            )"
+                          >
+                            <span>{{ getPlacementLabel(option.finisherPlacement) }}</span>
+                            <span>{{ getPlacementLabel(option.bufferPlacement) }}</span>
+                            <span class="deck-search-table-open">
+                              <v-icon size="16">mdi-magnify</v-icon>
+                            </span>
+                          </button>
+                        </div>
+                      </v-list>
+                    </v-menu>
+                  </div>
                 </div>
               </div>
             </v-list-item>
@@ -295,16 +413,21 @@
 <script setup lang="ts">
 import { useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
+import { useSearchSettingsStore, createDefaultSearchSettingsState } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
 import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { onMounted, ref, Ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { recalculateATK } from '@/utils/calculations';
+import { SEARCH_PRESET_CONFIGURATIONS } from '@/constants/searchPresets';
 import characterDataJson from '@/assets/characters_info.json';
 const { t } = useI18n();
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
+const searchSettingsStore = useSearchSettingsStore();
+const router = useRouter();
 const { characters } = storeToRefs(characterStore);
 // 独自の手持ち設定状態を管理（ストアとは独立）
 const useHandCollection = ref(false);
@@ -327,6 +450,7 @@ const elementIcons = {
 };
 
 const loading = ref(true);
+const savedCharacterLevels = ref<Record<string, number>>({});
 
 // CharacterIconWithTypeコンポーネントに渡すためのアイコン辞書
 const iconsForCharacterIconWithType = computed(() => {
@@ -338,6 +462,7 @@ const iconsForCharacterIconWithType = computed(() => {
 });
 
 onMounted(async () => {
+  loadSavedCharacterLevels();
   try {
     // 1. Piniaストアのcharactersからメイン画像URLを取得
     const mainImageUrls = await loadImageUrls(characters.value, 'name');
@@ -772,7 +897,7 @@ characters.value.forEach(character => {
 const dialogVisible = ref(false);
 const selectedDamageList = ref<DamageByCard[]>([]);
 const selectedCardName = ref('');
-const selectedElement = ref('');
+const selectedElement = ref<ElementType>('fire');
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
 
@@ -787,7 +912,7 @@ const totalPages = computed(() => {
   return Math.ceil(selectedDamageList.value.length / itemsPerPage.value);
 });
 
-function openDamageModal(charaName: string, element: string) {
+function openDamageModal(charaName: string, element: ElementType) {
   const damageDict = getDamageListByElement(element as 'fire' | 'water' | 'flora' | 'cosmic');
   const cardList = cardNameDict[charaName];
   if (!cardList || cardList.length === 0) return;
@@ -811,6 +936,40 @@ function openDamageModal(charaName: string, element: string) {
 // 型定義の追加
 type ElementType = 'fire' | 'water' | 'flora' | 'cosmic';
 
+type SearchPlacement = 'hand' | 'support';
+
+type DeckSearchOptionKey = 'hand-hand' | 'support-hand' | 'hand-support';
+
+interface DeckSearchOption {
+  key: DeckSearchOptionKey;
+  finisherPlacement: SearchPlacement;
+  bufferPlacement: SearchPlacement;
+}
+
+interface DeckSearchDamageEntry {
+  finisherCardName: string;
+  bufferName: string;
+  bufferSource: string;
+}
+
+const deckSearchOptions: DeckSearchOption[] = [
+  {
+    key: 'hand-hand',
+    finisherPlacement: 'hand',
+    bufferPlacement: 'hand',
+  },
+  {
+    key: 'support-hand',
+    finisherPlacement: 'support',
+    bufferPlacement: 'hand',
+  },
+  {
+    key: 'hand-support',
+    finisherPlacement: 'hand',
+    bufferPlacement: 'support',
+  }
+];
+
 function getDamageListByElement(element: ElementType) {
   const dict = {
     fire: fireDamageListByCardDict,
@@ -819,6 +978,182 @@ function getDamageListByElement(element: ElementType) {
     cosmic: cosmicDamageListByCardDict
   };
   return dict[element];
+}
+
+function getBasicExamPresetName(element: ElementType): string {
+  switch (element) {
+    case 'fire':
+      return 'settingModal.preset.fireBasicExam';
+    case 'water':
+      return 'settingModal.preset.waterBasicExam';
+    case 'flora':
+      return 'settingModal.preset.floraBasicExam';
+    case 'cosmic':
+      return 'settingModal.preset.neutralBasicExam';
+  }
+}
+
+function getPlacementLabel(placement: SearchPlacement): string {
+  return placement === 'hand'
+    ? t('finisherDamage.handCollection')
+    : t('finisherDamage.supportLabel');
+}
+
+function loadSavedCharacterLevels() {
+  try {
+    const raw = localStorage.getItem('characterLevels');
+    savedCharacterLevels.value = raw ? JSON.parse(raw) as Record<string, number> : {};
+  } catch (error) {
+    console.warn('Failed to load character levels from localStorage:', error);
+    savedCharacterLevels.value = {};
+  }
+}
+
+function getCardLevel(cardName: string): number {
+  const storeLevel = characters.value.find(character => character.name === cardName)?.level ?? 0;
+  const savedLevel = savedCharacterLevels.value[cardName] ?? 0;
+  return Math.max(storeLevel, savedLevel);
+}
+
+function hasSpecificBufferCard(entry: DeckSearchDamageEntry): boolean {
+  return !!entry.bufferSource && characters.value.some(character => character.name === entry.bufferName);
+}
+
+function isDeckSearchOptionDisabled(
+  entry: DeckSearchDamageEntry,
+  option: DeckSearchOption
+): boolean {
+  if (option.finisherPlacement === 'hand' && getCardLevel(entry.finisherCardName) <= 0) {
+    return true;
+  }
+
+  if (
+    option.bufferPlacement === 'hand' &&
+    hasSpecificBufferCard(entry) &&
+    getCardLevel(entry.bufferName) <= 0
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getCharacterNameJa(name: string): string | null {
+  if (!name) return null;
+
+  const matchedCard = characters.value.find(character => character.name === name);
+  if (matchedCard) {
+    return matchedCard.chara;
+  }
+
+  const matchedCharacter = (characterDataJson as CharacterInfo[]).find(character => (
+    character.name_ja === name || character.name_en === name
+  ));
+  return matchedCharacter?.name_ja || null;
+}
+
+function getSupportCardNames(name: string): string[] {
+  if (!name) return [];
+
+  const matchedCard = characters.value.find(character => character.name === name);
+  if (matchedCard) {
+    return [matchedCard.name];
+  }
+
+  const characterNameJa = getCharacterNameJa(name);
+  if (!characterNameJa) return [];
+
+  return characters.value
+    .filter(character => character.rare === 'SSR' && character.chara === characterNameJa)
+    .map(character => character.name);
+}
+
+function getRequiredBuddyCharacterNames(cardName: string): string[] {
+  const character = characters.value.find(char => char.name === cardName);
+  if (!character) return [];
+
+  const buddyNames: string[] = [];
+  if (character.buddy1c && character.buddy1s.includes('ATK')) {
+    buddyNames.push(character.buddy1c);
+  }
+  if (character.buddy2c && character.buddy2s.includes('ATK')) {
+    buddyNames.push(character.buddy2c);
+  }
+  if (character.buddy3c && character.buddy3s.includes('ATK')) {
+    buddyNames.push(character.buddy3c);
+  }
+  return buddyNames;
+}
+
+function resetRequiredCards() {
+  characters.value.forEach(character => {
+    character.required = false;
+  });
+}
+
+function setRequiredCard(cardName: string) {
+  const target = characters.value.find(character => character.name === cardName);
+  if (target) {
+    target.required = true;
+  }
+}
+
+async function openDeckSearchFromDamageEntry(
+  entry: DeckSearchDamageEntry,
+  element: ElementType,
+  option: DeckSearchOption
+) {
+  if (!entry.finisherCardName) return;
+
+  const defaults = createDefaultSearchSettingsState();
+  const preset = SEARCH_PRESET_CONFIGURATIONS.find(config => config.name === getBasicExamPresetName(element));
+  if (!preset) return;
+
+  resetRequiredCards();
+
+  const mustCharacterNames = new Set<string>(getRequiredBuddyCharacterNames(entry.finisherCardName));
+  let selectedSupportCharacters = [...defaults.selectedSupportCharacters];
+
+  if (option.finisherPlacement === 'hand') {
+    setRequiredCard(entry.finisherCardName);
+  } else {
+    selectedSupportCharacters = [entry.finisherCardName];
+  }
+
+  const bufferCharacterName = getCharacterNameJa(entry.bufferName);
+  const isSpecificBufferCard = hasSpecificBufferCard(entry);
+
+  if (option.bufferPlacement === 'hand') {
+    if (isSpecificBufferCard) {
+      setRequiredCard(entry.bufferName);
+    } else if (bufferCharacterName) {
+      mustCharacterNames.add(bufferCharacterName);
+    }
+  } else {
+    const supportCards = getSupportCardNames(
+      isSpecificBufferCard ? entry.bufferName : (bufferCharacterName || entry.bufferName)
+    );
+    if (supportCards.length > 0) {
+      selectedSupportCharacters = supportCards;
+    }
+  }
+
+  const convertedMustCharacters = Array.from(mustCharacterNames);
+  searchSettingsStore.updateSearchSettings({
+    ...defaults,
+    ...preset.minSettings,
+    sortOptions: preset.sortOptions.map(sortOption => ({ ...sortOption })),
+    attackNum: preset.attackNum ?? defaults.attackNum,
+    allowSameCharacter: true,
+    mustCharacters: convertedMustCharacters.map(name => ({ prop: name })),
+    convertedMustCharacters,
+    selectedSupportCharacters,
+  });
+
+  await router.push({
+    name: 'search',
+    query: { openSettings: '1' }
+  });
 }
 
 // ソート関連の状態
@@ -1278,6 +1613,15 @@ function recalculateAllDamage() {
     font-size: 0.8em;
   }
 
+  .damage-value-actions {
+    gap: 2px;
+  }
+
+  .deck-search-button {
+    padding: 0 4px;
+    font-size: 0.65rem;
+  }
+
   :deep(.v-overlay__content) {
     margin: 0 !important;
     left: 0 !important;
@@ -1299,6 +1643,16 @@ function recalculateAllDamage() {
     padding: 0 !important;
     border-radius: 0 !important;
     box-sizing: border-box !important;
+  }
+  :deep(.deck-search-menu-overlay) {
+    position: absolute !important;
+    inset: auto !important;
+    width: auto !important;
+    min-width: 280px !important;
+    max-width: calc(100vw - 16px) !important;
+    padding: 0 !important;
+    left: auto !important;
+    right: auto !important;
   }
 }
 
@@ -1404,6 +1758,95 @@ function recalculateAllDamage() {
   display: flex;
   justify-content: flex-start;
   align-items: center;
+}
+
+.damage-value-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  width: 100%;
+}
+
+.deck-search-button {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  letter-spacing: 0;
+}
+
+.deck-search-menu-list {
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.deck-search-menu-description {
+  padding: 12px 16px 4px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.deck-search-table {
+  padding: 4px 12px 12px;
+}
+
+.deck-search-table-header,
+.deck-search-table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.deck-search-table-header {
+  padding: 4px 8px 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #5f6368;
+}
+
+.deck-search-table-icon-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.deck-search-table-row {
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: #f7f9fc;
+  color: #1f2937;
+  text-align: left;
+  font-size: 0.82rem;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.deck-search-table-row:hover {
+  background: #e8f1ff;
+}
+
+.deck-search-table-row:disabled {
+  background: #eef1f4;
+  color: #9aa1a9;
+  cursor: not-allowed;
+}
+
+.deck-search-table-row:disabled .deck-search-table-open {
+  color: #9aa1a9;
+}
+
+.deck-search-table-open {
+  color: #1976d2;
+  font-weight: 700;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .loading-container {

@@ -59,10 +59,13 @@ import { calcDecks } from "./common";
 import { useSearchResultStore } from '@/store/searchResult';
 import { event } from 'vue-gtag'
 import { useI18n } from 'vue-i18n';
+import { useRoute, useRouter } from 'vue-router';
 const { t } = useI18n();
 
 const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, isSearching, errorMessage } = storeToRefs(searchResultStore);
+const route = useRoute();
+const router = useRouter();
 
 // モーダルの表示状態を管理するためのリアクティブな変数
 const isInfoModalVisible = ref(false);
@@ -149,4 +152,16 @@ watch(errorMessage, (newVal, oldVal) => {
     isErrorModalVisible.value = true; // エラーモーダルを表示する
   }
 });
+
+watch(
+  () => route.query.openSettings,
+  (openSettings) => {
+    if (openSettings !== '1') return;
+    isSettingModalVisible.value = true;
+    const nextQuery = { ...route.query };
+    delete nextQuery.openSettings;
+    void router.replace({ query: nextQuery });
+  },
+  { immediate: true }
+);
 </script>

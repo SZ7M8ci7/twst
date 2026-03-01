@@ -462,7 +462,16 @@
     "normal": "0クリ",
     "critical1": "1クリ",
     "critical2": "2クリ",
-    "critical3": "3クリ"
+    "critical3": "3クリ",
+    "openDeckSearch": "探索",
+    "deckSearchDescription": "デッキ探索ツールを以下の設定で開きます。",
+    "finisherLabel": "フィニッシャー",
+    "bufferLabel": "バッファー",
+    "supportLabel": "サポート",
+    "openLabel": "開く",
+    "deckSearchHandHand": "フィニッシャー：手持ち バッファー：手持ち",
+    "deckSearchSupportHand": "フィニッシャー：サポート バッファー：手持ち",
+    "deckSearchHandSupport": "フィニッシャー：手持ち バッファー：サポート"
   },
   "buddyDuo": {
     "reflectHandSettings": "手持ち設定を使用"
