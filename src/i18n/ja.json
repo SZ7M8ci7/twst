@@ -453,7 +453,11 @@
   },
   "support": {
     "selectAll": "全選択",
-    "deselectAll": "全解除"
+    "deselectAll": "全解除",
+    "selectHeal": "回復ON",
+    "deselectHeal": "回復OFF",
+    "selectRegen": "継続回復ON",
+    "deselectRegen": "継続回復OFF"
   },
   "finisherDamage": {
     "useHandCollection": "手持ち設定を使用",

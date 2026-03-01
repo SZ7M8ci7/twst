@@ -454,7 +454,11 @@
   },
   "support": {
     "selectAll": "Select All",
-    "deselectAll": "Deselect All"
+    "deselectAll": "Deselect All",
+    "selectHeal": "Heal ON",
+    "deselectHeal": "Heal OFF",
+    "selectRegen": "Regen ON",
+    "deselectRegen": "Regen OFF"
   },
   "finisherDamage": {
     "useHandCollection": "Use Card Settings",

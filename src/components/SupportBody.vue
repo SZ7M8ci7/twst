@@ -11,10 +11,42 @@
       </v-btn>
       <v-btn
         color="error"
+        class="mr-2"
         size="small"
         @click="deselectAll"
       >
         {{ $t('support.deselectAll') }}
+      </v-btn>
+      <v-btn
+        color="success"
+        class="mr-2"
+        size="small"
+        @click="selectHeal"
+      >
+        {{ $t('support.selectHeal') }}
+      </v-btn>
+      <v-btn
+        color="warning"
+        class="mr-2"
+        size="small"
+        @click="deselectHeal"
+      >
+        {{ $t('support.deselectHeal') }}
+      </v-btn>
+      <v-btn
+        color="success"
+        class="mr-2"
+        size="small"
+        @click="selectRegen"
+      >
+        {{ $t('support.selectRegen') }}
+      </v-btn>
+      <v-btn
+        color="warning"
+        size="small"
+        @click="deselectRegen"
+      >
+        {{ $t('support.deselectRegen') }}
       </v-btn>
     </div>
     <div class="character-grid">
@@ -68,7 +100,10 @@ const ssrCharacters = computed(() => {
     .map(chara => ({
       name: chara.name,
       imgUrl: chara.imgUrl,
-      chara: chara.chara
+      chara: chara.chara,
+      magic1heal: chara.magic1heal,
+      magic2heal: chara.magic2heal,
+      magic3heal: chara.magic3heal
     }));
 
 
@@ -90,6 +125,28 @@ const ssrCharacters = computed(() => {
   return sorted;
 });
 
+const hasInstantHeal = (
+  character: { magic1heal?: string; magic2heal?: string; magic3heal?: string }
+) => [character.magic1heal, character.magic2heal, character.magic3heal]
+  .some((heal) => typeof heal === 'string' && (heal.startsWith('回復(') || heal.startsWith('回復&継続回復(')));
+
+const hasRegen = (
+  character: { magic1heal?: string; magic2heal?: string; magic3heal?: string }
+) => [character.magic1heal, character.magic2heal, character.magic3heal]
+  .some((heal) => typeof heal === 'string' && (heal.startsWith('継続回復(') || heal.startsWith('回復&継続回復(')));
+
+const updateSelection = (names: string[], selected: boolean) => {
+  const next = new Set(selectedSupportCharacters.value);
+  names.forEach((name) => {
+    if (selected) {
+      next.add(name);
+    } else {
+      next.delete(name);
+    }
+  });
+  selectedSupportCharacters.value = [...next];
+};
+
 const isSelected = (characterName: string) => {
   return selectedSupportCharacters.value.includes(characterName);
 };
@@ -109,6 +166,34 @@ const selectAll = () => {
 
 const deselectAll = () => {
   selectedSupportCharacters.value = [];
+};
+
+const selectHeal = () => {
+  updateSelection(
+    ssrCharacters.value.filter(character => hasInstantHeal(character)).map(character => character.name),
+    true
+  );
+};
+
+const deselectHeal = () => {
+  updateSelection(
+    ssrCharacters.value.filter(character => hasInstantHeal(character)).map(character => character.name),
+    false
+  );
+};
+
+const selectRegen = () => {
+  updateSelection(
+    ssrCharacters.value.filter(character => hasRegen(character)).map(character => character.name),
+    true
+  );
+};
+
+const deselectRegen = () => {
+  updateSelection(
+    ssrCharacters.value.filter(character => hasRegen(character)).map(character => character.name),
+    false
+  );
 };
 
 onMounted(() => {
