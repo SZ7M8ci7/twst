@@ -1,30 +1,39 @@
 <template>
   <div class="select-wrapper">
-    <select v-model="selectedOption" @change="updateValue">
+    <select
+      v-model="selectedOption"
+      @change="updateValue"
+      :class="{ 'duo-warning-select': duoWarning && selectedOption === 'デュオ' }"
+    >
       <option>単発(弱)</option>
       <option>単発(強)</option>
       <option>連撃(弱)</option>
       <option>連撃(強)</option>
       <option>3連撃(弱)</option>
       <option>3連撃(強)</option>
-      <option>デュオ</option>
+      <option value="デュオ">デュオ</option>
     </select>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
   modelValue: {
     type: String,
     default: ''
+  },
+  duoWarning: {
+    type: Boolean,
+    default: false
   }
 });
 
 const emit = defineEmits(['update:modelValue']);
 
 const selectedOption = ref(props.modelValue || '単発(弱)');
+const duoWarning = computed(() => props.duoWarning);
 
 const updateValue = () => {
   emit('update:modelValue', selectedOption.value);
@@ -75,5 +84,10 @@ select:focus {
   outline: none;
   border-color: #66afe9;
   box-shadow: 0 0 8px rgba(102, 175, 233, 0.6);
+}
+
+.duo-warning-select {
+  background-color: #ffebee;
+  border-color: #ef9a9a;
 }
 </style>

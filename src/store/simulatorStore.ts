@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive, watch, nextTick } from 'vue';
 import { calculateCharacterStats, recalculateHP, recalculateATK } from '@/utils/calculations';
+import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { useHandCollectionStore } from '@/store/handCollection';
 
 function debounce(fn: Function, delay: number) {
@@ -160,6 +161,8 @@ export const useSimulatorStore = defineStore('simulator', () => {
     });
     return dict;
   });
+
+  const deckDuoStatuses = computed(() => resolveDeckDuoAvailability(deckCharacters).statuses);
 
   // 計算済みのステータスを保持（初期化時は空の辞書を使用）
   const characterStats = ref(deckCharacters.map(char => calculateCharacterStats(char, {})));
@@ -529,6 +532,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
     selectCharacter,
     recalculateStats,
     charaDict,
+    deckDuoStatuses,
     calculateCharacterStats,
     isInitialized,
     isDeckStatsReady,

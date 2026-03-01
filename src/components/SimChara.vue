@@ -72,6 +72,8 @@
                 <MagicDropdown
                   v-model="simulatorStore.deckCharacters[props.charaIndex][`magic${index}Power`]"
                   :style="getMagicDropdownStyle()"
+                  :duo-warning="shouldShowMagicDuoWarning(index)"
+                  :title="shouldShowMagicDuoWarning(index) ? duoWarningText : undefined"
                 />
               </v-col>
               <!-- バディキャラアイコン -->
@@ -709,6 +711,22 @@ const isDuoActive = computed(() => {
   return simulatorStore.charaDict[character.duo] === true;
 });
 
+const showDuoInsufficientWarning = computed(() => {
+  const duoStatus = simulatorStore.deckDuoStatuses[props.charaIndex];
+  return Boolean(duoStatus?.isPartnerInsufficient);
+});
+
+const duoWarningText = computed(() => {
+  const character = simulatorStore.deckCharacters[props.charaIndex];
+  if (!character?.duo) return '';
+  return `デュオ相手: ${character.duo} (相手あり・デュオ数不足)`;
+});
+
+const shouldShowMagicDuoWarning = (magicIndex) => (
+  magicIndex === 2 &&
+  showDuoInsufficientWarning.value
+);
+
 // デュオツールチップのテキスト
 const duoTooltipText = computed(() => {
   const character = simulatorStore.deckCharacters[props.charaIndex];
@@ -716,6 +734,10 @@ const duoTooltipText = computed(() => {
   
   const duoPartnerName = character.duo;
   const isActive = isDuoActive.value;
+
+  if (showDuoInsufficientWarning.value) {
+    return duoWarningText.value;
+  }
   
   return isActive 
     ? `デュオ相手: ${duoPartnerName} (有効)` 

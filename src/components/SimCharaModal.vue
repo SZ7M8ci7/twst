@@ -184,6 +184,7 @@ characterData.forEach(char => {
   characterDataMap.set(char.name_en, char);
 });
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict, recalculateHP, recalculateATK } from '@/utils/calculations';
+import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { applyMultiLevelSort, applyDefaultSort } from '@/utils/sortUtils';
 
 
@@ -531,11 +532,6 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     let totalBuddy = 0;
     let totalDuo = 0;
     
-    // デュオカウント用のフラグ管理（デッキ探索ツールと同じロジック）
-    const name2DuoUsed = {}; // デュオ使用者として使用済み
-    const name2MotherUsed = {}; // Motherとして使用済み  
-    const name2M2Used = {}; // M2として使用済み
-    
     // 最適化：バディとデュオの高速カウント
     virtualDeck.forEach((chara) => {
       // バディ数カウント（高速化）
@@ -553,71 +549,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       }
     });
     
-    // デュオ判定（デッキ探索ツールと同じ3段階判定）
-    
-    // 1. 相互デュオチェック（最優先）
-    virtualDeck.forEach((chara, index) => {
-      if (!chara.duo || !memberNameDict[chara.duo] || name2DuoUsed[index]) {
-        return;
-      }
-      
-      for (let partnerIndex = 0; partnerIndex < virtualDeck.length; partnerIndex++) {
-        if (partnerIndex === index) continue;
-        const partner = virtualDeck[partnerIndex];
-        if (partner && partner.chara === chara.duo && partner.duo === chara.chara) {
-          if (!name2DuoUsed[index] && !name2DuoUsed[partnerIndex]) {
-            name2DuoUsed[index] = true;
-            name2DuoUsed[partnerIndex] = true;
-            name2M2Used[index] = true;
-            name2M2Used[partnerIndex] = true;
-            totalDuo += 2; // 2人がデュオ魔法を使用
-            break;
-          }
-        }
-      }
-    });
-    
-    // 2. Motherデュオチェック（M2ではないキャラをパートナーとする）
-    virtualDeck.forEach((chara, index) => {
-      if (!chara.duo || !memberNameDict[chara.duo] || name2DuoUsed[index] || name2M2Used[index]) {
-        return;
-      }
-      
-      for (let partnerIndex = 0; partnerIndex < virtualDeck.length; partnerIndex++) {
-        if (partnerIndex === index) continue;
-        const partner = virtualDeck[partnerIndex];
-        if (partner && partner.chara === chara.duo) {
-          if (!name2MotherUsed[partnerIndex]) {
-            name2DuoUsed[index] = true;
-            name2M2Used[index] = true;
-            name2MotherUsed[partnerIndex] = true;
-            totalDuo += 1;
-            break;
-          }
-        }
-      }
-    });
-    
-    // 3. M2デュオチェック（今まで使われていないM2をパートナーとする）
-    virtualDeck.forEach((chara, index) => {
-      if (!chara.duo || !memberNameDict[chara.duo] || name2DuoUsed[index] || name2M2Used[index]) {
-        return;
-      }
-      
-      for (let partnerIndex = 0; partnerIndex < virtualDeck.length; partnerIndex++) {
-        if (partnerIndex === index) continue;
-        const partner = virtualDeck[partnerIndex];
-        if (partner && partner.chara === chara.duo) {
-          if (!name2M2Used[partnerIndex]) {
-            name2DuoUsed[index] = true;
-            name2M2Used[index] = true;
-            name2M2Used[partnerIndex] = true;
-            totalDuo += 1;
-            break;
-          }
-        }
-      }
-    });
+    totalDuo = resolveDeckDuoAvailability(virtualDeck).totalDuo;
     
     switch (sortKey) {
       case 'deckHPBuddyCount': return totalHPBuddy;
@@ -742,77 +674,11 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     recalculatedVirtualDeck.push(recalculatedChara);
   }
 
-  // デュオ判定を正確に行う（デッキ探索ツールと同じロジック）
-  const name2DuoUsed = {}; // デュオ使用者として使用済み
-  const name2MotherUsed = {}; // Motherとして使用済み  
-  const name2M2Used = {}; // M2として使用済み
-  
-  // デュオ判定（3段階判定）
-  
-  // 1. 相互デュオチェック（最優先）
-  recalculatedVirtualDeck.forEach((chara, index) => {
-    if (!chara.duo || !fullMemberNameDict[chara.duo] || name2DuoUsed[index]) {
-      return;
-    }
-    
-    for (let partnerIndex = 0; partnerIndex < recalculatedVirtualDeck.length; partnerIndex++) {
-      if (partnerIndex === index) continue;
-      const partner = recalculatedVirtualDeck[partnerIndex];
-      if (partner && partner.chara === chara.duo && partner.duo === chara.chara) {
-        if (!name2DuoUsed[index] && !name2DuoUsed[partnerIndex]) {
-          name2DuoUsed[index] = true;
-          name2DuoUsed[partnerIndex] = true;
-          name2M2Used[index] = true;
-          name2M2Used[partnerIndex] = true;
-          break;
-        }
-      }
-    }
-  });
-  
-  // 2. Motherデュオチェック（M2ではないキャラをパートナーとする）
-  recalculatedVirtualDeck.forEach((chara, index) => {
-    if (!chara.duo || !fullMemberNameDict[chara.duo] || name2DuoUsed[index] || name2M2Used[index]) {
-      return;
-    }
-    
-    for (let partnerIndex = 0; partnerIndex < recalculatedVirtualDeck.length; partnerIndex++) {
-      if (partnerIndex === index) continue;
-      const partner = recalculatedVirtualDeck[partnerIndex];
-      if (partner && partner.chara === chara.duo) {
-        if (!name2MotherUsed[partnerIndex]) {
-          name2DuoUsed[index] = true;
-          name2M2Used[index] = true;
-          name2MotherUsed[partnerIndex] = true;
-          break;
-        }
-      }
-    }
-  });
-  
-  // 3. M2デュオチェック（今まで使われていないM2をパートナーとする）
-  recalculatedVirtualDeck.forEach((chara, index) => {
-    if (!chara.duo || !fullMemberNameDict[chara.duo] || name2DuoUsed[index] || name2M2Used[index]) {
-      return;
-    }
-    
-    for (let partnerIndex = 0; partnerIndex < recalculatedVirtualDeck.length; partnerIndex++) {
-      if (partnerIndex === index) continue;
-      const partner = recalculatedVirtualDeck[partnerIndex];
-      if (partner && partner.chara === chara.duo) {
-        if (!name2M2Used[partnerIndex]) {
-          name2DuoUsed[index] = true;
-          name2M2Used[index] = true;
-          name2M2Used[partnerIndex] = true;
-          break;
-        }
-      }
-    }
-  });
-  
+  const duoResolution = resolveDeckDuoAvailability(recalculatedVirtualDeck);
+
   // デュオ判定結果をキャラクターのMagic2Powerに反映
   recalculatedVirtualDeck.forEach((chara, index) => {
-    chara.magic2Power = name2DuoUsed[index] ? 'デュオ' : (chara.magic2pow || '連撃(強)');
+    chara.magic2Power = duoResolution.statuses[index]?.canUseDuo ? 'デュオ' : (chara.magic2pow || '連撃(強)');
   });
   
   // デュオ判定後、全キャラクターの統計を再計算（ダメージ計算が必要な場合）
