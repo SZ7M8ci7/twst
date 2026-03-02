@@ -68,6 +68,9 @@ export const SEARCH_PRESET_CONFIGURATIONS: SearchPreset[] = [
     sortOptions: [{ prop: 'comments.duo', order: 'settingModal.desc' },
       { prop: 'comments.advantageDamage', order: 'settingModal.desc' }],
     minSettings: {
+      minFire: 2,
+      minWater: 2,
+      minFlora: 2,
       minReferenceAdvantageDamage: 90000,
     },
     attackNum: 8,
@@ -112,6 +115,9 @@ export const SEARCH_PRESET_CONFIGURATIONS: SearchPreset[] = [
     name: 'settingModal.preset.allDefenseExam',
     sortOptions: [{ prop: 'comments.effectiveHP', order: 'settingModal.desc' }],
     minSettings: {
+      minFire: 2,
+      minWater: 2,
+      minFlora: 2,
       minReferenceAdvantageDamage: 100000,
     },
     attackNum: 9,
@@ -151,7 +157,11 @@ export const SEARCH_PRESET_CONFIGURATIONS: SearchPreset[] = [
   {
     name: 'settingModal.preset.allAttackExam',
     sortOptions: [{ prop: 'comments.advantageDamage', order: 'settingModal.desc' }],
-    minSettings: {},
+    minSettings: {
+      minFire: 2,
+      minWater: 2,
+      minFlora: 2,
+    },
     attackNum: 10,
   },
   {

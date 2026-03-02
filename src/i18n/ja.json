@@ -302,6 +302,8 @@
     "minimumAgainstFireDamage":"最低対火ダメージ",
     "minimumAgainstWaterDamage":"最低対水ダメージ",
     "minimumAgainstFloraDamage":"最低対木ダメージ",
+    "minimumTarget":"項目",
+    "minimumValue":"値",
     "searchSettings":"検索設定",
     "maximumResult":"結果上限数",
     "attackNum":"攻撃回数",
@@ -312,6 +314,18 @@
     "no":"いいえ",
     "mustCharacter":"必須キャラクター",
     "searchPreset":"検索プリセット",
+    "presetMatrix": {
+      "basic": "BS",
+      "defense": "DF",
+      "attack": "ATK",
+      "fire": "火",
+      "water": "水",
+      "flora": "木",
+      "all": "全",
+      "neutral": "無",
+      "other": "その他",
+      "apply": "適用"
+    },
     "preset": {
       "fireBasicExam": "火属性BS試験",
       "waterBasicExam": "水属性BS試験",

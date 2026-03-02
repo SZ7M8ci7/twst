@@ -302,6 +302,8 @@
     "minimumAgainstFireDamage":"Minimum damage against fire",
     "minimumAgainstWaterDamage":"Minimum damage against water",
     "minimumAgainstFloraDamage":"Minimum damage against flora",
+    "minimumTarget":"Metric",
+    "minimumValue":"Value",
     "searchSettings":"Search settings",
     "maximumResult":"Maximum number of result",
     "attackNum":"Number of attacks",
@@ -312,6 +314,18 @@
     "no":"No",
     "mustCharacter":"Required Character",
     "searchPreset":"Search Preset",
+    "presetMatrix": {
+      "basic": "BS",
+      "defense": "DF",
+      "attack": "ATK",
+      "fire": "Fire",
+      "water": "Water",
+      "flora": "Flora",
+      "all": "Omni",
+      "neutral": "Cosmic",
+      "other": "Other",
+      "apply": "Apply"
+    },
     "preset": {
       "fireBasicExam": "Fire Basic Exam",
       "waterBasicExam": "Water Basic Exam",
