@@ -9,7 +9,6 @@
         :items-per-page="-1"
         :mobile-breakpoint="0"
       >
-        <!-- カスタムコンテンツのスロットを使用 -->
         <template v-slot:item="{ item }">
           <tr :key="item.simuURL">
             <td>{{ item.hp }}</td>
@@ -92,9 +91,21 @@
                 </div>
               </div>
             </td>
-            <!-- キャラ1～5の画像を表示 -->
             <td v-for="n in 5" :key="`chara${n}`">
-              <v-img :src="item[`chara${n}`]" max-width="50" width="50" height="50" :class="{ 'black-border': n === 5 && allowSameCharacter }"></v-img>
+              <button
+                type="button"
+                class="result-icon-button"
+                :aria-label="extractCharacterName(item.simuURL, n) || undefined"
+                @click="focusCharacterSetting(item.simuURL, n)"
+              >
+                <v-img
+                  :src="item[`chara${n}`]"
+                  max-width="50"
+                  width="50"
+                  height="50"
+                  :class="['result-icon-image', { 'black-border': n === 5 && allowSameCharacter }]"
+                ></v-img>
+              </button>
             </td>
             <td><v-btn variant="text" v-on:click="openInNewTab(item.simuURL)" icon="mdi-open-in-new" size="x-small"></v-btn></td>
           </tr>
@@ -109,12 +120,16 @@ import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 import { computed } from 'vue';
 import { useSearchSettingsStore } from '@/store/searchSetting';
+import { useI18n } from 'vue-i18n';
+
+const emit = defineEmits<{
+  (e: 'focus-character-setting', payload: { characterName: string; targetTab: 'search' | 'support' }): void;
+}>();
 
 const searchResultStore = useSearchResultStore();
 const searchSettingsStore = useSearchSettingsStore();
 const { results } = storeToRefs(searchResultStore);
 const allowSameCharacter = computed(() => searchSettingsStore.allowSameCharacter);
-import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 
 type DataTableHeader = {
@@ -162,8 +177,23 @@ const headers = computed<DataTableHeader[]>(() => [
   { title: fifthColumnTitle.value, value: 'chara5', sortable: false },
   { title: 'SIM', value: 'simuURL', sortable: false },
 ]);
+
+function extractCharacterName(url: string, slot: number): string | null {
+  const params = new URLSearchParams(url.startsWith('&') ? url.slice(1) : url);
+  return params.get(`name${slot}`);
+}
+
+function focusCharacterSetting(url: string, slot: number) {
+  const characterName = extractCharacterName(url, slot);
+  if (!characterName) return;
+
+  emit('focus-character-setting', {
+    characterName,
+    targetTab: allowSameCharacter.value && slot === 5 ? 'support' : 'search',
+  });
+}
+
 function openInNewTab(url: string){
-  // 現在のオリジンを使用して新しいシミュレータに遷移
   const baseUrl = window.location.origin;
   window.open(`${baseUrl}/twst/sim?restoreFromSearch=true${url}`, '_blank');
 }
@@ -178,23 +208,19 @@ function toDisplayIndex(index: string | number): number {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* ボタンとの間隔を設定 */
 }
 
 .level-input {
   max-width: 80px;
-  /* 最大横幅を80pxに設定 */
   min-width: 70px;
 }
 
 .v-data-table :deep(.v-data-table-footer) {
   display: none;
-  /* NOTE: フッタを非表示にする為 */
 }
 
 .right-align {
   margin-left: auto;
-  /* 左側の余白を自動で最大にして右寄せにする */
 }
 
 :deep(.v-data-table td) {
@@ -233,11 +259,13 @@ function toDisplayIndex(index: string | number): number {
   margin: 0;
   position: relative;
 }
+
 .text {
   display: inline-block;
   position: relative;
   z-index: 1;
 }
+
 .fukidashi {
   display: none;
   position: absolute;
@@ -253,9 +281,31 @@ function toDisplayIndex(index: string | number): number {
   white-space: nowrap;
   z-index: 2;
 }
+
 .text:hover + .fukidashi {
   display: block;
 }
+
+.result-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.result-icon-button:focus-visible {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
+.result-icon-image {
+  cursor: pointer;
+}
+
 .black-border {
   border: 2px solid black;
   border-radius: 4px;

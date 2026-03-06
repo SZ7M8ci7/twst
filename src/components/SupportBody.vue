@@ -54,9 +54,13 @@
         v-for="character in ssrCharacters"
         :key="character.name"
         class="character-item"
+        :ref="(element) => setCharacterElement(character.name, element)"
       >
         <v-card
-          :class="{ 'unselected-character': !isSelected(character.name) }"
+          :class="[
+            { 'unselected-character': !isSelected(character.name) },
+            { 'focused-support-character': highlightedCharacterName === character.name },
+          ]"
           @click="toggleCharacter(character.name)"
           class="character-card"
           elevation="2"
@@ -75,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
@@ -89,10 +93,25 @@ interface CharacterInfo {
   theme_2: string;
 }
 
+type FocusRequest = {
+  requestId: number;
+  characterName: string;
+  targetTab: 'search' | 'support';
+};
+
+const props = defineProps<{
+  focusRequest: FocusRequest | null;
+}>();
+
 const characterStore = useCharacterStore();
 const searchSettingsStore = useSearchSettingsStore();
 const { characters } = storeToRefs(characterStore);
 const { selectedSupportCharacters } = storeToRefs(searchSettingsStore);
+
+const highlightedCharacterName = ref('');
+const characterElements = new Map<string, HTMLElement>();
+let focusHighlightTimeout: number | null = null;
+const FOCUS_HIGHLIGHT_DURATION_MS = 900;
 
 const ssrCharacters = computed(() => {
   const characterOrder = characters.value
@@ -106,19 +125,17 @@ const ssrCharacters = computed(() => {
       magic3heal: chara.magic3heal
     }));
 
-
-  // characters_info.jsonの順序に基づいてソート
   const sorted = characterOrder.sort((a, b) => {
     const aInfo = (characters_info as CharacterInfo[]).find(char => char.name_ja === a.chara);
     const bInfo = (characters_info as CharacterInfo[]).find(char => char.name_ja === b.chara);
-    
+
     if (!aInfo || !bInfo) {
       return 0;
     }
-    
+
     const aIndex = (characters_info as CharacterInfo[]).indexOf(aInfo);
     const bIndex = (characters_info as CharacterInfo[]).indexOf(bInfo);
-    
+
     return aIndex - bIndex;
   });
 
@@ -196,8 +213,51 @@ const deselectRegen = () => {
   );
 };
 
+function setCharacterElement(characterName: string, element: unknown) {
+  if (element instanceof HTMLElement) {
+    characterElements.set(characterName, element);
+    return;
+  }
+  characterElements.delete(characterName);
+}
+
+async function focusCharacterSetting(request: FocusRequest | null) {
+  if (!request || request.targetTab !== 'support') return;
+
+  await nextTick();
+  const targetElement = characterElements.get(request.characterName);
+  if (!targetElement) return;
+
+  highlightedCharacterName.value = request.characterName;
+  targetElement.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  });
+
+  if (focusHighlightTimeout !== null) {
+    window.clearTimeout(focusHighlightTimeout);
+  }
+  focusHighlightTimeout = window.setTimeout(() => {
+    highlightedCharacterName.value = '';
+  }, FOCUS_HIGHLIGHT_DURATION_MS);
+}
+
+watch(
+  () => props.focusRequest?.requestId,
+  () => {
+    if (!props.focusRequest || props.focusRequest.targetTab !== 'support') return;
+    void focusCharacterSetting(props.focusRequest);
+  }
+);
+
 onMounted(() => {
-  selectAll(); // コンポーネントがマウントされた時に全選択
+  selectAll();
+});
+
+onBeforeUnmount(() => {
+  if (focusHighlightTimeout !== null) {
+    window.clearTimeout(focusHighlightTimeout);
+  }
 });
 </script>
 
@@ -225,6 +285,12 @@ onMounted(() => {
   transform: scale(1.05);
 }
 
+.focused-support-character {
+  outline: 2px solid #d32f2f;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.22);
+}
+
 .unselected-character {
   opacity: 0.3;
   filter: grayscale(100%);
@@ -233,4 +299,4 @@ onMounted(() => {
 .character-image {
   object-fit: contain;
 }
-</style> 
+</style>

@@ -13,13 +13,13 @@
     <v-card-text>
       <v-window v-model="tab" disabled >
         <v-window-item value="search">
-          <SearchBody />
+          <SearchBody :focus-request="focusRequest" />
         </v-window-item>
         <v-window-item value="support">
-          <SupportBody />
+          <SupportBody :focus-request="focusRequest" />
         </v-window-item>
         <v-window-item value="result">
-          <ResultBody/>
+          <ResultBody @focus-character-setting="handleFocusCharacterSetting" />
         </v-window-item>
       </v-window>
     </v-card-text>
@@ -27,21 +27,40 @@
 </template>
 
 <script setup lang="ts">
-import {onMounted, ref} from 'vue';
+import { nextTick, onMounted, ref } from 'vue';
 import SearchHeader from '@/components/SearchHeader.vue';
 import SearchBody from '@/components/SearchBody.vue';
 import SupportBody from '@/components/SupportBody.vue';
 import ResultBody from '@/components/ResultBody.vue';
-import {useCharacterStore} from '@/store/characters';
+import { useCharacterStore } from '@/store/characters';
+
+type SearchTab = 'search' | 'support' | 'result';
+
+type FocusRequest = {
+  requestId: number;
+  characterName: string;
+  targetTab: Exclude<SearchTab, 'result'>;
+};
 
 const characterStore = useCharacterStore();
 
-const tab = ref('search');
-const searchStarted = ref(false);
+const tab = ref<SearchTab>('search');
+const focusRequest = ref<FocusRequest | null>(null);
+let focusRequestSequence = 0;
 
 const handleSearchStarted = () => {
-  tab.value = 'result'; // タブを検索結果に切り替える
-  searchStarted.value = true; // 検索が開始されたことを示す
+  tab.value = 'result';
+};
+
+const handleFocusCharacterSetting = async (payload: Omit<FocusRequest, 'requestId'>) => {
+  tab.value = payload.targetTab;
+  await nextTick();
+
+  focusRequestSequence += 1;
+  focusRequest.value = {
+    ...payload,
+    requestId: focusRequestSequence,
+  };
 };
 
 onMounted(() => {

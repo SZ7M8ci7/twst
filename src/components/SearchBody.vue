@@ -19,8 +19,10 @@
       <div v-else>
         <!-- 表示件数が多いので仮想スクロールを使う -->
         <v-data-table-virtual
+          ref="characterTable"
           :headers="headers"
           :items="visibleCharacters"
+          :row-props="getRowProps"
           item-value="id"
           item-height="52"
           height="70vh"
@@ -146,12 +148,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onBeforeMount, onMounted } from 'vue';
+import { computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
+
+type FocusRequest = {
+  requestId: number;
+  characterName: string;
+  targetTab: 'search' | 'support';
+};
+
+const props = defineProps<{
+  focusRequest: FocusRequest | null;
+}>();
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
@@ -202,6 +214,93 @@ const headers = computed(() => [
   { title: t('search.other'), value: 'etc', sortable: false },
   { title: 'edit', value: 'edit', sortable: false },
 ]);
+
+const characterTable = ref<{ scrollToIndex: (index: number) => void; $el?: Element } | null>(null);
+const focusedCharacterName = ref('');
+let focusHighlightTimeout: number | null = null;
+const FOCUS_HIGHLIGHT_DURATION_MS = 900;
+
+const getCharacterRowId = (name: string) => `search-character-row-${encodeURIComponent(name)}`;
+
+const waitForAnimationFrame = () => new Promise<void>((resolve) => {
+  window.requestAnimationFrame(() => resolve());
+});
+
+const getCharacterTableWrapper = () => {
+  const tableRoot = characterTable.value?.$el;
+  if (!(tableRoot instanceof HTMLElement)) return null;
+  return tableRoot.querySelector<HTMLElement>('.v-table__wrapper');
+};
+
+async function scrollToCharacterRow(targetIndex: number, rowId: string) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    characterTable.value?.scrollToIndex(targetIndex);
+    await nextTick();
+    await waitForAnimationFrame();
+
+    const targetRow = document.getElementById(rowId);
+    if (targetRow) {
+      targetRow.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+      return;
+    }
+  }
+
+  getCharacterTableWrapper()?.scrollTo({
+    top: targetIndex * 52,
+    behavior: 'smooth',
+  });
+}
+
+
+const getRowProps = ({ item }: { item: { name: string } }) => ({
+  id: getCharacterRowId(item.name),
+  class: item.name === focusedCharacterName.value ? 'focused-character-row' : undefined,
+});
+
+async function focusCharacterSetting(request: FocusRequest | null) {
+  if (!request || request.targetTab !== 'search' || loadingImgUrl.value) return;
+
+  const targetCharacter = characters.value.find(character => character.name === request.characterName);
+  if (!targetCharacter) return;
+
+  if (!targetCharacter.visible) {
+    targetCharacter.visible = true;
+    await nextTick();
+  }
+
+  const targetIndex = visibleCharacters.value.findIndex(character => character.name === request.characterName);
+  if (targetIndex < 0) return;
+
+  focusedCharacterName.value = request.characterName;
+
+  const rowId = getCharacterRowId(request.characterName);
+  await nextTick();
+  await scrollToCharacterRow(targetIndex, rowId);
+
+  if (focusHighlightTimeout !== null) {
+    window.clearTimeout(focusHighlightTimeout);
+  }
+  focusHighlightTimeout = window.setTimeout(() => {
+    focusedCharacterName.value = '';
+  }, FOCUS_HIGHLIGHT_DURATION_MS);
+}
+
+watch(
+  () => props.focusRequest?.requestId,
+  () => {
+    if (!props.focusRequest || props.focusRequest.targetTab !== 'search' || loadingImgUrl.value) return;
+    void focusCharacterSetting(props.focusRequest);
+  }
+);
+
+watch(loadingImgUrl, (isLoading) => {
+  if (!isLoading && props.focusRequest?.targetTab === 'search') {
+    void focusCharacterSetting(props.focusRequest);
+  }
+});
 
 // SSRのM3有無を考慮して選択数を数える
 function countSelectedMagics(character: any): number {
@@ -452,6 +551,12 @@ function applyHandCollection() {
   }
 }
 
+onBeforeUnmount(() => {
+  if (focusHighlightTimeout !== null) {
+    window.clearTimeout(focusHighlightTimeout);
+  }
+});
+
 onBeforeMount(() => {
   const promises = characters.value.map(character => {
     return import(`@/assets/img/${character.name}.webp`)
@@ -491,6 +596,11 @@ onMounted(() => {
   object-fit: cover;
 }
 
+:deep(.focused-character-row td) {
+  background-color: rgba(211, 47, 47, 0.16) !important;
+  transition: background-color 0.3s ease;
+}
+
 .controls-container {
   display: flex;
   flex-wrap: wrap;
@@ -510,7 +620,7 @@ onMounted(() => {
 }
 
 @media (max-width: 600px) {
-  .controls-container {
+.controls-container {
     flex-direction: column;
     align-items: center;
   }
