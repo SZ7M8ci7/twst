@@ -53,13 +53,15 @@
       <div
         v-for="character in ssrCharacters"
         :key="character.name"
-        class="character-item"
+        :class="[
+          'character-item',
+          { 'focused-support-character': highlightedCharacterName === character.name },
+        ]"
         :ref="(element) => setCharacterElement(character.name, element)"
       >
         <v-card
           :class="[
             { 'unselected-character': !isSelected(character.name) },
-            { 'focused-support-character': highlightedCharacterName === character.name },
           ]"
           @click="toggleCharacter(character.name)"
           class="character-card"
@@ -111,7 +113,7 @@ const { selectedSupportCharacters } = storeToRefs(searchSettingsStore);
 const highlightedCharacterName = ref('');
 const characterElements = new Map<string, HTMLElement>();
 let focusHighlightTimeout: number | null = null;
-const FOCUS_HIGHLIGHT_DURATION_MS = 900;
+const FOCUS_HIGHLIGHT_DURATION_MS = 1300;
 
 const ssrCharacters = computed(() => {
   const characterOrder = characters.value
@@ -270,6 +272,8 @@ onBeforeUnmount(() => {
 
 .character-item {
   flex: 0 0 auto;
+  position: relative;
+  overflow: visible;
 }
 
 .character-card {
@@ -279,6 +283,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: center;
   padding: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .character-card:hover {
@@ -286,9 +292,46 @@ onBeforeUnmount(() => {
 }
 
 .focused-support-character {
-  outline: 2px solid #d32f2f;
-  outline-offset: 1px;
-  box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.22);
+  isolation: isolate;
+  z-index: 20;
+}
+
+.focused-support-character .character-card {
+  z-index: 21;
+}
+
+.focused-support-character::before,
+.focused-support-character::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 4px solid #ff3b30;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.focused-support-character::before {
+  z-index: 22;
+  opacity: 1;
+}
+
+.focused-support-character::after {
+  z-index: 23;
+  opacity: 0.95;
+  will-change: transform, opacity;
+  animation: support-focus-pulse 0.78s linear infinite alternate;
+}
+
+@keyframes support-focus-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: scale(1.36);
+    opacity: 0;
+  }
 }
 
 .unselected-character {
