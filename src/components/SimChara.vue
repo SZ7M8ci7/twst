@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="component-container">
     <div>
       <v-row dense>
@@ -189,8 +189,10 @@ import BuffDropdown from './BuffDropdown.vue';
 import SimCharaDetailModal from './SimCharaDetailModal.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { useHandCollectionStore } from '@/store/handCollection';
+import { getInputMaxLevel } from '@/constants/levels';
 import charactersInfo from '@/assets/characters_info.json';
 import { buffDragPayload } from '@/utils/buffDragState';
+import { processCharacterSelection } from '@/utils/characterSelection';
 
 const simulatorStore = useSimulatorStore();
 const handCollectionStore = useHandCollectionStore();
@@ -274,8 +276,6 @@ const shakingStates = ref( {
       });
 let shakeTimeout = null;
 
-// 共通関数をインポート
-import { processCharacterSelection } from '@/utils/characterSelection';
 
 const addBuff = () => {
   const character = simulatorStore.deckCharacters[props.charaIndex];
@@ -799,8 +799,7 @@ const toggleM = (index) => {
 
 // 最大レベルを取得する関数
 const getMaxLevel = (rare) => {
-  const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
-  return levelDict[rare] || 110;
+  return getInputMaxLevel(rare);
 };
 
 // レア度に応じて表示するマジックの数を取得

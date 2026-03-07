@@ -336,16 +336,6 @@ const characterOrder = computed(() =>
   charactersInfo.map((info: any) => info.name_ja)
 );
 
-// 最大レベルをキャッシュ化
-const getMaxLevelCached = (rare: string): number => {
-  switch (rare) {
-    case 'SSR': return 110;
-    case 'SR': return 90;
-    case 'R': return 70;
-    default: return 70;
-  }
-};
-
 // Computed Properties
 const filteredCharacters = computed(() => {
   if (loading.value || !characters.value) {
@@ -492,7 +482,12 @@ function updateM3(cardName: string, isM3: boolean) {
 }
 
 function getMaxLevel(rare: string): number {
-  return getMaxLevelCached(rare);
+  switch (rare) {
+    case 'SSR': return 110;
+    case 'SR': return 90;
+    case 'R': return 70;
+    default: return 70;
+  }
 }
 
 // 変更追跡機能

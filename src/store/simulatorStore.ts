@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive, watch, nextTick } from 'vue';
 import { calculateCharacterStats, recalculateHP, recalculateATK } from '@/utils/calculations';
+import { getInputMaxLevel, getStatScalingMaxLevel } from '@/constants/levels';
 import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { useHandCollectionStore } from '@/store/handCollection';
 
@@ -430,8 +431,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
     const oldLevel = character.level;
     
     // レベルが有効な範囲内かチェック
-    const maxLevel = character.rare === 'SSR' ? 110 : character.rare === 'SR' ? 90 : 70;
-    const validLevel = Math.max(0, Math.min(level, maxLevel));
+    const validLevel = Math.max(0, Math.min(level, getInputMaxLevel(character.rare)));
     
     character.level = validLevel;
     
@@ -453,7 +453,6 @@ export const useSimulatorStore = defineStore('simulator', () => {
     character.max_hp = character.originalMaxHP || character.hp;
     character.max_atk = character.originalMaxATK || character.atk;
     
-    const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
     // 現在の手持ち設定に基づいてHP/ATKを再計算
     // これにより、手持ち設定が変更された後の置き換えでも正しいステータスが適用される
     // ignoreHandCollectionがtrueの場合は手持ち設定を無視
@@ -461,14 +460,15 @@ export const useSimulatorStore = defineStore('simulator', () => {
       const handCard = handCollectionStore.getHandCard(character.name);
       if (handCard.isOwned) {
         // 手持ち設定ONで所持している場合、手持ちレベルで再計算
-        character.level = Number(handCard.level);
-        character.hp = recalculateHP(character, Number(handCard.level), handCard.isLimitBreak);
-        character.atk = recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
+        const handLevel = Math.max(0, Math.min(Number(handCard.level), getStatScalingMaxLevel(character.rare)));
+        character.level = handLevel;
+        character.hp = recalculateHP(character, handLevel, handCard.isLimitBreak);
+        character.atk = recalculateATK(character, handLevel, handCard.isLimitBreak);
         character.isBonusSelected = handCard.isLimitBreak;
         character.hasM3 = handCard.isM3;
       } else {
         // 手持ち設定ONで所持していない場合、完凸で計算
-        character.level = levelDict[character.rare as keyof typeof levelDict] || 110;
+        character.level = getStatScalingMaxLevel(character.rare);
         character.hp = recalculateHP(character, character.level, true);
         character.atk = recalculateATK(character, character.level, true);
         character.isBonusSelected = true;
@@ -484,7 +484,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
         character.atk = character.originalMaxATK;
       }
       // フルステータスの場合の設定
-      character.level = levelDict[character.rare as keyof typeof levelDict] || 110;
+      character.level = getStatScalingMaxLevel(character.rare);
       character.isBonusSelected = true;
       character.hasM3 = true;
     }

@@ -1,5 +1,6 @@
 // キャラクター選択の共通ロジック
 import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
+import { getStatScalingMaxLevel } from '@/constants/levels';
 import { useHandCollectionStore } from '@/store/handCollection';
 
 // バフの強さを判定するヘルパー関数
@@ -44,17 +45,15 @@ export const loadCharacterImage = async (characterName: string) => {
 export const processCharacterSelection = async (chara: any, customLevel?: number, ignoreHandCollection = false) => {
   const handCollectionStore = useHandCollectionStore();
   
-  const levelDict: { [key: string]: number } = {'R': 70, 'SR': 90, 'SSR': 110};
-  
   // 手持ちコレクション設定を確認
-  let characterLevel = customLevel || levelDict[chara.rare];
+  let characterLevel = customLevel || getStatScalingMaxLevel(chara.rare);
   let bonusSelected = true;
   
   // デッキ探索からの復元時は手持ち設定を無視
   if (!ignoreHandCollection && handCollectionStore.useHandCollection) {
     const handCard = handCollectionStore.getHandCard(chara.name);
     if (handCard.isOwned) {
-      characterLevel = Number(handCard.level);
+      characterLevel = Math.max(0, Math.min(Number(handCard.level), getStatScalingMaxLevel(chara.rare)));
       bonusSelected = handCard.isLimitBreak;
     } else {
       characterLevel = 1;

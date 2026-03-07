@@ -1,3 +1,5 @@
+import { getStatScalingMaxLevel } from '@/constants/levels';
+
 // バフの定数
 export const atkbuffDict: { [key: string]: string } = {};
 for (let i = 1; i <= 10; i++) {
@@ -652,8 +654,8 @@ export function calculateStatFromLevel(
   level: number,
   isLimitBreak: boolean
 ): number {
-  const levelDict = {'R': 70, 'SR': 90, 'SSR': 110};
-  const maxLevel = levelDict[rare as keyof typeof levelDict] || 110;
+  // SSR keeps Lv110 as the stat-scaling baseline and extends the same slope for Lv111+. 
+  const maxLevel = getStatScalingMaxLevel(rare);
   
   // base値が0の場合は計算式から算出
   const calculatedBaseStat = baseStat || Math.floor(maxStat / (rare === 'SSR' ? 4.7 : rare === 'SR' ? 4.3 : 4.2));

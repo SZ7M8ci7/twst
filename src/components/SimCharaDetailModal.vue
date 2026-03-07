@@ -251,6 +251,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import { getInputMaxLevel } from '@/constants/levels';
 import charactersInfo from '@/assets/characters_info.json';
 
 const props = defineProps({
@@ -278,8 +279,7 @@ watch(() => isOpen.value, (newValue) => {
 });
 
 const getMaxLevel = (rare) => {
-  const levelDict = { 'R': 70, 'SR': 90, 'SSR': 110 };
-  return levelDict[rare] || 110;
+  return getInputMaxLevel(rare);
 };
 
 const addBuff = () => {
