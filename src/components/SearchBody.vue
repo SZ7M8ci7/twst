@@ -154,6 +154,7 @@ import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
+import { scrollElementWithinContainerToCenter, waitForLayoutStability } from '@/utils/scrollPosition';
 
 type FocusRequest = {
   requestId: number;
@@ -222,10 +223,6 @@ const FOCUS_HIGHLIGHT_DURATION_MS = 900;
 
 const getCharacterRowId = (name: string) => `search-character-row-${encodeURIComponent(name)}`;
 
-const waitForAnimationFrame = () => new Promise<void>((resolve) => {
-  window.requestAnimationFrame(() => resolve());
-});
-
 const getCharacterTableWrapper = () => {
   const tableRoot = characterTable.value?.$el;
   if (!(tableRoot instanceof HTMLElement)) return null;
@@ -233,23 +230,28 @@ const getCharacterTableWrapper = () => {
 };
 
 async function scrollToCharacterRow(targetIndex: number, rowId: string) {
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     characterTable.value?.scrollToIndex(targetIndex);
     await nextTick();
-    await waitForAnimationFrame();
+    await waitForLayoutStability(2);
 
     const targetRow = document.getElementById(rowId);
-    if (targetRow) {
-      targetRow.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
+    const tableWrapper = getCharacterTableWrapper();
+    if (targetRow instanceof HTMLElement && tableWrapper) {
+      scrollElementWithinContainerToCenter(tableWrapper, targetRow);
       return;
     }
   }
 
-  getCharacterTableWrapper()?.scrollTo({
-    top: targetIndex * 52,
+  const tableWrapper = getCharacterTableWrapper();
+  if (!tableWrapper) return;
+
+  const estimatedRowHeight = 52;
+  const fallbackTop = targetIndex * estimatedRowHeight - (tableWrapper.clientHeight - estimatedRowHeight) / 2;
+  const maxTop = Math.max(0, tableWrapper.scrollHeight - tableWrapper.clientHeight);
+
+  tableWrapper.scrollTo({
+    top: Math.max(0, Math.min(fallbackTop, maxTop)),
     behavior: 'smooth',
   });
 }
@@ -269,6 +271,7 @@ async function focusCharacterSetting(request: FocusRequest | null) {
   if (!targetCharacter.visible) {
     targetCharacter.visible = true;
     await nextTick();
+    await waitForLayoutStability(1);
   }
 
   const targetIndex = visibleCharacters.value.findIndex(character => character.name === request.characterName);
@@ -278,6 +281,7 @@ async function focusCharacterSetting(request: FocusRequest | null) {
 
   const rowId = getCharacterRowId(request.characterName);
   await nextTick();
+  await waitForLayoutStability(2);
   await scrollToCharacterRow(targetIndex, rowId);
 
   if (focusHighlightTimeout !== null) {

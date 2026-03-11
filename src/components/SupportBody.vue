@@ -86,6 +86,7 @@ import { useCharacterStore } from '@/store/characters';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
 import characters_info from '@/assets/characters_info.json';
+import { findNearestVerticalScrollContainer, scrollElementToViewportCenter, scrollElementWithinContainerToCenter, waitForLayoutStability } from '@/utils/scrollPosition';
 
 interface CharacterInfo {
   name_ja: string;
@@ -227,14 +228,19 @@ async function focusCharacterSetting(request: FocusRequest | null) {
   if (!request || request.targetTab !== 'support') return;
 
   await nextTick();
+  await waitForLayoutStability(2);
+
   const targetElement = characterElements.get(request.characterName);
   if (!targetElement) return;
 
   highlightedCharacterName.value = request.characterName;
-  targetElement.scrollIntoView({
-    behavior: 'smooth',
-    block: 'center',
-  });
+
+  const scrollContainer = findNearestVerticalScrollContainer(targetElement);
+  if (scrollContainer) {
+    scrollElementWithinContainerToCenter(scrollContainer, targetElement);
+  } else {
+    scrollElementToViewportCenter(targetElement);
+  }
 
   if (focusHighlightTimeout !== null) {
     window.clearTimeout(focusHighlightTimeout);

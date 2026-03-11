@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue';
+import { waitForLayoutStability } from '@/utils/scrollPosition';
 import SearchHeader from '@/components/SearchHeader.vue';
 import SearchBody from '@/components/SearchBody.vue';
 import SupportBody from '@/components/SupportBody.vue';
@@ -55,6 +56,7 @@ const handleSearchStarted = () => {
 const handleFocusCharacterSetting = async (payload: Omit<FocusRequest, 'requestId'>) => {
   tab.value = payload.targetTab;
   await nextTick();
+  await waitForLayoutStability(2);
 
   focusRequestSequence += 1;
   focusRequest.value = {
