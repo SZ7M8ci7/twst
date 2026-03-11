@@ -1,5 +1,5 @@
 <template>
-  <v-container style="min-width: 90%;">
+  <v-container fluid class="search-page-container">
     <div>
       <SearchHeader @search-started="handleSearchStarted" />
     </div>
@@ -10,7 +10,7 @@
       <v-tab value="support">{{ $t('search.support') }}</v-tab>
       <v-tab value="result">{{ $t('search.result') }}</v-tab>
     </v-tabs>
-    <v-card-text>
+    <v-card-text class="search-page-card-text">
       <v-window v-model="tab" disabled >
         <v-window-item value="search">
           <SearchBody :focus-request="focusRequest" />
@@ -69,3 +69,43 @@ onMounted(() => {
   characterStore.handlePageChange('searchPage');
 });
 </script>
+<style scoped>
+.search-page-container {
+  max-width: none;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.search-page-card-text {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+@media (max-width: 960px) {
+  .search-page-container {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .search-page-card-text {
+    padding-left: 2px;
+    padding-right: 2px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .search-page-container {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .search-page-card-text {
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+</style>

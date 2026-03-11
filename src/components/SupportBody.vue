@@ -1,9 +1,9 @@
 <template>
   <v-container class="pa-0">
-    <div class="d-flex justify-end mb-2">
+    <div class="support-toolbar">
       <v-btn
         color="primary"
-        class="mr-2"
+        class="support-toolbar-button"
         size="small"
         @click="selectAll"
       >
@@ -11,7 +11,7 @@
       </v-btn>
       <v-btn
         color="error"
-        class="mr-2"
+        class="support-toolbar-button"
         size="small"
         @click="deselectAll"
       >
@@ -19,7 +19,7 @@
       </v-btn>
       <v-btn
         color="success"
-        class="mr-2"
+        class="support-toolbar-button"
         size="small"
         @click="selectHeal"
       >
@@ -27,7 +27,7 @@
       </v-btn>
       <v-btn
         color="warning"
-        class="mr-2"
+        class="support-toolbar-button"
         size="small"
         @click="deselectHeal"
       >
@@ -35,7 +35,7 @@
       </v-btn>
       <v-btn
         color="success"
-        class="mr-2"
+        class="support-toolbar-button"
         size="small"
         @click="selectRegen"
       >
@@ -43,6 +43,7 @@
       </v-btn>
       <v-btn
         color="warning"
+        class="support-toolbar-button"
         size="small"
         @click="deselectRegen"
       >
@@ -270,6 +271,18 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.support-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.support-toolbar-button {
+  margin-right: 0 !important;
+}
+
 .character-grid {
   display: flex;
   flex-wrap: wrap;
@@ -347,5 +360,17 @@ onBeforeUnmount(() => {
 
 .character-image {
   object-fit: contain;
+}
+
+@media (max-width: 600px) {
+  .support-toolbar {
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .support-toolbar-button {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
 }
 </style>

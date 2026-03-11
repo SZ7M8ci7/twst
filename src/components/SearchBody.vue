@@ -1,6 +1,6 @@
 <template>
   <v-app>
-    <v-container>
+    <v-container class="search-body-container">
       <div class="controls-container">
         <div class="level-controls">
           <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0" :max="110"></v-text-field>
@@ -615,6 +615,11 @@ onMounted(() => {
   transition: background-color 0.3s ease;
 }
 
+.search-body-container {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
 .controls-container {
   display: flex;
   flex-wrap: wrap;
@@ -633,8 +638,20 @@ onMounted(() => {
   margin-left: auto;
 }
 
+@media (max-width: 960px) {
+  .search-body-container {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+}
+
 @media (max-width: 600px) {
-.controls-container {
+  .search-body-container {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .controls-container {
     flex-direction: column;
     align-items: center;
   }
