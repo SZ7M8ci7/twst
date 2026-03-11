@@ -155,6 +155,7 @@ import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { scrollElementWithinContainerToCenter, waitForLayoutStability } from '@/utils/scrollPosition';
+import { useDisplay } from 'vuetify';
 
 type FocusRequest = {
   requestId: number;
@@ -170,6 +171,7 @@ const { t } = useI18n();
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
+const { width } = useDisplay();
 const bulkLevel = ref(110);
 const loadingImgUrl = ref(true);
 const editModal = ref(false);
@@ -202,19 +204,27 @@ const visibleCharacters = computed(() => {
   return applyDefaultSort(filteredCharacters);
 });
 
-const headers = computed(() => [
-  { title: 'Lv', value: 'level', sortable: true },
-  { title: t('search.required'), value: 'required', sortable: true },
-  { title: t('search.useM1'), value: 'hasM1', sortable: false },
-  { title: t('search.useM2'), value: 'hasM2', sortable: false },
-  { title: t('search.useM3'), value: 'hasM3', sortable: false },
-  { title: t('search.character'), value: 'name', sortable: false },
-  { title: t('search.rarity'), value: 'rare', sortable: true },
-  { title: 'HP', value: 'hp', sortable: true },
-  { title: 'ATK', value: 'atk', sortable: true },
-  { title: t('search.other'), value: 'etc', sortable: false },
-  { title: 'edit', value: 'edit', sortable: false },
-]);
+const shouldHideOtherColumn = computed(() => width.value < 960);
+
+const headers = computed(() => {
+  const nextHeaders = [
+    { title: 'Lv', value: 'level', sortable: true },
+    { title: t('search.required'), value: 'required', sortable: true },
+    { title: t('search.useM1'), value: 'hasM1', sortable: false },
+    { title: t('search.useM2'), value: 'hasM2', sortable: false },
+    { title: t('search.useM3'), value: 'hasM3', sortable: false },
+    { title: t('search.character'), value: 'name', sortable: false },
+    { title: t('search.rarity'), value: 'rare', sortable: true },
+    { title: 'HP', value: 'hp', sortable: true },
+    { title: 'ATK', value: 'atk', sortable: true },
+    { title: t('search.other'), value: 'etc', sortable: false },
+    { title: 'edit', value: 'edit', sortable: false },
+  ];
+
+  return shouldHideOtherColumn.value
+    ? nextHeaders.filter((header) => header.value !== 'etc')
+    : nextHeaders;
+});
 
 const characterTable = ref<{ scrollToIndex: (index: number) => void; $el?: Element } | null>(null);
 const focusedCharacterName = ref('');
@@ -233,7 +243,7 @@ async function scrollToCharacterRow(targetIndex: number, rowId: string) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     characterTable.value?.scrollToIndex(targetIndex);
     await nextTick();
-    await waitForLayoutStability(2);
+    await waitForLayoutStability(3);
 
     const targetRow = document.getElementById(rowId);
     const tableWrapper = getCharacterTableWrapper();
@@ -271,7 +281,7 @@ async function focusCharacterSetting(request: FocusRequest | null) {
   if (!targetCharacter.visible) {
     targetCharacter.visible = true;
     await nextTick();
-    await waitForLayoutStability(1);
+    await waitForLayoutStability(3);
   }
 
   const targetIndex = visibleCharacters.value.findIndex(character => character.name === request.characterName);
@@ -281,7 +291,7 @@ async function focusCharacterSetting(request: FocusRequest | null) {
 
   const rowId = getCharacterRowId(request.characterName);
   await nextTick();
-  await waitForLayoutStability(2);
+  await waitForLayoutStability(3);
   await scrollToCharacterRow(targetIndex, rowId);
 
   if (focusHighlightTimeout !== null) {

@@ -228,7 +228,7 @@ async function focusCharacterSetting(request: FocusRequest | null) {
   if (!request || request.targetTab !== 'support') return;
 
   await nextTick();
-  await waitForLayoutStability(2);
+  await waitForLayoutStability(5);
 
   const targetElement = characterElements.get(request.characterName);
   if (!targetElement) return;

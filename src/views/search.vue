@@ -56,7 +56,7 @@ const handleSearchStarted = () => {
 const handleFocusCharacterSetting = async (payload: Omit<FocusRequest, 'requestId'>) => {
   tab.value = payload.targetTab;
   await nextTick();
-  await waitForLayoutStability(2);
+  await waitForLayoutStability(5);
 
   focusRequestSequence += 1;
   focusRequest.value = {
