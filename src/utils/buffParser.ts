@@ -5,6 +5,7 @@ export type ParsedBuff = {
   buffOption: 'ATKUP' | 'ダメージUP' | '属性ダメUP' | 'クリティカル';
   powerOption: string; // '極小' | '小' | '中' | '大' | '極大' | '1/1' | '1/2' | '1/3' | '2/3'
   levelOption: number;
+  attributeOption?: '火' | '水' | '木' | '無';
   // 追加情報（任意）
   durationTurns?: number; // 効果ターン（例: 自/3T -> 3）
   isSelf?: boolean; // 自対象か
@@ -89,12 +90,14 @@ export function parseMagicBuffsFromEtc(chara: any, opts: ParseOptions = {}): Par
 
     const power = getPowerOption(item);
     const level = 10;
+    const attributeMatch = item.match(/^(火|水|木|無)属性ダメージUP/);
 
     results.push({
       magicOption,
       buffOption: buffType,
       powerOption: power,
       levelOption: level,
+      attributeOption: attributeMatch ? (attributeMatch[1] as ParsedBuff['attributeOption']) : undefined,
       durationTurns,
       isSelf,
     });

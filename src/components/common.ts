@@ -2,6 +2,8 @@ import { Character, useCharacterStore} from '@/store/characters'
 import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useSearchResultStore } from '@/store/searchResult';
+import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
+import { isM3Unlocked } from '@/utils/totsu';
 import { storeToRefs } from 'pinia';
 import { DeckSearchResultsManager, type DeckResult } from './TopNResultsManager';
 const searchSettingStore = useSearchSettingsStore();
@@ -392,7 +394,7 @@ const damageBuffMap: { [key: string]: number } = {
   "ダメUP(極大)": 0.1875,
   "属性ダメUP(極小)": 0.03,
   "属性ダメUP(小)": 0.06,
-  "属性ダメUP(中)": 0.1005,
+  "属性ダメUP(中)": 0.105,
   "属性ダメUP(大)": 0.15,
   "属性ダメUP(極大)": 0.27,
 };
@@ -431,6 +433,13 @@ function getMagicBuffTotalsAll(
       const factor = (atkBuffMap as any)[key] || 1;
       totals[idx].atkDelta += (factor - 1);
     } else if (b.buffOption === 'ダメージUP' || b.buffOption === '属性ダメUP') {
+      if (
+        b.buffOption === '属性ダメUP' &&
+        b.attributeOption &&
+        b.attributeOption !== (chara as any)[`magic${idx}atr`]
+      ) {
+        continue;
+      }
       const prefix = b.buffOption === 'ダメージUP' ? 'ダメUP' : '属性ダメUP';
       const key = `${prefix}(${b.powerOption})`;
       const add = (damageBuffMap as any)[key] || 0;
@@ -911,6 +920,13 @@ export function calcDeckStatus(
     let atkBuddyRate = 0;
     // バディHP増加分加算
     let increasedHP = 0;
+    let buddyDamageRate = 0;
+    let buddyCriticalMultiplier = 1;
+    let buddyFireDamageRate = 0;
+    let buddyWaterDamageRate = 0;
+    let buddyWoodDamageRate = 0;
+    let buddyCosmicDamageRate = 0;
+    let buddyContinueHeal = 0;
     const buddy1Id = charaAny.buddy1IdCached as number;
     const buddy2Id = charaAny.buddy2IdCached as number;
     const buddy3Id = charaAny.buddy3IdCached as number;
@@ -920,6 +936,27 @@ export function calcDeckStatus(
     const buddy1AtkRate = needAttackRateFromBuddy ? (charaAny.buddy1AtkRateCached as number) : 0;
     const buddy2AtkRate = needAttackRateFromBuddy ? (charaAny.buddy2AtkRateCached as number) : 0;
     const buddy3AtkRate = needAttackRateFromBuddy ? (charaAny.buddy3AtkRateCached as number) : 0;
+    const buddy1DamageRate = needAnyDamageMetric ? (charaAny.buddy1DamageRateCached as number) : 0;
+    const buddy2DamageRate = needAnyDamageMetric ? (charaAny.buddy2DamageRateCached as number) : 0;
+    const buddy3DamageRate = needAnyDamageMetric ? (charaAny.buddy3DamageRateCached as number) : 0;
+    const buddy1Critical = needAnyDamageMetric ? (charaAny.buddy1CriticalCached as number) : 1;
+    const buddy2Critical = needAnyDamageMetric ? (charaAny.buddy2CriticalCached as number) : 1;
+    const buddy3Critical = needAnyDamageMetric ? (charaAny.buddy3CriticalCached as number) : 1;
+    const buddy1FireDamage = needAnyDamageMetric ? (charaAny.buddy1FireDamageRateCached as number) : 0;
+    const buddy1WaterDamage = needAnyDamageMetric ? (charaAny.buddy1WaterDamageRateCached as number) : 0;
+    const buddy1WoodDamage = needAnyDamageMetric ? (charaAny.buddy1WoodDamageRateCached as number) : 0;
+    const buddy1CosmicDamage = needAnyDamageMetric ? (charaAny.buddy1CosmicDamageRateCached as number) : 0;
+    const buddy2FireDamage = needAnyDamageMetric ? (charaAny.buddy2FireDamageRateCached as number) : 0;
+    const buddy2WaterDamage = needAnyDamageMetric ? (charaAny.buddy2WaterDamageRateCached as number) : 0;
+    const buddy2WoodDamage = needAnyDamageMetric ? (charaAny.buddy2WoodDamageRateCached as number) : 0;
+    const buddy2CosmicDamage = needAnyDamageMetric ? (charaAny.buddy2CosmicDamageRateCached as number) : 0;
+    const buddy3FireDamage = needAnyDamageMetric ? (charaAny.buddy3FireDamageRateCached as number) : 0;
+    const buddy3WaterDamage = needAnyDamageMetric ? (charaAny.buddy3WaterDamageRateCached as number) : 0;
+    const buddy3WoodDamage = needAnyDamageMetric ? (charaAny.buddy3WoodDamageRateCached as number) : 0;
+    const buddy3CosmicDamage = needAnyDamageMetric ? (charaAny.buddy3CosmicDamageRateCached as number) : 0;
+    const buddy1ContinueHeal = charaAny.buddy1ContinueHealCached as number;
+    const buddy2ContinueHeal = charaAny.buddy2ContinueHealCached as number;
+    const buddy3ContinueHeal = charaAny.buddy3ContinueHealCached as number;
     if (useBuddyBitPresence) {
       if (assumePreparedCache) {
         if (!needsAnyBuddyAuxCounter) {
@@ -1110,12 +1147,46 @@ export function calcDeckStatus(
         }
       }
     }
+    const buddy1Active = buddy1Id >= 0 && (((charaAny.buddy1BitLowCached as number) & presenceLow) | ((charaAny.buddy1BitHighCached as number) & presenceHigh)) !== 0;
+    const buddy2Active = buddy2Id >= 0 && (((charaAny.buddy2BitLowCached as number) & presenceLow) | ((charaAny.buddy2BitHighCached as number) & presenceHigh)) !== 0;
+    const buddy3Active = buddy3Id >= 0 && (((charaAny.buddy3BitLowCached as number) & presenceLow) | ((charaAny.buddy3BitHighCached as number) & presenceHigh)) !== 0;
+
+    if (buddy1Active) buddyContinueHeal += buddy1ContinueHeal;
+    if (buddy2Active) buddyContinueHeal += buddy2ContinueHeal;
+    if (buddy3Active) buddyContinueHeal += buddy3ContinueHeal;
+
+    if (needAnyDamageMetric) {
+      if (buddy1Active) {
+        buddyDamageRate += buddy1DamageRate;
+        if (buddy1Critical > buddyCriticalMultiplier) buddyCriticalMultiplier = buddy1Critical;
+        buddyFireDamageRate += buddy1FireDamage;
+        buddyWaterDamageRate += buddy1WaterDamage;
+        buddyWoodDamageRate += buddy1WoodDamage;
+        buddyCosmicDamageRate += buddy1CosmicDamage;
+      }
+      if (buddy2Active) {
+        buddyDamageRate += buddy2DamageRate;
+        if (buddy2Critical > buddyCriticalMultiplier) buddyCriticalMultiplier = buddy2Critical;
+        buddyFireDamageRate += buddy2FireDamage;
+        buddyWaterDamageRate += buddy2WaterDamage;
+        buddyWoodDamageRate += buddy2WoodDamage;
+        buddyCosmicDamageRate += buddy2CosmicDamage;
+      }
+      if (buddy3Active) {
+        buddyDamageRate += buddy3DamageRate;
+        if (buddy3Critical > buddyCriticalMultiplier) buddyCriticalMultiplier = buddy3Critical;
+        buddyFireDamageRate += buddy3FireDamage;
+        buddyWaterDamageRate += buddy3WaterDamage;
+        buddyWoodDamageRate += buddy3WoodDamage;
+        buddyCosmicDamageRate += buddy3CosmicDamage;
+      }
+    }
     // Opt-33: Math.min を分岐で置換
     if (needIncreasedHPBuddy && increasedHP < deckMinIncreasedHPBuddy) {
       deckMinIncreasedHPBuddy = increasedHP;
     }
     // HP回復分はキャラ単位で事前計算した値を加算
-    const totalHeal = charaAny.totalHealCached as number;
+    const totalHeal = (charaAny.totalHealCached as number) + buddyContinueHeal;
     deckTotalHeal += totalHeal;
     if (includeDetails) {
       healList!.push(totalHeal);
@@ -1266,6 +1337,21 @@ export function calcDeckStatus(
       let magic1vsKiDamage = 0;
       let magic2vsKiDamage = 0;
       let magic3vsKiDamage = 0;
+      const totalsAll = (useM1 || useM2 || useM3)
+        ? (
+          (useM3
+            ? (charaAny.magicBuffTotalsAllowM3Cached as Array<{ atkDelta: number; dmgDelta: number }> | undefined)
+            : (charaAny.magicBuffTotalsNoM3Cached as Array<{ atkDelta: number; dmgDelta: number }> | undefined)
+          )
+          ?? getMagicBuffTotalsAll(chara, useM3)
+        )
+        : null;
+      const m1Totals = useM1 ? totalsAll![1] : zeroTotalsRefForDisabledMagic;
+      const m2Totals = useM2 ? totalsAll![2] : zeroTotalsRefForDisabledMagic;
+      const m3Totals = useM3 ? totalsAll![3] : zeroTotalsRefForDisabledMagic;
+      const m1BuddyDamageDelta = buddyDamageRate + (chara.magic1atr === '火' ? buddyFireDamageRate : chara.magic1atr === '水' ? buddyWaterDamageRate : chara.magic1atr === '木' ? buddyWoodDamageRate : buddyCosmicDamageRate);
+      const m2BuddyDamageDelta = buddyDamageRate + (chara.magic2atr === '火' ? buddyFireDamageRate : chara.magic2atr === '水' ? buddyWaterDamageRate : chara.magic2atr === '木' ? buddyWoodDamageRate : buddyCosmicDamageRate);
+      const m3BuddyDamageDelta = buddyDamageRate + (chara.magic3atr === '火' ? buddyFireDamageRate : chara.magic3atr === '水' ? buddyWaterDamageRate : chara.magic3atr === '木' ? buddyWoodDamageRate : buddyCosmicDamageRate);
 
       if (usePreparedLinearDamagePath) {
         // 高速経路:
@@ -1275,6 +1361,10 @@ export function calcDeckStatus(
           magic1Damage =
             (charaAny.m1DamageBaseCached as number) +
             (charaAny.m1DamageBuddyCoeffCached as number) * atkBuddyRate;
+          if (m1BuddyDamageDelta !== 0) {
+            magic1Damage += baseATK * (charaAny.m1ComboRateCached as number) * m1BuddyDamageDelta * (1 + m1Totals.atkDelta + atkBuddyRate);
+          }
+          if (buddyCriticalMultiplier !== 1) magic1Damage *= buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic1AdvantageDamage = magic1Damage * (charaAny.m1AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic1vsHiDamage = magic1Damage * (charaAny.m1VsFireCached as number);
           if (needReferenceVsMizuDamage) magic1vsMizuDamage = magic1Damage * (charaAny.m1VsWaterCached as number);
@@ -1291,6 +1381,11 @@ export function calcDeckStatus(
               (charaAny.m2DamageBaseCached as number) +
               (charaAny.m2DamageBuddyCoeffCached as number) * atkBuddyRate
             );
+          if (m2BuddyDamageDelta !== 0) {
+            const comboRate = isDuoPow ? (charaAny.m2DuoComboRateCached as number) : (charaAny.m2ComboRateCached as number);
+            magic2Damage += baseATK * comboRate * m2BuddyDamageDelta * (1 + m2Totals.atkDelta + atkBuddyRate);
+          }
+          if (buddyCriticalMultiplier !== 1) magic2Damage *= buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic2AdvantageDamage = magic2Damage * (charaAny.m2AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic2vsHiDamage = magic2Damage * (charaAny.m2VsFireCached as number);
           if (needReferenceVsMizuDamage) magic2vsMizuDamage = magic2Damage * (charaAny.m2VsWaterCached as number);
@@ -1300,6 +1395,10 @@ export function calcDeckStatus(
           magic3Damage =
             (charaAny.m3DamageBaseCached as number) +
             (charaAny.m3DamageBuddyCoeffCached as number) * atkBuddyRate;
+          if (m3BuddyDamageDelta !== 0) {
+            magic3Damage += baseATK * (charaAny.m3ComboRateCached as number) * m3BuddyDamageDelta * (1 + m3Totals.atkDelta + atkBuddyRate);
+          }
+          if (buddyCriticalMultiplier !== 1) magic3Damage *= buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic3AdvantageDamage = magic3Damage * (charaAny.m3AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic3vsHiDamage = magic3Damage * (charaAny.m3VsFireCached as number);
           if (needReferenceVsMizuDamage) magic3vsMizuDamage = magic3Damage * (charaAny.m3VsWaterCached as number);
@@ -1310,26 +1409,16 @@ export function calcDeckStatus(
         // 事前展開キャッシュが無いケースでも同一結果を返すため、従来式をそのまま計算する。
         // 等倍ダメージ加算（使用可能なマジックのみ・etc→buffs[]の合算を使用）
         // Opt-129: バフ合算を一度だけ取得
-        const totalsAll = (useM1 || useM2 || useM3)
-          ? (
-            (charaAny.magicBuffTotalsCached as Array<{ atkDelta: number; dmgDelta: number }> | undefined)
-            ?? getMagicBuffTotalsAll(chara, useM3)
-          )
-          : null;
-        const m1Totals = useM1 ? totalsAll![1] : zeroTotalsRefForDisabledMagic;
-        const m2Totals = useM2 ? totalsAll![2] : zeroTotalsRefForDisabledMagic;
-        const m3Totals = useM3 ? totalsAll![3] : zeroTotalsRefForDisabledMagic;
-
         const m1AtkDelta = m1Totals.atkDelta;
-        const m1DmgDelta = m1Totals.dmgDelta;
+        const m1DmgDelta = m1Totals.dmgDelta + m1BuddyDamageDelta;
         const m2AtkDelta = m2Totals.atkDelta;
-        const m2DmgDelta = m2Totals.dmgDelta;
+        const m2DmgDelta = m2Totals.dmgDelta + m2BuddyDamageDelta;
         const m3AtkDelta = m3Totals.atkDelta;
-        const m3DmgDelta = m3Totals.dmgDelta;
+        const m3DmgDelta = m3Totals.dmgDelta + m3BuddyDamageDelta;
         if (useM1) {
           const effectiveAtk = baseATK * (1 + atkBuddyRate + m1AtkDelta);
           const atkRate = (charaAny.m1BaseRateCached as number) + m1DmgDelta;
-          magic1Damage = effectiveAtk * atkRate * (charaAny.m1ComboRateCached as number);
+          magic1Damage = effectiveAtk * atkRate * (charaAny.m1ComboRateCached as number) * buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic1AdvantageDamage = magic1Damage * (charaAny.m1AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic1vsHiDamage = magic1Damage * (charaAny.m1VsFireCached as number);
           if (needReferenceVsMizuDamage) magic1vsMizuDamage = magic1Damage * (charaAny.m1VsWaterCached as number);
@@ -1341,7 +1430,7 @@ export function calcDeckStatus(
           const baseRate = isDuoPow ? (charaAny.m2DuoBaseRateCached as number) : (charaAny.m2BaseRateCached as number);
           const comboRate = isDuoPow ? (charaAny.m2DuoComboRateCached as number) : (charaAny.m2ComboRateCached as number);
           const atkRate = baseRate + m2DmgDelta;
-          magic2Damage = effectiveAtk * atkRate * comboRate;
+          magic2Damage = effectiveAtk * atkRate * comboRate * buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic2AdvantageDamage = magic2Damage * (charaAny.m2AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic2vsHiDamage = magic2Damage * (charaAny.m2VsFireCached as number);
           if (needReferenceVsMizuDamage) magic2vsMizuDamage = magic2Damage * (charaAny.m2VsWaterCached as number);
@@ -1350,7 +1439,7 @@ export function calcDeckStatus(
         if (useM3) {
           const effectiveAtk = baseATK * (1 + atkBuddyRate + m3AtkDelta);
           const atkRate = (charaAny.m3BaseRateCached as number) + m3DmgDelta;
-          magic3Damage = effectiveAtk * atkRate * (charaAny.m3ComboRateCached as number);
+          magic3Damage = effectiveAtk * atkRate * (charaAny.m3ComboRateCached as number) * buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic3AdvantageDamage = magic3Damage * (charaAny.m3AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic3vsHiDamage = magic3Damage * (charaAny.m3VsFireCached as number);
           if (needReferenceVsMizuDamage) magic3vsMizuDamage = magic3Damage * (charaAny.m3VsWaterCached as number);
@@ -1742,10 +1831,14 @@ function prepareCharacterSearchCache(chara: Character): void {
   charaAny.charaBitHighCached = charaBit.high;
   const useM1 = charaAny.hasM1 ?? true;
   const useM2 = charaAny.hasM2 ?? true;
-  const useM3 = chara.rare === 'SSR' ? (charaAny.hasM3 ?? true) : false;
+  const totsuCount = Number.isFinite(Number(charaAny.totsu))
+    ? Number(charaAny.totsu)
+    : ((charaAny.hasM3 ?? (chara.rare === 'SSR')) ? 3 : 0);
+  const useM3 = isM3Unlocked(chara.rare, totsuCount) || (chara.rare === 'SSR' && charaAny.hasM3 === true);
   charaAny.useM1Cached = useM1;
   charaAny.useM2Cached = useM2;
   charaAny.useM3Cached = useM3;
+  charaAny.totsuCached = totsuCount;
 
   const healRates = getMagicHealRates(chara);
   const magic1Rates = useM1 ? healRates.m1 : emptyHealRates;
@@ -1759,9 +1852,9 @@ function prepareCharacterSearchCache(chara: Character): void {
     (useM2 && isHealCard(chara.magic2heal) ? 1 : 0) +
     (useM3 && isHealCard(chara.magic3heal) ? 1 : 0);
 
-  const buddy1Rates = getBuddyRates(chara.buddy1s);
-  const buddy2Rates = getBuddyRates(chara.buddy2s);
-  const buddy3Rates = getBuddyRates(chara.buddy3s);
+  const buddy1Rates = getBuddyStatusSummary(getBuddyStatusForCharacter(chara, 1, { totsu: totsuCount, isActive: true }), 10);
+  const buddy2Rates = getBuddyStatusSummary(getBuddyStatusForCharacter(chara, 2, { totsu: totsuCount, isActive: true }), 10);
+  const buddy3Rates = getBuddyStatusSummary(getBuddyStatusForCharacter(chara, 3, { totsu: totsuCount, isActive: true }), 10);
   charaAny.buddy1IdCached = chara.buddy1c ? getCharaId(chara.buddy1c) : -1;
   charaAny.buddy2IdCached = chara.buddy2c ? getCharaId(chara.buddy2c) : -1;
   charaAny.buddy3IdCached = chara.buddy3c ? getCharaId(chara.buddy3c) : -1;
@@ -1774,16 +1867,37 @@ function prepareCharacterSearchCache(chara: Character): void {
   charaAny.buddy2BitHighCached = buddy2Bit.high;
   charaAny.buddy3BitLowCached = buddy3Bit.low;
   charaAny.buddy3BitHighCached = buddy3Bit.high;
-  charaAny.buddy1HpRateCached = buddy1Rates.hp;
-  charaAny.buddy2HpRateCached = buddy2Rates.hp;
-  charaAny.buddy3HpRateCached = buddy3Rates.hp;
+  charaAny.buddy1HpRateCached = buddy1Rates.hpRate;
+  charaAny.buddy2HpRateCached = buddy2Rates.hpRate;
+  charaAny.buddy3HpRateCached = buddy3Rates.hpRate;
   const baseHP = chara.calcBaseHP;
-  charaAny.buddy1HpIncreaseCached = baseHP * buddy1Rates.hp;
-  charaAny.buddy2HpIncreaseCached = baseHP * buddy2Rates.hp;
-  charaAny.buddy3HpIncreaseCached = baseHP * buddy3Rates.hp;
-  charaAny.buddy1AtkRateCached = buddy1Rates.atk;
-  charaAny.buddy2AtkRateCached = buddy2Rates.atk;
-  charaAny.buddy3AtkRateCached = buddy3Rates.atk;
+  charaAny.buddy1HpIncreaseCached = baseHP * buddy1Rates.hpRate;
+  charaAny.buddy2HpIncreaseCached = baseHP * buddy2Rates.hpRate;
+  charaAny.buddy3HpIncreaseCached = baseHP * buddy3Rates.hpRate;
+  charaAny.buddy1AtkRateCached = buddy1Rates.atkRate;
+  charaAny.buddy2AtkRateCached = buddy2Rates.atkRate;
+  charaAny.buddy3AtkRateCached = buddy3Rates.atkRate;
+  charaAny.buddy1DamageRateCached = buddy1Rates.damageRate;
+  charaAny.buddy2DamageRateCached = buddy2Rates.damageRate;
+  charaAny.buddy3DamageRateCached = buddy3Rates.damageRate;
+  charaAny.buddy1CriticalCached = buddy1Rates.criticalMultiplier;
+  charaAny.buddy2CriticalCached = buddy2Rates.criticalMultiplier;
+  charaAny.buddy3CriticalCached = buddy3Rates.criticalMultiplier;
+  charaAny.buddy1ContinueHealCached = baseHP * buddy1Rates.continueHealRate;
+  charaAny.buddy2ContinueHealCached = baseHP * buddy2Rates.continueHealRate;
+  charaAny.buddy3ContinueHealCached = baseHP * buddy3Rates.continueHealRate;
+  charaAny.buddy1FireDamageRateCached = buddy1Rates.attributeDamageRates['火'] || 0;
+  charaAny.buddy1WaterDamageRateCached = buddy1Rates.attributeDamageRates['水'] || 0;
+  charaAny.buddy1WoodDamageRateCached = buddy1Rates.attributeDamageRates['木'] || 0;
+  charaAny.buddy1CosmicDamageRateCached = buddy1Rates.attributeDamageRates['無'] || 0;
+  charaAny.buddy2FireDamageRateCached = buddy2Rates.attributeDamageRates['火'] || 0;
+  charaAny.buddy2WaterDamageRateCached = buddy2Rates.attributeDamageRates['水'] || 0;
+  charaAny.buddy2WoodDamageRateCached = buddy2Rates.attributeDamageRates['木'] || 0;
+  charaAny.buddy2CosmicDamageRateCached = buddy2Rates.attributeDamageRates['無'] || 0;
+  charaAny.buddy3FireDamageRateCached = buddy3Rates.attributeDamageRates['火'] || 0;
+  charaAny.buddy3WaterDamageRateCached = buddy3Rates.attributeDamageRates['水'] || 0;
+  charaAny.buddy3WoodDamageRateCached = buddy3Rates.attributeDamageRates['木'] || 0;
+  charaAny.buddy3CosmicDamageRateCached = buddy3Rates.attributeDamageRates['無'] || 0;
 
   const { buffByMagic, debuffByMagic } = getBuffDebuffCountsByMagic(chara);
   charaAny.totalBuffCached =
@@ -1917,7 +2031,7 @@ export async function calcDecks(t: (key: string) => string) {
     .filter(character => character.rare == 'SSR' && selectedSupportCharactersValue.includes(character.name))
     .map(chara => ({
       ...chara,
-      level: 110,
+      level: 120,
       calcBaseHP: 0,
       calcBaseATK: 0
     }));
@@ -1927,7 +2041,7 @@ export async function calcDecks(t: (key: string) => string) {
 
   for (let i = 0; i < nonZero.length; i++) {
     const chara = nonZero[i];
-    let maxLevel = 110;  // Default max level for SSR
+    let maxLevel = 120;  // Default max level for SSR
     if (chara.rare == 'SR') {
       maxLevel = 90;     // Max level for SR
     } else if (chara.rare == 'R') {

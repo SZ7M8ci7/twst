@@ -4,6 +4,7 @@ import { calculateCharacterStats, recalculateHP, recalculateATK } from '@/utils/
 import { getInputMaxLevel, getStatScalingMaxLevel } from '@/constants/levels';
 import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { useHandCollectionStore } from '@/store/handCollection';
+import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 function debounce(fn: Function, delay: number) {
   let timer: number | null = null;
@@ -32,6 +33,7 @@ interface Character {
   chara: string;
   name: string;
   level: number;
+  totsu: number;
   hp: number;
   atk: number;
   magic1Lv: number;
@@ -78,6 +80,7 @@ const createDefaultCharacter = (): Character => ({
   chara: '',
   name: '',
   level: 0,
+  totsu: 0,
   hp: 0,
   atk: 0,
   max_hp: 0,
@@ -115,10 +118,24 @@ const createDefaultCharacter = (): Character => ({
   isM3Selected: false
 });
 
+function syncLimitBreakState(character: Character) {
+  const normalizedTotsu = character.rare === 'SSR'
+    ? clampTotsuCount(character.totsu ?? (character.isBonusSelected ? 4 : 0))
+    : 0;
+
+  character.totsu = normalizedTotsu;
+  character.isBonusSelected = isMaxLimitBreak(normalizedTotsu);
+  character.hasM3 = isM3Unlocked(character.rare, normalizedTotsu);
+  if (!character.hasM3) {
+    character.isM3Selected = false;
+  }
+}
+
 function serializeDeckCharactersForStorage(deckCharacters: Character[]) {
   return deckCharacters.map(char => {
     const charCopy = JSON.parse(JSON.stringify(char));
     delete charCopy.imgUrl;
+    delete charCopy.buddyGeneratedBuffOverrides;
     return charCopy;
   });
 }
@@ -263,6 +280,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
     level: char.level,
     hp: char.hp,
     atk: char.atk,
+    totsu: char.totsu,
     rare: char.rare,
     isM1Selected: char.isM1Selected,
     isM2Selected: char.isM2Selected,
@@ -292,6 +310,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
           if ((newChar.rare === 'R' || newChar.rare === 'SR') && deckCharacters[index].isM3Selected) {
             deckCharacters[index].isM3Selected = false;
           }
+          syncLimitBreakState(deckCharacters[index]);
         }
       });
     }
@@ -415,6 +434,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
 
   // キャラクターの基本ステータスを計算（twstsimu.jsのchangeLevel関数に合わせる）
   function calculateBaseStats(character: Character) {
+    syncLimitBreakState(character);
     return {
       atk: recalculateATK(character, character.level, character.isBonusSelected),
       hp: recalculateHP(character, character.level, character.isBonusSelected)
@@ -462,17 +482,17 @@ export const useSimulatorStore = defineStore('simulator', () => {
         // 手持ち設定ONで所持している場合、手持ちレベルで再計算
         const handLevel = Math.max(0, Math.min(Number(handCard.level), getStatScalingMaxLevel(character.rare)));
         character.level = handLevel;
-        character.hp = recalculateHP(character, handLevel, handCard.isLimitBreak);
-        character.atk = recalculateATK(character, handLevel, handCard.isLimitBreak);
-        character.isBonusSelected = handCard.isLimitBreak;
-        character.hasM3 = handCard.isM3;
+        character.totsu = handCard.totsu;
+        syncLimitBreakState(character);
+        character.hp = recalculateHP(character, handLevel, character.isBonusSelected);
+        character.atk = recalculateATK(character, handLevel, character.isBonusSelected);
       } else {
         // 手持ち設定ONで所持していない場合、完凸で計算
         character.level = getStatScalingMaxLevel(character.rare);
-        character.hp = recalculateHP(character, character.level, true);
-        character.atk = recalculateATK(character, character.level, true);
-        character.isBonusSelected = true;
-        character.hasM3 = true;
+        character.totsu = character.rare === 'SSR' ? 4 : 0;
+        syncLimitBreakState(character);
+        character.hp = recalculateHP(character, character.level, character.isBonusSelected);
+        character.atk = recalculateATK(character, character.level, character.isBonusSelected);
       }
     } else if (!ignoreHandCollection) {
       // 手持ち設定OFFの場合のみ、フルステータスを使用
@@ -485,11 +505,12 @@ export const useSimulatorStore = defineStore('simulator', () => {
       }
       // フルステータスの場合の設定
       character.level = getStatScalingMaxLevel(character.rare);
-      character.isBonusSelected = true;
-      character.hasM3 = true;
+      character.totsu = character.rare === 'SSR' ? 4 : 0;
+      syncLimitBreakState(character);
     }
     // ignoreHandCollectionがtrueの場合は、既に設定されているレベルでHP/ATKを再計算
     else if (ignoreHandCollection) {
+      syncLimitBreakState(character);
       character.hp = recalculateHP(character, character.level, character.isBonusSelected);
       character.atk = recalculateATK(character, character.level, character.isBonusSelected);
     }

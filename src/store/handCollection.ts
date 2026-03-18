@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive } from 'vue';
+import { clampTotsuCount, deriveTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 // 手持ちカードの設定インターフェース
 export interface HandCard {
@@ -7,8 +8,9 @@ export interface HandCard {
   cardName: string;
   isOwned: boolean;
   level: number;
-  isLimitBreak: boolean; // 完凸状況
-  isM3: boolean; // M3状況（完凸時は自動的にtrue）
+  totsu: number;
+  isLimitBreak: boolean;
+  isM3: boolean;
 }
 
 // 全体の手持ちコレクション（カード名のみ）
@@ -29,8 +31,24 @@ function createDefaultHandCard(cardName: string): HandCard {
     cardName,
     isOwned: false,
     level: 0,
+    totsu: 0,
     isLimitBreak: false,
     isM3: false,
+  };
+}
+
+function normalizeHandCard(cardName: string, value?: Partial<HandCard> | null): HandCard {
+  const base = createDefaultHandCard(cardName);
+  const raw = value || {};
+  const totsu = clampTotsuCount(deriveTotsuCount(raw));
+
+  return {
+    ...base,
+    ...raw,
+    cardName,
+    totsu,
+    isLimitBreak: isMaxLimitBreak(totsu),
+    isM3: isM3Unlocked('SSR', totsu),
   };
 }
 
@@ -38,7 +56,14 @@ function createDefaultHandCard(cardName: string): HandCard {
 function loadHandCollection(): HandCollection {
   try {
     const stored = localStorage.getItem(HAND_COLLECTION_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : {};
+    if (!stored) return {};
+
+    const parsed = JSON.parse(stored) as HandCollection;
+    const normalized: HandCollection = {};
+    Object.entries(parsed || {}).forEach(([cardName, handCard]) => {
+      normalized[cardName] = normalizeHandCard(cardName, handCard);
+    });
+    return normalized;
   } catch (error) {
     console.warn('Failed to load hand collection from localStorage:', error);
     return {};
@@ -69,6 +94,8 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
   function getHandCard(cardName: string): HandCard {
     if (!handCollection[cardName]) {
       handCollection[cardName] = createDefaultHandCard(cardName);
+    } else {
+      handCollection[cardName] = normalizeHandCard(cardName, handCollection[cardName]);
     }
     
     return handCollection[cardName];
@@ -76,17 +103,11 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
 
   // 手持ちカード設定を更新
   function updateHandCard(cardName: string, updates: Partial<HandCard>): void {
-    const handCard = getHandCard(cardName);
-    
-    // 更新を適用
-    Object.assign(handCard, updates);
-    
-    // 完凸状況が変更された場合、M3状況も自動調整
-    if ('isLimitBreak' in updates) {
-      if (updates.isLimitBreak) {
-        handCard.isM3 = true; // 完凸時は自動的にM3もtrue
-      }
-    }
+    const normalized = normalizeHandCard(cardName, {
+      ...getHandCard(cardName),
+      ...updates,
+    });
+    handCollection[cardName] = normalized;
   }
 
   // キャラクターの所持状況を確認

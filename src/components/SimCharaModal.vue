@@ -186,6 +186,8 @@ characterData.forEach(char => {
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict, recalculateHP, recalculateATK } from '@/utils/calculations';
 import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { applyMultiLevelSort, applyDefaultSort } from '@/utils/sortUtils';
+import { getBuddyAtkRate, getBuddyHpRate, getBuddyStatusForCharacter } from '@/utils/buddyEffects';
+import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
@@ -358,14 +360,12 @@ watch(sortOrder, (newValue, oldValue) => {
 // 計算関数（calculations.tsの定数を使用）
 function calcHPBuddyRate(status, level = 10) {
   if (!status) return 0;
-  const key = `${status}${level}`;
-  return buddyHPDict[key] || 0;
+  return getBuddyHpRate(status, level) || buddyHPDict[`${status}${level}`] || 0;
 }
 
 function calcATKBuddyRate(status, level = 10) {
   if (!status) return 0;
-  const key = `${status}${level}`;
-  return buddyATKDict[key] || 0;
+  return getBuddyAtkRate(status, level) || buddyATKDict[`${status}${level}`] || 0;
 }
 
 function calcHealRate(status, level = 10) {
@@ -380,6 +380,20 @@ function calcConHealRate(status, level = 10) {
   const conHealValue = healContinueDict[key] || 0;
   // 継続回復は3ターン分
   return conHealValue * 3;
+}
+
+function getCharacterTotsu(character, handCard = null) {
+  if (handCard) {
+    return clampTotsuCount(handCard.totsu);
+  }
+  return clampTotsuCount(character?.totsu ?? (character?.isBonusSelected ? 4 : character?.hasM3 ? 3 : 0));
+}
+
+function getEffectiveBuddyStatus(character, buddyIndex, isActive, totsuOverride = undefined) {
+  return getBuddyStatusForCharacter(character, buddyIndex, {
+    totsu: totsuOverride ?? getCharacterTotsu(character),
+    isActive,
+  });
 }
 
 
@@ -407,16 +421,19 @@ function calculateEffectiveCardHP(character, memberNameDict) {
   
   // バディHP増加分
   let buddyHP = 0;
+  const totsu = handCollectionStore.useHandCollection
+    ? getCharacterTotsu(character, handCollectionStore.getHandCard(character.name))
+    : getCharacterTotsu(character);
   if (memberNameDict[character.buddy1c]) {
-    const rate = calcHPBuddyRate(character.buddy1s, 10);
+    const rate = calcHPBuddyRate(getEffectiveBuddyStatus(character, 1, true, totsu), 10);
     buddyHP += characterHP * rate;
   }
   if (memberNameDict[character.buddy2c]) {
-    const rate = calcHPBuddyRate(character.buddy2s, 10);
+    const rate = calcHPBuddyRate(getEffectiveBuddyStatus(character, 2, true, totsu), 10);
     buddyHP += characterHP * rate;
   }
   if (memberNameDict[character.buddy3c]) {
-    const rate = calcHPBuddyRate(character.buddy3s, 10);
+    const rate = calcHPBuddyRate(getEffectiveBuddyStatus(character, 3, true, totsu), 10);
     buddyHP += characterHP * rate;
   }
   // 回復量（ATK基準）
@@ -472,14 +489,17 @@ function calculateEffectiveCardATK(character, memberNameDict) {
   
   // バディATK増加分
   let buddyATK = 0;
+  const totsu = handCollectionStore.useHandCollection
+    ? getCharacterTotsu(character, handCollectionStore.getHandCard(character.name))
+    : getCharacterTotsu(character);
   if (memberNameDict[character.buddy1c]) {
-    buddyATK += baseATK * calcATKBuddyRate(character.buddy1s, 10);
+    buddyATK += baseATK * calcATKBuddyRate(getEffectiveBuddyStatus(character, 1, true, totsu), 10);
   }
   if (memberNameDict[character.buddy2c]) {
-    buddyATK += baseATK * calcATKBuddyRate(character.buddy2s, 10);
+    buddyATK += baseATK * calcATKBuddyRate(getEffectiveBuddyStatus(character, 2, true, totsu), 10);
   }
   if (memberNameDict[character.buddy3c]) {
-    buddyATK += baseATK * calcATKBuddyRate(character.buddy3s, 10);
+    buddyATK += baseATK * calcATKBuddyRate(getEffectiveBuddyStatus(character, 3, true, totsu), 10);
   }
   
   return baseATK + buddyATK;
@@ -536,13 +556,13 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     virtualDeck.forEach((chara) => {
       // バディ数カウント（高速化）
       const buddies = [chara.buddy1c, chara.buddy2c, chara.buddy3c];
-      const buddyStates = [chara.buddy1s, chara.buddy2s, chara.buddy3s];
+      const totsu = getCharacterTotsu(chara);
       
       for (let i = 0; i < buddies.length; i++) {
         if (buddies[i] && memberNameSet.has(buddies[i])) {
           totalBuddy += 1;
           // HPバディ数カウント（レベル10を仮定）
-          if (calcHPBuddyRate(buddyStates[i], 10) !== 0) {
+          if (calcHPBuddyRate(getEffectiveBuddyStatus(chara, i + 1, true, totsu), 10) !== 0) {
             totalHPBuddy += 1;
           }
         }
@@ -600,9 +620,10 @@ function calculateDeckStats(candidateCharacter, sortKey) {
         recalculatedChara.selectedMagic.push(3);
       }
       
+      recalculatedChara.totsu = clampTotsuCount(chara.totsu ?? (chara.rare === 'SSR' ? 4 : 0));
       recalculatedChara.isM1Selected = true;
       recalculatedChara.isM2Selected = true;
-      recalculatedChara.isM3Selected = chara.hasM3 || false;
+      recalculatedChara.isM3Selected = false;
       recalculatedChara.duo = chara.duo || '';
       recalculatedChara.buffs = [];
       
@@ -615,13 +636,15 @@ function calculateDeckStats(candidateCharacter, sortKey) {
         const handCard = handCollectionStore.getHandCard(chara.name);
         if (handCard.isOwned) {
           recalculatedChara.level = Number(handCard.level);
-          recalculatedChara.hasM3 = handCard.isM3;
-          recalculatedChara.isM3Selected = handCard.isM3; // M3選択状態も手持ち設定に合わせる
+          recalculatedChara.totsu = handCard.totsu;
+          recalculatedChara.hasM3 = isM3Unlocked(recalculatedChara.rare, handCard.totsu);
+          recalculatedChara.isM3Selected = false;
           recalculatedChara.hp = recalculateHP(chara, Number(handCard.level), handCard.isLimitBreak);
           recalculatedChara.atk = recalculateATK(chara, Number(handCard.level), handCard.isLimitBreak);
-          recalculatedChara.isBonusSelected = handCard.isLimitBreak;
+          recalculatedChara.isBonusSelected = isMaxLimitBreak(handCard.totsu);
         } else {
           // 所持していない場合のhasM3設定を追加
+          recalculatedChara.totsu = 0;
           recalculatedChara.hasM3 = false;
           recalculatedChara.isM3Selected = false; // M3選択状態もfalseに設定
         }
@@ -706,7 +729,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       isOwned = handCard.isOwned;
       
       if (isOwned) {
-        hasM3 = handCard.isM3;
+        hasM3 = isM3Unlocked(chara.rare, handCard.totsu);
         characterHP = recalculateHP(chara, Number(handCard.level), handCard.isLimitBreak);
         characterATK = recalculateATK(chara, Number(handCard.level), handCard.isLimitBreak);
       } else {
@@ -720,9 +743,12 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     
     // バディHP増加分計算
     // デッキキャラクターは手持ち設定に関係なく計算に含む、候補キャラクターのみ所持チェック
+    const buddyTotsu = handCollectionStore.useHandCollection && isCandidate
+      ? getCharacterTotsu(chara, handCollectionStore.getHandCard(chara.name))
+      : getCharacterTotsu(chara);
     if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy1c)) {
       deckTotalBuddy += 1;
-      const hpRate = calcHPBuddyRate(chara.buddy1s, 10);
+      const hpRate = calcHPBuddyRate(getEffectiveBuddyStatus(chara, 1, true, buddyTotsu), 10);
       if (hpRate !== 0) {
         deckTotalHPBuddy += 1;
         const hpIncrease = characterHP * hpRate;
@@ -733,7 +759,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     
     if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy2c)) {
       deckTotalBuddy += 1;
-      const hpRate = calcHPBuddyRate(chara.buddy2s, 10);
+      const hpRate = calcHPBuddyRate(getEffectiveBuddyStatus(chara, 2, true, buddyTotsu), 10);
       if (hpRate !== 0) {
         deckTotalHPBuddy += 1;
         const hpIncrease = characterHP * hpRate;
@@ -744,7 +770,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     
     if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy3c)) {
       deckTotalBuddy += 1;
-      const hpRate = calcHPBuddyRate(chara.buddy3s, 10);
+      const hpRate = calcHPBuddyRate(getEffectiveBuddyStatus(chara, 3, true, buddyTotsu), 10);
       if (hpRate !== 0) {
         deckTotalHPBuddy += 1;
         const hpIncrease = characterHP * hpRate;
@@ -1170,28 +1196,29 @@ const closeModal = () => {
 
 const selectImage = (character) => {
   // 手持ちコレクション設定が有効な場合、キャラクターにその設定を適用
-  if (handCollectionStore.useHandCollection) {
-    const handCard = handCollectionStore.getHandCard(character.name);
-    if (handCard.isOwned) {
-      // 手持ち設定に基づいてキャラクターのステータスを調整
-      const modifiedCharacter = { ...character };
+    if (handCollectionStore.useHandCollection) {
+      const handCard = handCollectionStore.getHandCard(character.name);
+      if (handCard.isOwned) {
+        // 手持ち設定に基づいてキャラクターのステータスを調整
+        const modifiedCharacter = { ...character };
       
-      // レベル設定
-      modifiedCharacter.level = handCard.level;
+        // レベル設定
+        modifiedCharacter.level = handCard.level;
+        modifiedCharacter.totsu = handCard.totsu;
       
-      // 完凸設定に基づくM3の有効/無効
-      modifiedCharacter.hasM3 = handCard.isM3;
-      modifiedCharacter.isM3Selected = handCard.isM3;
+        // 完凸設定に基づくM3の有効/無効
+        modifiedCharacter.hasM3 = isM3Unlocked(modifiedCharacter.rare, handCard.totsu);
+        modifiedCharacter.isM3Selected = false;
       
       // キャラクターステータスを手持ち設定に基づいて調整
       // 元のフルステータス最大値を保存
       modifiedCharacter.originalMaxHP = character.hp;
       modifiedCharacter.originalMaxATK = character.atk;
       
-      // HP/ATKを手持ちレベルで再計算
-      modifiedCharacter.hp = recalculateHP(character, Number(handCard.level), handCard.isLimitBreak);
-      modifiedCharacter.atk = recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
-      modifiedCharacter.isBonusSelected = handCard.isLimitBreak;
+        // HP/ATKを手持ちレベルで再計算
+        modifiedCharacter.hp = recalculateHP(character, Number(handCard.level), handCard.isLimitBreak);
+        modifiedCharacter.atk = recalculateATK(character, Number(handCard.level), handCard.isLimitBreak);
+        modifiedCharacter.isBonusSelected = isMaxLimitBreak(handCard.totsu);
       
       emit('select', modifiedCharacter);
       return;
@@ -1202,6 +1229,7 @@ const selectImage = (character) => {
   const normalCharacter = { ...character };
   normalCharacter.originalMaxHP = character.hp;
   normalCharacter.originalMaxATK = character.atk;
+  normalCharacter.totsu = clampTotsuCount(character.totsu ?? (character.rare === 'SSR' ? 4 : 0));
   
   emit('select', normalCharacter);
 };

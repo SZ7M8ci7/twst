@@ -423,6 +423,7 @@ import { useRouter } from 'vue-router';
 import { recalculateATK } from '@/utils/calculations';
 import { SEARCH_PRESET_CONFIGURATIONS } from '@/constants/searchPresets';
 import characterDataJson from '@/assets/characters_info.json';
+import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
 const { t } = useI18n();
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
@@ -674,8 +675,16 @@ function calculateDamage() {
     // 所持していないカードは計算をスキップ
     if (!shouldCalculate) return;
 
-    // ATKバディーボーナス値計算
-    const buddyBonus = calcBuddy(character.buddy1s) + calcBuddy(character.buddy2s) + calcBuddy(character.buddy3s);
+    const buddySummaries = [1, 2, 3].map(buddyIndex => getActiveBuddySummary(character, buddyIndex));
+    const buddyBonus = buddySummaries.reduce((total, summary) => total + summary.atkRate, 0);
+    const buddyDamageBonus = buddySummaries.reduce((total, summary) => total + summary.damageRate, 0);
+    const buddyCriticalMultiplier = buddySummaries.reduce((max, summary) => Math.max(max, summary.criticalMultiplier), 1);
+    const buddyAttributeDamageBonus = {
+      fire: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['火'] || 0), 0),
+      water: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['水'] || 0), 0),
+      flora: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['木'] || 0), 0),
+      cosmic: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['無'] || 0), 0),
+    };
     // 自己ATK/ダメージバフ計算（etcを解析して合算）
     const selfAtkBuff = calcSelfAtkUpFromCharacter(character);
     const selfDamageBuff = calcSelfDamageUpFromCharacter(character);
@@ -690,76 +699,90 @@ function calculateDamage() {
       const atkPartnerBuff = atkBuffDict[partnerBuff] || 0;
       // バフ込みのATK値
       const atk = characterAtk + characterAtk * buddyBonus + characterAtk * selfAtkBuff + characterAtk * atkPartnerBuff;
-    let partnerDamageBuff = 0;
-    const cosmicRatio = atr === '無' ? 1.1 : 1; // 無属性ダメージ補正
-    // 味方のバフ値計算
-    if (partnerBuff.includes(atr + '属性ダメージUP')) {
+      let partnerDamageBuff = 0;
+      const cosmicRatio = atr === '無' ? 1.1 : 1; // 無属性ダメージ補正
+      // 味方のバフ値計算
+      if (partnerBuff.includes(atr + '属性ダメージUP')) {
         if (partnerBuff.includes('(極小)')) partnerDamageBuff = 0.025;
         if (partnerBuff.includes('(小)')) partnerDamageBuff = 0.06;
         if (partnerBuff.includes('(中)')) partnerDamageBuff = 0.105;
         if (partnerBuff.includes('(大)')) partnerDamageBuff = 0.15;
         if (partnerBuff.includes('(極大)')) partnerDamageBuff = 0.27;
-    } else {
+      } else {
         if (partnerBuff.includes('ダメージUP') && !partnerBuff.includes('属性ダメージUP')) {
           if (partnerBuff.includes('(極小)')) partnerDamageBuff = 0.0225;
           if (partnerBuff.includes('(小)')) partnerDamageBuff = 0.05;
           if (partnerBuff.includes('(中)')) partnerDamageBuff = 0.0875;
           if (partnerBuff.includes('(大)')) partnerDamageBuff = 0.125;
           if (partnerBuff.includes('(極大)')) partnerDamageBuff = 0.225;
+        }
       }
-    }
 
-    if (partnerBuff != '' && atkPartnerBuff == 0 && partnerDamageBuff == 0) {
-      return;
-    }
-    // 等倍ダメージ
-    const basedamage = Math.floor(atk * (cosmicRatio + selfDamageBuff + partnerDamageBuff) * 2.4);
-    if (!fireDamageListByCardDict[character.name]) {
-      fireDamageListByCardDict[character.name] = [];
-      waterDamageListByCardDict[character.name] = [];
-      floraDamageListByCardDict[character.name] = [];
-      cosmicDamageListByCardDict[character.name] = [];
-    }
+      if (partnerBuff != '' && atkPartnerBuff == 0 && partnerDamageBuff == 0) {
+        return;
+      }
+
+      const buddyAttrDamageBuff = atr === '火'
+        ? buddyAttributeDamageBonus.fire
+        : atr === '水'
+          ? buddyAttributeDamageBonus.water
+          : atr === '木'
+            ? buddyAttributeDamageBonus.flora
+            : buddyAttributeDamageBonus.cosmic;
+
+      // 等倍ダメージ
+      const basedamage = Math.floor(
+        atk *
+        (cosmicRatio + selfDamageBuff + buddyDamageBonus + buddyAttrDamageBuff + partnerDamageBuff) *
+        2.4 *
+        buddyCriticalMultiplier
+      );
+      if (!fireDamageListByCardDict[character.name]) {
+        fireDamageListByCardDict[character.name] = [];
+        waterDamageListByCardDict[character.name] = [];
+        floraDamageListByCardDict[character.name] = [];
+        cosmicDamageListByCardDict[character.name] = [];
+      }
 
     // 各属性でのダメージ値をキャラクターごとの最大ダメージと、カード毎のダメージ値で保存
     // 属性ごとの係数を辞書で定義
-    const attributeModifiers: Record<string, { fire: number; water: number; flora: number; cosmic: number }> = {
-      '無': { fire: 1, water: 1, flora: 1, cosmic: 1 },
-      '火': { fire: 1, water: 0.5, flora: 1.5, cosmic: 1 },
-      '水': { fire: 1.5, water: 1, flora: 0.5, cosmic: 1 },
-      '木': { fire: 0.5, water: 1.5, flora: 1, cosmic: 1 },
-    };
+      const attributeModifiers: Record<string, { fire: number; water: number; flora: number; cosmic: number }> = {
+        '無': { fire: 1, water: 1, flora: 1, cosmic: 1 },
+        '火': { fire: 1, water: 0.5, flora: 1.5, cosmic: 1 },
+        '水': { fire: 1.5, water: 1, flora: 0.5, cosmic: 1 },
+        '木': { fire: 0.5, water: 1.5, flora: 1, cosmic: 1 },
+      };
 
-    // 属性の係数を取得
-    const modifiers = attributeModifiers[atr] || { fire: 1, water: 1, flora: 1, cosmic: 1 };
+      // 属性の係数を取得
+      const modifiers = attributeModifiers[atr] || { fire: 1, water: 1, flora: 1, cosmic: 1 };
 
-    // 各属性でのダメージ値を計算し、最大ダメージとリストに保存
-    maxFireDamage = Math.max(basedamage * modifiers.fire, maxFireDamage);
-    maxWaterDamage = Math.max(basedamage * modifiers.water, maxWaterDamage);
-    maxFloraDamage = Math.max(basedamage * modifiers.flora, maxFloraDamage);
-    maxCosmicDamage = Math.max(basedamage * modifiers.cosmic, maxCosmicDamage);
+      // 各属性でのダメージ値を計算し、最大ダメージとリストに保存
+      maxFireDamage = Math.max(basedamage * modifiers.fire, maxFireDamage);
+      maxWaterDamage = Math.max(basedamage * modifiers.water, maxWaterDamage);
+      maxFloraDamage = Math.max(basedamage * modifiers.flora, maxFloraDamage);
+      maxCosmicDamage = Math.max(basedamage * modifiers.cosmic, maxCosmicDamage);
 
-    // ダメージリストを更新
-    fireDamageListByCardDict[character.name].push({ 
-      damage: basedamage * modifiers.fire, 
-      name: partnerName,
-      buffSource: buffSource
-    });
-    waterDamageListByCardDict[character.name].push({ 
-      damage: basedamage * modifiers.water, 
-      name: partnerName,
-      buffSource: buffSource
-    });
-    floraDamageListByCardDict[character.name].push({ 
-      damage: basedamage * modifiers.flora, 
-      name: partnerName,
-      buffSource: buffSource
-    });
-    cosmicDamageListByCardDict[character.name].push({ 
-      damage: basedamage * modifiers.cosmic, 
-      name: partnerName,
-      buffSource: buffSource
-    });
+      // ダメージリストを更新
+      fireDamageListByCardDict[character.name].push({ 
+        damage: basedamage * modifiers.fire, 
+        name: partnerName,
+        buffSource: buffSource
+      });
+      waterDamageListByCardDict[character.name].push({ 
+        damage: basedamage * modifiers.water, 
+        name: partnerName,
+        buffSource: buffSource
+      });
+      floraDamageListByCardDict[character.name].push({ 
+        damage: basedamage * modifiers.flora, 
+        name: partnerName,
+        buffSource: buffSource
+      });
+      cosmicDamageListByCardDict[character.name].push({ 
+        damage: basedamage * modifiers.cosmic, 
+        name: partnerName,
+        buffSource: buffSource
+      });
     }
     // 味方バフ無しで計算
     calcDamage(character.magic2atr, '', getEnglishName(character.duo), '');
@@ -805,15 +828,34 @@ function calculateDamage() {
 // 初期計算を実行
 calculateDamage();
 
-// ATKバディ計算
-function calcBuddy(buddy: string) {
-  if (buddy.includes('ATK') && buddy.includes('小')) {
-    return 0.2;
+function getEffectiveTotsu(character: any) {
+  if (useHandCollection.value) {
+    const handCard = handCollectionStore.getHandCard(character.name);
+    if (handCard.isOwned) {
+      return handCard.totsu;
+    }
   }
-  if (buddy.includes('ATK') && buddy.includes('中')) {
-    return 0.35;
-  }
-  return 0;
+  return Number(character.totsu ?? (character.rare === 'SSR' ? 4 : 0));
+}
+
+function getActiveBuddySummary(character: any, buddyIndex: number) {
+  return getBuddyStatusSummary(
+    getBuddyStatusForCharacter(character, buddyIndex, {
+      totsu: getEffectiveTotsu(character),
+      isActive: true,
+    }),
+    10
+  );
+}
+
+function hasDamageBuddyEffect(character: any, buddyIndex: number) {
+  const summary = getActiveBuddySummary(character, buddyIndex);
+  return (
+    summary.atkRate > 0 ||
+    summary.damageRate > 0 ||
+    summary.criticalMultiplier > 1 ||
+    Object.values(summary.attributeDamageRates).some(rate => (rate || 0) > 0)
+  );
 }
 
 // etcパーサを用いた自己バフ合算（magicNbufは使用しない）
@@ -1073,13 +1115,13 @@ function getRequiredBuddyCharacterNames(cardName: string): string[] {
   if (!character) return [];
 
   const buddyNames: string[] = [];
-  if (character.buddy1c && character.buddy1s.includes('ATK')) {
+  if (character.buddy1c && hasAtkBuddyEffect(character, 1)) {
     buddyNames.push(character.buddy1c);
   }
-  if (character.buddy2c && character.buddy2s.includes('ATK')) {
+  if (character.buddy2c && hasAtkBuddyEffect(character, 2)) {
     buddyNames.push(character.buddy2c);
   }
-  if (character.buddy3c && character.buddy3s.includes('ATK')) {
+  if (character.buddy3c && hasAtkBuddyEffect(character, 3)) {
     buddyNames.push(character.buddy3c);
   }
   return buddyNames;
@@ -1342,15 +1384,15 @@ function getBuddyCards(cardName: string): string[] {
   if (!character) return [];
   
   const buddyCards: string[] = []; // 日本語名を格納する配列
-  if (character.buddy1c && character.buddy1s.includes('ATK')) {
+  if (character.buddy1c && hasDamageBuddyEffect(character, 1)) {
     const buddy1Info = characterInfoMap.value.get(character.buddy1c);
     if (buddy1Info) buddyCards.push(character.buddy1c);
   }
-  if (character.buddy2c && character.buddy2s.includes('ATK')) {
+  if (character.buddy2c && hasDamageBuddyEffect(character, 2)) {
     const buddy2Info = characterInfoMap.value.get(character.buddy2c);
     if (buddy2Info) buddyCards.push(character.buddy2c);
   }
-  if (character.buddy3c && character.buddy3s.includes('ATK')) {
+  if (character.buddy3c && hasDamageBuddyEffect(character, 3)) {
     const buddy3Info = characterInfoMap.value.get(character.buddy3c);
     if (buddy3Info) buddyCards.push(character.buddy3c);
   }

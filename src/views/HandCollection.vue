@@ -53,7 +53,7 @@
                   :label="$t('handCollection.level')" 
                   hide-details 
                   :min="0" 
-                  :max="110"
+                  :max="getMaxLevel('SSR')"
                   variant="outlined"
                   density="compact"
                 />
@@ -66,16 +66,15 @@
                 <v-btn @click="applyBulkOwnership(false)" color="grey" size="small">{{ $t('handCollection.ownershipCancel') }}</v-btn>
               </div>
               
-              <!-- 完凸設定 -->
+              <!-- 凸数設定 -->
               <div class="control-group">
-                <v-btn @click="applyBulkLimitBreak(true)" color="success" size="small">{{ $t('handCollection.limitBreakSetting') }}</v-btn>
-                <v-btn @click="applyBulkLimitBreak(false)" color="grey" size="small">{{ $t('handCollection.limitBreakCancel') }}</v-btn>
-              </div>
-              
-              <!-- M3設定 -->
-              <div class="control-group">
-                <v-btn @click="applyBulkM3(true)" color="success" size="small">{{ $t('handCollection.m3Setting') }}</v-btn>
-                <v-btn @click="applyBulkM3(false)" color="grey" size="small">{{ $t('handCollection.m3Cancel') }}</v-btn>
+                <div class="native-select-group level-input">
+                  <label class="native-select-label">{{ $t('handCollection.totsu') }}</label>
+                  <select v-model.number="bulkTotsu" class="native-select">
+                    <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
+                  </select>
+                </div>
+                <v-btn @click="applyBulkTotsu" color="success" size="small">{{ $t('handCollection.totsuSetting') }}</v-btn>
               </div>
             </div>
           </div>
@@ -130,13 +129,9 @@
                 {{ $t('handCollection.owned') }}
                 <v-icon size="16" class="sort-icon">{{ getSortIcon('isOwned') }}</v-icon>
               </div>
-              <div class="header-cell checkbox-col sortable-header" @click="handleSort('isLimitBreak')">
-                {{ $t('handCollection.limitBreak') }}
-                <v-icon size="16" class="sort-icon">{{ getSortIcon('isLimitBreak') }}</v-icon>
-              </div>
-              <div class="header-cell checkbox-col sortable-header" @click="handleSort('isM3')">
-                M3
-                <v-icon size="16" class="sort-icon">{{ getSortIcon('isM3') }}</v-icon>
+              <div class="header-cell totsu-col sortable-header" @click="handleSort('totsu')">
+                {{ $t('handCollection.totsu') }}
+                <v-icon size="16" class="sort-icon">{{ getSortIcon('totsu') }}</v-icon>
               </div>
               <div class="header-cell level-col sortable-header" @click="handleSort('level')">
                 Lv
@@ -175,29 +170,16 @@
                 />
               </div>
               
-              <!-- 完凸チェックボックス -->
-              <div class="data-cell checkbox-col">
-                <v-checkbox 
-                  :model-value="item.isLimitBreak"
-                  @update:model-value="updateLimitBreak(item.name, $event ?? false)"
-                  hide-details
-                  color="warning"
+              <!-- 凸数 -->
+              <div class="data-cell totsu-col">
+                <select
+                  class="table-select"
+                  :value="item.totsu ?? 0"
                   :disabled="!item.isOwned"
-                  density="compact"
-                />
-              </div>
-              
-              <!-- M3チェックボックス -->
-              <div class="data-cell checkbox-col">
-                <v-checkbox 
-                  :model-value="item.isM3"
-                  @update:model-value="updateM3(item.name, $event ?? false)"
-                  hide-details
-                  color="info"
-                  :disabled="item.isLimitBreak || !item.isOwned"
-                  :title="item.isLimitBreak ? 'M3は完凸時に自動で有効になります' : 'M3は手動で選択できます'"
-                  density="compact"
-                />
+                  @change="handleTableTotsuChange(item.name, $event)"
+                >
+                  <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
+                </select>
               </div>
               
               <!-- レベル入力 -->
@@ -292,6 +274,8 @@ import defaultImg from '@/assets/img/default.webp';
 import FilterModal from '@/components/FilterModal.vue';
 import charactersInfo from '@/assets/characters_info.json';
 import { useI18n } from 'vue-i18n';
+import { getInputMaxLevel } from '@/constants/levels';
+import { clampTotsuCount, deriveTotsuCount } from '@/utils/totsu';
 
 // Stores and i18n
 const { t } = useI18n();
@@ -303,10 +287,15 @@ const { characters } = storeToRefs(characterStore);
 // UI State
 const loading = ref(true);
 const showFilterModal = ref(false);
-const bulkLevel = ref(110);
+const bulkLevel = ref(getInputMaxLevel('SSR'));
+const bulkTotsu = ref(4);
 const windowWidth = ref(window.innerWidth);
 const saving = ref(false);
 const hasUnsavedChanges = ref(false);
+const totsuOptions = [0, 1, 2, 3, 4].map(value => ({
+  title: value.toString(),
+  value,
+}));
 
 // ソート機能
 const sortKey = ref<string>('default');
@@ -353,8 +342,7 @@ const filteredCharacters = computed(() => {
       return {
         ...character,
         isOwned: handCard.isOwned,
-        isLimitBreak: handCard.isLimitBreak,
-        isM3: handCard.isM3,
+        totsu: handCard.totsu,
         level: handCard.level
       };
     })
@@ -376,13 +364,9 @@ const filteredCharacters = computed(() => {
             aValue = a.isOwned ? 1 : 0;
             bValue = b.isOwned ? 1 : 0;
             break;
-          case 'isLimitBreak':
-            aValue = a.isLimitBreak ? 1 : 0;
-            bValue = b.isLimitBreak ? 1 : 0;
-            break;
-          case 'isM3':
-            aValue = a.isM3 ? 1 : 0;
-            bValue = b.isM3 ? 1 : 0;
+          case 'totsu':
+            aValue = a.totsu;
+            bValue = b.totsu;
             break;
           case 'level':
             aValue = a.level;
@@ -460,34 +444,25 @@ function updateLevel(cardName: string, level: string | number) {
   const numLevel = typeof level === 'string' ? parseInt(level) : level;
   if (isNaN(numLevel)) return;
   
-  const maxLevel = 110; // 暫定的に最大レベルを110に設定
+  const character = characters.value.find(item => item.name === cardName);
+  const maxLevel = getMaxLevel(character?.rare || 'R');
   const clampedLevel = Math.max(0, Math.min(numLevel, maxLevel));
   
   handCollectionStore.updateHandCard(cardName, { level: clampedLevel });
   markAsUnsaved();
 }
 
-function updateLimitBreak(cardName: string, isLimitBreak: boolean) {
-  handCollectionStore.updateHandCard(cardName, { isLimitBreak });
+function updateTotsu(cardName: string, value: string | number | null) {
+  handCollectionStore.updateHandCard(cardName, { totsu: clampTotsuCount(value) });
   markAsUnsaved();
 }
 
-function updateM3(cardName: string, isM3: boolean) {
-  // 完凸時は自動でM3がtrueになるので、手動変更は未完凸時のみ
-  const handCard = handCollectionStore.getHandCard(cardName);
-  if (!handCard.isLimitBreak) {
-    handCollectionStore.updateHandCard(cardName, { isM3 });
-    markAsUnsaved();
-  }
+function handleTableTotsuChange(cardName: string, event: Event) {
+  updateTotsu(cardName, (event.target as HTMLSelectElement)?.value ?? 0);
 }
 
 function getMaxLevel(rare: string): number {
-  switch (rare) {
-    case 'SSR': return 110;
-    case 'SR': return 90;
-    case 'R': return 70;
-    default: return 70;
-  }
+  return getInputMaxLevel(rare);
 }
 
 // 変更追跡機能
@@ -556,17 +531,9 @@ function applyBulkOwnership(isOwned: boolean) {
 }
 
 // 一括完凸設定
-function applyBulkLimitBreak(isLimitBreak: boolean) {
+function applyBulkTotsu() {
   filteredCharacters.value.forEach(character => {
-    handCollectionStore.updateHandCard(character.name, { isLimitBreak });
-  });
-  markAsUnsaved();
-}
-
-// 一括M3設定
-function applyBulkM3(isM3: boolean) {
-  filteredCharacters.value.forEach(character => {
-    handCollectionStore.updateHandCard(character.name, { isM3 });
+    handCollectionStore.updateHandCard(character.name, { totsu: bulkTotsu.value });
   });
   markAsUnsaved();
 }
@@ -580,14 +547,26 @@ function handleFilterApplied() {
 // データ管理機能
 function openDataModal() {
   dataModal.value = true;
-  // 統一形式（7項目）: キャラ名、衣装名、レベル、必須（不使用）、M3、所持、完凸
-  dataText.value = filteredCharacters.value
-    .map(char => {
-      const handCard = getHandCard(char.name);
-      const required = false; // 手持ち設定では必須フラグは使用しない
-      return `${char.chara}\t${char.costume}\t${handCard.level}\t${required}\t${handCard.isM3}\t${handCard.isOwned}\t${handCard.isLimitBreak}`;
-    })
-    .join('\n');
+  const cards = filteredCharacters.value.reduce((result, char) => {
+    const handCard = getHandCard(char.name);
+    if (handCard.level <= 0) {
+      return result;
+    }
+    result[char.name] = {
+      chara: char.chara,
+      costume: char.costume,
+      rare: char.rare,
+      isOwned: handCard.isOwned,
+      level: handCard.level,
+      totsu: handCard.totsu,
+    };
+    return result;
+  }, {} as Record<string, { chara: string; costume: string; rare: string; isOwned: boolean; level: number; totsu: number }>);
+
+  dataText.value = JSON.stringify({
+    format: 'twst-hand-collection-v2',
+    cards,
+  }, null, 2);
 }
 
 function closeDataModal() {
@@ -614,71 +593,123 @@ function copyToClipboard() {
 
 function importFromText() {
   try {
-    const lines = dataText.value.split('\n').filter(line => line.trim());
     let importedCount = 0;
-    
-    lines.forEach(line => {
-      const parts = line.split('\t');
-      
-      // costumeを使ってキャラクターを検索（最初の2項目は共通）
-      if (parts.length >= 2) {
+    const trimmed = dataText.value.trim();
+    const parsedJson = trimmed ? JSON.parse(trimmed) : null;
+
+    if (parsedJson && typeof parsedJson === 'object') {
+      const cards = Array.isArray((parsedJson as any).cards)
+        ? (parsedJson as any).cards
+        : Object.entries((parsedJson as any).cards || {}).map(([cardName, value]) => ({
+            cardName,
+            ...(value as Record<string, unknown>),
+          }));
+
+      cards.forEach((entry: any) => {
+        const character = characters.value.find(char =>
+          (entry.cardName && char.name === entry.cardName) ||
+          (entry.chara && entry.costume && char.chara === entry.chara && char.costume === entry.costume)
+        );
+        if (!character) return;
+
+        handCollectionStore.updateHandCard(character.name, {
+          isOwned: Boolean(entry.isOwned ?? entry.level > 0),
+          level: Number(entry.level) || 0,
+          totsu: clampTotsuCount(entry.totsu),
+        });
+        importedCount++;
+      });
+    }
+
+    if (importedCount === 0) {
+      const lines = dataText.value.split('\n').filter(line => line.trim());
+      lines.forEach(line => {
+        const parts = line.split('\t');
+        if (parts.length < 2) return;
         const [chara, costume] = parts;
         const character = characters.value.find(
           char => char.chara === chara && char.costume === costume
         );
-        
-        if (character) {
-          let handCardData: any = {
-            isOwned: false,
-            level: 0,
-            isLimitBreak: false,
-            isM3: false
-          };
-          
-          // デッキ検索ツール形式（5項目）: キャラ名、衣装、レベル、必須、M3
-          if (parts.length === 5) {
-            const [, , level, , hasM3] = parts; // 必須フラグは使用しない
-            const numLevel = parseInt(level) || 0;
-            
-            // レベルに基づいて完凸を判定
-            let isLimitBreak = false;
-            if (character.rare === 'SSR' && numLevel >= 106) {
-              isLimitBreak = true;
-            } else if (character.rare === 'SR' && numLevel >= 86) {
-              isLimitBreak = true;
-            } else if (character.rare === 'R' && numLevel >= 66) {
-              isLimitBreak = true;
-            }
-            
-            handCardData = {
-              isOwned: numLevel > 0, // レベル>0なら所持
-              level: numLevel,
-              isLimitBreak: isLimitBreak,
-              isM3: hasM3.toLowerCase() === 'true'
-            };
-          }
-          // 手持ち設定形式（7項目）: キャラ名、衣装名、レベル、必須（不使用）、M3、所持、完凸
-          else if (parts.length === 7) {
-            const [, , level, , hasM3, isOwned, isLimitBreak] = parts;
-            handCardData = {
-              isOwned: isOwned.toLowerCase() === 'true',
-              level: parseInt(level) || 0,
+        if (!character) return;
+
+        if (parts.length === 5) {
+          const [, , level, , hasM3] = parts;
+          handCollectionStore.updateHandCard(character.name, {
+            isOwned: (parseInt(level) || 0) > 0,
+            level: parseInt(level) || 0,
+            totsu: deriveTotsuCount({ isM3: hasM3.toLowerCase() === 'true' }),
+          });
+          importedCount++;
+          return;
+        }
+
+        if (parts.length === 7) {
+          const [, , level, , hasM3, isOwned, isLimitBreak] = parts;
+          handCollectionStore.updateHandCard(character.name, {
+            isOwned: isOwned.toLowerCase() === 'true',
+            level: parseInt(level) || 0,
+            totsu: deriveTotsuCount({
               isLimitBreak: isLimitBreak.toLowerCase() === 'true',
-              isM3: hasM3.toLowerCase() === 'true'
-            };
-          }
-          
-          handCollectionStore.updateHandCard(character.name, handCardData);
+              isM3: hasM3.toLowerCase() === 'true',
+            }),
+          });
           importedCount++;
         }
-      }
-    });
-    
+      });
+    }
+
+    markAsUnsaved();
     closeDataModal();
     showSnackbar(t('handCollection.importSuccess', { count: importedCount }));
   } catch (error) {
-    console.error('インポートエラー:', error);
-    showSnackbar(t('handCollection.importError'), 'error');
+    try {
+      let importedCount = 0;
+      const lines = dataText.value.split('\n').filter(line => line.trim());
+      lines.forEach(line => {
+        const parts = line.split('\t');
+        if (parts.length < 2) return;
+        const [chara, costume] = parts;
+        const character = characters.value.find(
+          char => char.chara === chara && char.costume === costume
+        );
+        if (!character) return;
+
+        if (parts.length === 5) {
+          const [, , level, , hasM3] = parts;
+          handCollectionStore.updateHandCard(character.name, {
+            isOwned: (parseInt(level) || 0) > 0,
+            level: parseInt(level) || 0,
+            totsu: deriveTotsuCount({ isM3: hasM3.toLowerCase() === 'true' }),
+          });
+          importedCount++;
+          return;
+        }
+
+        if (parts.length === 7) {
+          const [, , level, , hasM3, isOwned, isLimitBreak] = parts;
+          handCollectionStore.updateHandCard(character.name, {
+            isOwned: isOwned.toLowerCase() === 'true',
+            level: parseInt(level) || 0,
+            totsu: deriveTotsuCount({
+              isLimitBreak: isLimitBreak.toLowerCase() === 'true',
+              isM3: hasM3.toLowerCase() === 'true',
+            }),
+          });
+          importedCount++;
+        }
+      });
+
+      if (importedCount === 0) {
+        throw error;
+      }
+
+      markAsUnsaved();
+      closeDataModal();
+      showSnackbar(t('handCollection.importSuccess', { count: importedCount }));
+    } catch (fallbackError) {
+      console.error('インポートエラー:', fallbackError);
+      showSnackbar(t('handCollection.importError'), 'error');
+    }
   }
 }
 
@@ -898,6 +929,37 @@ onUnmounted(() => {
   padding-bottom: 8px !important;
 }
 
+.native-select-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.native-select-label {
+  font-size: 0.75rem;
+  color: rgba(0, 0, 0, 0.6);
+  line-height: 1;
+}
+
+.native-select,
+.table-select {
+  width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  color: rgba(0, 0, 0, 0.87);
+  min-height: 40px;
+  padding: 0 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.table-select:disabled {
+  background-color: #f5f5f5;
+  color: rgba(0, 0, 0, 0.38);
+}
+
 .character-image {
   width: 40px;
   height: 40px;
@@ -1105,6 +1167,11 @@ onUnmounted(() => {
   min-width: 60px;
 }
 
+.totsu-col {
+  flex: 0 0 90px;
+  min-width: 90px;
+}
+
 .level-col {
   flex: 0 0 100px;
   min-width: 100px;
@@ -1139,6 +1206,11 @@ onUnmounted(() => {
   .checkbox-col {
     flex: 0 0 50px;
     min-width: 50px;
+  }
+
+  .totsu-col {
+    flex: 0 0 84px;
+    min-width: 84px;
   }
   
   .level-col {

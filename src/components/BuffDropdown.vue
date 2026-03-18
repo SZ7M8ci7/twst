@@ -1,13 +1,13 @@
 <template>
   <div class="select-wrapper">
-    <select v-model="magicOption" @change="updateValue">
+    <select v-model="magicOption" :disabled="lockMagicOption" @change="updateValue">
       <option>M1</option>
       <option>M2</option>
       <option>M3</option>
     </select>
   </div>
   <div class="select-wrapper">
-    <select v-model="buffOption" @change="updateValue">
+    <select v-model="buffOption" :disabled="lockBuffOption" @change="updateValue">
       <option>ATKUP</option>
       <option>ダメージUP</option>
       <option>属性ダメUP</option>
@@ -20,7 +20,7 @@
     </select>
   </div>
   <div class="select-wrapper">
-    <select v-model="powerOption" @change="updateValue">
+    <select v-model="powerOption" :disabled="lockPowerOption" @change="updateValue">
       <template v-if="buffOption === 'クリティカル'">
         <option>0</option>
         <option>1/1</option>
@@ -38,7 +38,11 @@
     </select>
   </div>
   <div class="select-wrapper">
-    <select v-model="levelOption" @change="updateValue" :disabled="buffOption === 'クリティカル'">
+    <select
+      v-model="levelOption"
+      @change="updateValue"
+      :disabled="lockLevelOption || buffOption === 'クリティカル'"
+    >
       <option disabled value="">Lv</option>
       <option v-for="n in 10" :key="n" :value="n">Lv{{ n }}</option>
     </select>
@@ -57,7 +61,23 @@ const props = defineProps({
       powerOption: '',
       levelOption: 10
     })
-  }
+  },
+  lockMagicOption: {
+    type: Boolean,
+    default: false,
+  },
+  lockBuffOption: {
+    type: Boolean,
+    default: false,
+  },
+  lockPowerOption: {
+    type: Boolean,
+    default: false,
+  },
+  lockLevelOption: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(['update:modelValue', 'buff-changed']);

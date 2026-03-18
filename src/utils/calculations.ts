@@ -1,4 +1,11 @@
 import { getStatScalingMaxLevel } from '@/constants/levels';
+import {
+  applyBuddyGeneratedBuffOverrides,
+  createBuddyGeneratedBuffs,
+  getBuddyAtkRate,
+  getBuddyHpRate,
+  getBuddyStatusForCharacter,
+} from '@/utils/buddyEffects';
 
 // バフの定数
 export const atkbuffDict: { [key: string]: string } = {};
@@ -151,6 +158,16 @@ export const buddyHPDict: { [key: string]: number } = {
   "HPUP(中)8": 0.28,
   "HPUP(中)9": 0.29,
   "HPUP(中)10": 0.3,
+  "HPUP(大)1": 0.31,
+  "HPUP(大)2": 0.32,
+  "HPUP(大)3": 0.33,
+  "HPUP(大)4": 0.34,
+  "HPUP(大)5": 0.35,
+  "HPUP(大)6": 0.36,
+  "HPUP(大)7": 0.37,
+  "HPUP(大)8": 0.38,
+  "HPUP(大)9": 0.39,
+  "HPUP(大)10": 0.4,
   "HP&ATKUP(小)1": 0.11,
   "HP&ATKUP(小)2": 0.12,
   "HP&ATKUP(小)3": 0.13,
@@ -171,6 +188,16 @@ export const buddyHPDict: { [key: string]: number } = {
   "HP&ATKUP(中)8": 0.28,
   "HP&ATKUP(中)9": 0.29,
   "HP&ATKUP(中)10": 0.3,
+  "HP&ATKUP(大)1": 0.31,
+  "HP&ATKUP(大)2": 0.32,
+  "HP&ATKUP(大)3": 0.33,
+  "HP&ATKUP(大)4": 0.34,
+  "HP&ATKUP(大)5": 0.35,
+  "HP&ATKUP(大)6": 0.36,
+  "HP&ATKUP(大)7": 0.37,
+  "HP&ATKUP(大)8": 0.38,
+  "HP&ATKUP(大)9": 0.39,
+  "HP&ATKUP(大)10": 0.4,
 };
 
 // バディATKの定数
@@ -195,6 +222,16 @@ export const buddyATKDict: { [key: string]: number } = {
   "ATKUP(中)8": 0.32,
   "ATKUP(中)9": 0.335,
   "ATKUP(中)10": 0.35,
+  "ATKUP(大)1": 0.365,
+  "ATKUP(大)2": 0.38,
+  "ATKUP(大)3": 0.395,
+  "ATKUP(大)4": 0.41,
+  "ATKUP(大)5": 0.425,
+  "ATKUP(大)6": 0.44,
+  "ATKUP(大)7": 0.455,
+  "ATKUP(大)8": 0.47,
+  "ATKUP(大)9": 0.485,
+  "ATKUP(大)10": 0.5,
   "HP&ATKUP(小)1": 0.11,
   "HP&ATKUP(小)2": 0.12,
   "HP&ATKUP(小)3": 0.13,
@@ -215,6 +252,16 @@ export const buddyATKDict: { [key: string]: number } = {
   "HP&ATKUP(中)8": 0.32,
   "HP&ATKUP(中)9": 0.335,
   "HP&ATKUP(中)10": 0.35,
+  "HP&ATKUP(大)1": 0.365,
+  "HP&ATKUP(大)2": 0.38,
+  "HP&ATKUP(大)3": 0.395,
+  "HP&ATKUP(大)4": 0.41,
+  "HP&ATKUP(大)5": 0.425,
+  "HP&ATKUP(大)6": 0.44,
+  "HP&ATKUP(大)7": 0.455,
+  "HP&ATKUP(大)8": 0.47,
+  "HP&ATKUP(大)9": 0.485,
+  "HP&ATKUP(大)10": 0.5,
 };
 
 // 回復量の定数（旧シミュレータ形式に合わせる）
@@ -367,7 +414,7 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
   const buddyHP = calculateBuddyHP(character, charaDict);
 
   // 回復量計算
-  const heal = calculateHeal(character);
+  const heal = calculateHeal(character, charaDict);
 
   // ダメージ計算
   const damage = calculateDamage(character, charaDict);
@@ -385,6 +432,49 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
   return result;
 }
 
+function getActiveBuddyGeneratedBuffs(character: any, charaDict: { [key: string]: boolean }) {
+  const overrides = character?.buddyGeneratedBuffOverrides;
+  return [1, 2, 3].flatMap((buddyIndex) => {
+    const buddyName = character?.[`buddy${buddyIndex}c`];
+    const isActive = !!(buddyName && charaDict && buddyName in charaDict);
+    const generatedBuffs = createBuddyGeneratedBuffs(character, buddyIndex, {
+      totsu: character?.totsu ?? (character?.isBonusSelected ? 4 : 0),
+      isActive,
+    });
+    return applyBuddyGeneratedBuffOverrides(generatedBuffs, overrides);
+  });
+}
+
+function calculateBuddyGeneratedContinueHeal(character: any, charaDict: { [key: string]: boolean }) {
+  const appliedBuddyContinueHeals = new Set<string>();
+
+  return getActiveBuddyGeneratedBuffs(character, charaDict).reduce((total, buff: any) => {
+    if (buff.buffOption !== '継続回復') {
+      return total;
+    }
+
+    const buddyContinueHealKey = `${buff.buddyIndex}:${buff.status}`;
+    if (appliedBuddyContinueHeals.has(buddyContinueHealKey)) {
+      return total;
+    }
+
+    appliedBuddyContinueHeals.add(buddyContinueHealKey);
+
+    if (buff.powerOption === '極小') {
+      return total + 0.4 * Number(character.hp);
+    }
+
+    const level = Number(buff.levelOption) || 10;
+    const healContinueKey = `継続回復(${buff.powerOption})${level}`;
+    const healContinueValue = healContinueKey in healContinueDict ? healContinueDict[healContinueKey] : 0;
+    if (healContinueValue > 0) {
+      return total + 3 * Number(healContinueValue) * Number(character.hp);
+    }
+
+    return total;
+  }, 0);
+}
+
 
 // バディHPの計算
 function calculateBuddyHP(character: any, charaDict: { [key: string]: boolean }) {
@@ -399,12 +489,14 @@ function calculateBuddyHP(character: any, charaDict: { [key: string]: boolean })
   // 各バディのHP上昇率を計算（デッキに含まれている場合のみ）
   for (let i = 1; i <= 3; i++) {
     const buddyName = character[`buddy${i}c`];
-    const buddyState = character[`buddy${i}s`];
     const buddyLevel = character[`buddy${i}Lv`];
 
     if (buddyName && buddyName in charaDict) {
-      const buddyKey = buddyState + buddyLevel;
-      const buddyHPRatio = buddyKey in buddyHPDict ? Number(buddyHPDict[buddyKey]) : 0;
+      const buddyState = getBuddyStatusForCharacter(character, i, {
+        totsu: character?.totsu ?? (character?.isBonusSelected ? 4 : 0),
+        isActive: true,
+      });
+      const buddyHPRatio = getBuddyHpRate(buddyState, buddyLevel);
       totalBuddyHPRatio += buddyHPRatio;
     }
   }
@@ -414,7 +506,7 @@ function calculateBuddyHP(character: any, charaDict: { [key: string]: boolean })
 }
 
 // 回復量の計算
-function calculateHeal(character: any) {
+function calculateHeal(character: any, charaDict: { [key: string]: boolean }) {
   let totalHeal = 0;
   // 選択された魔法を取得
   const selectedMagic: number[] = [];
@@ -422,9 +514,11 @@ function calculateHeal(character: any) {
   if (character.isM2Selected) selectedMagic.push(2);
   if (character.isM3Selected) selectedMagic.push(3);
 
+  const allBuffs = character.buffs && Array.isArray(character.buffs) ? character.buffs : [];
+
   // buffs配列からの回復値を追加
-  if (character.buffs && Array.isArray(character.buffs)) {
-    character.buffs.forEach((buff: any) => {
+  if (allBuffs.length > 0) {
+    allBuffs.forEach((buff: any) => {
       // 回復タイプのバフをチェック
       if ((buff.buffOption === '回復' || buff.buffOption === '継続回復') && buff.magicOption) {
         const magicNum = Number(buff.magicOption.replace('M', ''));
@@ -450,10 +544,10 @@ function calculateHeal(character: any) {
           }
         }
       }
-    });
+      });
   }
 
-  return totalHeal;
+  return totalHeal + calculateBuddyGeneratedContinueHeal(character, charaDict);
 }
 
 const attributeEffectiveness: Record<string, Record<string, number>> = {
@@ -498,7 +592,7 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
     const power = character[`${magicKey}Power`] || '単発(弱)';
     const level = character[`${magicKey}Lv`] || 1;
     
-    const buffResults = calculateBuffs(character, magicKey);
+    const buffResults = calculateBuffs(character, magicKey, charaDict);
     const atkBuffTotal = buffResults.atkBuffTotal;
     const dmgBuffTotal = buffResults.dmgBuffTotal;
     const criticalMultiplier = buffResults.criticalMultiplier;
@@ -546,23 +640,30 @@ function calculateDamage(character: any, charaDict: { [key: string]: boolean }) 
 }
 
 function calculateBuddyATK(character: any, charaDict: { [key: string]: boolean }): number {
-  const buddy1atkRatio = character.buddy1c && character.buddy1c in charaDict ? 
-    (character.buddy1s + character.buddy1Lv in buddyATKDict ? buddyATKDict[character.buddy1s + character.buddy1Lv] : 0) : 0;
-  const buddy2atkRatio = character.buddy2c && character.buddy2c in charaDict ? 
-    (character.buddy2s + character.buddy2Lv in buddyATKDict ? buddyATKDict[character.buddy2s + character.buddy2Lv] : 0) : 0;
-  const buddy3atkRatio = character.buddy3c && character.buddy3c in charaDict ? 
-    (character.buddy3s + character.buddy3Lv in buddyATKDict ? buddyATKDict[character.buddy3s + character.buddy3Lv] : 0) : 0;
+  const totsu = character?.totsu ?? (character?.isBonusSelected ? 4 : 0);
+  const buddy1atkRatio = character.buddy1c && character.buddy1c in charaDict ?
+    getBuddyAtkRate(getBuddyStatusForCharacter(character, 1, { totsu, isActive: true }), character.buddy1Lv) : 0;
+  const buddy2atkRatio = character.buddy2c && character.buddy2c in charaDict ?
+    getBuddyAtkRate(getBuddyStatusForCharacter(character, 2, { totsu, isActive: true }), character.buddy2Lv) : 0;
+  const buddy3atkRatio = character.buddy3c && character.buddy3c in charaDict ?
+    getBuddyAtkRate(getBuddyStatusForCharacter(character, 3, { totsu, isActive: true }), character.buddy3Lv) : 0;
 
   return character.atk * (buddy1atkRatio + buddy2atkRatio + buddy3atkRatio);
 }
 
-function calculateBuffs(character: any, magicKey: string) {
+function calculateBuffs(character: any, magicKey: string, charaDict: { [key: string]: boolean }) {
   let atkBuffTotal = 0;
   let dmgBuffTotal = 0;
   let criticalMultiplier = 1.0;
+  const magicAttribute = character[`${magicKey}Attribute`];
+  const buddyGeneratedBuffs = getActiveBuddyGeneratedBuffs(character, charaDict);
+  const allBuffs = [
+    ...(character.buffs && Array.isArray(character.buffs) ? character.buffs : []),
+    ...buddyGeneratedBuffs,
+  ];
   
-  if (character.buffs && Array.isArray(character.buffs)) {
-    for (const buff of character.buffs) {
+  if (allBuffs.length > 0) {
+    for (const buff of allBuffs) {
       if (buff.magicOption !== `M${magicKey.charAt(5)}`) continue;
       
       const buffType = buff.buffOption;
@@ -578,6 +679,13 @@ function calculateBuffs(character: any, magicKey: string) {
       
       // ダメージバフの計算
       if (buffType === 'ダメージUP' || buffType === '属性ダメUP' || buffType === 'ダメージDOWN' || buffType === '属性ダメDOWN') {
+        if (
+          (buffType === '属性ダメUP' || buffType === '属性ダメDOWN') &&
+          buff.attributeOption &&
+          buff.attributeOption !== magicAttribute
+        ) {
+          continue;
+        }
         let prefix = '';
         if (buffType === 'ダメージUP') prefix = 'ダメUP';
         else if (buffType === 'ダメージDOWN') prefix = 'ダメDOWN';

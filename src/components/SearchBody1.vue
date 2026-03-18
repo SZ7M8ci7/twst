@@ -11,7 +11,7 @@
       <div v-else>
         <div class="controls-container">
           <div class="level-controls">
-            <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0" :max="110"></v-text-field>
+            <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0" :max="getMaxLevel('SSR')"></v-text-field>
             <v-btn @click="applyBulkLevel">{{ $t('search.batchSetting') }}</v-btn>
           </div>
           <v-btn @click="saveLevels" class="save-levels-btn">{{ $t('search.saveLevels') }}</v-btn>
@@ -28,7 +28,7 @@
               dense
               solo
               :min="0"
-              :max="110"
+              :max="getMaxLevel(item.rare)"
               @input="handleLevelChange(item)"
             />
           </template>
@@ -92,12 +92,13 @@ import { useLevelStore } from "@/store/app";
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
+import { getInputMaxLevel } from '@/constants/levels';
 
 const { t } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const levelStore = useLevelStore();
-const bulkLevel = ref(110);
+const bulkLevel = ref(getInputMaxLevel('SSR'));
 const loadingImgUrl = ref(true);
 const editModal = ref(false);
 const selectedCharacter = ref();
@@ -132,24 +133,13 @@ const headers = computed(() => [
   { title: 'edit', value: 'edit', sortable: false },
 ]);
 
+function getMaxLevel(rare: string) {
+  return getInputMaxLevel(rare);
+}
+
 function applyBulkLevel() {
   visibleCharacters.value.forEach(character => {
-    let maxLevel;
-
-    switch (character.rare) {
-      case 'SSR':
-        maxLevel = 110;
-        break;
-      case 'SR':
-        maxLevel = 90;
-        break;
-      case 'R':
-        maxLevel = 70;
-        break;
-      default:
-        maxLevel = 70;
-    }
-
+    const maxLevel = getMaxLevel(character.rare);
     // bulkLevelの値と最大レベルの小さい方をキャラクターのレベルに設定
     character.level = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
     character.oldlevel = character.level; // 更新後のレベルをoldlevelとして保持

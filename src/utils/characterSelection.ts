@@ -2,6 +2,7 @@
 import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { useHandCollectionStore } from '@/store/handCollection';
+import { isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 // バフの強さを判定するヘルパー関数
 export const getPowerOption = (buffString: string) => {
@@ -47,25 +48,29 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
   
   // 手持ちコレクション設定を確認
   let characterLevel = customLevel || getStatScalingMaxLevel(chara.rare);
-  let bonusSelected = true;
+  let totsu = chara.rare === 'SSR' ? 4 : 0;
   
   // デッキ探索からの復元時は手持ち設定を無視
   if (!ignoreHandCollection && handCollectionStore.useHandCollection) {
     const handCard = handCollectionStore.getHandCard(chara.name);
     if (handCard.isOwned) {
       characterLevel = Math.max(0, Math.min(Number(handCard.level), getStatScalingMaxLevel(chara.rare)));
-      bonusSelected = handCard.isLimitBreak;
+      totsu = handCard.totsu;
     } else {
       characterLevel = 1;
-      bonusSelected = false;
+      totsu = 0;
     }
   }
+  const bonusSelected = isMaxLimitBreak(totsu);
+  const hasM3 = isM3Unlocked(chara.rare, totsu);
   // 初期設定の処理
   const initialSettings = {
     chara: chara.chara || '',
     level: characterLevel,
+    totsu,
     hp: chara.hp || 0,
     atk: chara.atk || 0,
+    hasM3,
     isM1Selected: true,
     isM2Selected: true,
     isM3Selected: false,

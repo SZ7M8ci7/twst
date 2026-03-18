@@ -94,6 +94,7 @@ import characterData from '@/assets/characters_info.json';
 import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { applyDefaultSort } from '@/utils/sortUtils';
+import { getBuddyStatusForCharacter } from '@/utils/buddyEffects';
 
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
@@ -325,9 +326,9 @@ onMounted(async () => {
       });
 
       const buddyInfo = [
-        { name: character.buddy1c, typeString: character.buddy1s },
-        { name: character.buddy2c, typeString: character.buddy2s },
-        { name: character.buddy3c, typeString: character.buddy3s },
+        { name: character.buddy1c, typeString: getBuddyStatusForCharacter(character, 1, { forceTotsu: true }) },
+        { name: character.buddy2c, typeString: getBuddyStatusForCharacter(character, 2, { forceTotsu: true }) },
+        { name: character.buddy3c, typeString: getBuddyStatusForCharacter(character, 3, { forceTotsu: true }) },
       ];
 
       buddyInfo.forEach(buddy => {
@@ -337,7 +338,8 @@ onMounted(async () => {
               HPBuddyRelations.value[character.chara][buddy.name] = [];
             }
             HPBuddyRelations.value[character.chara][buddy.name].push(character);
-          } else if (buddy.typeString.includes('ATK')) {
+          }
+          if (buddy.typeString.includes('ATK')) {
             if (!ATKBuddyRelations.value[character.chara][buddy.name]) {
               ATKBuddyRelations.value[character.chara][buddy.name] = [];
             }

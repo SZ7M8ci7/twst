@@ -3,8 +3,15 @@
     <v-container class="search-body-container">
       <div class="controls-container">
         <div class="level-controls">
-          <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0" :max="110"></v-text-field>
+          <v-text-field type="number" v-model="bulkLevel" class="level-input" label="Lv" hide-details="auto" :min="0" :max="getMaxLevel('SSR')"></v-text-field>
           <v-btn @click="applyBulkLevel">{{ $t('search.batchSetting') }}</v-btn>
+          <div class="bulk-select-group">
+            <label class="bulk-select-label">{{ $t('search.totsu') }}</label>
+            <select v-model.number="bulkTotsu" class="bulk-select">
+              <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
+            </select>
+          </div>
+          <v-btn @click="applyBulkTotsu">{{ $t('search.totsuSetting') }}</v-btn>
           <v-btn color="primary" @click="openDataModal">{{ $t('search.dataManagement') }}</v-btn>
         </div>
         <v-btn @click="saveLevels" class="save-levels-btn">{{ $t('search.saveLevels') }}</v-btn>
@@ -30,7 +37,17 @@
         >
           <!-- level列のカスタムテンプレート定義 -->
           <template v-slot:[`item.level`]="{ item }">
-            <v-text-field type="number" v-model="item.level" class="mt-0 pt-0 level-input" hide-details="auto" dense solo :min="0" :max="110" />
+            <v-text-field type="number" v-model="item.level" class="mt-0 pt-0 level-input" hide-details="auto" dense solo :min="0" :max="getMaxLevel(item.rare)" />
+          </template>
+          <template v-slot:[`item.totsu`]="{ item }">
+            <select
+              class="table-select"
+              :value="item.rare === 'SSR' ? (item.totsu ?? 0) : 0"
+              :disabled="item.rare !== 'SSR'"
+              @change="handleTableTotsuChange(item, $event)"
+            >
+              <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
+            </select>
           </template>
           <template v-slot:[`item.required`]="{ item }">
             <v-checkbox v-model="item.required" hide-details></v-checkbox>
@@ -55,6 +72,7 @@
             <v-checkbox
               v-if="item.rare === 'SSR'"
               :model-value="item.hasM3"
+              :disabled="(item.totsu ?? 0) < 3"
               hide-details
               @update:modelValue="(val) => handleMagicToggle(item, 'hasM3', val)"
             ></v-checkbox>
@@ -131,6 +149,7 @@
                 auto-grow
                 rows="10"
                 class="mt-4"
+                :label="$t('search.dataFormat')"
               ></v-textarea>
             </v-card-text>
           </v-card>
@@ -156,6 +175,8 @@ import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { scrollElementWithinContainerToCenter, waitForLayoutStability } from '@/utils/scrollPosition';
 import { useDisplay } from 'vuetify';
+import { getInputMaxLevel } from '@/constants/levels';
+import { clampTotsuCount, isM3Unlocked } from '@/utils/totsu';
 
 type FocusRequest = {
   requestId: number;
@@ -172,7 +193,12 @@ const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
 const { width } = useDisplay();
-const bulkLevel = ref(110);
+const bulkLevel = ref(getInputMaxLevel('SSR'));
+const bulkTotsu = ref(4);
+const totsuOptions = [0, 1, 2, 3, 4].map(value => ({
+  title: value.toString(),
+  value,
+}));
 const loadingImgUrl = ref(true);
 const editModal = ref(false);
 const selectedCharacter = ref();
@@ -195,6 +221,11 @@ const snackbar = ref({
 });
 // デッキ探索専用：マジックの使用可否(はずす/使う)を保存
 const MAGIC_USAGE_STORAGE_KEY = 'characterMagicUsage';
+const TOTSU_STORAGE_KEY = 'characterTotsu';
+
+function getMaxLevel(rare: string) {
+  return getInputMaxLevel(rare);
+}
 
 const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
@@ -209,6 +240,7 @@ const shouldHideOtherColumn = computed(() => width.value < 960);
 const headers = computed(() => {
   const nextHeaders = [
     { title: 'Lv', value: 'level', sortable: true },
+    { title: t('search.totsu'), value: 'totsu', sortable: true },
     { title: t('search.required'), value: 'required', sortable: true },
     { title: t('search.useM1'), value: 'hasM1', sortable: false },
     { title: t('search.useM2'), value: 'hasM2', sortable: false },
@@ -325,15 +357,21 @@ function countSelectedMagics(character: any): number {
 // M1/M2/M3の初期化と「最低2つON」を強制する
 function normalizeMagicUsage(character: any) {
   if (character.rare !== 'SSR') {
+    character.totsu = 0;
     character.hasM3 = false;
-  } else if (character.hasM3 === undefined) {
-    character.hasM3 = true;
+  } else {
+    character.totsu = clampTotsuCount(character.totsu ?? 4);
+    if (character.totsu < 3) {
+      character.hasM3 = false;
+    } else if (character.hasM3 === undefined) {
+      character.hasM3 = true;
+    }
   }
 
   if (countSelectedMagics(character) < 2) {
     character.hasM1 = true;
     character.hasM2 = true;
-    character.hasM3 = character.rare === 'SSR';
+    character.hasM3 = character.rare === 'SSR' && (character.totsu ?? 0) >= 3;
   }
 }
 
@@ -371,35 +409,44 @@ function handleMagicToggle(
 
 function applyBulkLevel() {
   visibleCharacters.value.forEach(character => {
-    let maxLevel;
-
-    switch (character.rare) {
-      case 'SSR':
-        maxLevel = 110;
-        break;
-      case 'SR':
-        maxLevel = 90;
-        break;
-      case 'R':
-        maxLevel = 70;
-        break;
-      default:
-        maxLevel = 70;
-    }
-
-    // bulkLevelの値と最大レベルの小さい方をキャラクターのレベルに設定
+    const maxLevel = getMaxLevel(character.rare);
     character.level = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
+  });
+}
+
+function updateTotsu(character: any, value: string | number | null) {
+  if (character.rare !== 'SSR') {
+    character.totsu = 0;
+    character.hasM3 = false;
+    return;
+  }
+
+  character.totsu = clampTotsuCount(value);
+  if (character.totsu < 3) {
+    character.hasM3 = false;
+  }
+}
+
+function handleTableTotsuChange(character: any, event: Event) {
+  updateTotsu(character, (event.target as HTMLSelectElement)?.value ?? 0);
+}
+
+function applyBulkTotsu() {
+  visibleCharacters.value.forEach(character => {
+    updateTotsu(character, bulkTotsu.value);
   });
 }
 
 function saveLevels() {
   const levelsCache: { [name: string]: number } = {};
   const hasM3Cache: { [name: string]: boolean } = {};
+  const totsuCache: { [name: string]: number } = {};
   const magicUsageCache: { [name: string]: { hasM1: boolean; hasM2: boolean; hasM3: boolean } } = {};
   // M1/M2/M3の使用可否も保存（TSVの出力形式は従来通り）
   characters.value.forEach(character => {
     levelsCache[character.name] = character.level;
     hasM3Cache[character.name] = character.hasM3;
+    totsuCache[character.name] = clampTotsuCount(character.totsu ?? (character.hasM3 ? 3 : 0));
     magicUsageCache[character.name] = {
       hasM1: !!character.hasM1,
       hasM2: !!character.hasM2,
@@ -408,24 +455,37 @@ function saveLevels() {
   });
   localStorage.setItem('characterLevels', JSON.stringify(levelsCache));
   localStorage.setItem('characterM3', JSON.stringify(hasM3Cache));
+  localStorage.setItem(TOTSU_STORAGE_KEY, JSON.stringify(totsuCache));
   localStorage.setItem(MAGIC_USAGE_STORAGE_KEY, JSON.stringify(magicUsageCache));
 }
 
 function loadLevels() {
   const levelsCache = localStorage.getItem('characterLevels');
   const hasM3Cache = localStorage.getItem('characterM3');
+  const totsuCache = localStorage.getItem(TOTSU_STORAGE_KEY);
   const magicUsageCache = localStorage.getItem(MAGIC_USAGE_STORAGE_KEY);
   if (levelsCache) {
     const levels = JSON.parse(levelsCache);
     characters.value.forEach(character => {
-      if (levels[character.name]) {
+      if (levels[character.name] !== undefined) {
         character.level = levels[character.name];
+      }
+    });
+  }
+  if (totsuCache) {
+    const totsu = JSON.parse(totsuCache);
+    characters.value.forEach(character => {
+      if (totsu[character.name] !== undefined) {
+        character.totsu = clampTotsuCount(totsu[character.name]);
       }
     });
   }
   if (hasM3Cache) {
     const hasM3 = JSON.parse(hasM3Cache);
     characters.value.forEach(character => {
+      if ((character.totsu ?? 0) === 0 && hasM3[character.name] === true && character.rare === 'SSR') {
+        character.totsu = 3;
+      }
       if (hasM3[character.name] !== undefined) {
         character.hasM3 = hasM3[character.name];
       }
@@ -476,9 +536,35 @@ function saveCharacter() {
 
 function openDataModal() {
   dataModal.value = true;
-  dataText.value = characters.value
-    .map(char => `${char.chara}\t${char.costume}\t${char.level}\t${char.required}\t${char.hasM3}`)
-    .join('\n');
+  const cards = characters.value.reduce((result, char) => {
+    result[char.name] = {
+      chara: char.chara,
+      costume: char.costume,
+      rare: char.rare,
+      level: char.level,
+      required: !!char.required,
+      totsu: clampTotsuCount(char.totsu ?? (char.hasM3 ? 3 : 0)),
+      useM1: !!char.hasM1,
+      useM2: !!char.hasM2,
+      useM3: !!char.hasM3,
+    };
+    return result;
+  }, {} as Record<string, {
+    chara: string;
+    costume: string;
+    rare: string;
+    level: number;
+    required: boolean;
+    totsu: number;
+    useM1: boolean;
+    useM2: boolean;
+    useM3: boolean;
+  }>);
+
+  dataText.value = JSON.stringify({
+    format: 'twst-search-settings-v2',
+    cards,
+  }, null, 2);
 }
 
 function closeDataModal() {
@@ -505,28 +591,91 @@ function copyToClipboard() {
 
 function importFromText() {
   try {
-    const lines = dataText.value.split('\n').filter(line => line.trim());
     let importedCount = 0;
-    lines.forEach(line => {
-      const [chara, costume, level, required, hasM3] = line.split('\t');
-      const character = characters.value.find(
-        char => char.chara === chara && char.costume === costume
-      );
-      if (character) {
+    const trimmed = dataText.value.trim();
+    const parsedJson = trimmed ? JSON.parse(trimmed) : null;
+
+    if (parsedJson && typeof parsedJson === 'object') {
+      const cards = Array.isArray((parsedJson as any).cards)
+        ? (parsedJson as any).cards
+        : Object.entries((parsedJson as any).cards || {}).map(([cardName, value]) => ({
+            cardName,
+            ...(value as Record<string, unknown>),
+          }));
+
+      cards.forEach((entry: any) => {
+        const character = characters.value.find(char =>
+          (entry.cardName && char.name === entry.cardName) ||
+          (entry.chara && entry.costume && char.chara === entry.chara && char.costume === entry.costume)
+        );
+        if (!character) return;
+
+        character.level = Number(entry.level) || 0;
+        character.required = Boolean(entry.required);
+        character.totsu = character.rare === 'SSR'
+          ? clampTotsuCount(entry.totsu ?? ((entry.useM3 ?? entry.hasM3) ? 3 : 0))
+          : 0;
+        character.hasM1 = entry.useM1 !== undefined ? Boolean(entry.useM1) : true;
+        character.hasM2 = entry.useM2 !== undefined ? Boolean(entry.useM2) : true;
+        character.hasM3 = entry.useM3 !== undefined
+          ? Boolean(entry.useM3)
+          : Boolean(entry.hasM3);
+        normalizeMagicUsage(character);
+        importedCount++;
+      });
+    }
+
+    if (importedCount === 0) {
+      const lines = dataText.value.split('\n').filter(line => line.trim());
+      lines.forEach(line => {
+        const [chara, costume, level, required, hasM3] = line.split('\t');
+        const character = characters.value.find(
+          char => char.chara === chara && char.costume === costume
+        );
+        if (!character) return;
+
         character.level = parseInt(level) || 0;
         character.required = required.toLowerCase() === 'true';
         character.hasM3 = hasM3.toLowerCase() === 'true';
-        // TSVはM3のみなので、M1/M2を含めた使用可否を補正
+        character.totsu = character.hasM3 ? 3 : 0;
         normalizeMagicUsage(character);
         importedCount++;
-      }
-    });
+      });
+    }
+
     saveLevels();
     closeDataModal();
     showSnackbar(t('search.importSuccess', { count: importedCount }));
   } catch (error) {
-    console.error('インポートエラー:', error);
-    showSnackbar(t('search.importError'), 'error');
+    try {
+      let importedCount = 0;
+      const lines = dataText.value.split('\n').filter(line => line.trim());
+      lines.forEach(line => {
+        const [chara, costume, level, required, hasM3] = line.split('\t');
+        const character = characters.value.find(
+          char => char.chara === chara && char.costume === costume
+        );
+        if (!character) return;
+
+        character.level = parseInt(level) || 0;
+        character.required = required.toLowerCase() === 'true';
+        character.hasM3 = hasM3.toLowerCase() === 'true';
+        character.totsu = character.hasM3 ? 3 : 0;
+        normalizeMagicUsage(character);
+        importedCount++;
+      });
+
+      if (importedCount === 0) {
+        throw error;
+      }
+
+      saveLevels();
+      closeDataModal();
+      showSnackbar(t('search.importSuccess', { count: importedCount }));
+    } catch (fallbackError) {
+      console.error('インポートエラー:', fallbackError);
+      showSnackbar(t('search.importError'), 'error');
+    }
   }
 }
 
@@ -543,6 +692,7 @@ function applyHandCollection() {
         character.level = handCard.level;
         character.required = false;
         character.hasM3 = handCard.isM3;
+        character.totsu = handCard.totsu;
         // 手持ち設定はM3のみなので、M1/M2を含めた使用可否を補正
         normalizeMagicUsage(character);
         appliedCount++;
@@ -551,6 +701,7 @@ function applyHandCollection() {
         character.level = 0;
         character.required = false;
         character.hasM3 = false;
+        character.totsu = 0;
         // 未所持は最低2つONの初期状態に合わせる
         normalizeMagicUsage(character);
       }
@@ -594,7 +745,10 @@ onBeforeMount(() => {
 onMounted(() => {
   characters.value.forEach(character => {
     // M1/M2が未定義の古いデータに合わせた初期化
-    character.hasM3 = true; // M3をデフォルトでチェック
+    if (character.totsu === undefined) {
+      character.totsu = character.rare === 'SSR' ? 4 : 0;
+    }
+    character.hasM3 = character.rare === 'SSR' ? isM3Unlocked(character.rare, character.totsu) : false;
     if (character.hasM1 === undefined) character.hasM1 = true;
     if (character.hasM2 === undefined) character.hasM2 = true;
   });
@@ -634,6 +788,38 @@ onMounted(() => {
   flex-wrap: wrap;
 }
 
+.bulk-select-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-select-label {
+  font-size: 0.9rem;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.bulk-select,
+.table-select {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  padding: 6px 8px;
+}
+
+.bulk-select {
+  min-width: 64px;
+}
+
+.table-select {
+  min-width: 56px;
+}
+
+.table-select:disabled {
+  background-color: #f5f5f5;
+  color: #999;
+}
+
 .save-levels-btn {
   margin-left: auto;
 }
@@ -657,6 +843,11 @@ onMounted(() => {
   }
 
   .level-controls {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .bulk-select-group {
     width: 100%;
     justify-content: center;
   }

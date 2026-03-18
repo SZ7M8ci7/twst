@@ -63,6 +63,8 @@ import { ref, computed, watch } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import defaultImg from '@/assets/img/default.webp';
 import charactersInfo from '@/assets/characters_info.json';
+import { getBuddyStatusForCharacter } from '@/utils/buddyEffects';
+import { isTotsuBuddyEnhanced } from '@/utils/totsu';
 
 const simulatorStore = useSimulatorStore();
 
@@ -100,28 +102,37 @@ const deckCharactersWithBuddies = computed(() => {
       
       // バディ1
       if (char.buddy1c && char.buddy1c !== '') {
+        const inDeck = isCharacterInDeck(char.buddy1c);
         buddyList.push({
           charaCode: char.buddy1c,
-          effect: (char.buddy1s || 'ATK UP').replace(/UP/g, '').trim(),
-          inDeck: isCharacterInDeck(char.buddy1c)
+          effect: (getBuddyStatusForCharacter(char, 1, {
+            forceTotsu: isTotsuBuddyEnhanced(char.rare, char.totsu ?? 0),
+          }) || 'ATK UP').replace(/UP/g, '').trim(),
+          inDeck
         });
       }
       
       // バディ2
       if (char.buddy2c && char.buddy2c !== '') {
+        const inDeck = isCharacterInDeck(char.buddy2c);
         buddyList.push({
           charaCode: char.buddy2c,
-          effect: (char.buddy2s || 'HP UP').replace(/UP/g, '').trim(),
-          inDeck: isCharacterInDeck(char.buddy2c)
+          effect: (getBuddyStatusForCharacter(char, 2, {
+            forceTotsu: isTotsuBuddyEnhanced(char.rare, char.totsu ?? 0),
+          }) || 'HP UP').replace(/UP/g, '').trim(),
+          inDeck
         });
       }
       
       // バディ3
       if (char.buddy3c && char.buddy3c !== '') {
+        const inDeck = isCharacterInDeck(char.buddy3c);
         buddyList.push({
           charaCode: char.buddy3c,
-          effect: (char.buddy3s || 'SKILL UP').replace(/UP/g, '').trim(),
-          inDeck: isCharacterInDeck(char.buddy3c)
+          effect: (getBuddyStatusForCharacter(char, 3, {
+            forceTotsu: isTotsuBuddyEnhanced(char.rare, char.totsu ?? 0),
+          }) || 'SKILL UP').replace(/UP/g, '').trim(),
+          inDeck
         });
       }
       

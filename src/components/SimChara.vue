@@ -26,24 +26,32 @@
         <v-col cols="3" class="center">
           <div class="stats-section">
             <div class="stat">
-              <button class="bonusbutton" :class="{'selected': isBonusSelected}" @click="toggleBonus">凸</button>
+              <label>凸</label>
+              <select
+                :value="simulatorStore.deckCharacters[props.charaIndex].rare === 'SSR' ? (simulatorStore.deckCharacters[props.charaIndex].totsu ?? 0) : 0"
+                class="totsu-select"
+                :disabled="simulatorStore.deckCharacters[props.charaIndex].rare !== 'SSR'"
+                @change="handleTotsuChange"
+              >
+                <option v-for="value in totsuOptions" :key="value" :value="value">{{ value }}</option>
+              </select>
               <label>Lv</label>
               <input 
                 type="number" 
                 :value="simulatorStore.deckCharacters[props.charaIndex].level"
                 @input="handleLevelInput"
-                class="stat-input" 
+                class="stat-input level-value-input" 
                 min="0"
                 :max="getMaxLevel(simulatorStore.deckCharacters[props.charaIndex].rare)"
               />
             </div>
             <div class="stat">
               <label>HP</label>
-              <input type="number" v-model="simulatorStore.deckCharacters[props.charaIndex].hp" class="stat-input" />
+              <input type="number" v-model="simulatorStore.deckCharacters[props.charaIndex].hp" class="stat-input hp-value-input" />
             </div>
             <div class="stat">
               <label>ATK</label>
-              <input type="number" v-model="simulatorStore.deckCharacters[props.charaIndex].atk" class="stat-input" />
+              <input type="number" v-model="simulatorStore.deckCharacters[props.charaIndex].atk" class="stat-input atk-value-input" />
             </div>
           </div>
         </v-col>
@@ -88,8 +96,8 @@
               </v-col>
               <!-- バディ効果値 -->
               <v-col v-if="showBuddyEffect()" cols="2" class="buddy-effect-col" :class="{ 'buddy-inactive': !isBuddyActive(index) }">
-                <span v-if="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}s`]" class="buddy-effect">
-                  {{ formatBuddyEffect(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}s`]) }}
+                <span v-if="getDisplayedBuddyEffect(index)" class="buddy-effect">
+                  {{ formatBuddyEffect(getDisplayedBuddyEffect(index)) }}
                 </span>
               </v-col>
             </v-row>
@@ -126,7 +134,7 @@
         @drop.prevent="onBuffListDrop"
       >
         <div
-          v-if="!simulatorStore.deckCharacters[props.charaIndex].buffs.length"
+          v-if="!simulatorStore.deckCharacters[props.charaIndex].buffs.length && !displayBuddyGeneratedBuffs.length"
           class="buff-drop-empty"
           :class="{ 'active': dropInsertIndex === 0, 'drop-blink': isBuffDragging }"
           @dragenter.prevent="onEmptyBuffDragEnter"
@@ -168,6 +176,22 @@
             </div>
           </div>
         </template>
+        <template v-for="(buff, index) in displayBuddyGeneratedBuffs" :key="`buddy-buff-${buff.buddyIndex}-${buff.magicOption}-${buff.status}-${index}`">
+          <div class="buff-section buddy-generated" :class="{ 'buddy-generated-inactive': !buff.isActive }">
+            <div class="drag-placeholder" title="バディ追加効果">
+              <v-icon size="14">mdi-link-variant</v-icon>
+            </div>
+            <div class="buff-dropdown-wrapper">
+              <BuffDropdown
+                :model-value="buff"
+                :lock-magic-option="true"
+                :lock-buff-option="true"
+                :lock-power-option="buff.buffOption !== 'クリティカル'"
+                @update:model-value="updateBuddyGeneratedBuff(buff, $event)"
+              />
+            </div>
+          </div>
+        </template>
       </div>
     </v-row>
     <SimCharaModal v-if="isCharaModalOpen" :chara-index="props.charaIndex" :selected-attribute="props.selectedAttribute" @close="closeCharaModal" @select="selectCharaImage" />
@@ -193,12 +217,20 @@ import { getInputMaxLevel } from '@/constants/levels';
 import charactersInfo from '@/assets/characters_info.json';
 import { buffDragPayload } from '@/utils/buffDragState';
 import { processCharacterSelection } from '@/utils/characterSelection';
+import {
+  applyBuddyGeneratedBuffOverrides,
+  createBuddyGeneratedBuffs,
+  getBuddyGeneratedBuffKey,
+  getBuddyStatusForCharacter,
+} from '@/utils/buddyEffects';
+import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
 
 const simulatorStore = useSimulatorStore();
 const handCollectionStore = useHandCollectionStore();
 
 const imgpath = ref(defaultImg);
 const props = defineProps(['charaIndex', 'selectedAttribute']);
+const totsuOptions = [0, 1, 2, 3, 4];
 
 // SimCharaModalの制御
 const isCharaModalOpen = ref(false);
@@ -241,6 +273,7 @@ const selectCharaImage = async (chara) => {
   if (handCollectionStore.useHandCollection) {
     // deckCharactersのレベルとボーナス状態を更新
     simulatorStore.deckCharacters[props.charaIndex].level = processedChara.level;
+    simulatorStore.deckCharacters[props.charaIndex].totsu = processedChara.totsu ?? simulatorStore.deckCharacters[props.charaIndex].totsu;
     simulatorStore.deckCharacters[props.charaIndex].isBonusSelected = processedChara.isBonusSelected;
     
     // ステータスを再計算して更新
@@ -259,14 +292,8 @@ const selectCharaImage = async (chara) => {
     imgpath.value = defaultImg;
   }
   
-  // ボーナス選択状態を更新
-  isBonusSelected.value = processedChara.isBonusSelected;
   closeCharaModal();
 };
-
-
-// M1, M2, M3 ボタンの選択状態
-const isBonusSelected = ref(false);
 
 // 揺れアニメーションの制御
 const shakingStates = ref( {
@@ -306,6 +333,91 @@ const draggingBuffIndex = ref(null);
 const dropInsertIndex = ref(null);
 
 const isBuffDragging = computed(() => buffDragPayload.fromBuffIndex !== null);
+const currentCharacter = computed(() => simulatorStore.deckCharacters[props.charaIndex]);
+
+const ensureBuddyGeneratedBuffOverrides = (character) => {
+  if (!character) {
+    return {};
+  }
+  if (!character.buddyGeneratedBuffOverrides || typeof character.buddyGeneratedBuffOverrides !== 'object') {
+    character.buddyGeneratedBuffOverrides = {};
+  }
+  return character.buddyGeneratedBuffOverrides;
+};
+
+const getBuddyGeneratedBuffOverrides = (character) => {
+  if (!character?.buddyGeneratedBuffOverrides || typeof character.buddyGeneratedBuffOverrides !== 'object') {
+    return {};
+  }
+  return character.buddyGeneratedBuffOverrides;
+};
+
+const displayBuddyGeneratedBuffs = computed(() => {
+  const character = currentCharacter.value;
+  if (!character) return [];
+
+  const forceTotsu = isTotsuBuddyEnhanced(character?.rare, character?.totsu ?? 0);
+  const overrides = getBuddyGeneratedBuffOverrides(character);
+
+  return [1, 2, 3].flatMap((buddyIndex) => {
+    const isActive = isBuddyActive(buddyIndex);
+    const generatedBuffs = createBuddyGeneratedBuffs(character, buddyIndex, {
+      totsu: character?.totsu ?? 0,
+      isActive,
+      forceTotsu,
+    });
+
+    return applyBuddyGeneratedBuffOverrides(generatedBuffs, overrides)
+      .filter((buff) => buff.buffOption !== '継続回復')
+      .filter((buff) => isActive || buff.buffOption !== 'クリティカル')
+      .map((buff) => ({
+        ...buff,
+        isActive,
+      }));
+  });
+});
+
+const findBaseBuddyGeneratedBuff = (character, buff) => {
+  if (!character) {
+    return null;
+  }
+
+  const forceTotsu = isTotsuBuddyEnhanced(character?.rare, character?.totsu ?? 0);
+  const baseBuffs = createBuddyGeneratedBuffs(character, buff.buddyIndex, {
+    totsu: character?.totsu ?? 0,
+    isActive: isBuddyActive(buff.buddyIndex),
+    forceTotsu,
+  });
+  const buffKey = getBuddyGeneratedBuffKey(buff);
+  return baseBuffs.find((candidate) => getBuddyGeneratedBuffKey(candidate) === buffKey) ?? null;
+};
+
+const updateBuddyGeneratedBuff = (buff, updatedBuff) => {
+  const character = currentCharacter.value;
+  if (!character) return;
+
+  const overrides = ensureBuddyGeneratedBuffOverrides(character);
+  const overrideKey = getBuddyGeneratedBuffKey(buff);
+  const baseBuff = findBaseBuddyGeneratedBuff(character, buff) ?? buff;
+  const nextOverride = {};
+
+  if (updatedBuff?.powerOption !== undefined && updatedBuff.powerOption !== baseBuff.powerOption) {
+    nextOverride.powerOption = updatedBuff.powerOption;
+  }
+
+  const nextLevel = Number(updatedBuff?.levelOption);
+  if (Number.isFinite(nextLevel) && nextLevel !== Number(baseBuff.levelOption)) {
+    nextOverride.levelOption = nextLevel;
+  }
+
+  if (Object.keys(nextOverride).length === 0) {
+    delete overrides[overrideKey];
+  } else {
+    overrides[overrideKey] = nextOverride;
+  }
+
+  simulatorStore.recalculateStats();
+};
 
 const resetBuffDragState = () => {
   draggingBuffIndex.value = null;
@@ -524,16 +636,22 @@ const isBuffRowEnd = (index) => {
   return rowEnd || isLast;
 };
 
-const toggleBonus = () => {
-  isBonusSelected.value = !isBonusSelected.value;
-  const character = simulatorStore.deckCharacters[props.charaIndex];
-  character.isBonusSelected = isBonusSelected.value;
-  // ボーナス状態が変更されたら再計算
+const syncCharacterTotsu = (character, value) => {
+  const nextTotsu = character.rare === 'SSR' ? clampTotsuCount(value) : 0;
+  character.totsu = nextTotsu;
+  character.isBonusSelected = isMaxLimitBreak(nextTotsu);
+  character.hasM3 = isM3Unlocked(character.rare, nextTotsu);
+  if (!character.hasM3) {
+    character.isM3Selected = false;
+  }
+};
+
+const handleTotsuChange = (event) => {
+  const character = currentCharacter.value;
+  syncCharacterTotsu(character, event.target.value);
   const newStats = simulatorStore.calculateBaseStats(character);
-  // 計算結果を直接反映
   character.atk = newStats.atk;
   character.hp = newStats.hp;
-  // 全ステータスを再計算
   simulatorStore.recalculateStats();
 };
 
@@ -616,6 +734,13 @@ const showBuddyEffect = () => {
 const formatBuddyEffect = (effectText) => {
   if (!effectText) return '';
   return effectText.replace(/UP/gi, '');
+};
+
+const getDisplayedBuddyEffect = (buddyIndex) => {
+  const character = currentCharacter.value;
+  return getBuddyStatusForCharacter(character, buddyIndex, {
+    forceTotsu: isTotsuBuddyEnhanced(character?.rare, character?.totsu ?? 0),
+  });
 };
 
 // バディが有効かどうかを判定
@@ -829,6 +954,7 @@ const saveDetailChanges = (updatedCharacter) => {
     chara: updatedCharacter.chara,
     name: updatedCharacter.name,
     level: Number(updatedCharacter.level),
+    totsu: Number(updatedCharacter.totsu ?? currentCharacter.totsu ?? 0),
     hp: Number(updatedCharacter.hp),
     atk: Number(updatedCharacter.atk),
     magic1Lv: Number(updatedCharacter.magic1Lv),
@@ -845,6 +971,7 @@ const saveDetailChanges = (updatedCharacter) => {
     buddy3Lv: Number(updatedCharacter.buddy3Lv),
     buffs: updatedCharacter.buffs || []
   });
+  syncCharacterTotsu(currentCharacter, currentCharacter.totsu);
   
   // バフ設定の更新（詳細モーダルで設定された内容をそのまま保存）
   if (updatedCharacter.buffs) {
@@ -883,11 +1010,8 @@ watch(() => simulatorStore.deckCharacters[props.charaIndex]?.chara, (newChara) =
       // imgUrlが無い場合はデフォルト画像を使用
       imgpath.value = defaultImg;
     }
-    // ボーナス選択状態も同期
-    isBonusSelected.value = character.isBonusSelected || false;
   } else {
     imgpath.value = defaultImg;
-    isBonusSelected.value = false;
   }
 }, { immediate: true });
 
@@ -904,6 +1028,7 @@ watch(() => simulatorStore.deckCharacters[props.charaIndex]?.rare, (newRare) => 
     const character = simulatorStore.deckCharacters[props.charaIndex];
     // R/SRの場合、M3を無効化
     if (newRare === 'R' || newRare === 'SR') {
+      syncCharacterTotsu(character, 0);
       character.isM3Selected = false;
       // ステータス再計算
       simulatorStore.recalculateStats();
@@ -1007,17 +1132,43 @@ onUnmounted(() => {
 .stats-section {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  min-width: 0;
 }
 
 .stat {
   display: flex;
   align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stat label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .stat-input {
-  width: 100%;
-  margin-left: 10px;
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
   border: 1px solid #ccc;
+  padding: 1px 4px;
+}
+
+.level-value-input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 52px;
+  max-width: none;
+}
+
+.hp-value-input,
+.atk-value-input {
+  flex: 1 1 auto;
+  width: auto;
+  max-width: none;
 }
 
 select {
@@ -1065,14 +1216,6 @@ select {
   margin-top: auto;
   min-height: 28px;
   width: 32px;
-}
-.bonusbutton {
-  margin-bottom: 1px;
-  padding-left: 2%;
-  padding-right: 2%;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-  cursor: pointer;
 }
 .mbutton {
   margin-bottom: 1px;
@@ -1336,6 +1479,14 @@ select {
   background-color: rgba(255, 0, 0, 0.05);
 }
 
+.buff-section.buddy-generated {
+  background-color: rgba(25, 118, 210, 0.06);
+}
+
+.buff-section.buddy-generated.buddy-generated-inactive {
+  opacity: 0.65;
+}
+
 .drag-handle {
   display: flex;
   align-items: center;
@@ -1361,6 +1512,16 @@ select {
 
 .drag-handle:active {
   cursor: grabbing;
+}
+
+.drag-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  min-width: 15px;
+  align-self: stretch;
+  color: #1976d2;
 }
 
 /* モバイル（サイドパネルなし） */
@@ -1427,6 +1588,21 @@ select {
   max-width: 60px;
   margin: 0;
 }
+.totsu-select {
+  flex: 0 0 28px;
+  width: 28px;
+  max-width: 28px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  padding: 1px 0;
+  margin-right: 1px;
+  min-width: 0;
+  background: none;
+  text-align: center;
+}
+.totsu-select:disabled {
+  opacity: 0.6;
+}
 .level-select::-ms-expand {
   display: none;
 }
@@ -1441,9 +1617,62 @@ select {
   background-color: rgba(255, 100, 100, 0.1);
 }
 
+:deep(.v-theme--dark) .buff-section.buddy-generated {
+  background-color: rgba(100, 181, 246, 0.12);
+}
+
 :deep(.v-theme--dark) .drag-handle {
   border-color: #666;
   color: #ddd;
+}
+
+@media (max-width: 600px) {
+  .component-container {
+    font-size: 0.62em;
+  }
+
+  .image-section {
+    padding-left: 0;
+  }
+
+  .character-icon-container {
+    max-width: 48px;
+  }
+
+  .stats-section {
+    gap: 2px;
+  }
+
+  .stat {
+    gap: 2px;
+  }
+
+  .stat label {
+    font-size: 0.95em;
+  }
+
+  .totsu-select {
+    flex-basis: 24px;
+    width: 24px;
+    max-width: 24px;
+    min-width: 24px;
+    padding: 0 1px;
+    margin-right: 0;
+  }
+
+  .level-value-input {
+    min-width: 58px;
+  }
+
+  .stat-input {
+    padding: 0 2px;
+    font-size: 1em;
+  }
+
+  .hp-value-input,
+  .atk-value-input {
+    min-width: 0;
+  }
 }
 </style>
 

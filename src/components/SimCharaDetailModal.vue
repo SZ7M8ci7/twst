@@ -316,10 +316,13 @@ const characterOptions = computed(() =>
 const buddySkillOptions = [
   'ATKUP(小)',
   'ATKUP(中)',
+  'ATKUP(大)',
   'HPUP(小)',
   'HPUP(中)',
+  'HPUP(大)',
   'HP&ATKUP(小)',
-  'HP&ATKUP(中)'
+  'HP&ATKUP(中)',
+  'HP&ATKUP(大)'
 ];
 
 // バディレベル選択肢

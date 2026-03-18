@@ -161,12 +161,15 @@ async function restoreState() {
     if (savedState) {
       try {
         const state = JSON.parse(savedState);
+        const { useCharacterStore } = await import('@/store/characters');
+        const characterStore = useCharacterStore();
         
         // デッキキャラクターを復元
         if (state.deckCharacters) {
           state.deckCharacters.forEach((char: any, index: number) => {
             if (char.chara) {
-              Object.assign(simulatorStore.deckCharacters[index], char);
+              const originalCharacter = characterStore.characters.find((candidate: any) => candidate.name === char.name);
+              Object.assign(simulatorStore.deckCharacters[index], originalCharacter ? { ...originalCharacter, ...char } : char);
             }
           });
           restored = true;

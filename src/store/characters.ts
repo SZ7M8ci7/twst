@@ -16,10 +16,13 @@ export interface Character {
   calcBaseHP: number;
   buddy1c: string;
   buddy1s: string;
+  buddy1s_totsu: string;
   buddy2c: string;
   buddy2s: string;
+  buddy2s_totsu: string;
   buddy3c: string;
   buddy3s: string;
+  buddy3s_totsu: string;
   chara: string;
   duo: string;
   etc: string;
@@ -41,6 +44,7 @@ export interface Character {
   visible?: boolean;
   level: number;
   oldlevel: number;
+  totsu: number;
   imgUrl: string;
   wikiURL: string;
   required: boolean;
@@ -92,10 +96,13 @@ export const useCharacterStore = defineStore('characters', {
           calcBaseHP: Number(otherJsonProps.base_hp),
           buddy1c: otherJsonProps.buddy1c || '',
           buddy1s: otherJsonProps.buddy1s || '',
+          buddy1s_totsu: otherJsonProps.buddy1s_totsu || otherJsonProps.buddy1s || '',
           buddy2c: otherJsonProps.buddy2c || '',
           buddy2s: otherJsonProps.buddy2s || '',
+          buddy2s_totsu: otherJsonProps.buddy2s_totsu || otherJsonProps.buddy2s || '',
           buddy3c: otherJsonProps.buddy3c || '',
           buddy3s: otherJsonProps.buddy3s || '',
+          buddy3s_totsu: otherJsonProps.buddy3s_totsu || otherJsonProps.buddy3s || '',
           chara: otherJsonProps.chara || '',
           duo: otherJsonProps.duo,
           etc: formatEtc(otherJsonProps.etc) || '',
@@ -117,6 +124,7 @@ export const useCharacterStore = defineStore('characters', {
           visible: true,
           level: 0,
           oldlevel: 0,
+          totsu: otherJsonProps.rare === 'SSR' ? 4 : 0,
           wikiURL: otherJsonProps.wikiURL || '',
           required: false,
           hasM3: true,
