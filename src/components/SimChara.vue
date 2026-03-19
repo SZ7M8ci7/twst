@@ -1056,6 +1056,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+  min-width: 0;
 }
 .image-section {
   padding-left: 5%;
@@ -1139,6 +1140,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
   min-width: 0;
+  width: 100%;
+  overflow: hidden;
 }
 
 .stat label {
@@ -1156,10 +1159,18 @@ onUnmounted(() => {
 }
 
 .level-value-input {
-  flex: 1 1 auto;
-  width: auto;
-  min-width: 52px;
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
   max-width: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.level-value-input::-webkit-outer-spin-button,
+.level-value-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .hp-value-input,
@@ -1635,10 +1646,11 @@ select {
 
   .stats-section {
     gap: 2px;
+    overflow: hidden;
   }
 
   .stat {
-    gap: 2px;
+    gap: 1px;
   }
 
   .stat label {
@@ -1646,21 +1658,26 @@ select {
   }
 
   .totsu-select {
-    flex-basis: 24px;
-    width: 24px;
-    max-width: 24px;
-    min-width: 24px;
+    flex-basis: 20px;
+    width: 20px;
+    max-width: 20px;
+    min-width: 20px;
     padding: 0 1px;
     margin-right: 0;
   }
 
   .level-value-input {
-    min-width: 58px;
+    min-width: 0;
+    width: 0;
+    max-width: 100%;
+    padding-left: 1px;
+    padding-right: 1px;
   }
 
   .stat-input {
     padding: 0 2px;
     font-size: 1em;
+    box-sizing: border-box;
   }
 
   .hp-value-input,
