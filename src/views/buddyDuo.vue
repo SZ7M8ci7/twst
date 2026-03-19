@@ -115,6 +115,10 @@ const characterInfoMap = ref<Map<string, CharacterCardInfo>>(new Map());
 const imgUrlDictionary: Ref<Record<string, string>> = ref({});
 const iconUrlDictionary: Ref<Record<string, string>> = ref({});
 
+// Avoid mutating the hand collection store while this view is rebuilding relations.
+const isCharacterOwned = (cardName: string): boolean =>
+  handCollectionStore.handCollection[cardName]?.isOwned ?? false;
+
 // 手持ち設定でフィルタリングされたキャラクター一覧（ソート適用）
 const filteredCharacters = computed(() => {
   let filtered;
@@ -122,7 +126,7 @@ const filteredCharacters = computed(() => {
     filtered = characters.value;
   } else {
     filtered = characters.value.filter(character => 
-      handCollectionStore.isCharacterOwned(character.name)
+      isCharacterOwned(character.name)
     );
   }
   return applyDefaultSort(filtered);
@@ -171,7 +175,7 @@ const showCharacterModal = (characterInfoArray: any[], rowIndex?: number, cellIn
   if (Array.isArray(characterInfoArray) && characterInfoArray.length > 0) {
     // 手持ち設定が有効な場合は所持カードのみ表示
     const charactersToShow = handCollectionStore.useHandCollection
-      ? characterInfoArray.filter((char: { name: string; }) => handCollectionStore.isCharacterOwned(char.name))
+      ? characterInfoArray.filter((char: { name: string; }) => isCharacterOwned(char.name))
       : characterInfoArray;
     
     if (charactersToShow.length > 0) {
@@ -214,7 +218,7 @@ const showTotalCharacterModal = (colIndex: number, rowIndex?: number, cellIndex?
   // 手持ち設定が有効な場合は所持カードのみ表示
   if (handCollectionStore.useHandCollection) {
     charactersToShow = charactersToShow.filter((char: { name: string; }) => 
-      handCollectionStore.isCharacterOwned(char.name)
+      isCharacterOwned(char.name)
     );
   }
 

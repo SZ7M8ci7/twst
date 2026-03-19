@@ -3,6 +3,7 @@ import {
   applyBuddyGeneratedBuffOverrides,
   createBuddyGeneratedBuffs,
   getBuddyAtkRate,
+  getBuddyContinueHealRate,
   getBuddyHpRate,
   getBuddyStatusForCharacter,
 } from '@/utils/buddyEffects';
@@ -460,18 +461,8 @@ function calculateBuddyGeneratedContinueHeal(character: any, charaDict: { [key: 
 
     appliedBuddyContinueHeals.add(buddyContinueHealKey);
 
-    if (buff.powerOption === '極小') {
-      return total + 0.4 * Number(character.hp);
-    }
-
     const level = Number(buff.levelOption) || 10;
-    const healContinueKey = `継続回復(${buff.powerOption})${level}`;
-    const healContinueValue = healContinueKey in healContinueDict ? healContinueDict[healContinueKey] : 0;
-    if (healContinueValue > 0) {
-      return total + 3 * Number(healContinueValue) * Number(character.hp);
-    }
-
-    return total;
+    return total + getBuddyContinueHealRate(level) * Number(character.hp);
   }, 0);
 }
 

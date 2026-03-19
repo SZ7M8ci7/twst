@@ -177,7 +177,7 @@
           </div>
         </template>
         <template v-for="(buff, index) in displayBuddyGeneratedBuffs" :key="`buddy-buff-${buff.buddyIndex}-${buff.magicOption}-${buff.status}-${index}`">
-          <div class="buff-section buddy-generated" :class="{ 'buddy-generated-inactive': !buff.isActive }">
+          <div class="buff-section buddy-generated">
             <div class="drag-placeholder" title="バディ追加効果">
               <v-icon size="14">mdi-link-variant</v-icon>
             </div>
@@ -361,6 +361,9 @@ const displayBuddyGeneratedBuffs = computed(() => {
 
   return [1, 2, 3].flatMap((buddyIndex) => {
     const isActive = isBuddyActive(buddyIndex);
+    if (!isActive) {
+      return [];
+    }
     const generatedBuffs = createBuddyGeneratedBuffs(character, buddyIndex, {
       totsu: character?.totsu ?? 0,
       isActive,
@@ -368,12 +371,7 @@ const displayBuddyGeneratedBuffs = computed(() => {
     });
 
     return applyBuddyGeneratedBuffOverrides(generatedBuffs, overrides)
-      .filter((buff) => buff.buffOption !== '継続回復')
-      .filter((buff) => isActive || buff.buffOption !== 'クリティカル')
-      .map((buff) => ({
-        ...buff,
-        isActive,
-      }));
+      .filter((buff) => buff.buffOption !== '継続回復');
   });
 });
 
@@ -1481,10 +1479,6 @@ select {
 
 .buff-section.buddy-generated {
   background-color: rgba(25, 118, 210, 0.06);
-}
-
-.buff-section.buddy-generated.buddy-generated-inactive {
-  opacity: 0.65;
 }
 
 .drag-handle {

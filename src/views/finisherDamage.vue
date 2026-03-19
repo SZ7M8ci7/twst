@@ -421,6 +421,7 @@ import { onMounted, ref, Ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { recalculateATK } from '@/utils/calculations';
+import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { SEARCH_PRESET_CONFIGURATIONS } from '@/constants/searchPresets';
 import characterDataJson from '@/assets/characters_info.json';
 import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
@@ -678,16 +679,16 @@ function calculateDamage() {
     const buddySummaries = [1, 2, 3].map(buddyIndex => getActiveBuddySummary(character, buddyIndex));
     const buddyBonus = buddySummaries.reduce((total, summary) => total + summary.atkRate, 0);
     const buddyDamageBonus = buddySummaries.reduce((total, summary) => total + summary.damageRate, 0);
-    const buddyCriticalMultiplier = buddySummaries.reduce((max, summary) => Math.max(max, summary.criticalMultiplier), 1);
     const buddyAttributeDamageBonus = {
       fire: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['火'] || 0), 0),
       water: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['水'] || 0), 0),
       flora: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['木'] || 0), 0),
       cosmic: buddySummaries.reduce((total, summary) => total + (summary.attributeDamageRates['無'] || 0), 0),
     };
-    // 自己ATK/ダメージバフ計算（etcを解析して合算）
-    const selfAtkBuff = calcSelfAtkUpFromCharacter(character);
-    const selfDamageBuff = calcSelfDamageUpFromCharacter(character);
+    // M2は固定で使用し、M1/M3は高い方だけ採用する
+    const m2SelfBuffTotals = getFinisherBuffTotalsFromCharacter(character, character.magic2atr, ['M2']);
+    const m1SelfBuffTotals = getFinisherBuffTotalsFromCharacter(character, character.magic2atr, ['M1']);
+    const m3SelfBuffTotals = getFinisherBuffTotalsFromCharacter(character, character.magic2atr, ['M3']);
     // 対各属性最大ダメージ
     let maxFireDamage = 0;
     let maxWaterDamage = 0;
@@ -697,10 +698,7 @@ function calculateDamage() {
     // ダメージ計算関数
     function calcDamage(atr: string, partnerBuff: string, partnerName: string, buffSource: string) {
       const atkPartnerBuff = atkBuffDict[partnerBuff] || 0;
-      // バフ込みのATK値
-      const atk = characterAtk + characterAtk * buddyBonus + characterAtk * selfAtkBuff + characterAtk * atkPartnerBuff;
       let partnerDamageBuff = 0;
-      const cosmicRatio = atr === '無' ? 1.1 : 1; // 無属性ダメージ補正
       // 味方のバフ値計算
       if (partnerBuff.includes(atr + '属性ダメージUP')) {
         if (partnerBuff.includes('(極小)')) partnerDamageBuff = 0.025;
@@ -730,13 +728,26 @@ function calculateDamage() {
             ? buddyAttributeDamageBonus.flora
             : buddyAttributeDamageBonus.cosmic;
 
-      // 等倍ダメージ
-      const basedamage = Math.floor(
-        atk *
-        (cosmicRatio + selfDamageBuff + buddyDamageBonus + buddyAttrDamageBuff + partnerDamageBuff) *
-        2.4 *
-        buddyCriticalMultiplier
-      );
+      const optionalSelfBuffs = [
+        emptyFinisherSelfBuffTotals,
+        m1SelfBuffTotals,
+        m3SelfBuffTotals,
+      ];
+
+      const basedamage = optionalSelfBuffs.reduce((maxDamage, currentOptionalBuffs) => {
+        const candidateDamage = calculateBaseDamageWithSelfBuff({
+          atr,
+          characterAtk,
+          buddyBonus,
+          buddyDamageBonus,
+          buddyAttrDamageBuff,
+          atkPartnerBuff,
+          partnerDamageBuff,
+          mandatorySelfBuffs: m2SelfBuffTotals,
+          optionalSelfBuffs: currentOptionalBuffs,
+        });
+        return Math.max(maxDamage, candidateDamage);
+      }, 0);
       if (!fireDamageListByCardDict[character.name]) {
         fireDamageListByCardDict[character.name] = [];
         waterDamageListByCardDict[character.name] = [];
@@ -825,9 +836,6 @@ function calculateDamage() {
   });
 }
 
-// 初期計算を実行
-calculateDamage();
-
 function getEffectiveTotsu(character: any) {
   if (useHandCollection.value) {
     const handCard = handCollectionStore.getHandCard(character.name);
@@ -853,23 +861,68 @@ function hasDamageBuddyEffect(character: any, buddyIndex: number) {
   return (
     summary.atkRate > 0 ||
     summary.damageRate > 0 ||
-    summary.criticalMultiplier > 1 ||
     Object.values(summary.attributeDamageRates).some(rate => (rate || 0) > 0)
   );
 }
 
 // etcパーサを用いた自己バフ合算（magicNbufは使用しない）
-import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
+type FinisherMagicOption = 'M1' | 'M2' | 'M3';
+type FinisherSelfBuffTotals = {
+  atkRate: number;
+  damageRate: number;
+  attributeDamageRate: number;
+};
 
-function calcSelfAtkUpFromCharacter(character: any) {
-  // M3可否を手持ち設定に合わせて判定
+const emptyFinisherSelfBuffTotals: FinisherSelfBuffTotals = {
+  atkRate: 0,
+  damageRate: 0,
+  attributeDamageRate: 0,
+};
+
+function getFinisherAllowM3(character: any) {
   let allowM3 = character.rare === 'SSR';
   if (useHandCollection.value) {
     const handCard = handCollectionStore.getHandCard(character.name);
     if (handCard.isOwned) allowM3 = handCard.isM3;
   }
+  return allowM3;
+}
+
+function getAvailableFinisherMagicOptions(
+  selectedMagicOptions: FinisherMagicOption[],
+  allowM3: boolean
+) {
+  return selectedMagicOptions.filter(magicOption => magicOption !== 'M3' || allowM3);
+}
+
+function hasSelectedMagic(item: string, selectedMagicOptions: FinisherMagicOption[]) {
+  return selectedMagicOptions.some(magicOption => item.includes(`(${magicOption})`));
+}
+
+function getNormalizedEtcItems(character: any) {
+  return ((character.etc || '') as string)
+    .replace(/<br\s*\/?>/g, ',')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function getBuffRateFromItem(item: string, powerMap: Record<string, number>) {
+  if (item.includes('(極小)')) return powerMap['極小'] || 0;
+  if (item.includes('(小)')) return powerMap['小'] || 0;
+  if (item.includes('(中)')) return powerMap['中'] || 0;
+  if (item.includes('(大)')) return powerMap['大'] || 0;
+  if (item.includes('(極大)')) return powerMap['極大'] || 0;
+  return 0;
+}
+
+function calcSelfAtkUpFromCharacter(
+  character: any,
+  selectedMagicOptions: FinisherMagicOption[] = ['M1', 'M2', 'M3']
+) {
+  const allowM3 = getFinisherAllowM3(character);
+  const availableMagicOptions = getAvailableFinisherMagicOptions(selectedMagicOptions, allowM3);
   const parsed = parseMagicBuffsFromEtc(character, { allowM3 });
-  // 対象: 自己ATKUP（全M合算）。ゲーム仕様上、2T以上のみ加算対象。
   const powerMap: Record<string, number> = {
     '極小': 0.1,
     '小': 0.2,
@@ -878,23 +931,24 @@ function calcSelfAtkUpFromCharacter(character: any) {
     '極大': 0.8,
   };
   let total = 0;
-  parsed.forEach(b => {
-    if (b.buffOption === 'ATKUP' && b.isSelf) {
-      const dur = b.durationTurns ?? 0;
+  parsed.forEach(buff => {
+    if (!availableMagicOptions.includes(buff.magicOption)) return;
+    if (buff.buffOption === 'ATKUP' && buff.isSelf) {
+      const dur = buff.durationTurns ?? 0;
       if (dur >= 2) {
-        total += powerMap[b.powerOption] || 0;
+        total += powerMap[buff.powerOption] || 0;
       }
     }
   });
   return total;
 }
 
-function calcSelfDamageUpFromCharacter(character: any) {
-  let allowM3 = character.rare === 'SSR';
-  if (useHandCollection.value) {
-    const handCard = handCollectionStore.getHandCard(character.name);
-    if (handCard.isOwned) allowM3 = handCard.isM3;
-  }
+function calcSelfDamageUpFromCharacter(
+  character: any,
+  selectedMagicOptions: FinisherMagicOption[] = ['M1', 'M2', 'M3']
+) {
+  const allowM3 = getFinisherAllowM3(character);
+  const availableMagicOptions = getAvailableFinisherMagicOptions(selectedMagicOptions, allowM3);
   const parsed = parseMagicBuffsFromEtc(character, { allowM3 });
   const powerMap: Record<string, number> = {
     '極小': 0.02,
@@ -904,20 +958,147 @@ function calcSelfDamageUpFromCharacter(character: any) {
     '極大': 0.1875,
   };
   let total = 0;
-  parsed.forEach(b => {
-    if (b.buffOption === 'ダメージUP' && b.isSelf) {
-      const dur = b.durationTurns ?? 0;
+  parsed.forEach(buff => {
+    if (!availableMagicOptions.includes(buff.magicOption)) return;
+    if (buff.buffOption === 'ダメージUP' && buff.isSelf) {
+      const dur = buff.durationTurns ?? 0;
       if (dur >= 2) {
-        total += powerMap[b.powerOption] || 0;
+        total += powerMap[buff.powerOption] || 0;
       }
     }
   });
+
   // 既存の特例（フェロー）維持
-  if ((character.etc || '').includes('被ダメージUP(中)(相手全体/2T)')) {
+  const etcItems = getNormalizedEtcItems(character);
+  const hasDamageAmpDebuff = etcItems.some(item =>
+    hasSelectedMagic(item, availableMagicOptions) && item.includes('被ダメージUP(中)(相手全体/2T)')
+  );
+  if (hasDamageAmpDebuff) {
     total += 0.0875;
   }
+
   return total;
 }
+
+function calcPartyWideBuffTotalsFromCharacter(
+  character: any,
+  finisherAttribute: string,
+  selectedMagicOptions: FinisherMagicOption[]
+): FinisherSelfBuffTotals {
+  const allowM3 = getFinisherAllowM3(character);
+  const availableMagicOptions = getAvailableFinisherMagicOptions(selectedMagicOptions, allowM3);
+  const atkPowerMap: Record<string, number> = {
+    '極小': 0.1,
+    '小': 0.2,
+    '中': 0.35,
+    '大': 0.5,
+    '極大': 0.8,
+  };
+  const damagePowerMap: Record<string, number> = {
+    '極小': 0.0225,
+    '小': 0.05,
+    '中': 0.0875,
+    '大': 0.125,
+    '極大': 0.225,
+  };
+  const attributeDamagePowerMap: Record<string, number> = {
+    '極小': 0.025,
+    '小': 0.06,
+    '中': 0.105,
+    '大': 0.15,
+    '極大': 0.27,
+  };
+  const totals: FinisherSelfBuffTotals = { ...emptyFinisherSelfBuffTotals };
+
+  getNormalizedEtcItems(character).forEach(item => {
+    if (!hasSelectedMagic(item, availableMagicOptions)) return;
+
+    const durationMatch = item.match(/味方全体\/(\d+)T/);
+    if (!durationMatch) return;
+
+    const durationTurns = Number(durationMatch[1]);
+    if (Number.isNaN(durationTurns) || durationTurns < 2) return;
+
+    if (item.startsWith('ATKUP')) {
+      totals.atkRate += getBuffRateFromItem(item, atkPowerMap);
+      return;
+    }
+
+    if (item.includes('属性ダメージUP')) {
+      if (item.startsWith(`${finisherAttribute}属性ダメージUP`)) {
+        totals.attributeDamageRate += getBuffRateFromItem(item, attributeDamagePowerMap);
+      }
+      return;
+    }
+
+    if (item.includes('ダメージUP') && !item.includes('被ダメージUP')) {
+      totals.damageRate += getBuffRateFromItem(item, damagePowerMap);
+    }
+  });
+
+  return totals;
+}
+
+function getFinisherBuffTotalsFromCharacter(
+  character: any,
+  finisherAttribute: string,
+  selectedMagicOptions: FinisherMagicOption[]
+): FinisherSelfBuffTotals {
+  const partyWideBuffTotals = calcPartyWideBuffTotalsFromCharacter(
+    character,
+    finisherAttribute,
+    selectedMagicOptions
+  );
+
+  return {
+    atkRate: calcSelfAtkUpFromCharacter(character, selectedMagicOptions) + partyWideBuffTotals.atkRate,
+    damageRate: calcSelfDamageUpFromCharacter(character, selectedMagicOptions) + partyWideBuffTotals.damageRate,
+    attributeDamageRate: partyWideBuffTotals.attributeDamageRate,
+  };
+}
+
+function calculateBaseDamageWithSelfBuff(params: {
+  atr: string;
+  characterAtk: number;
+  buddyBonus: number;
+  buddyDamageBonus: number;
+  buddyAttrDamageBuff: number;
+  atkPartnerBuff: number;
+  partnerDamageBuff: number;
+  mandatorySelfBuffs: FinisherSelfBuffTotals;
+  optionalSelfBuffs: FinisherSelfBuffTotals;
+}) {
+  const {
+    atr,
+    characterAtk,
+    buddyBonus,
+    buddyDamageBonus,
+    buddyAttrDamageBuff,
+    atkPartnerBuff,
+    partnerDamageBuff,
+    mandatorySelfBuffs,
+    optionalSelfBuffs,
+  } = params;
+
+  const cosmicRatio = atr === '無' ? 1.1 : 1;
+  const atk =
+    characterAtk *
+    (1 + buddyBonus + mandatorySelfBuffs.atkRate + optionalSelfBuffs.atkRate + atkPartnerBuff);
+  const damageRate =
+    cosmicRatio +
+    mandatorySelfBuffs.damageRate +
+    mandatorySelfBuffs.attributeDamageRate +
+    optionalSelfBuffs.damageRate +
+    optionalSelfBuffs.attributeDamageRate +
+    buddyDamageBonus +
+    buddyAttrDamageBuff +
+    partnerDamageBuff;
+
+  return Math.floor(atk * damageRate * 2.4);
+}
+
+// 初期計算を実行
+calculateDamage();
 
 
 const cardNameDict: Record<string, string[]> = {}; // キャラ名をキー、カード名を値とする辞書

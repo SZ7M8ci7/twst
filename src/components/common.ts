@@ -921,7 +921,6 @@ export function calcDeckStatus(
     // バディHP増加分加算
     let increasedHP = 0;
     let buddyDamageRate = 0;
-    let buddyCriticalMultiplier = 1;
     let buddyFireDamageRate = 0;
     let buddyWaterDamageRate = 0;
     let buddyWoodDamageRate = 0;
@@ -939,9 +938,6 @@ export function calcDeckStatus(
     const buddy1DamageRate = needAnyDamageMetric ? (charaAny.buddy1DamageRateCached as number) : 0;
     const buddy2DamageRate = needAnyDamageMetric ? (charaAny.buddy2DamageRateCached as number) : 0;
     const buddy3DamageRate = needAnyDamageMetric ? (charaAny.buddy3DamageRateCached as number) : 0;
-    const buddy1Critical = needAnyDamageMetric ? (charaAny.buddy1CriticalCached as number) : 1;
-    const buddy2Critical = needAnyDamageMetric ? (charaAny.buddy2CriticalCached as number) : 1;
-    const buddy3Critical = needAnyDamageMetric ? (charaAny.buddy3CriticalCached as number) : 1;
     const buddy1FireDamage = needAnyDamageMetric ? (charaAny.buddy1FireDamageRateCached as number) : 0;
     const buddy1WaterDamage = needAnyDamageMetric ? (charaAny.buddy1WaterDamageRateCached as number) : 0;
     const buddy1WoodDamage = needAnyDamageMetric ? (charaAny.buddy1WoodDamageRateCached as number) : 0;
@@ -1158,7 +1154,6 @@ export function calcDeckStatus(
     if (needAnyDamageMetric) {
       if (buddy1Active) {
         buddyDamageRate += buddy1DamageRate;
-        if (buddy1Critical > buddyCriticalMultiplier) buddyCriticalMultiplier = buddy1Critical;
         buddyFireDamageRate += buddy1FireDamage;
         buddyWaterDamageRate += buddy1WaterDamage;
         buddyWoodDamageRate += buddy1WoodDamage;
@@ -1166,7 +1161,6 @@ export function calcDeckStatus(
       }
       if (buddy2Active) {
         buddyDamageRate += buddy2DamageRate;
-        if (buddy2Critical > buddyCriticalMultiplier) buddyCriticalMultiplier = buddy2Critical;
         buddyFireDamageRate += buddy2FireDamage;
         buddyWaterDamageRate += buddy2WaterDamage;
         buddyWoodDamageRate += buddy2WoodDamage;
@@ -1174,7 +1168,6 @@ export function calcDeckStatus(
       }
       if (buddy3Active) {
         buddyDamageRate += buddy3DamageRate;
-        if (buddy3Critical > buddyCriticalMultiplier) buddyCriticalMultiplier = buddy3Critical;
         buddyFireDamageRate += buddy3FireDamage;
         buddyWaterDamageRate += buddy3WaterDamage;
         buddyWoodDamageRate += buddy3WoodDamage;
@@ -1364,7 +1357,6 @@ export function calcDeckStatus(
           if (m1BuddyDamageDelta !== 0) {
             magic1Damage += baseATK * (charaAny.m1ComboRateCached as number) * m1BuddyDamageDelta * (1 + m1Totals.atkDelta + atkBuddyRate);
           }
-          if (buddyCriticalMultiplier !== 1) magic1Damage *= buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic1AdvantageDamage = magic1Damage * (charaAny.m1AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic1vsHiDamage = magic1Damage * (charaAny.m1VsFireCached as number);
           if (needReferenceVsMizuDamage) magic1vsMizuDamage = magic1Damage * (charaAny.m1VsWaterCached as number);
@@ -1385,7 +1377,6 @@ export function calcDeckStatus(
             const comboRate = isDuoPow ? (charaAny.m2DuoComboRateCached as number) : (charaAny.m2ComboRateCached as number);
             magic2Damage += baseATK * comboRate * m2BuddyDamageDelta * (1 + m2Totals.atkDelta + atkBuddyRate);
           }
-          if (buddyCriticalMultiplier !== 1) magic2Damage *= buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic2AdvantageDamage = magic2Damage * (charaAny.m2AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic2vsHiDamage = magic2Damage * (charaAny.m2VsFireCached as number);
           if (needReferenceVsMizuDamage) magic2vsMizuDamage = magic2Damage * (charaAny.m2VsWaterCached as number);
@@ -1398,7 +1389,6 @@ export function calcDeckStatus(
           if (m3BuddyDamageDelta !== 0) {
             magic3Damage += baseATK * (charaAny.m3ComboRateCached as number) * m3BuddyDamageDelta * (1 + m3Totals.atkDelta + atkBuddyRate);
           }
-          if (buddyCriticalMultiplier !== 1) magic3Damage *= buddyCriticalMultiplier;
           if (needReferenceAdvantageDamage) magic3AdvantageDamage = magic3Damage * (charaAny.m3AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic3vsHiDamage = magic3Damage * (charaAny.m3VsFireCached as number);
           if (needReferenceVsMizuDamage) magic3vsMizuDamage = magic3Damage * (charaAny.m3VsWaterCached as number);
@@ -1418,7 +1408,7 @@ export function calcDeckStatus(
         if (useM1) {
           const effectiveAtk = baseATK * (1 + atkBuddyRate + m1AtkDelta);
           const atkRate = (charaAny.m1BaseRateCached as number) + m1DmgDelta;
-          magic1Damage = effectiveAtk * atkRate * (charaAny.m1ComboRateCached as number) * buddyCriticalMultiplier;
+          magic1Damage = effectiveAtk * atkRate * (charaAny.m1ComboRateCached as number);
           if (needReferenceAdvantageDamage) magic1AdvantageDamage = magic1Damage * (charaAny.m1AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic1vsHiDamage = magic1Damage * (charaAny.m1VsFireCached as number);
           if (needReferenceVsMizuDamage) magic1vsMizuDamage = magic1Damage * (charaAny.m1VsWaterCached as number);
@@ -1430,7 +1420,7 @@ export function calcDeckStatus(
           const baseRate = isDuoPow ? (charaAny.m2DuoBaseRateCached as number) : (charaAny.m2BaseRateCached as number);
           const comboRate = isDuoPow ? (charaAny.m2DuoComboRateCached as number) : (charaAny.m2ComboRateCached as number);
           const atkRate = baseRate + m2DmgDelta;
-          magic2Damage = effectiveAtk * atkRate * comboRate * buddyCriticalMultiplier;
+          magic2Damage = effectiveAtk * atkRate * comboRate;
           if (needReferenceAdvantageDamage) magic2AdvantageDamage = magic2Damage * (charaAny.m2AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic2vsHiDamage = magic2Damage * (charaAny.m2VsFireCached as number);
           if (needReferenceVsMizuDamage) magic2vsMizuDamage = magic2Damage * (charaAny.m2VsWaterCached as number);
@@ -1439,7 +1429,7 @@ export function calcDeckStatus(
         if (useM3) {
           const effectiveAtk = baseATK * (1 + atkBuddyRate + m3AtkDelta);
           const atkRate = (charaAny.m3BaseRateCached as number) + m3DmgDelta;
-          magic3Damage = effectiveAtk * atkRate * (charaAny.m3ComboRateCached as number) * buddyCriticalMultiplier;
+          magic3Damage = effectiveAtk * atkRate * (charaAny.m3ComboRateCached as number);
           if (needReferenceAdvantageDamage) magic3AdvantageDamage = magic3Damage * (charaAny.m3AdvantageRateCached as number);
           if (needReferenceVsHiDamage) magic3vsHiDamage = magic3Damage * (charaAny.m3VsFireCached as number);
           if (needReferenceVsMizuDamage) magic3vsMizuDamage = magic3Damage * (charaAny.m3VsWaterCached as number);

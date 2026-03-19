@@ -81,10 +81,7 @@ const criticalRateMap: Record<string, number> = {
   'クリティカル(極大)': 1.25,
 };
 
-const continueHealRateMap: Record<string, number> = {
-  '継続回復(極小)': 0.4,
-  'HP継続回復(極小)': 0.4,
-};
+const buddyContinueHealPattern = /^(?:HP)?継続回復\(極小\)$/;
 
 function getLevelAdjustedRate(
   effect: string,
@@ -100,6 +97,11 @@ function mapCriticalPowerOption(effect: string): string {
   if (effect.includes('(小)')) return '1/2';
   if (effect.includes('(大)')) return '2/3';
   return '1/1';
+}
+
+export function getBuddyContinueHealRate(level = 10): number {
+  const normalizedLevel = Math.max(1, Math.min(10, Math.trunc(level)));
+  return normalizedLevel * 0.04;
 }
 
 export function splitBuddyEffects(status: string | undefined | null): string[] {
@@ -150,8 +152,8 @@ export function getBuddyStatusSummary(status: string | undefined | null, level =
       summary.criticalMultiplier = Math.max(summary.criticalMultiplier, criticalRateMap[effect]);
     }
 
-    if (continueHealRateMap[effect] !== undefined) {
-      summary.continueHealRate += continueHealRateMap[effect];
+    if (buddyContinueHealPattern.test(effect)) {
+      summary.continueHealRate += getBuddyContinueHealRate(level);
     }
   });
 
