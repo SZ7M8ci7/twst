@@ -1,0 +1,1 @@
+function t(e){switch(e){case"R":return 70;case"SR":return 90;case"SSR":return 120;default:return 120}}function r(e){switch(e){case"R":return 70;case"SR":return 90;case"SSR":return 120;default:return 120}}export{t as a,r as g};
