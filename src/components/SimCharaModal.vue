@@ -186,7 +186,7 @@ characterData.forEach(char => {
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict, recalculateHP, recalculateATK } from '@/utils/calculations';
 import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { applyMultiLevelSort, applyDefaultSort } from '@/utils/sortUtils';
-import { getBuddyAtkRate, getBuddyHpRate, getBuddyStatusForCharacter } from '@/utils/buddyEffects';
+import { getBuddyAtkRate, getBuddyContinueHealRate, getBuddyHpRate, getBuddyStatusForCharacter } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 
@@ -396,6 +396,29 @@ function getEffectiveBuddyStatus(character, buddyIndex, isActive, totsuOverride 
   });
 }
 
+function calculateBuddyContinueHealForDeck(character, memberNameSet, characterHP, totsu) {
+  let buddyContinueHeal = 0;
+
+  for (let buddyIndex = 1; buddyIndex <= 3; buddyIndex++) {
+    const buddyName = character[`buddy${buddyIndex}c`];
+    if (!buddyName || !memberNameSet.has(buddyName)) {
+      continue;
+    }
+
+    const buddyStatus = getEffectiveBuddyStatus(character, buddyIndex, true, totsu);
+    if (!buddyStatus) {
+      continue;
+    }
+
+    if (buddyStatus.includes('HP継続回復(極小)') || buddyStatus.includes('継続回復(極小)')) {
+      const buddyLevel = Number(character[`buddy${buddyIndex}Lv`]) || 10;
+      buddyContinueHeal += characterHP * getBuddyContinueHealRate(buddyLevel);
+    }
+  }
+
+  return buddyContinueHeal;
+}
+
 
 // キャラクター単体の実質HPを計算
 function calculateEffectiveCardHP(character, memberNameDict) {
@@ -507,6 +530,8 @@ function calculateEffectiveCardATK(character, memberNameDict) {
 
 // デッキ全体の計算（候補キャラクターを含む仮想デッキ）
 function calculateDeckStats(candidateCharacter, sortKey) {
+  const needsEffectiveDeckHP = sortKey === 'effectiveDeckHP';
+  const needsDeckDamage = sortKey === 'deckDamage';
   
   // 現在のデッキキャラクターを取得（インデックス情報も保持）
   let virtualDeck = [];
@@ -580,11 +605,13 @@ function calculateDeckStats(candidateCharacter, sortKey) {
 
   // 重い計算が必要な場合のみ完全な再計算を実行
   const fullMemberNameDict = {};
-  virtualDeck.forEach(char => {
-    if (char.chara) {
-      fullMemberNameDict[char.chara] = true;
-    }
-  });
+  if (needsDeckDamage) {
+    virtualDeck.forEach(char => {
+      if (char.chara) {
+        fullMemberNameDict[char.chara] = true;
+      }
+    });
+  }
 
   const virtualIndex = virtualDeckIndexMap.findIndex(index => index === -1);
 
@@ -697,15 +724,15 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     recalculatedVirtualDeck.push(recalculatedChara);
   }
 
-  const duoResolution = resolveDeckDuoAvailability(recalculatedVirtualDeck);
+  if (needsDeckDamage) {
+    const duoResolution = resolveDeckDuoAvailability(recalculatedVirtualDeck);
 
-  // デュオ判定結果をキャラクターのMagic2Powerに反映
-  recalculatedVirtualDeck.forEach((chara, index) => {
-    chara.magic2Power = duoResolution.statuses[index]?.canUseDuo ? 'デュオ' : (chara.magic2pow || '連撃(強)');
-  });
-  
-  // デュオ判定後、全キャラクターの統計を再計算（ダメージ計算が必要な場合）
-  if (sortKey === 'deckDamage') {
+    // デュオ判定結果をキャラクターのMagic2Powerに反映
+    recalculatedVirtualDeck.forEach((chara, index) => {
+      chara.magic2Power = duoResolution.statuses[index]?.canUseDuo ? 'デュオ' : (chara.magic2pow || '連撃(強)');
+    });
+
+    // デュオ判定後、全キャラクターの統計を再計算
     recalculatedVirtualDeck.forEach((chara) => {
       calculateCharacterStats(chara, fullMemberNameDict);
     });
@@ -781,37 +808,37 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     
     deckMinIncreasedHPBuddy = Math.min(deckMinIncreasedHPBuddy, increasedHP);
     
-    // HP回復分計算（選択されたマジックのみ）
-    let hpHeal = 0;
-    let hpConHeal = 0;
-    
-    // マジック選択状態を考慮した回復計算
-    // デッキキャラクターは手持ち設定に関係なく計算に含む、候補キャラクターのみ所持チェック
-    if (!isCandidate || isOwned) {
-      if (chara.isM1Selected) {
-        hpHeal += calcHealRate(chara.magic1heal, 10) * characterATK;
-        hpConHeal += calcConHealRate(chara.magic1heal, 10) * characterHP;
+    if (needsEffectiveDeckHP) {
+      // HP回復分計算（選択されたマジックのみ）
+      let hpHeal = 0;
+      let hpConHeal = 0;
+      
+      // マジック選択状態を考慮した回復計算
+      // デッキキャラクターは手持ち設定に関係なく計算に含む、候補キャラクターのみ所持チェック
+      if (!isCandidate || isOwned) {
+        if (chara.isM1Selected) {
+          hpHeal += calcHealRate(chara.magic1heal, 10) * characterATK;
+          hpConHeal += calcConHealRate(chara.magic1heal, 10) * characterHP;
+        }
+        if (chara.isM2Selected) {
+          hpHeal += calcHealRate(chara.magic2heal, 10) * characterATK;
+          hpConHeal += calcConHealRate(chara.magic2heal, 10) * characterHP;
+        }
+        if (chara.isM3Selected && hasM3) {
+          hpHeal += calcHealRate(chara.magic3heal, 10) * characterATK;
+          hpConHeal += calcConHealRate(chara.magic3heal, 10) * characterHP;
+        }
+
+        hpConHeal += calculateBuddyContinueHealForDeck(chara, memberNameSet, characterHP, buddyTotsu);
       }
-      if (chara.isM2Selected) {
-        hpHeal += calcHealRate(chara.magic2heal, 10) * characterATK;
-        hpConHeal += calcConHealRate(chara.magic2heal, 10) * characterHP;
-      }
-      if (chara.isM3Selected && hasM3) {
-        hpHeal += calcHealRate(chara.magic3heal, 10) * characterATK;
-        hpConHeal += calcConHealRate(chara.magic3heal, 10) * characterHP;
-      }
-    }
-    
-    deckTotalHeal += hpHeal + hpConHeal;
-    
-    // デュオカウント（再計算済みデータから判定）
-    if (chara.magic2Power === 'デュオ') {
-      deckDuo += 1;
+
+      deckTotalHeal += hpHeal + hpConHeal;
     }
   });
 
   // 再計算されたキャラクターデータを使用してダメージ計算
-  recalculatedVirtualDeck.forEach((chara, currentIndex) => {
+  if (needsDeckDamage) {
+    recalculatedVirtualDeck.forEach((chara, currentIndex) => {
     // このキャラクターが候補キャラクターかどうかを判定
     const isCandidateCharacter = (currentIndex === virtualIndex);
     
@@ -913,7 +940,8 @@ function calculateDeckStats(candidateCharacter, sortKey) {
         }
       }
     }
-  });
+    });
+  }
   
   // ソートキーに応じて適切な値を返す
   switch (sortKey) {
@@ -1041,6 +1069,7 @@ watch([sortBy, sortOrder, () => props.selectedAttribute], () => {
 
 // ソート中フラグ
 const isSorting = ref(false);
+const heavySortValueCache = ref({});
 
 // フィルター・ソート済みのキャラクターリスト（非同期対応）
 const filteredAndSortedCharacters = ref([]);
@@ -1051,6 +1080,7 @@ const filteredCharacters = computed(() => filteredAndSortedCharacters.value);
 // フィルターとソートの処理を非同期化
 const updateFilteredCharacters = async () => {
   isSorting.value = true;
+  heavySortValueCache.value = {};
   
   // リアクティブな依存関係を明示的に参照
   const currentSortBy = sortBy.value;
@@ -1104,6 +1134,12 @@ const updateFilteredCharacters = async () => {
           return { character, value };
         })
       );
+
+      const nextCache = {};
+      charactersWithValues.forEach(({ character, value }) => {
+        nextCache[character.name] = value;
+      });
+      heavySortValueCache.value = nextCache;
       
       // ソート
       charactersWithValues.sort((a, b) => {
@@ -1286,7 +1322,7 @@ function getDisplayText(character) {
     case 'deckBuddyCount':
     case 'minBuddyHPIncrease':
     case 'duoCount': {
-      const value = calculateDeckStats(character, currentSortBy);
+      const value = heavySortValueCache.value[character.name] ?? calculateDeckStats(character, currentSortBy);
       return Math.round(value);
     }
     default:
