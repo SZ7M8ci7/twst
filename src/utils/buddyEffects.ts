@@ -106,9 +106,10 @@ export function getBuddyContinueHealRate(level = 10): number {
 
 export function splitBuddyEffects(status: string | undefined | null): string[] {
   if (!status) return [];
-  return status
+  const protectedStatus = status.replace(/HP&ATKUP\(([^)]+)\)/g, 'HP__ATKUP($1)');
+  return protectedStatus
     .split('&')
-    .map(effect => effect.trim())
+    .map(effect => effect.trim().replace(/^HP__ATKUP\(/, 'HP&ATKUP('))
     .filter(Boolean);
 }
 
