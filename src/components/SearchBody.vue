@@ -44,6 +44,7 @@
               class="table-select"
               :value="item.rare === 'SSR' ? (item.totsu ?? 0) : 0"
               :disabled="item.rare !== 'SSR'"
+              @input="handleTableTotsuChange(item, $event)"
               @change="handleTableTotsuChange(item, $event)"
             >
               <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
@@ -185,6 +186,8 @@ type FocusRequest = {
   characterName: string;
   targetTab: 'search' | 'support';
 };
+
+type MagicUsageKey = 'hasM1' | 'hasM2' | 'hasM3';
 
 const props = defineProps<{
   focusRequest: FocusRequest | null;
@@ -354,61 +357,71 @@ watch(loadingImgUrl, (isLoading) => {
 
 // SSRのM3有無を考慮して選択数を数える
 function countSelectedMagics(character: any): number {
-  const useM3 = character.rare === 'SSR' ? character.hasM3 : false;
-  return [character.hasM1, character.hasM2, useM3].filter(Boolean).length;
+  const selectedMagicKeys = getSelectableMagicKeys(character);
+  return selectedMagicKeys.filter((key) => Boolean(character[key])).length;
+}
+
+function getSelectableMagicKeys(character: any): MagicUsageKey[] {
+  const selectableMagicKeys: MagicUsageKey[] = ['hasM1', 'hasM2'];
+  if (isM3Unlocked(character.rare, character.totsu ?? 0)) {
+    selectableMagicKeys.push('hasM3');
+  }
+  return selectableMagicKeys;
 }
 
 // M1/M2/M3の初期化と「最低2つON」を強制する
-function normalizeMagicUsage(character: any) {
+function normalizeMagicUsage(character: any, preferredOrder?: MagicUsageKey[]) {
+  if (character.hasM1 === undefined) character.hasM1 = true;
+  if (character.hasM2 === undefined) character.hasM2 = true;
+
   if (character.rare !== 'SSR') {
     character.totsu = 0;
     character.hasM3 = false;
   } else {
     character.totsu = clampTotsuCount(character.totsu ?? 4);
-    if (character.totsu < 3) {
+    if (!isM3Unlocked(character.rare, character.totsu)) {
       character.hasM3 = false;
     } else if (character.hasM3 === undefined) {
       character.hasM3 = true;
     }
   }
 
-  if (countSelectedMagics(character) < 2) {
-    character.hasM1 = true;
-    character.hasM2 = true;
-    character.hasM3 = character.rare === 'SSR' && (character.totsu ?? 0) >= 3;
+  const selectableMagicKeys = getSelectableMagicKeys(character);
+  const normalizedPreferredOrder = preferredOrder?.filter((key, index) =>
+    selectableMagicKeys.includes(key) && preferredOrder.indexOf(key) === index
+  ) ?? [];
+  const fillOrder = [
+    ...normalizedPreferredOrder,
+    ...selectableMagicKeys.filter((key) => !normalizedPreferredOrder.includes(key))
+  ];
+
+  let selectedCount = countSelectedMagics(character);
+  while (selectedCount < 2) {
+    const nextKey = fillOrder.find((key) => !character[key]);
+    if (!nextKey) break;
+    character[nextKey] = true;
+    selectedCount += 1;
   }
 }
 
 function handleMagicToggle(
   character: any,
-  key: 'hasM1' | 'hasM2' | 'hasM3',
+  key: MagicUsageKey,
   nextValue: boolean | null
 ) {
-  // 1つ外したら残り2つを必ずONにする（SSR以外はM1/M2固定ON）
-  const isSSR = character.rare === 'SSR';
-  const next = {
-    hasM1: !!character.hasM1,
-    hasM2: !!character.hasM2,
-    hasM3: isSSR ? !!character.hasM3 : false
-  };
-
-  if (key === 'hasM1') next.hasM1 = !!nextValue;
-  if (key === 'hasM2') next.hasM2 = !!nextValue;
-  if (key === 'hasM3') next.hasM3 = isSSR ? !!nextValue : false;
-
-  if (!isSSR) {
-    next.hasM1 = true;
-    next.hasM2 = true;
-    next.hasM3 = false;
-  } else if (!nextValue) {
-    next.hasM1 = key === 'hasM1' ? false : true;
-    next.hasM2 = key === 'hasM2' ? false : true;
-    next.hasM3 = key === 'hasM3' ? false : true;
+  if (key === 'hasM3' && !isM3Unlocked(character.rare, character.totsu ?? 0)) {
+    character.hasM3 = false;
+  } else {
+    character[key] = !!nextValue;
   }
 
-  character.hasM1 = next.hasM1;
-  character.hasM2 = next.hasM2;
-  character.hasM3 = next.hasM3;
+  const preferredOrder = nextValue
+    ? undefined
+    : [
+        ...getSelectableMagicKeys(character).filter((candidateKey) => candidateKey !== key),
+        key
+      ];
+  normalizeMagicUsage(character, preferredOrder);
 }
 
 function syncDefenseExamContinueHealMagics(presetName: string) {
@@ -438,6 +451,8 @@ function syncDefenseExamContinueHealMagics(presetName: string) {
       if (countSelectedMagics(character) <= 2) break;
       character[usageKey] = false;
     }
+
+    normalizeMagicUsage(character);
   });
 }
 
@@ -451,14 +466,10 @@ function applyBulkLevel() {
 function updateTotsu(character: any, value: string | number | null) {
   if (character.rare !== 'SSR') {
     character.totsu = 0;
-    character.hasM3 = false;
-    return;
+  } else {
+    character.totsu = clampTotsuCount(value);
   }
-
-  character.totsu = clampTotsuCount(value);
-  if (character.totsu < 3) {
-    character.hasM3 = false;
-  }
+  normalizeMagicUsage(character);
 }
 
 function handleTableTotsuChange(character: any, event: Event) {
@@ -561,7 +572,9 @@ function closeEditModal() {
 function saveCharacter() {
   const index = characters.value.findIndex(c => c.name === selectedCharacter.value.name);
   if (index !== -1) {
-    characters.value[index] = { ...selectedCharacter.value };
+    const normalizedCharacter = { ...selectedCharacter.value };
+    normalizeMagicUsage(normalizedCharacter);
+    characters.value[index] = normalizedCharacter;
   } else {
     console.error('character not found');
   }
@@ -778,13 +791,10 @@ onBeforeMount(() => {
 
 onMounted(() => {
   characters.value.forEach(character => {
-    // M1/M2が未定義の古いデータに合わせた初期化
     if (character.totsu === undefined) {
       character.totsu = character.rare === 'SSR' ? 4 : 0;
     }
-    character.hasM3 = character.rare === 'SSR' ? isM3Unlocked(character.rare, character.totsu) : false;
-    if (character.hasM1 === undefined) character.hasM1 = true;
-    if (character.hasM2 === undefined) character.hasM2 = true;
+    normalizeMagicUsage(character);
   });
   loadLevels(); // 画面を開いた時にlocalStorageからレベルを復元
   syncDefenseExamContinueHealMagics(appliedPresetName.value);
