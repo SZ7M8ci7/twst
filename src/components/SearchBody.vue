@@ -170,6 +170,7 @@
 import { computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
+import { useSearchSettingsStore } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
@@ -177,6 +178,7 @@ import { scrollElementWithinContainerToCenter, waitForLayoutStability } from '@/
 import { useDisplay } from 'vuetify';
 import { getInputMaxLevel } from '@/constants/levels';
 import { clampTotsuCount, isM3Unlocked } from '@/utils/totsu';
+import { SEARCH_PRESET_CONFIGURATIONS } from '@/constants/searchPresets';
 
 type FocusRequest = {
   requestId: number;
@@ -191,7 +193,9 @@ const props = defineProps<{
 const { t } = useI18n();
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
+const searchSettingsStore = useSearchSettingsStore();
 const { characters } = storeToRefs(characterStore);
+const { appliedPresetName, appliedPresetToken } = storeToRefs(searchSettingsStore);
 const { width } = useDisplay();
 const bulkLevel = ref(getInputMaxLevel('SSR'));
 const bulkTotsu = ref(4);
@@ -405,6 +409,36 @@ function handleMagicToggle(
   character.hasM1 = next.hasM1;
   character.hasM2 = next.hasM2;
   character.hasM3 = next.hasM3;
+}
+
+function syncDefenseExamContinueHealMagics(presetName: string) {
+  const preset = SEARCH_PRESET_CONFIGURATIONS.find((entry) => entry.name === presetName);
+  const disabledAttribute = preset?.deckSearchContinueHealDisabledAttribute;
+  if (!disabledAttribute) return;
+
+  characters.value.forEach(character => {
+    const magicKeys = [
+      { attrKey: 'magic1atr', healKey: 'magic1heal', usageKey: 'hasM1' },
+      { attrKey: 'magic2atr', healKey: 'magic2heal', usageKey: 'hasM2' },
+      { attrKey: 'magic3atr', healKey: 'magic3heal', usageKey: 'hasM3' },
+    ] as const;
+
+    for (const { attrKey, healKey, usageKey } of magicKeys) {
+      const isContinueHealMagic = typeof character[healKey] === 'string' && character[healKey].includes('継続回復');
+      if (!isContinueHealMagic) continue;
+      if (character[attrKey] === disabledAttribute) continue;
+      if (usageKey === 'hasM3' && !isM3Unlocked(character.rare, character.totsu ?? 0)) continue;
+      character[usageKey] = true;
+    }
+
+    for (const { attrKey, healKey, usageKey } of magicKeys) {
+      if (!character[usageKey]) continue;
+      if (character[attrKey] !== disabledAttribute) continue;
+      if (typeof character[healKey] !== 'string' || !character[healKey].includes('継続回復')) continue;
+      if (countSelectedMagics(character) <= 2) break;
+      character[usageKey] = false;
+    }
+  });
 }
 
 function applyBulkLevel() {
@@ -753,6 +787,11 @@ onMounted(() => {
     if (character.hasM2 === undefined) character.hasM2 = true;
   });
   loadLevels(); // 画面を開いた時にlocalStorageからレベルを復元
+  syncDefenseExamContinueHealMagics(appliedPresetName.value);
+});
+
+watch(appliedPresetToken, () => {
+  syncDefenseExamContinueHealMagics(appliedPresetName.value);
 });
 </script>
 

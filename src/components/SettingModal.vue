@@ -180,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { createDefaultSearchSettingsState, useSearchSettingsStore, type SearchSettingsState } from '@/store/searchSetting';
 import { onBeforeMount, onMounted } from 'vue';
 import { cloneDeep } from 'lodash';
@@ -351,6 +351,7 @@ onBeforeMount(() => {
     .map((option) => enName2jpName[option.prop] || option.prop)
     .filter((name): name is string => typeof name === 'string' && name.length > 0);
   minimumSettings.value = buildMinimumSettingRows(getMinimumSettingValues(searchSettingsStore));
+  selectedPreset.value = searchSettingsStore.appliedPresetName ?? '';
 });
 
 onMounted(async () => {
@@ -359,6 +360,7 @@ onMounted(async () => {
 
 const allowSameCharacter = ref(searchSettingsStore.allowSameCharacter);
 const selectedPreset = ref('');
+const isApplyingPreset = ref(false);
 
 function getMinimumSettingValues(source: Pick<SearchSettingsState, MinimumSettingKey>): Record<MinimumSettingKey, number> {
   return minimumSettingDefinitions.reduce((acc, definition) => {
@@ -414,6 +416,7 @@ function removeMinimumSetting(index: string | number) {
 
 // プリセット適用関数（自動リセット付き）
 function applyPreset(preset: SearchPreset) {
+  isApplyingPreset.value = true;
   // まず全設定をリセット
   resetAllSettings();
 
@@ -435,6 +438,7 @@ function applyPreset(preset: SearchPreset) {
   // その他の設定
   if (preset.attackNum !== undefined) attackNum.value = preset.attackNum;
   if (preset.allowSameCharacter !== undefined) allowSameCharacter.value = preset.allowSameCharacter;
+  isApplyingPreset.value = false;
 }
 
 // 全設定をデフォルト値にリセット
@@ -559,6 +563,8 @@ function applyFilter() {
     allowSameCharacter: allowSameCharacter.value,
     mustCharacters: storedMustCharacters,
     convertedMustCharacters: convertedMustCharacters,
+    appliedPresetName: selectedPreset.value,
+    appliedPresetToken: searchSettingsStore.appliedPresetToken + 1,
   });
   emit('close');
 }
@@ -571,6 +577,15 @@ function cancel() {
 function toDisplayIndex(index: string | number): number {
   return Number(index) + 1;
 }
+
+watch(
+  [sortOptions, minimumSettings, attackNum, allowSameCharacter],
+  () => {
+    if (isApplyingPreset.value || selectedPreset.value === '') return;
+    selectedPreset.value = '';
+  },
+  { deep: true, flush: 'sync' }
+);
 </script>
 <style scoped>
 .character-list > .character-item {

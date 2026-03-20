@@ -37,6 +37,8 @@ export interface SearchSettingsState {
   convertedMustCharacters: string[];
   allowSameCharacter: boolean;
   selectedSupportCharacters: string[];
+  appliedPresetName: string;
+  appliedPresetToken: number;
 }
 
 // SSRキャラクターの名前を取得する関数
@@ -74,6 +76,8 @@ export const createDefaultSearchSettingsState = (): SearchSettingsState => ({
   convertedMustCharacters: [],
   allowSameCharacter: false,
   selectedSupportCharacters: getInitialSSRCharacters(),
+  appliedPresetName: '',
+  appliedPresetToken: 0,
 });
 
 export const useSearchSettingsStore = defineStore('searchSettings', {

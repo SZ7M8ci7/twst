@@ -30,6 +30,7 @@ export interface SearchPreset {
   minSettings: SearchPresetMinSettings;
   attackNum?: number;
   allowSameCharacter?: boolean;
+  deckSearchContinueHealDisabledAttribute?: string;
 }
 
 export const SEARCH_PRESET_CONFIGURATIONS: SearchPreset[] = [
@@ -92,6 +93,7 @@ export const SEARCH_PRESET_CONFIGURATIONS: SearchPreset[] = [
       minReferenceVsHiDamage: 100000,
     },
     attackNum: 9,
+    deckSearchContinueHealDisabledAttribute: '木',
   },
   {
     name: 'settingModal.preset.waterDefenseExam',
@@ -101,6 +103,7 @@ export const SEARCH_PRESET_CONFIGURATIONS: SearchPreset[] = [
       minReferenceVsMizuDamage: 100000,
     },
     attackNum: 9,
+    deckSearchContinueHealDisabledAttribute: '火',
   },
   {
     name: 'settingModal.preset.floraDefenseExam',
@@ -110,6 +113,7 @@ export const SEARCH_PRESET_CONFIGURATIONS: SearchPreset[] = [
       minReferenceVsKiDamage: 100000,
     },
     attackNum: 9,
+    deckSearchContinueHealDisabledAttribute: '水',
   },
   {
     name: 'settingModal.preset.allDefenseExam',
