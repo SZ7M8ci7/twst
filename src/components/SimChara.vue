@@ -28,9 +28,8 @@
             <div class="stat">
               <label>凸</label>
               <select
-                :value="simulatorStore.deckCharacters[props.charaIndex].rare === 'SSR' ? (simulatorStore.deckCharacters[props.charaIndex].totsu ?? 0) : 0"
+                :value="simulatorStore.deckCharacters[props.charaIndex].totsu ?? 0"
                 class="totsu-select"
-                :disabled="simulatorStore.deckCharacters[props.charaIndex].rare !== 'SSR'"
                 @change="handleTotsuChange"
               >
                 <option v-for="value in totsuOptions" :key="value" :value="value">{{ value }}</option>
@@ -635,7 +634,7 @@ const isBuffRowEnd = (index) => {
 };
 
 const syncCharacterTotsu = (character, value) => {
-  const nextTotsu = character.rare === 'SSR' ? clampTotsuCount(value) : 0;
+  const nextTotsu = clampTotsuCount(value);
   character.totsu = nextTotsu;
   character.isBonusSelected = isMaxLimitBreak(nextTotsu);
   character.hasM3 = isM3Unlocked(character.rare, nextTotsu);
@@ -1026,7 +1025,7 @@ watch(() => simulatorStore.deckCharacters[props.charaIndex]?.rare, (newRare) => 
     const character = simulatorStore.deckCharacters[props.charaIndex];
     // R/SRの場合、M3を無効化
     if (newRare === 'R' || newRare === 'SR') {
-      syncCharacterTotsu(character, 0);
+      syncCharacterTotsu(character, character.totsu ?? 0);
       character.isM3Selected = false;
       // ステータス再計算
       simulatorStore.recalculateStats();

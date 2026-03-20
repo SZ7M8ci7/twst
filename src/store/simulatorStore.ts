@@ -119,9 +119,7 @@ const createDefaultCharacter = (): Character => ({
 });
 
 function syncLimitBreakState(character: Character) {
-  const normalizedTotsu = character.rare === 'SSR'
-    ? clampTotsuCount(character.totsu ?? (character.isBonusSelected ? 4 : 0))
-    : 0;
+  const normalizedTotsu = clampTotsuCount(character.totsu ?? (character.isBonusSelected ? 4 : 0));
 
   character.totsu = normalizedTotsu;
   character.isBonusSelected = isMaxLimitBreak(normalizedTotsu);
@@ -489,7 +487,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
       } else {
         // 手持ち設定ONで所持していない場合、完凸で計算
         character.level = getStatScalingMaxLevel(character.rare);
-        character.totsu = character.rare === 'SSR' ? 4 : 0;
+        character.totsu = 4;
         syncLimitBreakState(character);
         character.hp = recalculateHP(character, character.level, character.isBonusSelected);
         character.atk = recalculateATK(character, character.level, character.isBonusSelected);
@@ -505,7 +503,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
       }
       // フルステータスの場合の設定
       character.level = getStatScalingMaxLevel(character.rare);
-      character.totsu = character.rare === 'SSR' ? 4 : 0;
+      character.totsu = 4;
       syncLimitBreakState(character);
     }
     // ignoreHandCollectionがtrueの場合は、既に設定されているレベルでHP/ATKを再計算

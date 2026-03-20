@@ -647,7 +647,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
         recalculatedChara.selectedMagic.push(3);
       }
       
-      recalculatedChara.totsu = clampTotsuCount(chara.totsu ?? (chara.rare === 'SSR' ? 4 : 0));
+      recalculatedChara.totsu = clampTotsuCount(chara.totsu ?? 4);
       recalculatedChara.isM1Selected = true;
       recalculatedChara.isM2Selected = true;
       recalculatedChara.isM3Selected = false;
@@ -1265,7 +1265,7 @@ const selectImage = (character) => {
   const normalCharacter = { ...character };
   normalCharacter.originalMaxHP = character.hp;
   normalCharacter.originalMaxATK = character.atk;
-  normalCharacter.totsu = clampTotsuCount(character.totsu ?? (character.rare === 'SSR' ? 4 : 0));
+  normalCharacter.totsu = clampTotsuCount(character.totsu ?? 4);
   
   emit('select', normalCharacter);
 };

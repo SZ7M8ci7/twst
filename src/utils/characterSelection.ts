@@ -48,7 +48,7 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
   
   // 手持ちコレクション設定を確認
   let characterLevel = customLevel || getStatScalingMaxLevel(chara.rare);
-  let totsu = chara.rare === 'SSR' ? 4 : 0;
+  let totsu = 4;
   
   // デッキ探索からの復元時は手持ち設定を無視
   if (!ignoreHandCollection && handCollectionStore.useHandCollection) {
