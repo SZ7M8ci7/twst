@@ -434,6 +434,18 @@ const { characters } = storeToRefs(characterStore);
 // 独自の手持ち設定状態を管理（ストアとは独立）
 const useHandCollection = ref(false);
 
+function getReadOnlyHandCard(cardName: string) {
+  return handCollectionStore.peekHandCard(cardName) ?? {
+    characterName: '',
+    cardName,
+    isOwned: false,
+    level: 0,
+    totsu: 0,
+    isLimitBreak: false,
+    isM3: false,
+  };
+}
+
 const characterInfoMap: Ref<Map<string, CharacterCardInfo>> = ref(new Map());
 
 const iconSize = 50;
@@ -576,7 +588,7 @@ function buildEffectDict() {
   characters.value.forEach(character => {
     // 手持ち設定ONの場合、所持していないカードはバフ要員から除外
     if (useHandCollection.value) {
-      const handCard = handCollectionStore.getHandCard(character.name);
+      const handCard = getReadOnlyHandCard(character.name);
       if (!handCard.isOwned) {
         return; // 所持していない場合はスキップ
       }
@@ -615,7 +627,7 @@ function buildEffectDict() {
                 }
                 // 手持ち設定でM3がfalseの場合もスキップ
                 if (useHandCollection.value) {
-                  const handCard = handCollectionStore.getHandCard(character.name);
+                  const handCard = getReadOnlyHandCard(character.name);
                   if (handCard.isOwned && !handCard.isM3) {
                     return;
                   }
@@ -648,7 +660,7 @@ function calculateDamage() {
     let shouldCalculate = true; // 計算を行うかどうかのフラグ
     
     if (useHandCollection.value) {
-      const handCard = handCollectionStore.getHandCard(character.name);
+      const handCard = getReadOnlyHandCard(character.name);
       if (handCard.isOwned) {
         // 所持している場合、手持ち設定の値を使用
         const characterLevel = Number(handCard.level);
@@ -814,7 +826,7 @@ function calculateDamage() {
         }
         // 手持ち設定でM3がfalseの場合もスキップ
         if (useHandCollection.value) {
-          const handCard = handCollectionStore.getHandCard(duoPartner.name);
+          const handCard = getReadOnlyHandCard(duoPartner.name);
           if (handCard.isOwned && !handCard.isM3) {
             return;
           }
@@ -838,7 +850,7 @@ function calculateDamage() {
 
 function getEffectiveTotsu(character: any) {
   if (useHandCollection.value) {
-    const handCard = handCollectionStore.getHandCard(character.name);
+    const handCard = getReadOnlyHandCard(character.name);
     if (handCard.isOwned) {
       return handCard.totsu;
     }
@@ -882,7 +894,7 @@ const emptyFinisherSelfBuffTotals: FinisherSelfBuffTotals = {
 function getFinisherAllowM3(character: any) {
   let allowM3 = character.rare === 'SSR';
   if (useHandCollection.value) {
-    const handCard = handCollectionStore.getHandCard(character.name);
+    const handCard = getReadOnlyHandCard(character.name);
     if (handCard.isOwned) allowM3 = handCard.isM3;
   }
   return allowM3;
@@ -1427,7 +1439,7 @@ function getMaxDamage(charaName: string, element: ElementType): number | string 
       .forEach(character => {
         // 手持ち設定を考慮した表示判定
         if (useHandCollection.value) {
-          const handCard = handCollectionStore.getHandCard(character.name);
+          const handCard = getReadOnlyHandCard(character.name);
           if (!handCard.isOwned) {
             return; // 所持していない場合は除外
           }
@@ -1446,7 +1458,7 @@ function getMaxDamage(charaName: string, element: ElementType): number | string 
     const hasOwnedCard = characters.value
       .filter(character => character.rare === 'SSR' && character.chara === charaName)
       .some(character => {
-        const handCard = handCollectionStore.getHandCard(character.name);
+        const handCard = getReadOnlyHandCard(character.name);
         return handCard.isOwned;
       });
     

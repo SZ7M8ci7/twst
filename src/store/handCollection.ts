@@ -90,12 +90,14 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
   // 同一セッション内でのモーダル表示回数を追跡
   let modalOpenCount = 0;
 
+  function peekHandCard(cardName: string): HandCard | undefined {
+    return handCollection[cardName];
+  }
+
   // 指定されたカード名の手持ち設定を取得
   function getHandCard(cardName: string): HandCard {
     if (!handCollection[cardName]) {
       handCollection[cardName] = createDefaultHandCard(cardName);
-    } else {
-      handCollection[cardName] = normalizeHandCard(cardName, handCollection[cardName]);
     }
     
     return handCollection[cardName];
@@ -112,8 +114,7 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
 
   // キャラクターの所持状況を確認
   function isCharacterOwned(cardName: string): boolean {
-    const handCard = getHandCard(cardName);
-    return handCard.isOwned;
+    return !!peekHandCard(cardName)?.isOwned;
   }
 
   // 所持しているカードのみを取得
@@ -167,6 +168,7 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
     stats,
     
     // Actions
+    peekHandCard,
     getHandCard,
     updateHandCard,
     isCharacterOwned,

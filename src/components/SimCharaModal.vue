@@ -292,6 +292,20 @@ const { deckCharacters } = storeToRefs(simulatorStore);
 const filterdStore = useFilterdStore();
 const handCollectionStore = useHandCollectionStore();
 
+const ASYNC_SORT_KEYS = ['hp', 'atk', 'effectiveCardHP', 'effectiveCardATK', 'effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'];
+
+function getReadOnlyHandCard(cardName) {
+  return handCollectionStore.peekHandCard(cardName) ?? {
+    characterName: '',
+    cardName,
+    isOwned: false,
+    level: 0,
+    totsu: 0,
+    isLimitBreak: false,
+    isM3: false,
+  };
+}
+
 const loadingImgUrl = ref(false);
 
 // タブ管理
@@ -429,7 +443,7 @@ function calculateEffectiveCardHP(character, memberNameDict) {
   let hasM3 = character.hasM3;
   
   if (handCollectionStore.useHandCollection) {
-    const handCard = handCollectionStore.getHandCard(character.name);
+    const handCard = getReadOnlyHandCard(character.name);
     if (!handCard.isOwned) {
       // 未所持の場合は計算しない
       return 0;
@@ -444,8 +458,9 @@ function calculateEffectiveCardHP(character, memberNameDict) {
   
   // バディHP増加分
   let buddyHP = 0;
+  const handCard = handCollectionStore.useHandCollection ? getReadOnlyHandCard(character.name) : null;
   const totsu = handCollectionStore.useHandCollection
-    ? getCharacterTotsu(character, handCollectionStore.getHandCard(character.name))
+    ? getCharacterTotsu(character, handCard)
     : getCharacterTotsu(character);
   if (memberNameDict[character.buddy1c]) {
     const rate = calcHPBuddyRate(getEffectiveBuddyStatus(character, 1, true, totsu), 10);
@@ -477,7 +492,7 @@ function calculateEffectiveCardHP(character, memberNameDict) {
 function getStatForSort(character, statType) {
   // 手持ち設定が有効な場合
   if (handCollectionStore.useHandCollection) {
-    const handCard = handCollectionStore.getHandCard(character.name);
+    const handCard = getReadOnlyHandCard(character.name);
     if (!handCard.isOwned) {
       // 未所持の場合は0を返す（実質HPの計算と一貫性を保つ）
       return 0;
@@ -500,7 +515,7 @@ function calculateEffectiveCardATK(character, memberNameDict) {
   let baseATK = character.atk || 0;
   
   if (handCollectionStore.useHandCollection) {
-    const handCard = handCollectionStore.getHandCard(character.name);
+    const handCard = getReadOnlyHandCard(character.name);
     if (!handCard.isOwned) {
       // 未所持の場合は計算しない
       return 0;
@@ -512,8 +527,9 @@ function calculateEffectiveCardATK(character, memberNameDict) {
   
   // バディATK増加分
   let buddyATK = 0;
+  const handCard = handCollectionStore.useHandCollection ? getReadOnlyHandCard(character.name) : null;
   const totsu = handCollectionStore.useHandCollection
-    ? getCharacterTotsu(character, handCollectionStore.getHandCard(character.name))
+    ? getCharacterTotsu(character, handCard)
     : getCharacterTotsu(character);
   if (memberNameDict[character.buddy1c]) {
     buddyATK += baseATK * calcATKBuddyRate(getEffectiveBuddyStatus(character, 1, true, totsu), 10);
@@ -660,7 +676,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       
       // 手持ち設定がONの場合、候補キャラクターのHP/ATKを手持ちレベルで再計算
       if (handCollectionStore.useHandCollection) {
-        const handCard = handCollectionStore.getHandCard(chara.name);
+        const handCard = getReadOnlyHandCard(chara.name);
         if (handCard.isOwned) {
           recalculatedChara.level = Number(handCard.level);
           recalculatedChara.totsu = handCard.totsu;
@@ -752,7 +768,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     
     if (handCollectionStore.useHandCollection && isCandidate) {
       // 候補キャラクターのみ手持ち設定を適用
-      const handCard = handCollectionStore.getHandCard(chara.name);
+      const handCard = getReadOnlyHandCard(chara.name);
       isOwned = handCard.isOwned;
       
       if (isOwned) {
@@ -771,7 +787,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     // バディHP増加分計算
     // デッキキャラクターは手持ち設定に関係なく計算に含む、候補キャラクターのみ所持チェック
     const buddyTotsu = handCollectionStore.useHandCollection && isCandidate
-      ? getCharacterTotsu(chara, handCollectionStore.getHandCard(chara.name))
+      ? getCharacterTotsu(chara, getReadOnlyHandCard(chara.name))
       : getCharacterTotsu(chara);
     if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy1c)) {
       deckTotalBuddy += 1;
@@ -1069,7 +1085,8 @@ watch([sortBy, sortOrder, () => props.selectedAttribute], () => {
 
 // ソート中フラグ
 const isSorting = ref(false);
-const heavySortValueCache = ref({});
+const sortValueCache = ref({});
+let sortRequestId = 0;
 
 // フィルター・ソート済みのキャラクターリスト（非同期対応）
 const filteredAndSortedCharacters = ref([]);
@@ -1077,10 +1094,32 @@ const filteredAndSortedCharacters = ref([]);
 // フィルター適用済みのキャラクターリスト
 const filteredCharacters = computed(() => filteredAndSortedCharacters.value);
 
+function calculateSortValue(character, sortKey) {
+  switch (sortKey) {
+    case 'hp':
+    case 'atk':
+      return getStatForSort(character, sortKey);
+    case 'effectiveCardHP':
+      return calculateEffectiveCardHP(character, getMemberNameSet(character, props.charaIndex));
+    case 'effectiveCardATK':
+      return calculateEffectiveCardATK(character, getMemberNameSet(character, props.charaIndex));
+    case 'effectiveDeckHP':
+    case 'deckDamage':
+    case 'deckHPBuddyCount':
+    case 'deckBuddyCount':
+    case 'minBuddyHPIncrease':
+    case 'duoCount':
+      return calculateDeckStats(character, sortKey);
+    default:
+      return 0;
+  }
+}
+
 // フィルターとソートの処理を非同期化
 const updateFilteredCharacters = async () => {
+  const requestId = ++sortRequestId;
   isSorting.value = true;
-  heavySortValueCache.value = {};
+  sortValueCache.value = {};
   
   // リアクティブな依存関係を明示的に参照
   const currentSortBy = sortBy.value;
@@ -1117,29 +1156,39 @@ const updateFilteredCharacters = async () => {
       // 降順の場合は逆順
       filteredAndSortedCharacters.value = applyDefaultSort(filtered).reverse();
     }
-    isSorting.value = false;
-  } else if (['effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'].includes(currentSortBy)) {
-    // 高コストなソートの場合は非同期処理
+    if (requestId === sortRequestId) {
+      isSorting.value = false;
+    }
+  } else if (ASYNC_SORT_KEYS.includes(currentSortBy)) {
+    // 計算コストが高い項目は1回ずつ値を計算してから並び替える
     // まずフィルターされた結果を即座に表示
     filteredAndSortedCharacters.value = [...filtered];
     
     // 非同期でソート計算を実行
     requestAnimationFrame(async () => {
-      // 各キャラクターのソート値を計算
-      const charactersWithValues = await Promise.all(
-        filtered.map(async (character) => {
-          // 計算をバッチ処理
-          await new Promise(resolve => setTimeout(resolve, 0));
-          const value = calculateDeckStats(character, currentSortBy);
-          return { character, value };
-        })
-      );
-
+      const charactersWithValues = [];
       const nextCache = {};
-      charactersWithValues.forEach(({ character, value }) => {
+
+      for (let index = 0; index < filtered.length; index++) {
+        if (requestId !== sortRequestId) {
+          return;
+        }
+
+        if (index > 0 && index % 20 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+
+        const character = filtered[index];
+        const value = calculateSortValue(character, currentSortBy);
+        charactersWithValues.push({ character, value });
         nextCache[character.name] = value;
-      });
-      heavySortValueCache.value = nextCache;
+      }
+
+      if (requestId !== sortRequestId) {
+        return;
+      }
+
+      sortValueCache.value = nextCache;
       
       // ソート
       charactersWithValues.sort((a, b) => {
@@ -1150,8 +1199,13 @@ const updateFilteredCharacters = async () => {
       });
       
       // 結果を更新
+      if (requestId !== sortRequestId) {
+        return;
+      }
       filteredAndSortedCharacters.value = charactersWithValues.map(item => item.character);
-      isSorting.value = false;
+      if (requestId === sortRequestId) {
+        isSorting.value = false;
+      }
     });
   } else {
     // 軽量なソート項目
@@ -1208,7 +1262,9 @@ const updateFilteredCharacters = async () => {
     });
     
     filteredAndSortedCharacters.value = filtered;
-    isSorting.value = false;
+    if (requestId === sortRequestId) {
+      isSorting.value = false;
+    }
   }
 };
 
@@ -1233,7 +1289,7 @@ const closeModal = () => {
 const selectImage = (character) => {
   // 手持ちコレクション設定が有効な場合、キャラクターにその設定を適用
     if (handCollectionStore.useHandCollection) {
-      const handCard = handCollectionStore.getHandCard(character.name);
+      const handCard = getReadOnlyHandCard(character.name);
       if (handCard.isOwned) {
         // 手持ち設定に基づいてキャラクターのステータスを調整
         const modifiedCharacter = { ...character };
@@ -1306,25 +1362,26 @@ function getDisplayText(character) {
       return character.rare;
     case 'hp':
     case 'atk':
-      return Math.round(getStatForSort(character, currentSortBy));
-    case 'duoPartner':
-      return character.duo || 'なし';
-    case 'effectiveCardHP': {
-      const effectiveHP = calculateEffectiveCardHP(character, getMemberNameSet(character, props.charaIndex));
-      const roundedHP = Math.round(effectiveHP);
-      return roundedHP;
-    }
+    case 'effectiveCardHP':
     case 'effectiveCardATK':
-      return Math.round(calculateEffectiveCardATK(character, getMemberNameSet(character, props.charaIndex)));
     case 'effectiveDeckHP':
     case 'deckDamage':
     case 'deckHPBuddyCount':
     case 'deckBuddyCount':
     case 'minBuddyHPIncrease':
     case 'duoCount': {
-      const value = heavySortValueCache.value[character.name] ?? calculateDeckStats(character, currentSortBy);
+      const cachedValue = sortValueCache.value[character.name];
+      if (cachedValue !== undefined) {
+        return Math.round(cachedValue);
+      }
+      if (isSorting.value && ASYNC_SORT_KEYS.includes(currentSortBy)) {
+        return '';
+      }
+      const value = calculateSortValue(character, currentSortBy);
       return Math.round(value);
     }
+    case 'duoPartner':
+      return character.duo || 'なし';
     default:
       return character.chara || character.name;
   }

@@ -945,6 +945,12 @@ const handleLevelInput = (event) => {
 const saveDetailChanges = (updatedCharacter) => {
   // 詳細設定で変更された値を直接反映（selectCharacterによる自動計算を回避）
   const currentCharacter = simulatorStore.deckCharacters[props.charaIndex];
+  const previousBuddy1Totsu = currentCharacter.buddy1s_totsu;
+  const previousBuddy2Totsu = currentCharacter.buddy2s_totsu;
+  const previousBuddy3Totsu = currentCharacter.buddy3s_totsu;
+  const buddy1SkillChanged = updatedCharacter.buddy1s !== currentCharacter.buddy1s;
+  const buddy2SkillChanged = updatedCharacter.buddy2s !== currentCharacter.buddy2s;
+  const buddy3SkillChanged = updatedCharacter.buddy3s !== currentCharacter.buddy3s;
   
   // キャラクター基本情報の更新
   Object.assign(currentCharacter, {
@@ -968,6 +974,25 @@ const saveDetailChanges = (updatedCharacter) => {
     buddy3Lv: Number(updatedCharacter.buddy3Lv),
     buffs: updatedCharacter.buffs || []
   });
+
+  if (buddy1SkillChanged && updatedCharacter.buddy1s_totsu === previousBuddy1Totsu) {
+    currentCharacter.buddy1s_totsu = updatedCharacter.buddy1s;
+  } else if (updatedCharacter.buddy1s_totsu !== undefined) {
+    currentCharacter.buddy1s_totsu = updatedCharacter.buddy1s_totsu;
+  }
+
+  if (buddy2SkillChanged && updatedCharacter.buddy2s_totsu === previousBuddy2Totsu) {
+    currentCharacter.buddy2s_totsu = updatedCharacter.buddy2s;
+  } else if (updatedCharacter.buddy2s_totsu !== undefined) {
+    currentCharacter.buddy2s_totsu = updatedCharacter.buddy2s_totsu;
+  }
+
+  if (buddy3SkillChanged && updatedCharacter.buddy3s_totsu === previousBuddy3Totsu) {
+    currentCharacter.buddy3s_totsu = updatedCharacter.buddy3s;
+  } else if (updatedCharacter.buddy3s_totsu !== undefined) {
+    currentCharacter.buddy3s_totsu = updatedCharacter.buddy3s_totsu;
+  }
+
   syncCharacterTotsu(currentCharacter, currentCharacter.totsu);
   
   // バフ設定の更新（詳細モーダルで設定された内容をそのまま保存）
