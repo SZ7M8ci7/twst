@@ -1187,14 +1187,6 @@ onUnmounted(() => {
   width: 0;
   min-width: 0;
   max-width: none;
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-.level-value-input::-webkit-outer-spin-button,
-.level-value-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .hp-value-input,
