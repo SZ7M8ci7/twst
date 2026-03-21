@@ -43,7 +43,7 @@
           fixed-header :mobile-breakpoint="0">
           <!-- level列のカスタムテンプレート定義 -->
           <template v-slot:[`item.type`]="{ item }">
-            <div class="text-no-wrap">{{ item.growtype.slice(-3) }}</div>
+            <div class="text-no-wrap">{{ item.type }}</div>
           </template>
           <template v-slot:[`item.buddy1s`]="{ item }">
             <div class="text-no-wrap">{{ formatBuddy(item.buddy1s) }}</div>
@@ -86,6 +86,20 @@ const { characters } = storeToRefs(characterStore);
 const { t } = useI18n();
 const loadingImgUrl = ref(true);
 const useHandCollectionFilter = ref(false);
+
+function getTypeFromAttr(attr: string) {
+  switch (attr) {
+    case 'アタック':
+      return 'ATK';
+    case 'バランス':
+      return 'BAL';
+    case 'ディフェンス':
+      return 'DEF';
+    default:
+      return attr ? attr.substring(0, 3).toUpperCase() : '';
+  }
+}
+
 // visibleプロパティがtrueのキャラクターだけを表示（レアリティ・実装日順でソート）
 const visibleCharacters = computed(() => {
   if (loadingImgUrl.value) {
@@ -101,7 +115,10 @@ const visibleCharacters = computed(() => {
     const handCard = handCollectionStore.getHandCard(character.name);
     return handCard.isOwned;
   });
-  return applyDefaultSort(filteredCharacters);
+  return applyDefaultSort(filteredCharacters).map(character => ({
+    ...character,
+    type: getTypeFromAttr(character.attr),
+  }));
 });
 const search = ref('');
 const headers = [
@@ -144,7 +161,7 @@ const exportToExcel = () => {
     名前: character.chara,
     衣装: character.costume,
     レア: character.rare,
-    タイプ: character.growtype.slice(-3),
+    タイプ: getTypeFromAttr(character.attr),
     非公式タイプ: character.growtype,
     HP: character.hp,
     ATK: character.atk,
