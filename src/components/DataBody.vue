@@ -48,11 +48,20 @@
           <template v-slot:[`item.buddy1s`]="{ item }">
             <div class="text-no-wrap">{{ formatBuddy(item.buddy1s) }}</div>
           </template>
+          <template v-slot:[`item.buddy1s_totsu`]="{ item }">
+            <div class="text-no-wrap">{{ formatBuddy(item.buddy1s_totsu) }}</div>
+          </template>
           <template v-slot:[`item.buddy2s`]="{ item }">
             <div class="text-no-wrap">{{ formatBuddy(item.buddy2s) }}</div>
           </template>
+          <template v-slot:[`item.buddy2s_totsu`]="{ item }">
+            <div class="text-no-wrap">{{ formatBuddy(item.buddy2s_totsu) }}</div>
+          </template>
           <template v-slot:[`item.buddy3s`]="{ item }">
             <div class="text-no-wrap">{{ formatBuddy(item.buddy3s) }}</div>
+          </template>
+          <template v-slot:[`item.buddy3s_totsu`]="{ item }">
+            <div class="text-no-wrap">{{ formatBuddy(item.buddy3s_totsu) }}</div>
           </template>
           <template v-slot:[`item.name`]="{ item }">
             <img :src="item.imgUrl" :alt="item.name" class="character-image" />
@@ -119,10 +128,13 @@ const headers = [
   { title: 'M3回復', value: 'magic3heal', sortable: true  },
   { title: 'バディ1', value: 'buddy1c', sortable: true  },
   { title: 'バディ1', value: 'buddy1s', sortable: true  },
+  { title: 'バディ1凸', value: 'buddy1s_totsu', sortable: true  },
   { title: 'バディ2', value: 'buddy2c', sortable: true  },
   { title: 'バディ2', value: 'buddy2s', sortable: true  },
+  { title: 'バディ2凸', value: 'buddy2s_totsu', sortable: true  },
   { title: 'バディ3', value: 'buddy3c', sortable: true  },
   { title: 'バディ3', value: 'buddy3s', sortable: true  },
+  { title: 'バディ3凸', value: 'buddy3s_totsu', sortable: true  },
   { title: 'その他', value: 'etc', sortable: false  },
 ];
 import * as XLSX from 'xlsx';
@@ -151,10 +163,13 @@ const exportToExcel = () => {
     M3回復: character.magic3heal,
     バディ1: character.buddy1c,
     バディ1スキル: character.buddy1s,
+    バディ1凸スキル: character.buddy1s_totsu,
     バディ2: character.buddy2c,
     バディ2スキル: character.buddy2s,
+    バディ2凸スキル: character.buddy2s_totsu,
     バディ3: character.buddy3c,
     バディ3スキル: character.buddy3s,
+    バディ3凸スキル: character.buddy3s_totsu,
     その他: character.etc
   }));
 
