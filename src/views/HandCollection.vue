@@ -1,5 +1,5 @@
 <template>
-  <v-container class="pa-2" :key="`container-${handCollectionChangeCounter}`">
+  <v-container class="pa-2">
     <v-row class="ma-0">
       <v-col cols="12" class="pa-2">
         <!-- ヘッダー -->
@@ -150,7 +150,7 @@
             <!-- データ行 -->
             <div 
               v-for="(item, index) in filteredCharacters" 
-              :key="`${item.chara}-${item.name}-${handCollectionChangeCounter}`"
+              :key="item.name"
               class="table-row"
               :class="{ 'even-row': index % 2 === 0 }"
             >
@@ -266,7 +266,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useHandCollectionStore } from '@/store/handCollection';
+import { useHandCollectionStore, type HandCard } from '@/store/handCollection';
 import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
@@ -305,12 +305,6 @@ const sortOrder = ref<'asc' | 'desc'>('asc');
 const savedState = ref<string>('');
 
 
-// 手持ちコレクションの変更を追跡するためのカウンター（軽量版）
-const handCollectionChangeCounter = computed(() => {
-  // 単純にhandCollectionオブジェクトのキー数を返す（軽量）
-  return Object.keys(handCollectionStore.handCollection).length;
-});
-
 // データ管理用
 const dataModal = ref(false);
 const dataText = ref('');
@@ -325,6 +319,18 @@ const characterOrder = computed(() =>
   charactersInfo.map((info: any) => info.name_ja)
 );
 
+function getReadOnlyHandCard(cardName: string): HandCard {
+  return handCollectionStore.peekHandCard(cardName) ?? {
+    characterName: '',
+    cardName,
+    isOwned: false,
+    level: 0,
+    totsu: 0,
+    isLimitBreak: false,
+    isM3: false,
+  };
+}
+
 // Computed Properties
 const filteredCharacters = computed(() => {
   if (loading.value || !characters.value) {
@@ -336,8 +342,7 @@ const filteredCharacters = computed(() => {
   const result = characters.value
     .filter(character => character.visible)
     .map(character => {
-      // 手持ち設定は常に有効なので、その部分だけを処理
-      const handCard = handCollectionStore.getHandCard(character.name);
+      const handCard = getReadOnlyHandCard(character.name);
       
       return {
         ...character,
@@ -413,7 +418,7 @@ const filteredCharacters = computed(() => {
 
 // Methods
 function getHandCard(cardName: string) {
-  return handCollectionStore.getHandCard(cardName);
+  return getReadOnlyHandCard(cardName);
 }
 
 // ソート機能
