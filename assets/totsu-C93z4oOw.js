@@ -1,0 +1,1 @@
+function r(t){const n=Number(t);return Number.isFinite(n)?Math.max(0,Math.min(4,Math.trunc(n))):0}function i(t){return t?t.totsu!==void 0&&t.totsu!==null&&t.totsu!==""?r(t.totsu):t.isLimitBreak?4:t.isM3?3:0:0}function u(t){return r(t)>=4}function s(t,n){return t==="SSR"&&r(n)>=3}function o(t,n){return t==="SSR"&&r(n)>=2}export{u as a,o as b,r as c,i as d,s as i};
