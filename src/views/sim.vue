@@ -110,6 +110,7 @@ import CalcATK from '@/views/calcATK.vue';
 import BuddyInfo from '@/components/BuddyInfo.vue';
 import CharacterEtc from '@/components/CharacterEtc.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { loadSimulatorWindowState } from '@/storage/simulatorStorage';
 import { processCharacterSelection } from '@/utils/characterSelection';
 
 const isLargeScreen = ref(window.innerWidth >= 768);
@@ -156,11 +157,11 @@ async function restoreState() {
   
   // 既存の状態復元
   if (urlParams.get('restoreState') === 'true') {
-    const savedState = localStorage.getItem('twstSimulatorState');
+    const savedState = loadSimulatorWindowState();
     let restored = false;
     if (savedState) {
       try {
-        const state = JSON.parse(savedState);
+        const state = savedState;
         const { useCharacterStore } = await import('@/store/characters');
         const characterStore = useCharacterStore();
         

@@ -30,6 +30,7 @@
 import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
 const { t } = useI18n();
@@ -58,19 +59,10 @@ const onAddClick = (item:any) => {
   deckStore.addToDeck(item);
 };
 onBeforeMount(() => {
-  const promises = characters.value.map(character => {
-    return import(`@/assets/img/${character.name}.webp`)
-      .then(module => {
-        character.imgUrl = module.default;
-      })
-      .catch(() => {
-        character.imgUrl = ''; // 画像の読み込みに失敗した場合
-      });
-  });
-
-  Promise.all(promises).then(() => {
-    loadingImgUrl.value = false; // すべての画像のロードが完了
-  });
+  void hydrateCharacterImageUrls(characters.value, 'name')
+    .finally(() => {
+      loadingImgUrl.value = false;
+    });
 });
 </script>
 <style scoped>

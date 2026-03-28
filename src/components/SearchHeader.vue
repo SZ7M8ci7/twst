@@ -55,7 +55,7 @@ import FilterModal from "@/components/FilterModal.vue";
 import SettingModal from "@/components/SettingModal.vue";
 import ErrorModal from "@/components/ErrorModal.vue";
 import { storeToRefs } from "pinia";
-import { calcDecks } from "./common";
+import { runDeckSearch } from '@/domain/deckSearch/runDeckSearch';
 import { useSearchResultStore } from '@/store/searchResult';
 import { event } from 'vue-gtag'
 import { useI18n } from 'vue-i18n';
@@ -132,7 +132,7 @@ async function startSearch(){
   event('search start')
   await new Promise(resolve => setTimeout(resolve, 300)); // UI反映待ち
   try {
-    await calcDecks(t);
+    await runDeckSearch(t);
   } finally {
     if (runToken === searchRunToken) {
       isSearching.value = false;

@@ -223,6 +223,7 @@ import {
   getBuddyStatusForCharacter,
 } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
+import { loadCachedImageUrl } from '@/utils/characterAssets';
 
 const simulatorStore = useSimulatorStore();
 const handCollectionStore = useHandCollectionStore();
@@ -678,10 +679,9 @@ const getBuddyIcon = async (buddyCharaName) => {
   if (!enName) return null;
   
   try {
-    // 動的インポートを使用してアイコンを取得
-    const module = await import(`@/assets/img/icon/${enName}.webp`);
-    buddyIconCache.value[buddyCharaName] = module.default;
-    return module.default;
+    const imageUrl = await loadCachedImageUrl(enName, 'icon/');
+    buddyIconCache.value[buddyCharaName] = imageUrl || defaultImg;
+    return buddyIconCache.value[buddyCharaName];
   } catch (error) {
     console.warn(`Failed to load buddy icon for ${enName}:`, error);
     buddyIconCache.value[buddyCharaName] = null;
@@ -817,8 +817,8 @@ const loadDuoPartnerIcon = async (duoPartnerName) => {
   }
   
   try {
-    const module = await import(`@/assets/img/icon/${jpName2enName[duoPartnerName]}.webp`);
-    duoPartnerIcon.value = module.default;
+    const imageUrl = await loadCachedImageUrl(jpName2enName[duoPartnerName], 'icon/');
+    duoPartnerIcon.value = imageUrl || defaultImg;
   } catch (error) {
     duoPartnerIcon.value = defaultImg;
   }

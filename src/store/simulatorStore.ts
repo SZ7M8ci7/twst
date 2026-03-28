@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive, watch, nextTick } from 'vue';
+import { saveStoredAutoSaveDeck } from '@/storage/simulatorStorage';
 import { calculateCharacterStats, recalculateHP, recalculateATK } from '@/utils/calculations';
 import { getInputMaxLevel, getStatScalingMaxLevel } from '@/constants/levels';
 import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
@@ -17,7 +18,6 @@ function debounce(fn: Function, delay: number) {
   };
 }
 
-const AUTO_SAVE_STORAGE_KEY = 'twst_autosave_deck';
 const AUTO_SAVE_DECK_ID = 'autosave';
 const AUTO_SAVE_DECK_NAME = 'AutoSave';
 
@@ -149,7 +149,7 @@ function saveAutoDeck(deckCharacters: Character[], selectedAttribute: string) {
       selectedAttribute,
       savedAt: new Date().toISOString()
     };
-    localStorage.setItem(AUTO_SAVE_STORAGE_KEY, JSON.stringify(deck));
+    saveStoredAutoSaveDeck(deck);
   } catch (error) {
     console.warn('AutoSaveの保存に失敗しました:', error);
   }

@@ -65,6 +65,7 @@ import defaultImg from '@/assets/img/default.webp';
 import charactersInfo from '@/assets/characters_info.json';
 import { getBuddyStatusForCharacter } from '@/utils/buddyEffects';
 import { isTotsuBuddyEnhanced } from '@/utils/totsu';
+import { loadCachedImageUrl } from '@/utils/characterAssets';
 
 const simulatorStore = useSimulatorStore();
 
@@ -172,9 +173,8 @@ async function loadCharacterIcon(charaCode: string): Promise<void> {
   }
   
   try {
-    // 動的インポートを使用してアイコンを読み込む
-    const module = await import(`@/assets/img/icon/${englishName}.webp`);
-    characterIcons.value[charaCode] = module.default;
+    const imageUrl = await loadCachedImageUrl(englishName, 'icon/');
+    characterIcons.value[charaCode] = imageUrl || defaultImg;
   } catch (error) {
     console.error(`Error loading icon for ${charaCode} (${englishName}):`, error);
     characterIcons.value[charaCode] = defaultImg;

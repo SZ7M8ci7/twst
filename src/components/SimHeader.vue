@@ -32,6 +32,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { saveSimulatorWindowState } from '@/storage/simulatorStorage';
 import SavedDeckModal from '@/components/SavedDeckModal.vue';
 
 const props = defineProps({
@@ -117,7 +118,7 @@ const saveState = () => {
     deckCharacters: charactersToSave,
     selectedAttribute: selectedOption.value
   };
-  localStorage.setItem('twstSimulatorState', JSON.stringify(state));
+  saveSimulatorWindowState(state);
 };
 
 const openInNewTab = () => {

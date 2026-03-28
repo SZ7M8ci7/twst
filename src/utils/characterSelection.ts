@@ -1,5 +1,6 @@
 // キャラクター選択の共通ロジック
 import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
+import { loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
@@ -29,17 +30,7 @@ export const getPowerOption = (buffString: string) => {
 
 // キャラクター画像の動的読み込み
 export const loadCharacterImage = async (characterName: string) => {
-  try {
-    const imageModule = await import(`@/assets/img/${characterName}.webp`);
-    return imageModule.default;
-  } catch (error) {
-    try {
-      const defaultModule = await import(`@/assets/img/notyet.webp`);
-      return defaultModule.default;
-    } catch {
-      return '';
-    }
-  }
+  return loadCharacterImageUrl(characterName);
 };
 
 // キャラクター選択時の共通処理

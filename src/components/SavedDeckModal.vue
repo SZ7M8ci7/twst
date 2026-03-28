@@ -89,6 +89,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import {
+  loadStoredAutoSaveDeck,
+  loadStoredSavedDecks,
+  saveStoredSavedDecks,
+} from '@/storage/simulatorStorage';
 import { loadCharacterImage } from '@/utils/characterSelection';
 
 interface SavedDeck {
@@ -195,8 +200,6 @@ const preloadDeckImages = async () => {
   await Promise.all(imagePromises);
 };
 
-const STORAGE_KEY = 'twst_saved_decks';
-const AUTO_SAVE_STORAGE_KEY = 'twst_autosave_deck';
 const AUTO_SAVE_DECK_ID = 'autosave';
 const AUTO_SAVE_DECK_NAME = 'AutoSave';
 
@@ -228,17 +231,14 @@ function buildDeckSnapshot(deckCharacters: any[], name: string, id: string): Sav
 
 function loadAutoSaveDeck() {
   try {
-    const saved = localStorage.getItem(AUTO_SAVE_STORAGE_KEY);
-    if (saved) {
-      const loaded = JSON.parse(saved);
-      if (loaded && Array.isArray(loaded.deckCharacters)) {
-        autoSaveDeck.value = {
-          ...loaded,
-          id: AUTO_SAVE_DECK_ID,
-          name: AUTO_SAVE_DECK_NAME
-        };
-        return;
-      }
+    const loaded = loadStoredAutoSaveDeck<SavedDeck>();
+    if (loaded && Array.isArray(loaded.deckCharacters)) {
+      autoSaveDeck.value = {
+        ...loaded,
+        id: AUTO_SAVE_DECK_ID,
+        name: AUTO_SAVE_DECK_NAME
+      };
+      return;
     }
   } catch (error) {
     console.error('AutoSaveの読み込みに失敗しました:', error);
@@ -283,18 +283,12 @@ function migrateLegacyDecks(decks: SavedDeck[]): SavedDeck[] {
 
 function loadSavedDecks() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      let loadedDecks = JSON.parse(saved);
-      
-      // 旧形式のデータをマイグレーション
-      loadedDecks = migrateLegacyDecks(loadedDecks);
-      
-      savedDecks.value = loadedDecks;
-      
-      // マイグレーション後のデータを保存（次回以降の読み込みを高速化）
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedDecks));
-    }
+    let loadedDecks = loadStoredSavedDecks<SavedDeck>();
+
+    loadedDecks = migrateLegacyDecks(loadedDecks);
+
+    savedDecks.value = loadedDecks;
+    saveStoredSavedDecks(loadedDecks);
   } catch (error) {
     console.error('保存された編成の読み込みに失敗しました:', error);
   }
@@ -324,7 +318,7 @@ async function saveDeck() {
     );
 
     savedDecks.value.unshift(newDeck);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDecks.value));
+    saveStoredSavedDecks(savedDecks.value);
     newDeckName.value = '';
     saveError.value = '';
     
@@ -396,7 +390,7 @@ function deleteDeck(deckId: string) {
   savedDecks.value = savedDecks.value.filter(deck => deck.id !== deckId);
   
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedDecks.value));
+    saveStoredSavedDecks(savedDecks.value);
   } catch (error) {
     console.error('編成の削除に失敗しました:', error);
   }

@@ -91,7 +91,7 @@ import { storeToRefs } from 'pinia';
 import { onMounted, onBeforeUnmount, ref, computed, Ref, watch} from 'vue';
 import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
-import { loadImageUrls } from '@/components/common';
+import { loadImageUrls } from '@/utils/characterAssets';
 import defaultImg from '@/assets/img/default.webp';
 import { effects } from '@/store/searchResult';
 

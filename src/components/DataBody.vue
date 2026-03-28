@@ -78,6 +78,7 @@ import { computed, onBeforeMount, ref } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { storeToRefs } from 'pinia';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { useI18n } from 'vue-i18n';
 const characterStore = useCharacterStore();
@@ -202,23 +203,10 @@ const formatBuddy = (value: string) => {
 };
 
 onBeforeMount(() => {
-  const promises = characters.value.map(character => {
-    return import(`@/assets/img/${character.name}.webp`)
-      .then(module => {
-        character.imgUrl = module.default;
-      })
-      .catch(async () => {
-        const module = await import(`@/assets/img/notyet.webp`);
-        character.imgUrl = module.default;
-      })
-      .catch(() => {
-        character.imgUrl = ''; // 画像の読み込みに失敗した場合
-      });
-  });
-
-  Promise.all(promises).then(() => {
-    loadingImgUrl.value = false; // すべての画像のロードが完了
-  });
+  void hydrateCharacterImageUrls(characters.value, 'name', { fallbackName: 'notyet' })
+    .finally(() => {
+      loadingImgUrl.value = false;
+    });
 });
 </script>
 <style scoped>

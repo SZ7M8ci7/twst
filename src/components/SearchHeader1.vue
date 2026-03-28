@@ -52,7 +52,7 @@ import FilterModal from "@/components/FilterModal.vue";
 import SettingModal from "@/components/SettingModal.vue";
 import ErrorModal from "@/components/ErrorModal.vue";
 import { storeToRefs } from "pinia";
-import { calcDecks } from "./common";
+import { runDeckSearch } from '@/domain/deckSearch/runDeckSearch';
 import { useSearchResultStore } from '@/store/searchResult';
 import { useLevelStore } from "@/store/app";
 import { event } from 'vue-gtag'
@@ -90,7 +90,7 @@ async function startSearch(){
   event('search start')
   await new Promise(resolve => setTimeout(resolve, 300));
   try {
-    await calcDecks(t);
+    await runDeckSearch(t);
   } finally {
     if (runToken === searchRunToken) {
       isSearching.value = false;

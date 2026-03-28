@@ -415,7 +415,9 @@ import { useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { useSearchSettingsStore, createDefaultSearchSettingsState } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
-import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
+import { createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
+import { loadImageUrls } from '@/utils/characterAssets';
+import { loadSearchCharacterPreferences } from '@/storage/searchPreferences';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { onMounted, ref, Ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -1236,10 +1238,9 @@ function getPlacementLabel(placement: SearchPlacement): string {
 
 function loadSavedCharacterLevels() {
   try {
-    const raw = localStorage.getItem('characterLevels');
-    savedCharacterLevels.value = raw ? JSON.parse(raw) as Record<string, number> : {};
+    savedCharacterLevels.value = loadSearchCharacterPreferences().levels;
   } catch (error) {
-    console.warn('Failed to load character levels from localStorage:', error);
+    console.warn('Failed to load character levels from storage:', error);
     savedCharacterLevels.value = {};
   }
 }

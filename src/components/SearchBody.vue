@@ -174,10 +174,12 @@ import { useHandCollectionStore } from '@/store/handCollection';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
+import { loadSearchCharacterPreferences, saveSearchCharacterPreferences } from '@/storage/searchPreferences';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { scrollElementWithinContainerToCenter, waitForLayoutStability } from '@/utils/scrollPosition';
 import { useDisplay } from 'vuetify';
 import { getInputMaxLevel } from '@/constants/levels';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { clampTotsuCount, isM3Unlocked } from '@/utils/totsu';
 import { SEARCH_PRESET_CONFIGURATIONS } from '@/constants/searchPresets';
 
@@ -226,9 +228,6 @@ const snackbar = ref({
   text: '',
   color: 'success'
 });
-// デッキ探索専用：マジックの使用可否(はずす/使う)を保存
-const MAGIC_USAGE_STORAGE_KEY = 'characterMagicUsage';
-const TOTSU_STORAGE_KEY = 'characterTotsu';
 
 function getMaxLevel(rare: string) {
   return getInputMaxLevel(rare);
@@ -498,62 +497,46 @@ function saveLevels() {
       hasM3: !!character.hasM3
     };
   });
-  localStorage.setItem('characterLevels', JSON.stringify(levelsCache));
-  localStorage.setItem('characterM3', JSON.stringify(hasM3Cache));
-  localStorage.setItem(TOTSU_STORAGE_KEY, JSON.stringify(totsuCache));
-  localStorage.setItem(MAGIC_USAGE_STORAGE_KEY, JSON.stringify(magicUsageCache));
+  saveSearchCharacterPreferences({
+    levels: levelsCache,
+    hasM3: hasM3Cache,
+    totsu: totsuCache,
+    magicUsage: magicUsageCache,
+  });
 }
 
 function loadLevels() {
-  const levelsCache = localStorage.getItem('characterLevels');
-  const hasM3Cache = localStorage.getItem('characterM3');
-  const totsuCache = localStorage.getItem(TOTSU_STORAGE_KEY);
-  const magicUsageCache = localStorage.getItem(MAGIC_USAGE_STORAGE_KEY);
-  if (levelsCache) {
-    const levels = JSON.parse(levelsCache);
-    characters.value.forEach(character => {
-      if (levels[character.name] !== undefined) {
-        character.level = levels[character.name];
+  const preferences = loadSearchCharacterPreferences();
+  characters.value.forEach(character => {
+    if (preferences.levels[character.name] !== undefined) {
+      character.level = preferences.levels[character.name];
+    }
+
+    if (preferences.totsu[character.name] !== undefined) {
+      character.totsu = clampTotsuCount(preferences.totsu[character.name]);
+    }
+
+    if ((character.totsu ?? 0) === 0 && preferences.hasM3[character.name] === true && character.rare === 'SSR') {
+      character.totsu = 3;
+    }
+    if (preferences.hasM3[character.name] !== undefined) {
+      character.hasM3 = preferences.hasM3[character.name];
+    }
+
+    const entry = preferences.magicUsage[character.name];
+    if (entry !== undefined) {
+      if ('hasM1' in entry || 'hasM2' in entry || 'hasM3' in entry) {
+        character.hasM1 = !!entry.hasM1;
+        character.hasM2 = !!entry.hasM2;
+        character.hasM3 = !!entry.hasM3;
+      } else if ('useM1' in (entry as any) || 'useM2' in (entry as any) || 'useM3' in (entry as any)) {
+        const legacyEntry = entry as any;
+        character.hasM1 = !!legacyEntry.useM1;
+        character.hasM2 = !!legacyEntry.useM2;
+        character.hasM3 = !!legacyEntry.useM3;
       }
-    });
-  }
-  if (totsuCache) {
-    const totsu = JSON.parse(totsuCache);
-    characters.value.forEach(character => {
-      if (totsu[character.name] !== undefined) {
-        character.totsu = clampTotsuCount(totsu[character.name]);
-      }
-    });
-  }
-  if (hasM3Cache) {
-    const hasM3 = JSON.parse(hasM3Cache);
-    characters.value.forEach(character => {
-      if ((character.totsu ?? 0) === 0 && hasM3[character.name] === true && character.rare === 'SSR') {
-        character.totsu = 3;
-      }
-      if (hasM3[character.name] !== undefined) {
-        character.hasM3 = hasM3[character.name];
-      }
-    });
-  }
-  if (magicUsageCache) {
-    const usage = JSON.parse(magicUsageCache);
-    characters.value.forEach(character => {
-      if (usage[character.name] !== undefined) {
-        const entry = usage[character.name];
-        // 旧キー(useM*)にも対応して読み込む
-        if ('hasM1' in entry || 'hasM2' in entry || 'hasM3' in entry) {
-          character.hasM1 = !!entry.hasM1;
-          character.hasM2 = !!entry.hasM2;
-          character.hasM3 = !!entry.hasM3;
-        } else if ('useM1' in entry || 'useM2' in entry || 'useM3' in entry) {
-          character.hasM1 = !!entry.useM1;
-          character.hasM2 = !!entry.useM2;
-          character.hasM3 = !!entry.useM3;
-        }
-      }
-    });
-  }
+    }
+  });
   // 読み込み後に必ず最低2つON/SSRのみM3可を補正
   characters.value.forEach(character => {
     normalizeMagicUsage(character);
@@ -770,23 +753,10 @@ onBeforeUnmount(() => {
 });
 
 onBeforeMount(() => {
-  const promises = characters.value.map(character => {
-    return import(`@/assets/img/${character.name}.webp`)
-      .then(module => {
-        character.imgUrl = module.default;
-      })
-      .catch(async () => {
-        const module = await import(`@/assets/img/notyet.webp`);
-        character.imgUrl = module.default;
-      })
-      .catch(() => {
-        character.imgUrl = ''; // 画像の読み込みに失敗した場合
-      });
-  });
-
-  Promise.all(promises).then(() => {
-    loadingImgUrl.value = false; // すべての画像のロードが完了
-  });
+  void hydrateCharacterImageUrls(characters.value, 'name', { fallbackName: 'notyet' })
+    .finally(() => {
+      loadingImgUrl.value = false;
+    });
 });
 
 onMounted(() => {

@@ -92,6 +92,7 @@
 import { computed, onBeforeMount, onMounted, Ref, ref, watch } from 'vue';
 import { Character, useCharacterStore } from '@/store/characters';
 import { useHandCollectionStore } from '@/store/handCollection';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { storeToRefs } from 'pinia';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
@@ -190,28 +191,17 @@ watch(() => handCollectionStore.handCollection, () => {
 }, { deep: true });
 
 onBeforeMount(() => {
-  const promises = characters.value.map(character => {
-    return import(`@/assets/img/${character.name}.webp`)
-      .then(module => {
-        character.imgUrl = module.default;
-      })
-      .catch(async () => {
-        const module = await import(`@/assets/img/notyet.webp`);
-        character.imgUrl = module.default;
+  void hydrateCharacterImageUrls(characters.value, 'name', { fallbackName: 'notyet' })
+    .then(() => {
+      loadingImgUrl.value = false;
+
+      characterInfoMap.value = createCharacterInfoMap(filteredCharacters.value);
+
+      filteredCharacters.value.forEach(character => {
+        computeDuo(character);
+        character.hasDuo = selectedCharacter.value.length > 0;
       });
-  });
-
-  Promise.all(promises).then(() => {
-    loadingImgUrl.value = false;
-
-    // filteredCharacters が確定した後に characterInfoMap を初期化
-    characterInfoMap.value = createCharacterInfoMap(filteredCharacters.value);
-
-    filteredCharacters.value.forEach(character => {
-      computeDuo(character);
-      character.hasDuo = selectedCharacter.value.length > 0;
     });
-  });
 });
 function arraysEqualIgnoreOrder(a: string | any[], b: string | any[]) {
   if (a.length !== b.length) return false;

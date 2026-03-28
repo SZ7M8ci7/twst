@@ -176,6 +176,7 @@ import defaultImg from '@/assets/img/default.webp';
 import FilterModal from '@/components/FilterModal.vue';
 import characterData from '@/assets/characters_info.json';
 import charactersInfo from '@/assets/characters_info.json';
+import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 
 // characterDataの高速検索用Mapを事前に作成
 const characterDataMap = new Map();
@@ -243,10 +244,9 @@ const getDuoIcon = async (duoCharaName) => {
   if (!enName) return null;
   
   try {
-    // 動的インポートを使用してアイコンを取得
-    const module = await import(`@/assets/img/icon/${enName}.webp`);
-    duoIconCache.value[duoCharaName] = module.default;
-    return module.default;
+    const imageUrl = await loadCachedImageUrl(enName, 'icon/');
+    duoIconCache.value[duoCharaName] = imageUrl || defaultImg;
+    return duoIconCache.value[duoCharaName];
   } catch (error) {
     duoIconCache.value[duoCharaName] = defaultImg;
     return defaultImg;
@@ -1419,9 +1419,9 @@ const loadImagesInParallel = (charactersToLoad, batchSize = MAX_CONCURRENT) => {
     const batch = toLoad.slice(startIndex, startIndex + batchSize);
     
     const promises = batch.map(character => {
-      return import(`@/assets/img/${character.name}.webp`)
-        .then(module => {
-          character.imgUrl = module.default;
+      return loadCharacterImageUrl(character.name)
+        .then((imageUrl) => {
+          character.imgUrl = imageUrl || defaultImg;
           character.imageLoaded = true;
         })
         .catch(() => {

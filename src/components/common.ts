@@ -1,42 +1,8 @@
-import { Character, useCharacterStore} from '@/store/characters'
+import type { Character } from '@/store/characters'
 import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
-import { useSearchSettingsStore } from '@/store/searchSetting';
-import { useSearchResultStore } from '@/store/searchResult';
 import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
 import { isM3Unlocked } from '@/utils/totsu';
-import { storeToRefs } from 'pinia';
 import { DeckSearchResultsManager, type DeckResult } from './TopNResultsManager';
-const searchSettingStore = useSearchSettingsStore();
-const {
-  minEHP,
-  minHP,
-  minDebuff,
-  minBuff,
-  minHPBuddy,
-  minIncreasedHPBuddy,
-  minEvasion,
-  minDuo,
-  minCosmic,
-  minFire,
-  minWater,
-  minFlora,
-  minHealNum,
-  minReferenceDamage,
-  minReferenceAdvantageDamage,
-  minReferenceVsHiDamage,
-  minReferenceVsKiDamage,
-  minReferenceVsMizuDamage,
-  maxResult,
-  sortOptions,
-  convertedMustCharacters,
-  allowSameCharacter,
-  attackNum,
-  selectedSupportCharacters,
-} = storeToRefs(searchSettingStore);
-const characterStore = useCharacterStore();
-const { characters } = storeToRefs(characterStore);
-const searchResultStore = useSearchResultStore();
-const { totalResults, nowResults, results, isSearching, errorMessage} = storeToRefs(searchResultStore);
 const charaIdMap = new Map<string, number>();
 // 探索ループ内で毎回 new すると GC が増えるため、作業用バッファはモジュールスコープで再利用する。
 let memberFlags = new Uint32Array(0); // Opt-296: memberFlags を再利用して割り当てを削減
@@ -78,6 +44,74 @@ type SearchSnapshot = {
   minReferenceVsKiDamage: number;
   attackNum: number;
 };
+
+const EMPTY_SEARCH_SNAPSHOT: SearchSnapshot = {
+  minEHP: 0,
+  minHP: 0,
+  minDebuff: 0,
+  minBuff: 0,
+  minHPBuddy: 0,
+  minIncreasedHPBuddy: 0,
+  minEvasion: 0,
+  minDuo: 0,
+  minCosmic: 0,
+  minFire: 0,
+  minWater: 0,
+  minFlora: 0,
+  minHealNum: 0,
+  minReferenceDamage: 0,
+  minReferenceAdvantageDamage: 0,
+  minReferenceVsHiDamage: 0,
+  minReferenceVsMizuDamage: 0,
+  minReferenceVsKiDamage: 0,
+  attackNum: 2,
+};
+
+export interface DeckSearchSortOption {
+  prop: string;
+  order: string;
+}
+
+export interface DeckSearchSettings {
+  minEHP: number;
+  minHP: number;
+  minDebuff: number;
+  minBuff: number;
+  minHPBuddy: number;
+  minIncreasedHPBuddy: number;
+  minEvasion: number;
+  minDuo: number;
+  minCosmic: number;
+  minFire: number;
+  minWater: number;
+  minFlora: number;
+  minHealNum: number;
+  minReferenceDamage: number;
+  minReferenceAdvantageDamage: number;
+  minReferenceVsHiDamage: number;
+  minReferenceVsMizuDamage: number;
+  minReferenceVsKiDamage: number;
+  maxResult: number;
+  sortOptions: DeckSearchSortOption[];
+  convertedMustCharacters: string[];
+  allowSameCharacter: boolean;
+  attackNum: number;
+  selectedSupportCharacters: string[];
+}
+
+export interface DeckSearchControls {
+  isSearching: () => boolean;
+  setTotalResults: (value: number) => void;
+  setNowResults: (value: number) => void;
+  setResults: (value: DeckResult[]) => void;
+  setErrorMessage: (value: string) => void;
+}
+
+export interface DeckSearchContext {
+  characters: Character[];
+  settings: DeckSearchSettings;
+  controls: DeckSearchControls;
+}
 
 type BitPair = { low: number; high: number };
 
@@ -144,29 +178,29 @@ function getMagicHealRates(chara: Character) {
   magicHealRatesCache.set(chara as any, rates);
   return rates;
 }
-function buildSearchSnapshot(): SearchSnapshot {
+function buildSearchSnapshot(settings: DeckSearchSettings): SearchSnapshot {
   // リアクティブ参照（ref.value）を探索内で都度読むとコストが積み上がるため、
   // 探索開始時点の値をスナップショット化して使い回す。
   return {
-    minEHP: minEHP.value,
-    minHP: minHP.value,
-    minDebuff: minDebuff.value,
-    minBuff: minBuff.value,
-    minHPBuddy: minHPBuddy.value,
-    minIncreasedHPBuddy: minIncreasedHPBuddy.value,
-    minEvasion: minEvasion.value,
-    minDuo: minDuo.value,
-    minCosmic: minCosmic.value,
-    minFire: minFire.value,
-    minWater: minWater.value,
-    minFlora: minFlora.value,
-    minHealNum: minHealNum.value,
-    minReferenceDamage: minReferenceDamage.value,
-    minReferenceAdvantageDamage: minReferenceAdvantageDamage.value,
-    minReferenceVsHiDamage: minReferenceVsHiDamage.value,
-    minReferenceVsMizuDamage: minReferenceVsMizuDamage.value,
-    minReferenceVsKiDamage: minReferenceVsKiDamage.value,
-    attackNum: attackNum.value,
+    minEHP: settings.minEHP,
+    minHP: settings.minHP,
+    minDebuff: settings.minDebuff,
+    minBuff: settings.minBuff,
+    minHPBuddy: settings.minHPBuddy,
+    minIncreasedHPBuddy: settings.minIncreasedHPBuddy,
+    minEvasion: settings.minEvasion,
+    minDuo: settings.minDuo,
+    minCosmic: settings.minCosmic,
+    minFire: settings.minFire,
+    minWater: settings.minWater,
+    minFlora: settings.minFlora,
+    minHealNum: settings.minHealNum,
+    minReferenceDamage: settings.minReferenceDamage,
+    minReferenceAdvantageDamage: settings.minReferenceAdvantageDamage,
+    minReferenceVsHiDamage: settings.minReferenceVsHiDamage,
+    minReferenceVsMizuDamage: settings.minReferenceVsMizuDamage,
+    minReferenceVsKiDamage: settings.minReferenceVsKiDamage,
+    attackNum: settings.attackNum,
   };
 }
 
@@ -620,6 +654,7 @@ export function calcDeckStatus(
     damageMetricMask?: number;
     mustIds?: number[];
     snapshot?: SearchSnapshot;
+    settings?: DeckSearchSettings;
   } = {}
 ): Array<number | string | any> | undefined {
   /*
@@ -649,7 +684,7 @@ export function calcDeckStatus(
       (!skipAuxMetrics && (auxMetricMask & AUX_METRIC_DUO) !== 0)
     );
   const useBuddyBitPresence = true;
-  const snapshot = options.snapshot ?? buildSearchSnapshot();
+  const snapshot = options.snapshot ?? (options.settings ? buildSearchSnapshot(options.settings) : EMPTY_SEARCH_SNAPSHOT);
   const charaLen = characters.length; // Opt-266: length参照をローカル化
   const assumePreparedCache = options.assumePreparedCache === true;
   if (!assumePreparedCache) {
@@ -736,9 +771,7 @@ export function calcDeckStatus(
     }
   }
   if (!skipMustCheck) {
-    // mustIds は呼び出し側で渡すのが本来の高速経路。
-    // 未指定時だけ store から生成する（互換用フォールバック）。
-    const mustIds = options.mustIds ?? Array.from(convertedMustCharacters.value).map(name => getCharaId(name as string));
+    const mustIds = options.mustIds ?? [];
     const mustLen = mustIds.length;
     if (mustLen === 1) {
       if (memberFlags[mustIds[0]] !== memberFlagsStamp) return;
@@ -2000,12 +2033,15 @@ function prepareCharacterSearchCache(chara: Character): void {
   charaAny.m3DamageBaseCached = m3Common * (1 + m3Totals.atkDelta);
 }
 
-export async function calcDecks(t: (key: string) => string) {
-  const charactersValue = characters.value;
+export async function calcDecks(
+  t: (key: string) => string,
+  context: DeckSearchContext
+) {
+  const { characters: charactersValue, settings, controls } = context;
   for (let i = 0; i < charactersValue.length; i++) {
     const chara = charactersValue[i];
     if (chara.required && chara.level == 0) {
-      errorMessage.value = t('error.requiredCharacter');
+      controls.setErrorMessage(t('error.requiredCharacter'));
       return
     }
   }
@@ -2016,7 +2052,7 @@ export async function calcDecks(t: (key: string) => string) {
       calcBaseHP: 0,
       calcBaseATK: 0
     }));
-  const selectedSupportCharactersValue = selectedSupportCharacters.value;
+  const selectedSupportCharactersValue = settings.selectedSupportCharacters;
   const maxLevelCharacters = charactersValue
     .filter(character => character.rare == 'SSR' && selectedSupportCharactersValue.includes(character.name))
     .map(chara => ({
@@ -2060,11 +2096,11 @@ export async function calcDecks(t: (key: string) => string) {
 
   const listLength = nonZero.length;
   if (listLength < 5) {
-    errorMessage.value = t('error.fewCharacter');
+    controls.setErrorMessage(t('error.fewCharacter'));
     return;
   }
-  const snapshot = buildSearchSnapshot();
-  nowResults.value = 0;
+  const snapshot = buildSearchSnapshot(settings);
+  controls.setNowResults(0);
   // Opt-242: 進捗更新を間引いてリアクティブ更新コストを削減
   // Opt-243: nowResults は描画更新/終了時のみ反映
   let nowResultsCount = 0;
@@ -2075,7 +2111,7 @@ export async function calcDecks(t: (key: string) => string) {
     sortPropIndexMap[availableSortProps[i]] = i;
   }
   // Opt-102: sortOptions の参照をローカル化
-  const sortOptionsValue = sortOptions.value;
+  const sortOptionsValue = settings.sortOptions;
   const sortCriteria: SortCriterion[] = [];
   for (let i = 0; i < sortOptionsValue.length; i++) {
     const key = sortOptionsValue[i];
@@ -2101,7 +2137,7 @@ export async function calcDecks(t: (key: string) => string) {
 
   // sortCriteriaが空の場合はエラーを表示して終了
   if (sortCriteria.length === 0) {
-    errorMessage.value = t('search.noSettingOptions');
+    controls.setErrorMessage(t('search.noSettingOptions'));
     return;
   }
   
@@ -2113,8 +2149,8 @@ export async function calcDecks(t: (key: string) => string) {
     finalizeTopDecksForRender(topDecks);
     const displayDecks = buildDisplayDecks(topDecks);
     sortTopDecksForDisplay(displayDecks);
-    results.value = displayDecks;
-    nowResults.value = nowResultsCount;
+    controls.setResults(displayDecks);
+    controls.setNowResults(nowResultsCount);
     await new Promise(requestAnimationFrame);
   }
   if (ATK_SORT_KEYS.has(sortCriteria[0].key)) {
@@ -2138,14 +2174,14 @@ export async function calcDecks(t: (key: string) => string) {
     if (nonZero[i].required) requiredCount += 1;
   }
   if (requiredCount > 5) {
-    errorMessage.value = '必須設定されたキャラが多すぎます';
+    controls.setErrorMessage('必須設定されたキャラが多すぎます');
     return;
   }
-  results.value = [];
+  controls.setResults([]);
   
   // 効率的な上位N件管理クラスを初期化
-  const resultsManager = new DeckSearchResultsManager(maxResult.value, sortCriteria);
-  const mustIds = Array.from(convertedMustCharacters.value).map(name => getCharaId(name as string));
+  const resultsManager = new DeckSearchResultsManager(settings.maxResult, sortCriteria);
+  const mustIds = Array.from(settings.convertedMustCharacters).map(name => getCharaId(name as string));
   const skipMustCheckForCalcDeckStatus = mustIds.length === 0;
 
   const fillDeckResultFromArray = (ret: (string | number)[], target: DeckResult) => {
@@ -2169,13 +2205,6 @@ export async function calcDecks(t: (key: string) => string) {
     target.referenceVsMizuDamage = ret[17] as number;
     target.referenceVsKiDamage = ret[18] as number;
     target.healNum = ret[19] as number;
-  };
-  const fillDeckResultCharacters = (combination: Character[], target: DeckResult) => {
-    target.chara1 = combination[0].imgUrl;
-    target.chara2 = combination[1].imgUrl;
-    target.chara3 = combination[2].imgUrl;
-    target.chara4 = combination[3].imgUrl;
-    target.chara5 = combination[4].imgUrl;
   };
   const sortCompareLen = sortCriteria.length;
   const sortCompareRetIndices = new Int8Array(sortCompareLen);
@@ -2404,22 +2433,22 @@ export async function calcDecks(t: (key: string) => string) {
     lengthes[i] = i+1;
   }
   // 同キャラ編成有り
-  if (allowSameCharacter.value) {
+  if (settings.allowSameCharacter) {
     let lastRenderTime = Date.now();
     let lastAppendedResultsCount = 0;
     let renderCheckCounter = 0;
     let searchCheckCounter = 0;
     const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
-    totalResults.value = beforeLastLoops*(maxLevel.length)/factorialize(4-requiredCount);
+    controls.setTotalResults(beforeLastLoops * (maxLevel.length) / factorialize(4 - requiredCount));
     if (requiredCount == 5) {
-      totalResults.value = 1;
+      controls.setTotalResults(1);
       combination[0] = nonZero[0];
       combination[1] = nonZero[1];
       combination[2] = nonZero[2];
       combination[3] = nonZero[3];
       combination[4] = nonZero[4];
       processCombinationCore(combination);
-      nowResults.value = nowResultsCount;
+      controls.setNowResults(nowResultsCount);
       await new Promise(requestAnimationFrame);
       return
     }
@@ -2429,8 +2458,8 @@ export async function calcDecks(t: (key: string) => string) {
         for (let k = j + 1; k < lengthes[2]; k++) {
           searchCheckCounter += 1;
           if ((searchCheckCounter & SEARCH_CHECK_MASK) === 0) {
-            if (!isSearching.value) {
-              nowResults.value = nowResultsCount;
+            if (!controls.isSearching()) {
+              controls.setNowResults(nowResultsCount);
               return;
             }
           }
@@ -2468,16 +2497,16 @@ export async function calcDecks(t: (key: string) => string) {
     }
   } else {
     const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
-    totalResults.value = (beforeLastLoops*(lengthes[4]-4)/factorialize(5-requiredCount));
+    controls.setTotalResults(beforeLastLoops * (lengthes[4] - 4) / factorialize(5 - requiredCount));
     if (requiredCount == 5) {
-      totalResults.value = 1;
+      controls.setTotalResults(1);
       combination[0] = nonZero[0];
       combination[1] = nonZero[1];
       combination[2] = nonZero[2];
       combination[3] = nonZero[3];
       combination[4] = nonZero[4];
       processCombinationCore(combination);
-      nowResults.value = nowResultsCount;
+      controls.setNowResults(nowResultsCount);
       await new Promise(requestAnimationFrame);
       return
     }
@@ -2491,8 +2520,8 @@ export async function calcDecks(t: (key: string) => string) {
         for (let k = j + 1; k < lengthes[2]; k++) {
           searchCheckCounter += 1;
           if ((searchCheckCounter & SEARCH_CHECK_MASK) === 0) {
-            if (!isSearching.value) {
-              nowResults.value = nowResultsCount;
+            if (!controls.isSearching()) {
+              controls.setNowResults(nowResultsCount);
               return;
             }
           }
@@ -2527,107 +2556,13 @@ export async function calcDecks(t: (key: string) => string) {
       }
     }
   }
-  nowResults.value = nowResultsCount;
+  controls.setNowResults(nowResultsCount);
   const topDecks = resultsManager.getTopDecks();
   finalizeTopDecksForRender(topDecks);
   const displayDecks = buildDisplayDecks(topDecks);
   sortTopDecksForDisplay(displayDecks);
-  results.value = displayDecks;
+  controls.setResults(displayDecks);
   
-}
-
-// キャッシュされた画像URLの辞書 (モジュールスコープ)
-const cachedImageUrls: Record<string, string> = {};
-
-// 汎用的な画像読み込み関数
-export async function loadImageUrls(
-  items: any[],
-  nameAccessor: string | ((item: any) => string),
-  prefix: string = ''
-): Promise<Record<string, string>> {
-  const imageUrlDictionary: Record<string, string> = {};
-
-  // Add notyet.png loading
-  const notYetImageName = 'notyet';
-  const notYetCacheKey = notYetImageName; // Assuming no prefix for notyet.png
-  if (cachedImageUrls[notYetCacheKey]) {
-    imageUrlDictionary[notYetImageName] = cachedImageUrls[notYetCacheKey];
-  } else {
-    try {
-      const module = await import(`@/assets/img/${notYetImageName}.webp`) as { default: string };
-      const imageUrl = module.default;
-      cachedImageUrls[notYetCacheKey] = imageUrl;
-      imageUrlDictionary[notYetImageName] = imageUrl;
-    } catch (error) {
-      console.error(`[loadImageUrls] Error loading ${notYetImageName}.webp:`, error);
-      imageUrlDictionary[notYetImageName] = ''; // Set empty string on error
-    }
-  }
-
-  const imageLoadPromises = items.map(async (item) => {
-    let itemName: string | undefined;
-    try {
-      itemName = typeof nameAccessor === 'function' ? nameAccessor(item) : item[nameAccessor];
-      if (typeof itemName !== 'string' || !itemName) {
-        console.error(`[loadImageUrls] Invalid or undefined itemName (type: ${typeof itemName}, value: ${itemName}) for item:`, item, `with prefix '${prefix}'. Skipping.`);
-        imageUrlDictionary[String(item) || 'unknown_item'] = '';
-        return;
-      }
-
-      const cacheKey = `${prefix}${itemName}`;
-      if (cachedImageUrls[cacheKey]) {
-        imageUrlDictionary[itemName] = cachedImageUrls[cacheKey];
-        return;
-      }
-
-      let module;
-      if (prefix === 'icon/') {
-        module = await import(`@/assets/img/icon/${itemName}.webp`) as { default: string };
-      } else if (prefix === '') {
-        module = await import(`@/assets/img/${itemName}.webp`) as { default: string };
-      } else {
-        console.error(`[loadImageUrls] Unsupported or unknown prefix '${prefix}' for item '${itemName}'. Trying a generic path that might fail.`);
-        module = await import(`@/assets/img/${prefix}${itemName}.webp`) as { default: string };
-      }
-      const imageUrl = module.default;
-      cachedImageUrls[cacheKey] = imageUrl;
-      imageUrlDictionary[itemName] = imageUrl;
-    } catch (error) {
-      imageUrlDictionary[itemName || String(item) || 'unknown_error_item'] = '';
-    }
-  });
-
-  await Promise.all(imageLoadPromises);
-  return imageUrlDictionary;
-}
-
-// 単一の画像をキャッシュ付きで読み込む関数
-export async function loadCachedImageUrl(imageName: string, prefix: string = ''): Promise<string> {
-  const cacheKey = `${prefix}${imageName}`;
-  if (cachedImageUrls[cacheKey]) {
-    return cachedImageUrls[cacheKey];
-  }
-  let imagePathForLog: string = 'unknown_path'; // ログ出力用のパス変数
-  try {
-    let module;
-    if (prefix === 'icon/') {
-      imagePathForLog = `@/assets/img/icon/${imageName}.webp`;
-      module = await import(`@/assets/img/icon/${imageName}.webp`) as { default: string };
-    } else if (prefix === '') {
-      imagePathForLog = `@/assets/img/${imageName}.webp`;
-      module = await import(`@/assets/img/${imageName}.webp`) as { default: string };
-    } else {
-      console.error(`[loadCachedImageUrl] Unsupported or unknown prefix '${prefix}' for item '${imageName}'. Trying a generic path that might fail.`);
-      imagePathForLog = `@/assets/img/${prefix}${imageName}.webp`;
-      module = await import(`@/assets/img/${prefix}${imageName}.webp`) as { default: string };
-    }
-    const imageUrl = module.default;
-    cachedImageUrls[cacheKey] = imageUrl;
-    return imageUrl;
-  } catch (error) {
-    console.error(`[loadCachedImageUrl] Error loading image '${imageName}' (path: '${imagePathForLog}'):`, error);
-    return '';
-  }
 }
 
 export interface CharacterCardInfo {

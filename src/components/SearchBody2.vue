@@ -89,6 +89,8 @@
 import { computed, ref, onBeforeMount, onMounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { storeToRefs } from 'pinia';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
+import { loadSearchCharacterPreferences, saveSearchCharacterPreferences } from '@/storage/searchPreferences';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { getInputMaxLevel } from '@/constants/levels';
@@ -150,29 +152,24 @@ function saveLevels() {
     levelsCache[character.name] = character.level;
     hasM3Cache[character.name] = character.hasM3;
   });
-  localStorage.setItem('characterLevels', JSON.stringify(levelsCache));
-  localStorage.setItem('characterM3', JSON.stringify(hasM3Cache));
+  const preferences = loadSearchCharacterPreferences();
+  saveSearchCharacterPreferences({
+    ...preferences,
+    levels: levelsCache,
+    hasM3: hasM3Cache,
+  });
 }
 
 function loadLevels() {
-  const levelsCache = localStorage.getItem('characterLevels');
-  const hasM3Cache = localStorage.getItem('characterM3');
-  if (levelsCache) {
-    const levels = JSON.parse(levelsCache);
-    characters.value.forEach(character => {
-      if (levels[character.name]) {
-        character.level = levels[character.name];
-      }
-    });
-  }
-  if (hasM3Cache) {
-    const hasM3 = JSON.parse(hasM3Cache);
-    characters.value.forEach(character => {
-      if (hasM3[character.name] !== undefined) {
-        character.hasM3 = hasM3[character.name];
-      }
-    });
-  }
+  const preferences = loadSearchCharacterPreferences();
+  characters.value.forEach(character => {
+    if (preferences.levels[character.name] !== undefined) {
+      character.level = preferences.levels[character.name];
+    }
+    if (preferences.hasM3[character.name] !== undefined) {
+      character.hasM3 = preferences.hasM3[character.name];
+    }
+  });
 }
 
 function openEditModal(character: any) {
@@ -200,19 +197,10 @@ function handleLevelChange(this: any, character: { oldlevel: any; level: any; })
 }
 
 onBeforeMount(() => {
-  const promises = characters.value.map(character => {
-    return import(`@/assets/img/${character.name}.webp`)
-      .then(module => {
-        character.imgUrl = module.default;
-      })
-      .catch(() => {
-        character.imgUrl = ''; // 画像の読み込みに失敗した場合
-      });
-  });
-
-  Promise.all(promises).then(() => {
-    loadingImgUrl.value = false; // すべての画像のロードが完了
-  });
+  void hydrateCharacterImageUrls(characters.value, 'name')
+    .finally(() => {
+      loadingImgUrl.value = false;
+    });
 });
 
 onMounted(() => {

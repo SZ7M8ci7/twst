@@ -91,7 +91,9 @@ import { useHandCollectionStore } from '@/store/handCollection';
 import charactersInfo from '@/assets/characters_info.json';
 import { storeToRefs } from 'pinia';
 import characterData from '@/assets/characters_info.json';
-import { loadImageUrls, createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
+import { createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
+import { loadImageUrls } from '@/utils/characterAssets';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { getBuddyStatusForCharacter } from '@/utils/buddyEffects';
@@ -240,19 +242,8 @@ const totals = computed(() => {
 });
 
 onMounted(async () => {
-  const imageLoadPromises = characters.value.map((char: Character) => {
-    return import(`@/assets/img/${char.name}.webp`)
-      .then(module => {
-        char.imgUrl = module.default;
-      })
-      .catch(async () => {
-        const module = await import(`@/assets/img/notyet.webp`);
-        char.imgUrl = module.default;
-      });
-  });
-
   try {
-    await Promise.all(imageLoadPromises);
+    await hydrateCharacterImageUrls(characters.value, 'name', { fallbackName: 'notyet' });
   } catch (error) {
     // console.error("Error during Promise.all in buddyDuo:", error);
   }

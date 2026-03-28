@@ -271,6 +271,7 @@ import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.webp';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import FilterModal from '@/components/FilterModal.vue';
 import charactersInfo from '@/assets/characters_info.json';
 import { useI18n } from 'vue-i18n';
@@ -757,22 +758,12 @@ onMounted(async () => {
     
     // 画像の読み込み処理
     if (characters.value && characters.value.length > 0) {
-      const promises = characters.value.map(character => {
-        return import(`@/assets/img/${character.name}.webp`)
-          .then(module => {
-            character.imgUrl = module.default;
-          })
-          .catch(async () => {
-            try {
-              const module = await import(`@/assets/img/notyet.webp`);
-              character.imgUrl = module.default;
-            } catch {
-              character.imgUrl = defaultImg; // フォールバック
-            }
-          });
+      await hydrateCharacterImageUrls(characters.value, 'name', { fallbackName: 'notyet' });
+      characters.value.forEach((character) => {
+        if (!character.imgUrl) {
+          character.imgUrl = defaultImg;
+        }
       });
-
-      await Promise.all(promises);
     }
     
     // 初期化時にcharacter.visibleを設定

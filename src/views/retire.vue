@@ -269,7 +269,8 @@
 import { onMounted, ref, computed, onUnmounted } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import charactersInfo from '@/assets/characters_info.json';
-import { loadImageUrls } from '@/components/common';
+import { loadImageUrls } from '@/utils/characterAssets';
+import { clearRetireState, loadRetireState, saveRetireState } from '@/storage/retireStorage';
 
 interface CharacterInfo {
   name_ja: string;
@@ -303,15 +304,6 @@ const selectedSlotIndex = ref(-1);
 const selectedCharacters = ref<(CharacterInfo | null)[]>([null, null, null, null, null]);
 const imgUrlDictionary = ref<Record<string, string>>({});
 
-// ローカルストレージのキー
-const STORAGE_KEY = {
-  INPUT_VALUES: 'retire_input_values',
-  SELECTED_CHARACTERS: 'retire_selected_characters',
-  VISIBLE_FIELDS: 'retire_visible_fields',
-  RESET_COUNT: 'retire_reset_count',
-  LAST_RESET_TIME: 'retire_last_reset_time'
-};
-
 // 属性選択用のデータ
 const attributes = ref([
   { name: '火', value: 'fire', icon: '' },
@@ -335,15 +327,15 @@ const visibleFields = ref<number[]>([2, 2, 2, 2, 2]);
 
 const resetCount = ref(0);
 const elapsedSeconds = ref(0);
+const lastResetTime = ref('');
 let timer: number | null = null;
 
 const showConfirmDialog = ref(false);
 
 // 経過時間を更新する
 const updateElapsedTime = () => {
-  const lastResetTime = localStorage.getItem(STORAGE_KEY.LAST_RESET_TIME);
-  if (lastResetTime) {
-    const elapsed = Math.floor((Date.now() - parseInt(lastResetTime)) / 1000);
+  if (lastResetTime.value) {
+    const elapsed = Math.floor((Date.now() - parseInt(lastResetTime.value)) / 1000);
     elapsedSeconds.value = elapsed;
   }
 };
@@ -351,17 +343,14 @@ const updateElapsedTime = () => {
 // ローカルストレージからデータを読み込む
 const loadFromLocalStorage = () => {
   try {
-    const savedInputValues = localStorage.getItem(STORAGE_KEY.INPUT_VALUES);
-    const savedSelectedCharacters = localStorage.getItem(STORAGE_KEY.SELECTED_CHARACTERS);
-    const savedVisibleFields = localStorage.getItem(STORAGE_KEY.VISIBLE_FIELDS);
-    const savedResetCount = localStorage.getItem(STORAGE_KEY.RESET_COUNT);
-    const savedLastResetTime = localStorage.getItem(STORAGE_KEY.LAST_RESET_TIME);
+    const savedState = loadRetireState();
+    if (!savedState) return;
 
-    if (savedInputValues) {
-      inputValues.value = JSON.parse(savedInputValues);
+    if (savedState.inputValues.length > 0) {
+      inputValues.value = savedState.inputValues as InputValues[];
     }
-    if (savedSelectedCharacters) {
-      const parsed = JSON.parse(savedSelectedCharacters);
+    if (savedState.selectedCharacters.length > 0) {
+      const parsed = savedState.selectedCharacters;
       selectedCharacters.value = parsed.map((charFromFile: any) => {
         if (!charFromFile) return null;
 
@@ -382,13 +371,14 @@ const loadFromLocalStorage = () => {
         } as CharacterInfo;
       });
     }
-    if (savedVisibleFields) {
-      visibleFields.value = JSON.parse(savedVisibleFields);
+    if (savedState.visibleFields.length > 0) {
+      visibleFields.value = savedState.visibleFields;
     }
-    if (savedResetCount) {
-      resetCount.value = parseInt(savedResetCount);
+    if (savedState.resetCount) {
+      resetCount.value = savedState.resetCount;
     }
-    if (savedLastResetTime) {
+    if (savedState.lastResetTime) {
+      lastResetTime.value = savedState.lastResetTime;
       updateElapsedTime();
     }
   } catch (error) {
@@ -399,10 +389,13 @@ const loadFromLocalStorage = () => {
 // ローカルストレージにデータを保存する
 const saveToLocalStorage = () => {
   try {
-    localStorage.setItem(STORAGE_KEY.INPUT_VALUES, JSON.stringify(inputValues.value));
-    localStorage.setItem(STORAGE_KEY.SELECTED_CHARACTERS, JSON.stringify(selectedCharacters.value));
-    localStorage.setItem(STORAGE_KEY.VISIBLE_FIELDS, JSON.stringify(visibleFields.value));
-    localStorage.setItem(STORAGE_KEY.RESET_COUNT, resetCount.value.toString());
+    saveRetireState({
+      inputValues: inputValues.value,
+      selectedCharacters: selectedCharacters.value,
+      visibleFields: visibleFields.value,
+      resetCount: resetCount.value,
+      lastResetTime: lastResetTime.value,
+    });
   } catch (error) {
     console.error('ローカルストレージへの保存に失敗しました:', error);
   }
@@ -490,18 +483,14 @@ const resetAllCounters = () => {
   });
   resetCount.value++;
   elapsedSeconds.value = 0;
-  localStorage.setItem(STORAGE_KEY.LAST_RESET_TIME, Date.now().toString());
+  lastResetTime.value = Date.now().toString();
   saveToLocalStorage();
 };
 
 // ローカルストレージをクリアする
 const clearLocalStorage = () => {
   try {
-    localStorage.removeItem(STORAGE_KEY.INPUT_VALUES);
-    localStorage.removeItem(STORAGE_KEY.SELECTED_CHARACTERS);
-    localStorage.removeItem(STORAGE_KEY.VISIBLE_FIELDS);
-    localStorage.removeItem(STORAGE_KEY.RESET_COUNT);
-    localStorage.removeItem(STORAGE_KEY.LAST_RESET_TIME);
+    clearRetireState();
     
     // 状態をリセット
     inputValues.value = inputValues.value.map(() => ({
@@ -513,6 +502,7 @@ const clearLocalStorage = () => {
     visibleFields.value = [2, 2, 2, 2, 2];
     resetCount.value = 0;
     elapsedSeconds.value = 0;
+    lastResetTime.value = '';
   } catch (error) {
     console.error('ローカルストレージのクリアに失敗しました:', error);
   }
@@ -526,25 +516,22 @@ const confirmClearStorage = () => {
 
 onMounted(async () => {
   try {
-    // 属性アイコンの読み込み
-    await Promise.all(attributes.value.map(async (attr) => {
-      const module = await import(`@/assets/img/icon/${attr.value}.webp`);
-      attr.icon = module.default;
-    }));
+    const attributeIconUrls = await loadImageUrls(attributes.value, 'value', 'icon/');
+    attributes.value.forEach((attr) => {
+      attr.icon = attributeIconUrls[attr.value] ?? '';
+    });
 
     // キャラクター画像の辞書を作成
     imgUrlDictionary.value = await loadImageUrls(charactersInfo, (item: any) => item.name_en);
 
-    // キャラクター画像の読み込み
-    await Promise.all((charactersInfo as CharacterInfo[]).map(character => {
-      return import(`@/assets/img/icon/${character.name_en}.webp`)
-        .then(module => {
-          character.imgUrl = module.default;
-        })
-        .catch(() => {
-          character.imgUrl = '';
-        });
-    }));
+    const characterIconUrls = await loadImageUrls(
+      charactersInfo as CharacterInfo[],
+      (character: CharacterInfo) => character.name_en,
+      'icon/'
+    );
+    (charactersInfo as CharacterInfo[]).forEach((character) => {
+      character.imgUrl = characterIconUrls[character.name_en] ?? '';
+    });
 
     // ローカルストレージからデータを読み込む
     loadFromLocalStorage();

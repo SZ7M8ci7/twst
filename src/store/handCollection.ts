@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed, reactive } from 'vue';
+import { loadStoredHandCollection, saveStoredHandCollection } from '@/storage/handCollectionStorage';
 import { clampTotsuCount, deriveTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 // 手持ちカードの設定インターフェース
@@ -17,9 +18,6 @@ export interface HandCard {
 export interface HandCollection {
   [cardName: string]: HandCard;
 }
-
-// localStorageのキー
-const HAND_COLLECTION_STORAGE_KEY = 'twst-hand-collection';
 
 // デフォルトの手持ちカード設定を作成
 function createDefaultHandCard(cardName: string): HandCard {
@@ -55,10 +53,7 @@ function normalizeHandCard(cardName: string, value?: Partial<HandCard> | null): 
 // localStorageから手持ちコレクションを読み込み
 function loadHandCollection(): HandCollection {
   try {
-    const stored = localStorage.getItem(HAND_COLLECTION_STORAGE_KEY);
-    if (!stored) return {};
-
-    const parsed = JSON.parse(stored) as HandCollection;
+    const parsed = loadStoredHandCollection();
     const normalized: HandCollection = {};
     Object.entries(parsed || {}).forEach(([cardName, handCard]) => {
       normalized[cardName] = normalizeHandCard(cardName, handCard);
@@ -73,7 +68,7 @@ function loadHandCollection(): HandCollection {
 // localStorageに手持ちコレクションを保存
 function saveHandCollection(collection: HandCollection): void {
   try {
-    localStorage.setItem(HAND_COLLECTION_STORAGE_KEY, JSON.stringify(collection));
+    saveStoredHandCollection(collection);
   } catch (error) {
     console.warn('Failed to save hand collection to localStorage:', error);
   }

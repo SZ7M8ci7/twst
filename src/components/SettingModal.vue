@@ -187,7 +187,8 @@ import { cloneDeep } from 'lodash';
 import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 import characterData from '@/assets/characters_info.json';
-import { enName2jpName, getAvailableSortProps, loadImageUrls } from '@/components/common'
+import { enName2jpName, getAvailableSortProps } from '@/components/common'
+import { loadImageUrls } from '@/utils/characterAssets'
 import { SEARCH_PRESET_CONFIGURATIONS as PRESET_CONFIGURATIONS, type SearchPreset } from '@/constants/searchPresets';
 
 interface SortOption {
