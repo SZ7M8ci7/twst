@@ -6,6 +6,7 @@ import { getInputMaxLevel, getStatScalingMaxLevel } from '@/constants/levels';
 import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
+import { getDamageValueFromDetails, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
 
 function debounce(fn: Function, delay: number) {
   let timer: number | null = null;
@@ -45,6 +46,9 @@ interface Character {
   magic1Attribute?: string;
   magic2Attribute?: string;
   magic3Attribute?: string;
+  magic1TargetAttribute?: string;
+  magic2TargetAttribute?: string;
+  magic3TargetAttribute?: string;
   magic1Power?: string;
   magic2Power?: string;
   magic3Power?: string;
@@ -94,6 +98,9 @@ const createDefaultCharacter = (): Character => ({
   magic1Attribute: '火',
   magic2Attribute: '火',
   magic3Attribute: '火',
+  magic1TargetAttribute: '',
+  magic2TargetAttribute: '',
+  magic3TargetAttribute: '',
   magic1Power: '単発(弱)',
   magic2Power: '単発(弱)',
   magic3Power: '単発(弱)',
@@ -138,7 +145,10 @@ function serializeDeckCharactersForStorage(deckCharacters: Character[]) {
   });
 }
 
-function saveAutoDeck(deckCharacters: Character[], selectedAttribute: string) {
+function saveAutoDeck(
+  deckCharacters: Character[],
+  selectedAttribute: string
+) {
   if (typeof window === 'undefined') return;
   if (!deckCharacters.some(char => char?.chara)) return;
   try {
@@ -339,6 +349,18 @@ export const useSimulatorStore = defineStore('simulator', () => {
     recalculateStats();
   });
 
+  watch(selectedAttribute, (newAttribute) => {
+    saveAutoDeck(deckCharacters, newAttribute);
+  });
+
+  watch(() => deckCharacters.map(char => ({
+    magic1TargetAttribute: char.magic1TargetAttribute,
+    magic2TargetAttribute: char.magic2TargetAttribute,
+    magic3TargetAttribute: char.magic3TargetAttribute
+  })), () => {
+    saveAutoDeck(deckCharacters, selectedAttribute.value);
+  }, { deep: true });
+
   // デッキ全体のステータスを計算 - 最適化: 型安全性の向上
   const deckStats = computed(() => {
     const stats = {
@@ -415,16 +437,23 @@ export const useSimulatorStore = defineStore('simulator', () => {
         return 0;
       }
       
-      // 属性に応じてダメージを取得
-      if (attribute === '対全') {
-        // 全属性の最大値を取得
-        const damages = Object.values(stats.totalDamage).map(d => Number(d) || 0);
-        return Math.max(...damages, 0);
-      } else {
-        // 特定属性のダメージを取得（例: '対火' -> '火'）
-        const targetAttribute = attribute.replace('対', '');
-        return Number(stats.totalDamage[targetAttribute]) || 0;
-      }
+      let totalDamage = 0;
+
+      deckCharacters.forEach((char) => {
+        for (let i = 1; i <= 3; i++) {
+          if (!char[`isM${i}Selected`] || !isMagicValidForRarity(char, i)) {
+            continue;
+          }
+
+          totalDamage += getDamageValueFromDetails(
+            char[`magic${i}DamageDetails`],
+            attribute,
+            getMagicTargetAttribute(char, i)
+          );
+        }
+      });
+
+      return totalDamage;
     } catch (error) {
       return 0;
     }
@@ -514,7 +543,15 @@ export const useSimulatorStore = defineStore('simulator', () => {
     }
     
     const oldChara = deckCharacters[index].chara;
-    Object.assign(deckCharacters[index], character);
+    const isCharacterChanged = oldChara !== character.chara;
+    const normalizedCharacter = {
+      ...character,
+      magic1TargetAttribute: isCharacterChanged ? '' : (character.magic1TargetAttribute || ''),
+      magic2TargetAttribute: isCharacterChanged ? '' : (character.magic2TargetAttribute || ''),
+      magic3TargetAttribute: isCharacterChanged ? '' : (character.magic3TargetAttribute || '')
+    };
+
+    Object.assign(deckCharacters[index], normalizedCharacter);
     
     // バフの初期値を設定
     if (!deckCharacters[index].buffs) {

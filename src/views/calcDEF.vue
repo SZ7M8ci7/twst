@@ -194,7 +194,11 @@ nextTick(async () => {
   
   // シミュレータの値と属性選択を監視して自動反映
   watch(
-    () => [simulatorStore.deckCharacters, props.selectedAttribute, simulatorStore.isDeckStatsReady],
+    () => [
+      simulatorStore.deckCharacters,
+      props.selectedAttribute,
+      simulatorStore.isDeckStatsReady
+    ],
     () => {
       if (isInitialized.value && simulatorStore.isDeckStatsReady) {
         autoFillFromSimulator();

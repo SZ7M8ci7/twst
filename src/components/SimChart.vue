@@ -25,7 +25,11 @@
 import { ref, onMounted, watch } from 'vue';
 import Chart from 'chart.js/auto';
 import { useSimulatorStore } from '@/store/simulatorStore';
-// import { calculateCharacterStats } from '@/utils/calculations';
+import {
+  getDamageValueFromDetails,
+  getMagicTargetAttribute,
+  getTargetElementFromAttribute
+} from '@/utils/simulatorAttributes';
 
 const props = defineProps<{
   filterAttribute: string;
@@ -51,6 +55,42 @@ const stackColors: { [key: string]: string } = {
   '無': 'rgba(140, 140, 140, 0.4)'
 };
 
+function getRawDamageValueForElement(damageDetails: any, element: string): number {
+  if (!damageDetails) return 0;
+
+  if (element === '火') return damageDetails.fire || 0;
+  if (element === '水') return damageDetails.water || 0;
+  if (element === '木') return damageDetails.wood || 0;
+  if (element === '無') return damageDetails.neutral || 0;
+  return 0;
+}
+
+function getMagicDamageForElement(char: any, magicNumber: number, element: string): number {
+  const damageDetails = char[`magic${magicNumber}DamageDetails`];
+  const isMagicValid = simulatorStore.isMagicValidForRarity(char, magicNumber);
+
+  if (!damageDetails || !isMagicValid) {
+    return 0;
+  }
+
+  const selectedTargetAttribute = getMagicTargetAttribute(char, magicNumber);
+
+  if (props.filterAttribute !== '対全') {
+    return getDamageValueFromDetails(damageDetails, props.filterAttribute, selectedTargetAttribute);
+  }
+
+  if (selectedTargetAttribute) {
+    const targetElement = getTargetElementFromAttribute(selectedTargetAttribute);
+    if (targetElement !== element) {
+      return 0;
+    }
+
+    return getDamageValueFromDetails(damageDetails, '対全', selectedTargetAttribute);
+  }
+
+  return getRawDamageValueForElement(damageDetails, element);
+}
+
 function createChart() {
   if (!chartCanvas.value) return;
 
@@ -61,7 +101,7 @@ function createChart() {
     chart.destroy();
   }
 
-  const datasets = [
+  const datasets: any[] = [
     {
       label: 'HP',
       stack: 'Stack HP',
@@ -87,12 +127,23 @@ function createChart() {
   const magicTypes = ['M1', 'M2', 'M3'];
   
   // 選択された属性のみ表示するか、全属性を表示するか
-  const elementsToShow = props.filterAttribute === '対全' ? elements : [props.filterAttribute.replace('対', '')];
+  const elementsToShow = props.filterAttribute === '対全'
+    ? elements
+    : [getTargetElementFromAttribute(props.filterAttribute)];
   
   // 各魔法タイプと属性の組み合わせでデータセットを作成
   magicTypes.forEach((magicType) => {
     const magicNumber = Number(magicType.replace('M', ''));
     elementsToShow.forEach((element) => {
+      if (!element) {
+        return;
+      }
+
+      const data = simulatorStore.deckCharacters.map((char) => getMagicDamageForElement(char, magicNumber, element));
+      if (!data.some((value) => value > 0)) {
+        return;
+      }
+
       datasets.push({
         label: `対${element}(${magicType})`,
         stack: `Stack ${element}${magicType}`,
@@ -107,21 +158,7 @@ function createChart() {
           }
           return baseColor;
         }) as any,
-        // 各キャラクターの指定された魔法タイプと属性のダメージを取得
-        data: simulatorStore.deckCharacters.map((char) => {
-          const damageDetails = char[`magic${magicNumber}DamageDetails`];
-          const isMagicValid = simulatorStore.isMagicValidForRarity(char, magicNumber);
-          // レア度により無効な魔法は0にする
-          if (!damageDetails || !isMagicValid) {
-            return 0;
-          }
-          
-          if (element === '火') return damageDetails.fire || 0;
-          if (element === '水') return damageDetails.water || 0;
-          if (element === '木') return damageDetails.wood || 0;
-          if (element === '無') return damageDetails.neutral || 0;
-          return 0;
-        })
+        data
       });
     });
   });
@@ -226,6 +263,9 @@ watch(() => ({
     isM1Selected: char.isM1Selected,
     isM2Selected: char.isM2Selected,
     isM3Selected: char.isM3Selected,
+    magic1TargetAttribute: char.magic1TargetAttribute,
+    magic2TargetAttribute: char.magic2TargetAttribute,
+    magic3TargetAttribute: char.magic3TargetAttribute,
     magic1DamageDetails: char.magic1DamageDetails,
     magic2DamageDetails: char.magic2DamageDetails,
     magic3DamageDetails: char.magic3DamageDetails

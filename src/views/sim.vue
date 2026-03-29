@@ -112,6 +112,7 @@ import CharacterEtc from '@/components/CharacterEtc.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { loadSimulatorWindowState } from '@/storage/simulatorStorage';
 import { processCharacterSelection } from '@/utils/characterSelection';
+import { applyLegacyTargetAttributeToCharacter } from '@/utils/simulatorAttributes';
 
 const isLargeScreen = ref(window.innerWidth >= 768);
 const selectedAttribute = ref('対全');
@@ -170,7 +171,9 @@ async function restoreState() {
           state.deckCharacters.forEach((char: any, index: number) => {
             if (char.chara) {
               const originalCharacter = characterStore.characters.find((candidate: any) => candidate.name === char.name);
-              Object.assign(simulatorStore.deckCharacters[index], originalCharacter ? { ...originalCharacter, ...char } : char);
+              const restoredCharacter = originalCharacter ? { ...originalCharacter, ...char } : { ...char };
+              applyLegacyTargetAttributeToCharacter(restoredCharacter, state.selectedOpponentAttribute);
+              Object.assign(simulatorStore.deckCharacters[index], restoredCharacter);
             }
           });
           restored = true;

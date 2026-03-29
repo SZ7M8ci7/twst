@@ -8,6 +8,7 @@ const AUTO_SAVE_KEY = 'twst_autosave_deck';
 export interface SimulatorWindowState {
   deckCharacters: any[];
   selectedAttribute: string;
+  selectedOpponentAttribute?: string;
 }
 
 export function loadSimulatorWindowState() {

@@ -95,12 +95,14 @@ import {
   saveStoredSavedDecks,
 } from '@/storage/simulatorStorage';
 import { loadCharacterImage } from '@/utils/characterSelection';
+import { applyLegacyTargetAttributeToCharacter } from '@/utils/simulatorAttributes';
 
 interface SavedDeck {
   id: string;
   name: string;
   deckCharacters: any[];
   selectedAttribute: string;
+  selectedOpponentAttribute?: string;
   savedAt: string;
 }
 
@@ -229,12 +231,40 @@ function buildDeckSnapshot(deckCharacters: any[], name: string, id: string): Sav
   };
 }
 
+function migrateLegacyDeck(deck: SavedDeck): SavedDeck {
+  const { selectedOpponentAttribute, ...restDeck } = deck;
+  const migratedCharacters = deck.deckCharacters.map(char => {
+    let migratedCharacter = char;
+
+    // 旧形式（nameがなくimgUrlのみ存在）の場合、nameを補完
+    if (!migratedCharacter.name && migratedCharacter.imgUrl) {
+      const characterName = getCharacterNameFromImageUrl(migratedCharacter.imgUrl);
+      migratedCharacter = {
+        ...migratedCharacter,
+        name: characterName
+      };
+    }
+
+    migratedCharacter = applyLegacyTargetAttributeToCharacter(
+      { ...migratedCharacter },
+      selectedOpponentAttribute
+    );
+
+    return migratedCharacter;
+  });
+
+  return {
+    ...restDeck,
+    deckCharacters: migratedCharacters
+  };
+}
+
 function loadAutoSaveDeck() {
   try {
     const loaded = loadStoredAutoSaveDeck<SavedDeck>();
     if (loaded && Array.isArray(loaded.deckCharacters)) {
       autoSaveDeck.value = {
-        ...loaded,
+        ...migrateLegacyDeck(loaded),
         id: AUTO_SAVE_DECK_ID,
         name: AUTO_SAVE_DECK_NAME
       };
@@ -261,24 +291,7 @@ function closeModal() {
 
 // 旧形式のデータを新形式にマイグレーションする関数
 function migrateLegacyDecks(decks: SavedDeck[]): SavedDeck[] {
-  return decks.map(deck => {
-    const migratedCharacters = deck.deckCharacters.map(char => {
-      // 旧形式（nameがなくimgUrlのみ存在）の場合、nameを補完
-      if (!char.name && char.imgUrl) {
-        const characterName = getCharacterNameFromImageUrl(char.imgUrl);
-        return {
-          ...char,
-          name: characterName
-        };
-      }
-      return char;
-    });
-    
-    return {
-      ...deck,
-      deckCharacters: migratedCharacters
-    };
-  });
+  return decks.map(migrateLegacyDeck);
 }
 
 function loadSavedDecks() {
@@ -373,7 +386,12 @@ async function restoreDeck(deckId: string) {
         }
       }
       
-      Object.assign(simulatorStore.deckCharacters[index], char);
+      const restoredCharacter = applyLegacyTargetAttributeToCharacter(
+        { ...char },
+        deck.selectedOpponentAttribute
+      );
+
+      Object.assign(simulatorStore.deckCharacters[index], restoredCharacter);
     }
   }
   

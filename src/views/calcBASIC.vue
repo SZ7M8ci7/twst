@@ -80,6 +80,7 @@ import { Chart, registerables } from 'chart.js';
 import DoughnutGraph from '@/components/DoughnutGraph.vue';
 import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { getCompatibilityType, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
 Chart.register(...registerables);
 const { t } = useI18n();
 const simulatorStore = useSimulatorStore();
@@ -154,7 +155,11 @@ nextTick(async () => {
   
   // シミュレータの値と属性選択を監視して自動反映
   watch(
-    () => [simulatorStore.deckCharacters, props.selectedAttribute, simulatorStore.isDeckStatsReady],
+    () => [
+      simulatorStore.deckCharacters,
+      props.selectedAttribute,
+      simulatorStore.isDeckStatsReady
+    ],
     () => {
       if (isInitialized.value && simulatorStore.isDeckStatsReady) {
         autoFillFromSimulator();
@@ -198,10 +203,7 @@ async function autoFillFromSimulator() {
 // 属性相性を計算する関数
 function calculateAttributeCompatibility() {
   const compatibility = { advantage: 0, equal: 0, disadvantage: 0 };
-  // 選択された属性を取得
   const selectedAttribute = props.selectedAttribute || '対全';
-  // 「対火」から「火」を抽出
-  const targetAttribute = selectedAttribute.replace('対', '');
   
   (simulatorStore.deckCharacters || []).forEach((char: any) => {
     // キャラが未選択の場合（nameが空など）はスキップ
@@ -210,52 +212,18 @@ function calculateAttributeCompatibility() {
     for (let i = 1; i <= 3; i++) {
       if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const magicAttribute = char[`magic${i}Attribute`];
-        
-        if (selectedAttribute === '対全') {
-          // 対全の場合: 無属性は等倍、それ以外は有利として扱う
-          if (magicAttribute === '無') {
-            compatibility.equal++;
-          } else {
-            compatibility.advantage++;
-          }
-        } else if (targetAttribute === '無') {
-          // 対無の場合: 全て等倍
-          compatibility.equal++;
-        } else {
-          // 特定属性の場合: 属性相性を判定
-          if (isAdvantage(magicAttribute, targetAttribute)) {
-            compatibility.advantage++;
-          } else if (isDisadvantage(magicAttribute, targetAttribute)) {
-            compatibility.disadvantage++;
-          } else {
-            compatibility.equal++;
-          }
-        }
+        const compatibilityType = getCompatibilityType(
+          magicAttribute,
+          selectedAttribute,
+          getMagicTargetAttribute(char, i)
+        );
+
+        compatibility[compatibilityType]++;
       }
     }
   });
   
   return compatibility;
-}
-
-// 有利属性判定
-function isAdvantage(magicAttr: string, targetAttr: string): boolean {
-  const advantages: Record<string, string> = {
-    '火': '木',
-    '水': '火', 
-    '木': '水'
-  };
-  return advantages[magicAttr] === targetAttr;
-}
-
-// 不利属性判定
-function isDisadvantage(magicAttr: string, targetAttr: string): boolean {
-  const disadvantages: Record<string, string> = {
-    '火': '水',
-    '水': '木',
-    '木': '火'
-  };
-  return disadvantages[magicAttr] === targetAttr;
 }
 
 </script>

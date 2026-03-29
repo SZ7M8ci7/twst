@@ -177,6 +177,7 @@ import FilterModal from '@/components/FilterModal.vue';
 import characterData from '@/assets/characters_info.json';
 import charactersInfo from '@/assets/characters_info.json';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
+import { getDamageValueFromDetails, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
 
 // characterDataの高速検索用Mapを事前に作成
 const characterDataMap = new Map();
@@ -874,32 +875,11 @@ function calculateDeckStats(candidateCharacter, sortKey) {
         
         const damageDetails = chara[`magic${i}DamageDetails`];
         if (damageDetails) {
-          let damage = 0;
-          
-          switch (props.selectedAttribute) {
-            case '対火':
-              damage = damageDetails.fire || 0;
-              break;
-            case '対水':
-              damage = damageDetails.water || 0;
-              break;
-            case '対木':
-              damage = damageDetails.wood || 0;
-              break;
-            case '対無':
-            case '対無属性':
-              damage = damageDetails.neutral || 0;
-              break;
-            case '対全':
-            default:
-              damage = Math.max(
-                damageDetails.fire || 0,
-                damageDetails.water || 0,
-                damageDetails.wood || 0,
-                damageDetails.neutral || 0
-              );
-              break;
-          }
+          const damage = getDamageValueFromDetails(
+            damageDetails,
+            props.selectedAttribute,
+            getMagicTargetAttribute(chara, i)
+          );
           
           
           if (damage > 0) {
@@ -922,32 +902,11 @@ function calculateDeckStats(candidateCharacter, sortKey) {
           const damageDetails = chara[`magic${i}DamageDetails`];
           
           if (damageDetails) {
-            let damage = 0;
-            
-            switch (props.selectedAttribute) {
-              case '対火':
-                damage = damageDetails.fire || 0;
-                break;
-              case '対水':
-                damage = damageDetails.water || 0;
-                break;
-              case '対木':
-                damage = damageDetails.wood || 0;
-                break;
-              case '対無':
-              case '対無属性':
-                damage = damageDetails.neutral || 0;
-                break;
-              case '対全':
-              default:
-                damage = Math.max(
-                  damageDetails.fire || 0,
-                  damageDetails.water || 0,
-                  damageDetails.wood || 0,
-                  damageDetails.neutral || 0
-                );
-                break;
-            }
+            const damage = getDamageValueFromDetails(
+              damageDetails,
+              props.selectedAttribute,
+              getMagicTargetAttribute(chara, i)
+            );
             
             if (damage > 0) {
               deckReferenceDamageList.push(damage);
@@ -1044,6 +1003,13 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'select']);
+const deckTargetAttributes = computed(() => (
+  simulatorStore.deckCharacters.map(char => ({
+    magic1TargetAttribute: char.magic1TargetAttribute,
+    magic2TargetAttribute: char.magic2TargetAttribute,
+    magic3TargetAttribute: char.magic3TargetAttribute
+  }))
+));
 
 // 最適化されたデータ構造：高速ルックアップテーブル（lazy evaluation）
 const optimizedDataStructures = computed(() => {
@@ -1078,7 +1044,7 @@ const resetImageLoadingQueue = () => {
 };
 
 // watchでソート条件が変更されたら画像読み込みキューをリセット
-watch([sortBy, sortOrder, () => props.selectedAttribute], () => {
+watch([sortBy, sortOrder, () => props.selectedAttribute, deckTargetAttributes], () => {
   resetImageLoadingQueue();
 }, { flush: 'sync' });
 
@@ -1270,7 +1236,13 @@ const updateFilteredCharacters = async () => {
 
 // ソート条件変更時に更新（デバウンス）
 let updateTimer = null;
-watch([sortBy, sortOrder, () => characters.value.filter(c => c.visible).length], () => {
+watch([
+  sortBy,
+  sortOrder,
+  () => characters.value.filter(c => c.visible).length,
+  () => props.selectedAttribute,
+  deckTargetAttributes
+], () => {
   if (updateTimer) clearTimeout(updateTimer);
   updateTimer = setTimeout(() => {
     updateFilteredCharacters();

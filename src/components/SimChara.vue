@@ -61,7 +61,11 @@
                 <button :class="{'mbutton': true, 'selected': simulatorStore.deckCharacters[props.charaIndex][`isM${index}Selected`], 'shake': shakingStates[`isM${index}Shaking`]}" @click="toggleM(index)">M{{ index }}</button>
               </v-col>
               <v-col cols="2">
-                <ElementDropdown :chara-index="props.charaIndex" :element-index="index"/>
+                <ElementDropdown
+                  :chara-index="props.charaIndex"
+                  :element-index="index"
+                  :selected-attribute="props.selectedAttribute"
+                />
               </v-col>
               <v-col :cols="windowWidth >= 360 ? (showBuddyIcon() ? 2 : 3) : 0">
                 <select
@@ -945,6 +949,7 @@ const handleLevelInput = (event) => {
 const saveDetailChanges = (updatedCharacter) => {
   // 詳細設定で変更された値を直接反映（selectCharacterによる自動計算を回避）
   const currentCharacter = simulatorStore.deckCharacters[props.charaIndex];
+  const isCharacterChanged = updatedCharacter.chara !== currentCharacter.chara;
   const previousBuddy1Totsu = currentCharacter.buddy1s_totsu;
   const previousBuddy2Totsu = currentCharacter.buddy2s_totsu;
   const previousBuddy3Totsu = currentCharacter.buddy3s_totsu;
@@ -974,6 +979,12 @@ const saveDetailChanges = (updatedCharacter) => {
     buddy3Lv: Number(updatedCharacter.buddy3Lv),
     buffs: updatedCharacter.buffs || []
   });
+
+  if (isCharacterChanged) {
+    currentCharacter.magic1TargetAttribute = '';
+    currentCharacter.magic2TargetAttribute = '';
+    currentCharacter.magic3TargetAttribute = '';
+  }
 
   if (buddy1SkillChanged && updatedCharacter.buddy1s_totsu === previousBuddy1Totsu) {
     currentCharacter.buddy1s_totsu = updatedCharacter.buddy1s;

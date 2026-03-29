@@ -58,6 +58,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import {
+  getCompatibilityType,
+  getDamageValueFromDetails,
+  getMagicTargetAttribute
+} from '@/utils/simulatorAttributes';
 
 const props = defineProps<{
   selectedAttribute: string;
@@ -95,39 +100,17 @@ const totalEffectiveHP = computed(() =>
 // 全キャラクターの全ダメージを収集（旧シミュレータのdamageListに相当）
 const damageList = computed(() => {
   const damages: number[] = [];
-  
-  // 選択された属性に基づいてダメージを取得
-  const getAttributeDamage = (damageDetails: any) => {
-    if (!damageDetails) return 0;
-    
-    switch (props.selectedAttribute) {
-      case '対火':
-        return damageDetails.fire || 0;
-      case '対水':
-        return damageDetails.water || 0;
-      case '対木':
-        return damageDetails.wood || 0;
-      case '対無':
-      case '対無属性':
-        return damageDetails.neutral || 0;
-      case '対全':
-      default:
-        // 対全の場合は全属性ダメージの最大値を使用（旧シミュレータの仕様）
-        return Math.max(
-          damageDetails.fire || 0,
-          damageDetails.water || 0,
-          damageDetails.wood || 0,
-          damageDetails.neutral || 0
-        );
-    }
-  };
-  
+
   simulatorStore.deckCharacters.forEach((char) => {
     // 各キャラクターの選択されたマジックのダメージを収集
     for (let i = 1; i <= 3; i++) {
       if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const damageDetails = char[`magic${i}DamageDetails`];
-        const damage = getAttributeDamage(damageDetails);
+        const damage = getDamageValueFromDetails(
+          damageDetails,
+          props.selectedAttribute,
+          getMagicTargetAttribute(char, i)
+        );
         if (damage > 0) {
           damages.push(damage);
         }
@@ -183,27 +166,24 @@ const midDamage5T = computed(() => {
 // Basic試験スコア計算（calcBASICと統一）
 const scoreBase = computed(() => {
   const scores = [0, 0, 0, 0, 0]; // 1T～5T
-  
-  // ダメージデータを収集
-  const damageDataList: any[] = [];
+
+  const damageDataList: {
+    damage: number;
+    compatibility: 'advantage' | 'equal' | 'disadvantage';
+    duoMagic: boolean;
+  }[] = [];
+
   simulatorStore.deckCharacters.forEach((char) => {
     for (let i = 1; i <= 3; i++) {
       if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const damageDetails = char[`magic${i}DamageDetails`];
         if (damageDetails) {
           const magicAttribute = char[`magic${i}Attribute`];
+          const targetAttribute = getMagicTargetAttribute(char, i);
           damageDataList.push({
-            vszendamage: Math.max(
-              damageDetails.fire || 0,
-              damageDetails.wood || 0,
-              damageDetails.water || 0
-            ), // 火・木・水の最大値
-            vshidamage: damageDetails.fire || 0,
-            vskidamage: damageDetails.wood || 0,
-            vsmizudamage: damageDetails.water || 0,
-            vsmudamage: damageDetails.neutral || 0,
-            attribute: magicAttribute,
-            duoMagic: char[`magic${i}Power`] === 'デュオ' ? 'デュオ魔法' : ''
+            damage: getDamageValueFromDetails(damageDetails, props.selectedAttribute, targetAttribute),
+            compatibility: getCompatibilityType(magicAttribute, props.selectedAttribute, targetAttribute),
+            duoMagic: char[`magic${i}Power`] === 'デュオ'
           });
         }
       }
@@ -212,171 +192,38 @@ const scoreBase = computed(() => {
   
   // 各ターンの攻撃数を計算
   const attackCounts = [2, 4, 6, 8, 10]; // 1T～5Tの攻撃数
-  
-  // 選択された属性に基づいてスコア計算
-  if (props.selectedAttribute === '対全') {
-    // 全属性: vszendamageでソート
-    const result = damageDataList.sort((a, b) => b.vszendamage - a.vszendamage);
-    for (let j = 0; j < 5; j++) {
-      let totalDamage = 0;
-      let duoCount = 0;
-      let advantageCount = 0;
-      let equalCount = 0;
-      let disadvantageCount = 0;
-      
-      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
-        if (!result[k]) continue;
-        
-        totalDamage += result[k].vszendamage;
-        
-        if (result[k].duoMagic === 'デュオ魔法') {
-          duoCount++;
-        }
-        if (result[k].attribute !== '無') {
-          advantageCount++;
-        } else {
-          equalCount++;
-        }
+
+  const result = [...damageDataList].sort((a, b) => b.damage - a.damage);
+  for (let j = 0; j < 5; j++) {
+    let totalDamage = 0;
+    let duoCount = 0;
+    let advantageCount = 0;
+    let equalCount = 0;
+    let disadvantageCount = 0;
+
+    for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
+      if (!result[k]) continue;
+
+      totalDamage += result[k].damage;
+
+      if (result[k].duoMagic) {
+        duoCount++;
       }
-      
-      // calcBASICと同じ計算式
-      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
-                  duoCount * 3000 + 
-                  advantageCount * 2000 + 
-                  equalCount * 500 + 
-                  disadvantageCount * (-1000);
-    }
-  } else if (props.selectedAttribute === '対火') {
-    // 対火: vshidamageでソート
-    const result = damageDataList.sort((a, b) => b.vshidamage - a.vshidamage);
-    for (let j = 0; j < 5; j++) {
-      let totalDamage = 0;
-      let duoCount = 0;
-      let advantageCount = 0;
-      let equalCount = 0;
-      let disadvantageCount = 0;
-      
-      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
-        if (!result[k]) continue;
-        
-        totalDamage += result[k].vshidamage;
-        
-        if (result[k].duoMagic === 'デュオ魔法') {
-          duoCount++;
-        }
-        if (result[k].attribute === '水') {
-          advantageCount++;
-        } else if (result[k].attribute === '木') {
-          disadvantageCount++;
-        } else {
-          equalCount++;
-        }
-      }
-      
-      // calcBASICと同じ計算式
-      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
-                  duoCount * 3000 + 
-                  advantageCount * 2000 + 
-                  equalCount * 500 + 
-                  disadvantageCount * (-1000);
-    }
-  } else if (props.selectedAttribute === '対木') {
-    // 対木: vskidamageでソート
-    const result = damageDataList.sort((a, b) => b.vskidamage - a.vskidamage);
-    for (let j = 0; j < 5; j++) {
-      let totalDamage = 0;
-      let duoCount = 0;
-      let advantageCount = 0;
-      let equalCount = 0;
-      let disadvantageCount = 0;
-      
-      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
-        if (!result[k]) continue;
-        
-        totalDamage += result[k].vskidamage;
-        
-        if (result[k].duoMagic === 'デュオ魔法') {
-          duoCount++;
-        }
-        if (result[k].attribute === '火') {
-          advantageCount++;
-        } else if (result[k].attribute === '水') {
-          disadvantageCount++;
-        } else {
-          equalCount++;
-        }
-      }
-      
-      // calcBASICと同じ計算式
-      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
-                  duoCount * 3000 + 
-                  advantageCount * 2000 + 
-                  equalCount * 500 + 
-                  disadvantageCount * (-1000);
-    }
-  } else if (props.selectedAttribute === '対水') {
-    // 対水: vsmizudamageでソート
-    const result = damageDataList.sort((a, b) => b.vsmizudamage - a.vsmizudamage);
-    for (let j = 0; j < 5; j++) {
-      let totalDamage = 0;
-      let duoCount = 0;
-      let advantageCount = 0;
-      let equalCount = 0;
-      let disadvantageCount = 0;
-      
-      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
-        if (!result[k]) continue;
-        
-        totalDamage += result[k].vsmizudamage;
-        
-        if (result[k].duoMagic === 'デュオ魔法') {
-          duoCount++;
-        }
-        if (result[k].attribute === '木') {
-          advantageCount++;
-        } else if (result[k].attribute === '火') {
-          disadvantageCount++;
-        } else {
-          equalCount++;
-        }
-      }
-      
-      // calcBASICと同じ計算式
-      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
-                  duoCount * 3000 + 
-                  advantageCount * 2000 + 
-                  equalCount * 500 + 
-                  disadvantageCount * (-1000);
-    }
-  } else if (props.selectedAttribute === '対無' || props.selectedAttribute === '対無属性') {
-    // 対無: vsmudamageでソート
-    const result = damageDataList.sort((a, b) => b.vsmudamage - a.vsmudamage);
-    for (let j = 0; j < 5; j++) {
-      let totalDamage = 0;
-      let duoCount = 0;
-      let advantageCount = 0;
-      let equalCount = 0;
-      let disadvantageCount = 0;
-      
-      for (let k = 0; k < attackCounts[j] && k < result.length; k++) {
-        if (!result[k]) continue;
-        
-        totalDamage += result[k].vsmudamage;
-        
-        if (result[k].duoMagic === 'デュオ魔法') {
-          duoCount++;
-        }
-        // 対無の場合は全て等倍
+
+      if (result[k].compatibility === 'advantage') {
+        advantageCount++;
+      } else if (result[k].compatibility === 'disadvantage') {
+        disadvantageCount++;
+      } else {
         equalCount++;
       }
-      
-      // calcBASICと同じ計算式
-      scores[j] = (totalDamage - attackCounts[j] * 4.5) + 
-                  duoCount * 3000 + 
-                  advantageCount * 2000 + 
-                  equalCount * 500 + 
-                  disadvantageCount * (-1000);
     }
+
+    scores[j] = (totalDamage - attackCounts[j] * 4.5) +
+                duoCount * 3000 +
+                advantageCount * 2000 +
+                equalCount * 500 +
+                disadvantageCount * (-1000);
   }
   
   return scores;

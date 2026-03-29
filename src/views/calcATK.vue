@@ -111,6 +111,7 @@ import { Chart, registerables } from 'chart.js';
 import DoughnutGraph from '@/components/DoughnutGraph.vue';
 import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { getCompatibilityType, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
 Chart.register(...registerables);
 
 const { t } = useI18n();
@@ -218,7 +219,11 @@ nextTick(async () => {
   
   // シミュレータの値と属性選択を監視して自動反映
   watch(
-    () => [simulatorStore.deckCharacters, props.selectedAttribute, simulatorStore.isDeckStatsReady],
+    () => [
+      simulatorStore.deckCharacters,
+      props.selectedAttribute,
+      simulatorStore.isDeckStatsReady
+    ],
     () => {
       if (isInitialized.value && simulatorStore.isDeckStatsReady) {
         autoFillFromSimulator();
@@ -356,10 +361,7 @@ function calculateAttackCounts() {
     disadvantage: { combo: 0, single: 0 }
   };
   
-  // 選択された属性を取得
   const selectedAttribute = props.selectedAttribute || '対全';
-  // 「対火」から「火」を抽出
-  const targetAttribute = selectedAttribute.replace('対', '');
   
   (simulatorStore.deckCharacters || []).forEach(char => {
     // キャラが未選択の場合はスキップ
@@ -369,30 +371,11 @@ function calculateAttackCounts() {
       if (char[`isM${i}Selected`] && simulatorStore.isMagicValidForRarity(char, i)) {
         const magicAttribute = char[`magic${i}Attribute`];
         const magicPower = char[`magic${i}Power`];
-        
-        // 属性相性を判定
-        let compatibilityType: 'advantage' | 'equal' | 'disadvantage';
-        
-        if (selectedAttribute === '対全') {
-          // 対全の場合: 無属性は等倍、それ以外は有利として扱う
-          if (magicAttribute === '無') {
-            compatibilityType = 'equal';
-          } else {
-            compatibilityType = 'advantage';
-          }
-        } else if (targetAttribute === '無') {
-          // 対無の場合: 全て等倍
-          compatibilityType = 'equal';
-        } else {
-          // 特定属性の場合: 属性相性を判定
-          if (isAdvantage(magicAttribute, targetAttribute)) {
-            compatibilityType = 'advantage';
-          } else if (isDisadvantage(magicAttribute, targetAttribute)) {
-            compatibilityType = 'disadvantage';
-          } else {
-            compatibilityType = 'equal';
-          }
-        }
+        const compatibilityType = getCompatibilityType(
+          magicAttribute,
+          selectedAttribute,
+          getMagicTargetAttribute(char, i)
+        );
         
         // 魔法の種類によって単発か連撃かを判定
         if (magicPower === '単発(弱)' || magicPower === '単発(強)') {
@@ -406,26 +389,6 @@ function calculateAttackCounts() {
   });
   
   return counts;
-}
-
-// 有利属性判定
-function isAdvantage(magicAttr: string, targetAttr: string): boolean {
-  const advantages: Record<string, string> = {
-    '火': '木',
-    '水': '火', 
-    '木': '水'
-  };
-  return advantages[magicAttr] === targetAttr;
-}
-
-// 不利属性判定
-function isDisadvantage(magicAttr: string, targetAttr: string): boolean {
-  const disadvantages: Record<string, string> = {
-    '火': '水',
-    '水': '木',
-    '木': '火'
-  };
-  return disadvantages[magicAttr] === targetAttr;
 }
 
 </script>
