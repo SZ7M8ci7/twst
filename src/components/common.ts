@@ -1857,7 +1857,9 @@ function prepareCharacterSearchCache(chara: Character): void {
   const totsuCount = Number.isFinite(Number(charaAny.totsu))
     ? Number(charaAny.totsu)
     : ((charaAny.hasM3 ?? (chara.rare === 'SSR')) ? 3 : 0);
-  const useM3 = isM3Unlocked(chara.rare, totsuCount) || (chara.rare === 'SSR' && charaAny.hasM3 === true);
+  // M3は「解放されていること」と「UIで使用可になっていること」の両方を満たす時だけ使う。
+  // これにより、3凸以上でも hasM3=false のカードは探索でM3を使わない。
+  const useM3 = isM3Unlocked(chara.rare, totsuCount) && (charaAny.hasM3 ?? true);
   charaAny.useM1Cached = useM1;
   charaAny.useM2Cached = useM2;
   charaAny.useM3Cached = useM3;
