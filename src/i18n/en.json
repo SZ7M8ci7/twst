@@ -16,6 +16,7 @@
     "buddyDuo": "Buddy/Duo Relation",
     "finisherDamage": "Finisher Damage",
     "data": "Data",
+    "statusPlot": "Status Plot",
     "other": "Other",
     "sim": "New Deck Simulator",
     "retire": "Retire Counter"
@@ -158,6 +159,21 @@
   },
   "data": {
     "useHandCollection": "Use Card Settings"
+  },
+  "statusPlot": {
+    "typeLabel": "Type",
+    "currentStats": "Current Stats",
+    "allBuddyStats": "All Buddy Active",
+    "filteredCount": "Showing {count} / {total} cards",
+    "selectedTitle": "Selected Card",
+    "selectedHint": "Click a point in the plot to show card details here.",
+    "buddyEffectsTitle": "Buddy Effects",
+    "hpLabel": "HP",
+    "atkLabel": "ATK",
+    "duoLabel": "Duo",
+    "implementationDateLabel": "Release Date",
+    "noDataTitle": "No matching cards",
+    "noDataText": "Adjust the filter settings."
   },
   "search": {
     "characterList": "Character List",

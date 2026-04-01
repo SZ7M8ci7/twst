@@ -104,6 +104,11 @@
         :title="$t('tool.data')"
         @click="drawer = false;"
       /></RouterLink>
+      <RouterLink :to="{name:'statusPlot'}">
+      <v-list-item
+        :title="$t('tool.statusPlot')"
+        @click="drawer = false;"
+      /></RouterLink>
       <RouterLink :to="{name:'other'}">
       <v-list-item
         :title="$t('tool.other')"

@@ -16,6 +16,7 @@
     "buddyDuo": "バディ・デュオ関係",
     "finisherDamage": "フィニッシャーダメージ",
     "data": "データ",
+    "statusPlot": "ステータスプロット",
     "sim": "新デッキシミュレータ",
     "retire": "リタマラカウンター",
     "other": "その他"
@@ -158,6 +159,21 @@
   },
   "data": {
     "useHandCollection": "手持ち設定を使用"
+  },
+  "statusPlot": {
+    "typeLabel": "タイプ",
+    "currentStats": "実ステータス",
+    "allBuddyStats": "全バディ発動",
+    "filteredCount": "{count} / {total} 枚を表示",
+    "selectedTitle": "選択中カード",
+    "selectedHint": "散布図の点を選ぶとここに詳細を表示します。",
+    "buddyEffectsTitle": "Buddy Effects",
+    "hpLabel": "HP",
+    "atkLabel": "ATK",
+    "duoLabel": "デュオ",
+    "implementationDateLabel": "実装日",
+    "noDataTitle": "該当カードがありません",
+    "noDataText": "フィルタ条件を見直してください。"
   },
   "search": {
     "characterList": "キャラ一覧",

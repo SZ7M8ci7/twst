@@ -98,6 +98,11 @@ const routes = [
     component: () => import('@/views/data.vue'),
   },
   {
+    path: '/twst/status-plot',
+    name: 'statusPlot',
+    component: () => import('@/views/statusPlot.vue'),
+  },
+  {
     path: '/twst/buddyDuo',
     name: 'buddyDuo',
     component: () => import('@/views/buddyDuo.vue'),
