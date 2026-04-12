@@ -1,11 +1,16 @@
 type ImageNameAccessor<T> = keyof T | ((item: T) => string);
+type ImageModuleRegistry = Record<string, string>;
 
 const mainImageModules = import.meta.glob('../assets/img/*.webp', {
+  eager: true,
   import: 'default',
-});
+  query: '?url',
+}) as ImageModuleRegistry;
 const iconImageModules = import.meta.glob('../assets/img/icon/*.webp', {
+  eager: true,
   import: 'default',
-});
+  query: '?url',
+}) as ImageModuleRegistry;
 
 const imageUrlCache = new Map<string, string>();
 
@@ -30,7 +35,7 @@ function resolveModuleKey(imageName: string, prefix: string): string {
   return `../assets/img/${imageName}.webp`;
 }
 
-function getModuleRegistry(prefix: string) {
+function getModuleRegistry(prefix: string): ImageModuleRegistry {
   if (prefix === 'icon/') {
     return iconImageModules;
   }
@@ -38,7 +43,7 @@ function getModuleRegistry(prefix: string) {
   return mainImageModules;
 }
 
-async function loadImageModuleUrl(imageName: string, prefix = ''): Promise<string> {
+function loadImageModuleUrl(imageName: string, prefix = ''): string {
   const cacheKey = `${prefix}${imageName}`;
   const cached = imageUrlCache.get(cacheKey);
   if (cached !== undefined) {
@@ -47,20 +52,14 @@ async function loadImageModuleUrl(imageName: string, prefix = ''): Promise<strin
 
   const moduleKey = resolveModuleKey(imageName, prefix);
   const registry = getModuleRegistry(prefix);
-  const importer = registry[moduleKey];
-  if (!importer) {
+  const imageUrl = registry[moduleKey];
+  if (!imageUrl) {
     imageUrlCache.set(cacheKey, '');
     return '';
   }
 
-  try {
-    const imageUrl = await importer() as string;
-    imageUrlCache.set(cacheKey, imageUrl);
-    return imageUrl;
-  } catch {
-    imageUrlCache.set(cacheKey, '');
-    return '';
-  }
+  imageUrlCache.set(cacheKey, imageUrl);
+  return imageUrl;
 }
 
 export async function loadCachedImageUrl(imageName: string, prefix: string = ''): Promise<string> {
@@ -86,20 +85,18 @@ export async function loadImageUrls<T>(
 
   const fallbackUrl =
     fallbackName && prefix !== 'icon/'
-      ? await loadImageModuleUrl(fallbackName, prefix)
+      ? loadImageModuleUrl(fallbackName, prefix)
       : '';
 
-  await Promise.all(
-    items.map(async (item) => {
-      const imageName = resolveImageName(item, nameAccessor);
-      if (!imageName) {
-        return;
-      }
+  items.forEach((item) => {
+    const imageName = resolveImageName(item, nameAccessor);
+    if (!imageName) {
+      return;
+    }
 
-      const imageUrl = await loadImageModuleUrl(imageName, prefix);
-      dictionary[imageName] = imageUrl || fallbackUrl || '';
-    })
-  );
+    const imageUrl = loadImageModuleUrl(imageName, prefix);
+    dictionary[imageName] = imageUrl || fallbackUrl || '';
+  });
 
   if (fallbackName) {
     dictionary[fallbackName] = fallbackUrl || '';
