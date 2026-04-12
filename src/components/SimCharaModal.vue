@@ -865,11 +865,18 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       
       // 計算されたダメージ詳細から属性ダメージを取得
       const allDamages = [];
+      let candidateHasM3 = !!chara.hasM3;
+
+      if (handCollectionStore.useHandCollection) {
+        const handCard = getReadOnlyHandCard(chara.name);
+        candidateHasM3 = handCard.isOwned && isM3Unlocked(chara.rare, handCard.totsu);
+      }
       
-      // M1, M2（、M3）のダメージ詳細から属性ダメージを抽出
+      // 候補キャラはまだ魔法選択が確定していないため、
+      // 使用可能な M1/M2/M3 の中から上位2つを採用して実編成時の比較値に揃える。
       for (let i = 1; i <= 3; i++) {
-        // M3の場合はisM3Selectedが有効な場合のみ計算に含める
-        if (i === 3 && !chara.isM3Selected) {
+        const isMagicAvailable = i === 3 ? candidateHasM3 : true;
+        if (!isMagicAvailable) {
           continue;
         }
         
