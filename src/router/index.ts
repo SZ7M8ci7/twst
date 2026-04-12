@@ -1,128 +1,137 @@
 // Composables
 import { createRouter, createWebHistory } from 'vue-router'
+import { defineAsyncComponent, type AsyncComponentLoader } from 'vue'
+import RouteLoading from '@/components/RouteLoading.vue'
+
+const createAsyncRoute = (loader: AsyncComponentLoader) => defineAsyncComponent({
+  loader,
+  loadingComponent: RouteLoading,
+  delay: 0,
+  suspensible: false,
+})
 
 const routes = [
   {
     path: '/',
     name: 'top',
-    component: () => import('@/views/top.vue'),
+    component: createAsyncRoute(() => import('@/views/top.vue')),
   },
   {
     path: '/twst/top',
     name: 'twstTop',
-    component: () => import('@/views/top.vue'),
+    component: createAsyncRoute(() => import('@/views/top.vue')),
   },
   {
     path: '/twst/drop',
     name: 'drop',
-    component: () => import('@/views/drop.vue'),
+    component: createAsyncRoute(() => import('@/views/drop.vue')),
   },
   {
     path: '/twst/sam',
     name: 'sam',
-    component: () => import('@/views/sam.vue'),
+    component: createAsyncRoute(() => import('@/views/sam.vue')),
   },
   {
     path: '/twst/grow',
     name: 'grow',
-    component: () => import('@/views/grow.vue'),
+    component: createAsyncRoute(() => import('@/views/grow.vue')),
   },
   {
     path: '/twst/other',
     name: 'other',
-    component: () => import('@/views/other.vue'),
+    component: createAsyncRoute(() => import('@/views/other.vue')),
   },
   {
     path: '/twst/comfort',
     name: 'comfort',
-    component: () => import('@/views/redirect.vue'),
+    component: createAsyncRoute(() => import('@/views/redirect.vue')),
   },
   {
     path: '/twst/invite',
     name: 'invite',
-    component: () => import('@/views/redirect.vue'),
+    component: createAsyncRoute(() => import('@/views/redirect.vue')),
   },
   {
     path: '/twst/simulator',
     name: 'simulator',
-    component: () => import('@/views/redirect.vue'),
+    component: createAsyncRoute(() => import('@/views/redirect.vue')),
   },
   {
     path: '/twst/search',
     name: 'search',
-    component: () => import('@/views/search.vue'),
+    component: createAsyncRoute(() => import('@/views/search.vue')),
   },
   {
     path: '/twst/search1',
     name: 'search1',
-    component: () => import('@/views/search1.vue'),
+    component: createAsyncRoute(() => import('@/views/search1.vue')),
   },
   {
     path: '/twst/search2',
     name: 'search2',
-    component: () => import('@/views/search2.vue'),
+    component: createAsyncRoute(() => import('@/views/search2.vue')),
   },
   {
     path: '/twst/hand',
     name: 'hand',
-    component: () => import('@/views/hand.vue'),
+    component: createAsyncRoute(() => import('@/views/hand.vue')),
   },
   {
     path: '/twst/hand-collection',
     name: 'handCollection',
-    component: () => import('@/views/HandCollection.vue'),
+    component: createAsyncRoute(() => import('@/views/HandCollection.vue')),
   },
   {
     path: '/twst/relation',
     name: 'relation',
-    component: () => import('@/views/relation.vue'),
+    component: createAsyncRoute(() => import('@/views/relation.vue')),
   },
   {
     path: '/twst/calc-atk-exam',
     name: 'calcATK',
-    component: () => import('@/views/calcATK.vue'),
+    component: createAsyncRoute(() => import('@/views/calcATK.vue')),
   },
   {
     path: '/twst/calc-def-exam',
     name: 'calcDEF',
-    component: () => import('@/views/calcDEF.vue'),
+    component: createAsyncRoute(() => import('@/views/calcDEF.vue')),
   },
   {
     path: '/twst/calc-basic-exam',
     name: 'calcBASIC',
-    component: () => import('@/views/calcBASIC.vue'),
+    component: createAsyncRoute(() => import('@/views/calcBASIC.vue')),
   },
   {
     path: '/twst/data',
     name: 'data',
-    component: () => import('@/views/data.vue'),
+    component: createAsyncRoute(() => import('@/views/data.vue')),
   },
   {
     path: '/twst/status-plot',
     name: 'statusPlot',
-    component: () => import('@/views/statusPlot.vue'),
+    component: createAsyncRoute(() => import('@/views/statusPlot.vue')),
   },
   {
     path: '/twst/buddyDuo',
     name: 'buddyDuo',
-    component: () => import('@/views/buddyDuo.vue'),
+    component: createAsyncRoute(() => import('@/views/buddyDuo.vue')),
   },
   {
     path: '/twst/finisherDamage',
     name: 'finisherDamage',
-    component: () => import('@/views/finisherDamage.vue'),
+    component: createAsyncRoute(() => import('@/views/finisherDamage.vue')),
   },
   {
     path: '/twst/retire',
     name: 'retire',
-    component: () => import('@/views/retire.vue'),
+    component: createAsyncRoute(() => import('@/views/retire.vue')),
   },
   {
     path: '/twst/sim',
     name: 'sim',
-    component: () => import('@/views/sim.vue'),
+    component: createAsyncRoute(() => import('@/views/sim.vue')),
   },
-  { path: '/twst/', component: () => import('@/views/top.vue') },
+  { path: '/twst/', component: createAsyncRoute(() => import('@/views/top.vue')) },
   // キャッチオールルート - マッチしないパスをトップページにリダイレクト
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
