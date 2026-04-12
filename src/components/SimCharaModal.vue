@@ -178,6 +178,7 @@ import characterData from '@/assets/characters_info.json';
 import charactersInfo from '@/assets/characters_info.json';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getDamageValueFromDetails, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
+import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
 
 // characterDataの高速検索用Mapを事前に作成
 const characterDataMap = new Map();
@@ -694,26 +695,10 @@ function calculateDeckStats(candidateCharacter, sortKey) {
         }
       }
       
-      // 自動バフ設定
-      for (let j = 1; j <= 3; j++) {
-        const buffValue = chara[`magic${j}buf`];
-        if (buffValue) {
-          const buffType = buffValue.includes('ATKUP') ? 'ATKUP' :
-                          buffValue.includes('属性ダメUP') ? '属性ダメUP' :
-                          buffValue.includes('ダメUP') ? 'ダメージUP' :
-                          buffValue.includes('クリティカル') ? 'クリティカル' : '';
-          
-          if (buffType) {
-            const buff = {
-              magicOption: `M${j}`,
-              buffOption: buffType,
-              powerOption: getPowerOptionForBuff(buffValue),
-              levelOption: 10
-            };
-            recalculatedChara.buffs.push(buff);
-          }
-        }
-      }
+      // 実編成時と同じく etc から複数バフを抽出する
+      recalculatedChara.buffs.push(
+        ...parseMagicBuffsFromEtc(chara, { allowM3: chara.rare === 'SSR' })
+      );
     } else {
       // 既存のデッキキャラクター：現在の設定値を使用
       const originalDeckIndex = virtualDeckIndexMap[i];
@@ -942,34 +927,6 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     default:
       return 0;
   }
-}
-
-// バフ文字列からパワーオプションを取得（SimChara.vueのgetPowerOptionと同じロジック）
-function getPowerOptionForBuff(buffString) {
-  // クリティカル分数形式の確認（旧シミュレータ形式）
-  if (buffString.includes('(0)')) return '0';
-  if (buffString.includes('(1/1)')) return '1/1';
-  if (buffString.includes('(1/2)')) return '1/2';
-  if (buffString.includes('(1/3)')) return '1/3';
-  if (buffString.includes('(2/3)')) return '2/3';
-  
-  // クリティカルサイズ形式から分数形式への変換
-  if (buffString.includes('クリティカル')) {
-    if (buffString.includes('(小)')) return '1/2';
-    if (buffString.includes('(中)')) return '1/1';
-    if (buffString.includes('(大)')) return '2/3';
-    if (buffString.includes('(極大)')) return '1/1';
-    return '1/1'; // デフォルトのクリティカル値
-  }
-  
-  // 通常のバフ形式の確認
-  if (buffString.includes('極小')) return '極小';
-  if (buffString.includes('小')) return '小';
-  if (buffString.includes('中')) return '中';
-  if (buffString.includes('大')) return '大';
-  if (buffString.includes('極大')) return '極大';
-  
-  return '小'; // デフォルト値
 }
 
 // 置き換えを考慮したメンバー名セットを取得
