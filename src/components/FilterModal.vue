@@ -93,7 +93,8 @@ import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
 import { loadImageUrls } from '@/utils/characterAssets';
 import defaultImg from '@/assets/img/default.webp';
-import { effects } from '@/store/searchResult';
+import { defaultSelectedEffectValues, effects } from '@/store/searchResult';
+import { matchesAnySelectedEffect } from '@/utils/effectFilter';
 
 const { t } = useI18n();
 
@@ -197,7 +198,7 @@ onMounted(async () => {
     selectedRare.value = ['SSR']; // SSRのみをデフォルトで選択
     selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
     selectedAttr.value = ['火', '水', '木', '無'];
-    selectedEffects.value = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
+    selectedEffects.value = [...defaultSelectedEffectValues];
   } else {
     if (tempSelectedCharacters.value.length > 0) {
       selectedCharacters.value = [...tempSelectedCharacters.value];
@@ -280,7 +281,7 @@ function resetFilter() {
   selectedRare.value = ['SSR']; // SSRのみをデフォルトで選択
   selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
   selectedAttr.value = ['火', '水', '木', '無'];
-  selectedEffects.value = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
+  selectedEffects.value = [...defaultSelectedEffectValues];
 
   // 一時保存エリアも更新
   tempSelectedCharacters.value = [...selectedCharacters.value];
@@ -302,6 +303,7 @@ const selectedRareSet = computed(() => new Set(selectedRare.value));
 const selectedTypeSet = computed(() => new Set(selectedType.value));
 const selectedAttrSet = computed(() => new Set(selectedAttr.value));
 const selectedEffectsSet = computed(() => new Set(selectedEffects.value));
+const allEffectsSelected = computed(() => localEffects.value.every(effect => selectedEffectsSet.value.has(effect.value)));
 
 // 全キャラクター配列 - computed property化（画像があるもののみ）
 const allCharacterNames = computed(() => 
@@ -345,7 +347,7 @@ function updateCharacterVisibility() {
       return
     }
     // 効果チェック
-    if (selectedEffects.value.length === 17) {
+    if (allEffectsSelected.value) {
       // 効果が全件選択されている場合は無条件でtrue
       character.visible = true;
     } else if (selectedEffects.value.length === 0) {
@@ -353,8 +355,8 @@ function updateCharacterVisibility() {
       character.visible = false;
       return;
     } else {
-      // 効果が1件以上選択されている場合、character.etcに選択された効果が含まれているかをチェック
-      const effectMatched = selectedEffects.value.some(effect => character.etc.includes(effect));
+      // 効果が1件以上選択されている場合、特殊条件を含めて一致を判定
+      const effectMatched = matchesAnySelectedEffect(character.etc, selectedEffects.value);
       if (!effectMatched) {
         character.visible = false;
         return;

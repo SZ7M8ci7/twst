@@ -292,7 +292,8 @@
     "nullifies_curse": "呪い無効",
     "nullifies_freeze": "凍結無効",
     "debuff_removal": "デバフ解除",
-    "curse": "呪い"
+    "curse": "呪い",
+    "partywide_2turn_buff": "味方全体2T"
   },
   "settingModal": {
     "sortSettings": "ソート設定",

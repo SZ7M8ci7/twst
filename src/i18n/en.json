@@ -292,7 +292,8 @@
     "nullifies_curse": "nullifies curse",
     "nullifies_freeze": "nullifies freeze",
     "debuff_removal": "debuff removal",
-    "curse": "curse"
+    "curse": "curse",
+    "partywide_2turn_buff": "party-wide 2T"
   },
   "settingModal": {
     "sortSettings": "Sort settings",

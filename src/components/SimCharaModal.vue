@@ -179,6 +179,8 @@ import charactersInfo from '@/assets/characters_info.json';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getDamageValueFromDetails, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
 import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
+import { matchesSelectedEffect } from '@/utils/effectFilter';
+import { defaultSelectedEffectValues } from '@/store/searchResult';
 
 // characterDataの高速検索用Mapを事前に作成
 const characterDataMap = new Map();
@@ -1475,7 +1477,7 @@ const initializeModalFilter = () => {
     filterdStore.tempSelectedRare = ['SSR']; // SSRのみ
     filterdStore.tempSelectedType = ['バランス', 'ディフェンス', 'アタック'];
     filterdStore.tempSelectedAttr = ['火', '水', '木', '無'];
-    filterdStore.tempSelectedEffects = ['ATKUP', 'ダメージUP', 'クリティカル', '属性ダメージUP', '被ダメージUP', 'ATKDOWN', 'ダメージDOWN', '回避', '属性ダメージDOWN', '被ダメージDOWN', 'HP回復', 'HP継続回復', '暗闇無効', '呪い無効', '凍結無効', 'デバフ解除', '呪い'];
+    filterdStore.tempSelectedEffects = [...defaultSelectedEffectValues];
     
     // 初回表示フラグをfalseに設定（ただし、保存はしない）
     filterdStore.isFirst = false;
@@ -1486,7 +1488,8 @@ const initializeModalFilter = () => {
   const selectedTypeSet = new Set(filterdStore.tempSelectedType);
   const selectedAttrSet = new Set(filterdStore.tempSelectedAttr);
   const selectedCharactersSet = new Set(filterdStore.tempSelectedCharacters);
-  const allEffectsSelected = filterdStore.tempSelectedEffects.length === 17;
+  const selectedEffectsSet = new Set(filterdStore.tempSelectedEffects);
+  const allEffectsSelected = defaultSelectedEffectValues.every(effect => selectedEffectsSet.has(effect));
   
   // 変更が必要なもののみ更新
   const updatesNeeded = [];
@@ -1513,7 +1516,7 @@ const initializeModalFilter = () => {
             shouldBeVisible = true;
           } else if (filterdStore.tempSelectedEffects.length > 0) {
             for (let j = 0; j < filterdStore.tempSelectedEffects.length; j++) {
-              if (character.etc.indexOf(filterdStore.tempSelectedEffects[j]) !== -1) {
+              if (matchesSelectedEffect(character.etc, filterdStore.tempSelectedEffects[j])) {
                 shouldBeVisible = true;
                 break;
               }
