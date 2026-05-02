@@ -1309,13 +1309,13 @@ function getRequiredBuddyCharacterNames(cardName: string): string[] {
   if (!character) return [];
 
   const buddyNames: string[] = [];
-  if (character.buddy1c && hasAtkBuddyEffect(character, 1)) {
+  if (character.buddy1c && hasDamageBuddyEffect(character, 1)) {
     buddyNames.push(character.buddy1c);
   }
-  if (character.buddy2c && hasAtkBuddyEffect(character, 2)) {
+  if (character.buddy2c && hasDamageBuddyEffect(character, 2)) {
     buddyNames.push(character.buddy2c);
   }
-  if (character.buddy3c && hasAtkBuddyEffect(character, 3)) {
+  if (character.buddy3c && hasDamageBuddyEffect(character, 3)) {
     buddyNames.push(character.buddy3c);
   }
   return buddyNames;
