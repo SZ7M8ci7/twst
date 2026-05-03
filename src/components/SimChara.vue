@@ -54,10 +54,10 @@
             </div>
           </div>
         </v-col>
-        <v-col cols="5" style="margin-top: 2px;">
-          <div v-for="index in getMagicCount()" :key="index" class="stat">
+        <v-col cols="5" class="magic-section">
+          <div v-for="index in getMagicCount()" :key="index" class="stat magic-row">
             <v-row dense>
-              <v-col cols="2">
+              <v-col cols="2" class="magic-button-col">
                 <button :class="{'mbutton': true, 'selected': simulatorStore.deckCharacters[props.charaIndex][`isM${index}Selected`], 'shake': shakingStates[`isM${index}Shaking`]}" @click="toggleM(index)">M{{ index }}</button>
               </v-col>
               <v-col cols="2">
@@ -1231,6 +1231,29 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+.magic-section {
+  margin-top: 2px;
+  min-width: 0;
+}
+
+.magic-row {
+  min-height: 22px;
+  overflow: visible;
+}
+
+.magic-row :deep(.v-col),
+.magic-row :deep([class*=v-col-]) {
+  padding-left: 1px;
+  padding-right: 1px;
+}
+
+.magic-button-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
 .stat label {
   flex: 0 0 auto;
   white-space: nowrap;
@@ -1307,11 +1330,20 @@ select {
 }
 .mbutton {
   margin-bottom: 1px;
-  padding-left: 20%;
-  padding-right: 20%;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
   border-radius: 5px;
   border: 1px solid #ccc;
   cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* mbuttonを含むdense rowの左パディングを調整 */
@@ -1730,6 +1762,21 @@ select {
 
   .stat {
     gap: 1px;
+  }
+
+  .magic-row {
+    min-height: 22px;
+  }
+
+  .magic-button-col {
+    min-width: 0;
+  }
+
+  .mbutton {
+    min-width: 0;
+    height: 20px;
+    min-height: 20px;
+    font-size: 1em;
   }
 
   .stat label {
