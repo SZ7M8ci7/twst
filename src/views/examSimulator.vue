@@ -106,14 +106,19 @@
                     <v-text-field
                       v-model.number="slot.level"
                       class="level-field"
-                      type="number"
+                      type="text"
+                      inputmode="numeric"
+                      pattern="[0-9]*"
                       label="Lv"
                       :min="1"
                       :max="maxCardLevel(slot)"
                       density="compact"
                       variant="outlined"
                       hide-details
-                      @update:model-value="normalizeDeckLevel(index)"
+                      @focus="selectLevelInput"
+                      @change="normalizeDeckLevel(index)"
+                      @blur="normalizeDeckLevel(index)"
+                      @keydown.enter="normalizeDeckLevel(index)"
                     />
                     <v-select
                       v-model.number="slot.totsu"
@@ -1986,6 +1991,14 @@ function normalizeDeckLevel(index: number) {
   if (!slot.character) return;
   slot.level = Math.min(maxCardLevel(slot), Math.max(1, Math.floor(safeNumber(slot.level) || 1)));
   recalculateDeckStats(index);
+}
+
+function selectLevelInput(event: FocusEvent) {
+  const target = event.target instanceof HTMLInputElement
+    ? event.target
+    : (event.target as HTMLElement | null)?.querySelector?.('input') as HTMLInputElement | null;
+  if (!target) return;
+  requestAnimationFrame(() => target.select());
 }
 
 function normalizeDeckTotsu(index: number) {
