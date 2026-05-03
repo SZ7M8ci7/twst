@@ -347,6 +347,18 @@
                   <Bar :data="scoreDistributionChartData" :options="scoreDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
                 </div>
               </div>
+              <div v-if="retireReasonDistributionData.labels.length" class="chart-panel">
+                <div class="chart-heading">リタイア理由</div>
+                <div class="chart-body compact">
+                  <Bar :data="retireReasonDistributionData" :options="retireReasonDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
+                </div>
+              </div>
+              <div v-if="retireTurnDistributionData.labels.length" class="chart-panel">
+                <div class="chart-heading">リタイアターン</div>
+                <div class="chart-body compact">
+                  <Bar :data="retireTurnDistributionData" :options="retireTurnDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
+                </div>
+              </div>
             </div>
             <div v-if="resultSummary && !scoreDistributionData.labels.length" class="empty-result">スコア0以外の結果なし</div>
 
@@ -784,6 +796,8 @@ interface SimulationResultAggregate {
   retiredCount: number;
   positiveScoreCount: number;
   scoreFrequencies: Record<number, number>;
+  retireReasonFrequencies: Record<string, number>;
+  retireTurnFrequencies: Record<number, number>;
 }
 
 interface SimulationState {
@@ -975,6 +989,42 @@ const scoreDistributionOptions = computed(() => {
   };
 });
 
+function createRetireDistributionOptions(kind: 'reason' | 'turn') {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: isRunning.value ? false as const : { duration: 120 },
+    indexAxis: kind === 'reason' ? 'y' as const : 'x' as const,
+    scales: {
+      x: {
+        beginAtZero: true,
+        ticks: { precision: 0 },
+        title: { display: kind === 'reason', text: '回数' },
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { precision: 0 },
+        title: { display: kind === 'turn', text: '回数' },
+      },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const count = kind === 'reason'
+              ? Number(context.parsed.x ?? 0)
+              : Number(context.parsed.y ?? 0);
+            const total = simulationAggregate.value?.retiredCount ?? 0;
+            const rate = total > 0 ? (count / total) * 100 : 0;
+            return `回数: ${formatNumber(count)} (${formatPercentage(rate)}%)`;
+          },
+        },
+      },
+    },
+  };
+}
+
 let nextId = 0;
 function makeId(prefix: string) {
   nextId += 1;
@@ -1130,6 +1180,52 @@ const resultSummary = computed(() => {
     retiredCount: simulationAggregate.value.retiredCount,
   };
 });
+
+const RETIRE_REASON_BUCKETS = [
+  '手札無し',
+  '敗北',
+] as const;
+
+const retireReasonDistributionData = computed<any>(() => {
+  const aggregate = simulationAggregate.value;
+  if (!aggregate?.count) return { labels: [], datasets: [] };
+  const knownReasons = RETIRE_REASON_BUCKETS.map((reason) => [reason, aggregate.retireReasonFrequencies[reason] ?? 0] as const);
+  const extraReasons = Object.entries(aggregate.retireReasonFrequencies)
+    .filter(([reason]) => !RETIRE_REASON_BUCKETS.includes(reason as typeof RETIRE_REASON_BUCKETS[number]))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'));
+  const entries = [...knownReasons, ...extraReasons];
+  return {
+    labels: entries.map(([reason]) => reason),
+    datasets: [{
+      label: '回数',
+      data: entries.map(([, count]) => count),
+      backgroundColor: '#b35d5d',
+      borderColor: '#8f3d3d',
+      borderWidth: 1,
+    }],
+  };
+});
+
+const retireTurnDistributionData = computed<any>(() => {
+  const aggregate = simulationAggregate.value;
+  if (!aggregate?.retiredCount) return { labels: [], datasets: [] };
+  const turnCount = maxTurnCount.value;
+  const turns = Array.from({ length: turnCount }, (_, index) => index + 1);
+  return {
+    labels: turns.map((turn) => `${turn}T`),
+    datasets: [{
+      label: '回数',
+      data: turns.map((turn) => aggregate.retireTurnFrequencies[turn] ?? 0),
+      backgroundColor: '#7d8fb3',
+      borderColor: '#526b94',
+      borderWidth: 1,
+    }],
+  };
+});
+
+const retireReasonDistributionOptions = computed(() => createRetireDistributionOptions('reason'));
+const retireTurnDistributionOptions = computed(() => createRetireDistributionOptions('turn'));
+
 const scoreBuckets = computed(() => {
   const aggregate = simulationAggregate.value;
   const scoreEntries = Object.entries(aggregate?.scoreFrequencies ?? {})
@@ -2554,6 +2650,8 @@ async function runSimulation() {
   try {
     const count = Math.min(100000, Math.max(1, Math.floor(safeNumber(iterations.value) || 1)));
     const scoreFrequencies: Record<number, number> = {};
+    const retireReasonFrequencies: Record<string, number> = {};
+    const retireTurnFrequencies: Record<number, number> = {};
     let positiveScoreCount = 0;
     let completed = 0;
     let retiredCount = 0;
@@ -2566,13 +2664,21 @@ async function runSimulation() {
         retiredCount,
         positiveScoreCount,
         scoreFrequencies: { ...scoreFrequencies },
+        retireReasonFrequencies: { ...retireReasonFrequencies },
+        retireTurnFrequencies: { ...retireTurnFrequencies },
       };
     };
     for (let i = 0; i < count; i += 1) {
       const seedText = createIterationSeed(i);
       const result = runOneSimulation(createRng(seedText), false);
       completed += 1;
-      if (result.retired) retiredCount += 1;
+      if (result.retired) {
+        retiredCount += 1;
+        const reason = retireReasonBucket(result.retireReason);
+        retireReasonFrequencies[reason] = (retireReasonFrequencies[reason] ?? 0) + 1;
+        const retireTurn = Math.min(maxTurnCount.value, Math.max(1, Math.floor(safeNumber(result.finishTurn) || 1)));
+        retireTurnFrequencies[retireTurn] = (retireTurnFrequencies[retireTurn] ?? 0) + 1;
+      }
       if (result.score > 0) {
         positiveScoreCount += 1;
         scoreFrequencies[result.score] = (scoreFrequencies[result.score] ?? 0) + 1;
@@ -4782,6 +4888,16 @@ function retire(stats: SimulationStats, reason: string) {
   pushLog(stats, `リタイア: ${reason}`);
 }
 
+function retireReasonBucket(reason: string) {
+  const normalized = String(reason || '')
+    .replace(/^\d+T\s*/, '')
+    .replace(/^(先手|後手)\s*/, '')
+    .trim();
+  if (normalized === '使用可能な手札が2枚未満' || normalized === '許容組み合わせなし') return '手札無し';
+  if (normalized === '被ダメージで自HP0') return '敗北';
+  return normalized || '不明';
+}
+
 function describeMagic(magicId?: string, duoActive = false) {
   const magic = magicById(magicId);
   if (!magic) {
@@ -5841,6 +5957,10 @@ function formatRatePercent(value: number) {
 
 .chart-body {
   height: 330px;
+}
+
+.chart-body.compact {
+  height: 240px;
 }
 
 .best-log-strip {
