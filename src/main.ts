@@ -30,3 +30,34 @@ const app = createApp(App)
 registerPlugins(app)
 app.use(i18n)
 app.mount('#app')
+
+const registerAssetCacheWorker = () => {
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) {
+    return
+  }
+
+  window.addEventListener('load', () => {
+    const scopes = window.location.pathname.startsWith('/twst/')
+      ? ['/twst/', '/']
+      : ['/']
+
+    const register = async () => {
+      for (const scope of scopes) {
+        try {
+          const registration = await navigator.serviceWorker.register(
+            `${scope}twst-cache-sw.js`,
+            { scope }
+          )
+          void registration.update().catch(() => undefined)
+          return
+        } catch {
+          continue
+        }
+      }
+    }
+
+    void register()
+  })
+}
+
+registerAssetCacheWorker()

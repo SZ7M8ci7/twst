@@ -1000,8 +1000,16 @@ const optimizedDataStructures = computed(() => {
 
 // 画像読み込みキューをリセットする関数
 const resetImageLoadingQueue = () => {
-  // 画像読み込みキューをクリア
-  imageLoadingQueue.clear();
+  imageLoadGeneration += 1;
+  pendingImageLoads.forEach(({ character }) => {
+    imageLoadingQueue.delete(character.name);
+  });
+  pendingImageLoads = [];
+
+  if (imageQueueTimer) {
+    clearTimeout(imageQueueTimer);
+    imageQueueTimer = null;
+  }
   
   // Observerを再設定
   if (imageObserver) {
@@ -1339,54 +1347,75 @@ const handleImageError = (character) => {
 // 画像の遅延読み込み
 let imageObserver = null;
 const imageLoadingQueue = new Set();
+let pendingImageLoads = [];
+let activeImageLoadCount = 0;
+let imageQueueTimer = null;
+let imageLoadGeneration = 0;
 
 // 並列読み込みの設定
-const INITIAL_LOAD_COUNT = 50; // 初期読み込み数
-const BATCH_SIZE = 30; // スクロール時のバッチサイズ
-const MAX_CONCURRENT = 100; // 最大同時読み込み数
+const INITIAL_LOAD_COUNT = 12; // IntersectionObserverが使えない環境向けの最小読み込み数
+const BATCH_SIZE = 8; // スクロール時の登録単位
+const MAX_CONCURRENT = 8; // 最大同時読み込み数
 
-// 並列読み込みを実行する関数（バッチ処理対応）
-const loadImagesInParallel = (charactersToLoad, batchSize = MAX_CONCURRENT) => {
-  // 既に読み込み済みのキャラクターを除外
-  const toLoad = charactersToLoad.filter(character => 
-    !character.imageLoaded || 
-    !character.imgUrl || 
-    character.imgUrl === 'placeholder'
-  );
-  
-  if (toLoad.length === 0) return Promise.resolve();
-  
-  // 大量のキャラクターをバッチに分割して処理
-  const processBatch = async (startIndex) => {
-    const batch = toLoad.slice(startIndex, startIndex + batchSize);
-    
-    const promises = batch.map(character => {
-      return loadCharacterImageUrl(character.name)
-        .then((imageUrl) => {
-          character.imgUrl = imageUrl || defaultImg;
-          character.imageLoaded = true;
-        })
-        .catch(() => {
-          character.imgUrl = defaultImg;
-          character.imageLoaded = true;
-        })
-        .finally(() => {
-          // キューから削除
-          imageLoadingQueue.delete(character.name);
-        });
-    });
-    
-    await Promise.all(promises);
-    
-    // 次のバッチを処理
-    const nextIndex = startIndex + batchSize;
-    if (nextIndex < toLoad.length) {
-      await new Promise(resolve => setTimeout(resolve, 1));
-      return processBatch(nextIndex);
+const isCharacterImageReady = (character) => (
+  character.imageLoaded &&
+  character.imgUrl &&
+  character.imgUrl !== 'placeholder'
+);
+
+const requestImageQueuePump = () => {
+  if (imageQueueTimer) return;
+  imageQueueTimer = window.setTimeout(processImageQueue, 0);
+};
+
+const processImageQueue = () => {
+  imageQueueTimer = null;
+
+  while (activeImageLoadCount < MAX_CONCURRENT && pendingImageLoads.length > 0) {
+    const { character, generation } = pendingImageLoads.shift();
+
+    if (generation !== imageLoadGeneration || isCharacterImageReady(character)) {
+      imageLoadingQueue.delete(character.name);
+      continue;
     }
-  };
-  
-  return processBatch(0);
+
+    activeImageLoadCount += 1;
+
+    loadCharacterImageUrl(character.name)
+      .then((imageUrl) => {
+        character.imgUrl = imageUrl || defaultImg;
+        character.imageLoaded = true;
+      })
+      .catch(() => {
+        character.imgUrl = defaultImg;
+        character.imageLoaded = true;
+      })
+      .finally(() => {
+        activeImageLoadCount -= 1;
+        imageLoadingQueue.delete(character.name);
+        requestImageQueuePump();
+      });
+  }
+};
+
+// 画像読み込みを少数並列のキューに積む
+const loadImagesInParallel = (charactersToLoad) => {
+  if (!charactersToLoad.length) return Promise.resolve();
+
+  for (let index = 0; index < charactersToLoad.length; index += BATCH_SIZE) {
+    const batch = charactersToLoad.slice(index, index + BATCH_SIZE);
+    batch.forEach((character) => {
+      if (isCharacterImageReady(character) || imageLoadingQueue.has(character.name)) {
+        return;
+      }
+
+      imageLoadingQueue.add(character.name);
+      pendingImageLoads.push({ character, generation: imageLoadGeneration });
+    });
+  }
+
+  requestImageQueuePump();
+  return Promise.resolve();
 };
 
 // Observerを設定する関数
@@ -1397,22 +1426,6 @@ const setupImageObserver = () => {
       imageObserver.observe(wrapper);
     }
   });
-  
-  // 最初の大量の画像を即座に読み込む（非同期）
-  requestAnimationFrame(() => {
-    const visibleCharacters = filteredCharacters.value.slice(0, INITIAL_LOAD_COUNT);
-    if (visibleCharacters.length > 0) {
-      loadImagesInParallel(visibleCharacters, 50); // 初期読み込みはさらに高速化
-    }
-  });
-  
-  // バックグラウンドで残りの画像を遅延読み込み
-  setTimeout(() => {
-    const remainingCharacters = filteredCharacters.value.slice(INITIAL_LOAD_COUNT);
-    if (remainingCharacters.length > 0) {
-      loadImagesInParallel(remainingCharacters, 20); // バックグラウンド読み込み
-    }
-  }, 500); // 500ms後に開始
 };
 
 const loadCharacterImages = () => {
@@ -1423,6 +1436,11 @@ const loadCharacterImages = () => {
   
   // すぐにloadingImgUrlをfalseにして枠を表示
   loadingImgUrl.value = false;
+
+  if (!('IntersectionObserver' in window)) {
+    loadImagesInParallel(filteredCharacters.value.slice(0, INITIAL_LOAD_COUNT));
+    return;
+  }
   
   // IntersectionObserverを使った遅延読み込み（最適化）
   imageObserver = new IntersectionObserver((entries) => {
@@ -1431,10 +1449,9 @@ const loadCharacterImages = () => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         const characterName = entry.target.getAttribute('data-character-name');
-        const character = characters.value.find(c => c.name === characterName && c.visible);
+        const character = filteredCharacters.value.find(c => c.name === characterName);
         
-        if (character && !character.imageLoaded && !imageLoadingQueue.has(character.name)) {
-          imageLoadingQueue.add(character.name);
+        if (character && !isCharacterImageReady(character) && !imageLoadingQueue.has(character.name)) {
           charactersToLoad.push(character);
         }
         
@@ -1445,10 +1462,10 @@ const loadCharacterImages = () => {
     
     // 複数の画像を並列で読み込み（バッチサイズ指定）
     if (charactersToLoad.length > 0) {
-      loadImagesInParallel(charactersToLoad, BATCH_SIZE);
+      loadImagesInParallel(charactersToLoad);
     }
   }, {
-    rootMargin: '200px', // 画面に入る200px前から読み込み開始（拡大）
+    rootMargin: '300px', // 画面に入る少し前から読み込み開始
     threshold: 0.01 // 少しでも見えたら読み込み開始
   });
   
@@ -1578,15 +1595,6 @@ onMounted(async () => {
     requestAnimationFrame(() => {
       loadCharacterImages();
     });
-    
-    // バックグラウンドでプリロード
-    setTimeout(() => {
-      const allVisibleCharacters = characters.value.filter(c => c.visible);
-      if (allVisibleCharacters.length > INITIAL_LOAD_COUNT) {
-        const remainingCharacters = allVisibleCharacters.slice(INITIAL_LOAD_COUNT);
-        loadImagesInParallel(remainingCharacters, 10);
-      }
-    }, 100);
   } catch (error) {
     console.error('SimCharaModal:onMounted - Error during initialization:', error);
   }
@@ -1610,6 +1618,17 @@ onUnmounted(() => {
   if (imageObserver) {
     imageObserver.disconnect();
   }
+  if (imageWatchTimer) {
+    clearTimeout(imageWatchTimer);
+  }
+  if (observerTimer) {
+    clearTimeout(observerTimer);
+  }
+  if (imageQueueTimer) {
+    clearTimeout(imageQueueTimer);
+  }
+  pendingImageLoads = [];
+  imageLoadingQueue.clear();
 });
 </script>
 
