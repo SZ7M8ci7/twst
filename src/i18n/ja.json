@@ -6,6 +6,7 @@
     "basicExamScoreCalculator": "ベーシック試験スコア計算",
     "attackExamScoreCalculator": "アタック試験スコア計算",
     "defencexamScoreCalculator": "ディフェンス試験スコア計算",
+    "examSimulator": "試験シミュレータ",
     "comfortLevelConsiderationTool": "いごこち度検討ツール",
     "invitationRoomConsiderationTool": "招待部屋検討ツール",
     "deckSimulator": "デッキシミュレータ",
@@ -17,14 +18,21 @@
     "finisherDamage": "フィニッシャーダメージ",
     "data": "データ",
     "statusPlot": "ステータスプロット",
-    "sim": "新デッキシミュレータ",
+    "sim": "デッキシミュレータ",
     "retire": "リタマラカウンター",
+    "other": "その他"
+  },
+  "nav": {
+    "exam": "試験",
+    "room": "ルーム",
+    "training": "育成",
     "other": "その他"
   },
   "top": {
     "twistedTool": "ツイステ関連のツール置き場",
     "createdBy": "（作者X:あきた）",
     "useFromTopLeft": "左上のメニューからツールをご利用ください。",
+    "recommended": "おすすめ",
     "opinion": "ご意見・ご要望はDMか",
     "please": "へどうぞ。",
     "forForeginer": ""

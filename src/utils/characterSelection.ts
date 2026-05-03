@@ -1,5 +1,5 @@
 // キャラクター選択の共通ロジック
-import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
+import { normalizeLegacyDeckBuffs, parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { useHandCollectionStore } from '@/store/handCollection';
@@ -83,7 +83,7 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
   
   // etcから複数バフを抽出（magicNbufは使用しない）
   // 手持ち設定とは無関係に、レアがSSRならM3バフも抽出対象に含める
-  const parsedEtcBuffs = parseMagicBuffsFromEtc(chara, { allowM3: chara.rare === 'SSR' });
+  const parsedEtcBuffs = normalizeLegacyDeckBuffs(parseMagicBuffsFromEtc(chara, { allowM3: chara.rare === 'SSR' }));
 
   // 各魔法の初期設定をループで処理
   for (let magicIndex = 1; magicIndex <= 3; magicIndex++) {

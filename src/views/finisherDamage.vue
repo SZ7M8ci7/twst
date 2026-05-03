@@ -436,6 +436,11 @@ const { characters } = storeToRefs(characterStore);
 // 独自の手持ち設定状態を管理（ストアとは独立）
 const useHandCollection = ref(false);
 
+interface CharacterInfo {
+  name_ja: string;
+  name_en: string;
+}
+
 function getReadOnlyHandCard(cardName: string) {
   return handCollectionStore.peekHandCard(cardName) ?? {
     characterName: '',

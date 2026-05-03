@@ -6,6 +6,7 @@
     "basicExamScoreCalculator": "Basic Exam Score Calculator",
     "attackExamScoreCalculator": "Offense Exam Score Calculator",
     "defencexamScoreCalculator": "Defence Exam Score Calculator",
+    "examSimulator": "Exam Simulator",
     "comfortLevelConsiderationTool": "Comfort Level Consideration Tool",
     "invitationRoomConsiderationTool": "Invitation Room Consideration Tool",
     "deckSimulator": "Deck Simulator",
@@ -18,13 +19,20 @@
     "data": "Data",
     "statusPlot": "Status Plot",
     "other": "Other",
-    "sim": "New Deck Simulator",
+    "sim": "Deck Simulator",
     "retire": "Retire Counter"
+  },
+  "nav": {
+    "exam": "Exam",
+    "room": "Room",
+    "training": "Training",
+    "other": "Other"
   },
   "top": {
     "twistedTool": "A web site to put tools related to Twisted Wonderland",
     "createdBy": "（Creater X:akita）",
     "useFromTopLeft": "Please use the tools in the upper left menu.",
+    "recommended": "Recommended",
     "opinion": "Please DM or ",
     "please": " for any suggestions or bug reports.",
     "forForeginer": "Some tools have not been translated due to technical issues or difficulties in translating the external data they use. We appreciate your understanding."

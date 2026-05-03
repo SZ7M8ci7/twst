@@ -1,12 +1,13 @@
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import {
   applyBuddyGeneratedBuffOverrides,
+  calculateLegacyBuddyContinueHealAmount,
   createBuddyGeneratedBuffs,
   getBuddyAtkRate,
-  getBuddyContinueHealRate,
   getBuddyHpRate,
   getBuddyStatusForCharacter,
 } from '@/utils/buddyEffects';
+import { normalizeLegacyDeckBuff } from '@/utils/buffParser';
 
 // バフの定数
 export const atkbuffDict: { [key: string]: string } = {};
@@ -462,7 +463,7 @@ function calculateBuddyGeneratedContinueHeal(character: any, charaDict: { [key: 
     appliedBuddyContinueHeals.add(buddyContinueHealKey);
 
     const level = Number(buff.levelOption) || 10;
-    return total + getBuddyContinueHealRate(level) * Number(character.hp);
+    return total + calculateLegacyBuddyContinueHealAmount(Number(character.hp), level);
   }, 0);
 }
 
@@ -530,7 +531,7 @@ function calculateHeal(character: any, charaDict: { [key: string]: boolean }) {
             const healContinueKey = `継続回復(${buff.powerOption})${level}`;
             const healContinueValue = healContinueKey in healContinueDict ? healContinueDict[healContinueKey] : 0;
             if (healContinueValue > 0) {
-              totalHeal += 3 * Number(healContinueValue) * Number(character.hp);
+              totalHeal += 3 * Math.ceil(Number(healContinueValue) * Number(character.hp));
             }
           }
         }
@@ -655,11 +656,12 @@ function calculateBuffs(character: any, magicKey: string, charaDict: { [key: str
   
   if (allBuffs.length > 0) {
     for (const buff of allBuffs) {
-      if (buff.magicOption !== `M${magicKey.charAt(5)}`) continue;
+      const legacyBuff = normalizeLegacyDeckBuff(buff);
+      if (!legacyBuff || legacyBuff.magicOption !== `M${magicKey.charAt(5)}`) continue;
       
-      const buffType = buff.buffOption;
-      const powerType = buff.powerOption;
-      const level = buff.levelOption || 10;
+      const buffType = legacyBuff.buffOption;
+      const powerType = legacyBuff.powerOption;
+      const level = legacyBuff.levelOption || 10;
       
       if (buffType === 'ATKUP' || buffType === 'ATKDOWN') {
         const buffKey = `${buffType}(${powerType})${level}`;
@@ -672,8 +674,8 @@ function calculateBuffs(character: any, magicKey: string, charaDict: { [key: str
       if (buffType === 'ダメージUP' || buffType === '属性ダメUP' || buffType === 'ダメージDOWN' || buffType === '属性ダメDOWN') {
         if (
           (buffType === '属性ダメUP' || buffType === '属性ダメDOWN') &&
-          buff.attributeOption &&
-          buff.attributeOption !== magicAttribute
+          legacyBuff.attributeOption &&
+          legacyBuff.attributeOption !== magicAttribute
         ) {
           continue;
         }

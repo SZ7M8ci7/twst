@@ -82,6 +82,7 @@ const criticalRateMap: Record<string, number> = {
 };
 
 const buddyContinueHealPattern = /^(?:HP)?継続回復\(極小\)$/;
+export const LEGACY_BUDDY_CONTINUE_HEAL_TURNS = 4;
 
 function getLevelAdjustedRate(
   effect: string,
@@ -93,15 +94,37 @@ function getLevelAdjustedRate(
   return config.base + config.perLevel * Math.max(1, Math.min(10, Math.trunc(level)));
 }
 
-function mapCriticalPowerOption(effect: string): string {
+function mapCriticalPowerOption(effect: string, mode: 'legacy' | 'probability' = 'legacy'): string {
+  if (mode === 'probability') {
+    if (effect.includes('(極小)')) return '極小';
+    if (effect.includes('(小)')) return '小';
+    if (effect.includes('(中)')) return '中';
+    if (effect.includes('(大)')) return '大';
+    if (effect.includes('(極大)')) return '極大';
+    return '中';
+  }
+
+  if (effect.includes('(極小)')) return '1/1';
   if (effect.includes('(小)')) return '1/2';
+  if (effect.includes('(中)')) return '1/2';
   if (effect.includes('(大)')) return '2/3';
+  if (effect.includes('(極大)')) return '1/1';
   return '1/1';
 }
 
 export function getBuddyContinueHealRate(level = 10): number {
-  const normalizedLevel = Math.max(1, Math.min(10, Math.trunc(level)));
-  return normalizedLevel * 0.04;
+  void level;
+  return 0.1;
+}
+
+export function calculateBuddyContinueHealAmount(hp: number, level = 10, turns = 1): number {
+  const baseHp = Number(hp);
+  if (!Number.isFinite(baseHp) || baseHp <= 0 || turns <= 0) return 0;
+  return Math.ceil(baseHp * getBuddyContinueHealRate(level)) * turns;
+}
+
+export function calculateLegacyBuddyContinueHealAmount(hp: number, level = 10): number {
+  return calculateBuddyContinueHealAmount(hp, level, LEGACY_BUDDY_CONTINUE_HEAL_TURNS);
 }
 
 export function splitBuddyEffects(status: string | undefined | null): string[] {
@@ -200,6 +223,7 @@ export function createBuddyGeneratedBuffs(
     totsu?: number;
     isActive: boolean;
     forceTotsu?: boolean;
+    criticalPowerMode?: 'legacy' | 'probability';
   }
 ): BuddyGeneratedBuff[] {
   const status = getBuddyStatusForCharacter(character, buddyIndex, options);
@@ -237,7 +261,7 @@ export function createBuddyGeneratedBuffs(
         generated.push({
           magicOption,
           buffOption: 'クリティカル',
-          powerOption: mapCriticalPowerOption(effect),
+          powerOption: mapCriticalPowerOption(effect, options.criticalPowerMode),
           levelOption: 10,
           isBuddyGenerated: true,
           buddyIndex,

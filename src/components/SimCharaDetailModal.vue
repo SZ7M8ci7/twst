@@ -168,7 +168,7 @@
             </v-col>
 
             <!-- バフ設定 -->
-            <v-col cols="12">
+            <v-col v-if="!hideBuffSection" cols="12">
               <v-card elevation="2">
                 <v-card-title class="text-subtitle-1 py-1">バフ設定</v-card-title>
                 <v-card-text class="pa-1">
@@ -221,6 +221,7 @@
                     </v-row>
                   </div>
                   <v-btn
+                    v-if="!hideBuffAddButton"
                     color="primary"
                     variant="text"
                     @click="addBuff"
@@ -256,7 +257,9 @@ import charactersInfo from '@/assets/characters_info.json';
 
 const props = defineProps({
   modelValue: Boolean,
-  character: Object
+  character: Object,
+  hideBuffAddButton: Boolean,
+  hideBuffSection: Boolean
 });
 
 const emit = defineEmits(['update:modelValue', 'save']);

@@ -1,26 +1,29 @@
 <template>
-  <v-row>
-    <v-col cols="9">
-      <div class="radio-group">
-        <label v-for="option in options" :key="option" class="radio-option">
-          <input type="radio" :value="option" v-model="selectedOption" @change="updateFilter" />
+  <div class="sim-header">
+    <label class="target-select">
+      <span class="target-select-label">対象</span>
+      <select v-model="selectedOption" class="target-select-input" aria-label="対象属性" @change="updateFilter">
+        <option v-for="option in options" :key="option" :value="option">
           {{ option }}
-        </label>
-      </div>
-    </v-col>
-    <v-col cols="3">
-      <div class="button-group-horizontal">
-        <button class="button save-button-with-text" @click="openSavedDeckModal">
-          <v-icon size="small">mdi-content-save</v-icon>
-          <span class="button-text">編成保存</span>
-        </button>
-        <button class="button" @click="openInNewTab">
-          <span class="dli-external-link"><span></span></span>
-          <span class="button-text">別タブ</span>
-        </button>
-      </div>
-    </v-col>
-  </v-row>
+        </option>
+      </select>
+    </label>
+
+    <div class="button-group-horizontal">
+      <button class="button save-button-with-text" @click="openSavedDeckModal">
+        <v-icon size="small">mdi-content-save</v-icon>
+        <span class="button-text">編成</span>
+      </button>
+      <button class="button" @click="openInNewTab">
+        <span class="dli-external-link"><span></span></span>
+        <span class="button-text">別タブ</span>
+      </button>
+      <button class="button" @click="openInExamSimulator">
+        <v-icon size="small">mdi-chart-box-outline</v-icon>
+        <span class="button-text">試験シミュ</span>
+      </button>
+    </div>
+  </div>
   
   <!-- 保存編成モーダル -->
   <SavedDeckModal 
@@ -32,7 +35,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { saveSimulatorWindowState } from '@/storage/simulatorStorage';
+import { saveExamSimulatorDeckImportState, saveSimulatorWindowState } from '@/storage/simulatorStorage';
 import SavedDeckModal from '@/components/SavedDeckModal.vue';
 
 const props = defineProps({
@@ -55,32 +58,26 @@ watch(() => props.modelValue, (newValue) => {
 const emit = defineEmits(['update:filter', 'update:modelValue']);
 
 const updateFilter = () => {
-  const filterMap = {
-    '対全': '対全',
-    '対火': '対火',
-    '対水': '対水',
-    '対木': '対木',
-    '対無': '対無'
-  };
-  const newValue = filterMap[selectedOption.value];
-  emit('update:filter', newValue);
-  emit('update:modelValue', newValue);
+  emit('update:filter', selectedOption.value);
+  emit('update:modelValue', selectedOption.value);
 };
 
-const saveState = () => {
-  // 必要な情報のみを保存（循環参照を避けるため）
-  const charactersToSave = simulatorStore.deckCharacters.map(char => ({
+const createDeckSnapshot = () => simulatorStore.deckCharacters.map(char => ({
     ...char,
     // 必要なプロパティを明示的にコピー
     chara: char.chara,
     name: char.name,
     level: char.level,
+    totsu: char.totsu,
     hp: char.hp,
     atk: char.atk,
     max_hp: char.max_hp,
     max_atk: char.max_atk,
+    originalMaxHP: char.originalMaxHP,
+    originalMaxATK: char.originalMaxATK,
     rare: char.rare,
     imgUrl: char.imgUrl, // 画像URLも保存
+    hasM3: char.hasM3,
     isBonusSelected: char.isBonusSelected,
     isM1Selected: char.isM1Selected,
     isM2Selected: char.isM2Selected,
@@ -117,6 +114,9 @@ const saveState = () => {
     magic2pow: char.magic2pow
   }));
 
+const saveState = () => {
+  const charactersToSave = createDeckSnapshot();
+
   const state = {
     deckCharacters: charactersToSave,
     selectedAttribute: selectedOption.value
@@ -138,6 +138,26 @@ const openInNewTab = () => {
   window.open(newUrl, '_blank');
 };
 
+const createTransferId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const openInExamSimulator = () => {
+  const transferId = createTransferId();
+  saveExamSimulatorDeckImportState({
+    id: transferId,
+    deckCharacters: createDeckSnapshot(),
+    selectedAttribute: selectedOption.value,
+    createdAt: new Date().toISOString()
+  });
+
+  const baseUrl = window.location.origin;
+  window.open(`${baseUrl}/twst/exam-simulator?importDeck=${encodeURIComponent(transferId)}`, '_blank');
+};
+
 const openSavedDeckModal = () => {
   showSavedDeckModal.value = true;
 };
@@ -148,11 +168,43 @@ const closeSavedDeckModal = () => {
 </script>
 
 <style scoped>
-.radio-group {
+.sim-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  font-size: 0.8em;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 8px;
 }
+
+.target-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.target-select-label {
+  font-size: 0.8em;
+  font-weight: 700;
+  color: #4a5562;
+  white-space: nowrap;
+}
+
+.target-select-input {
+  width: 112px;
+  min-width: 112px;
+  height: 30px;
+  padding: 3px 28px 3px 10px;
+  border: 1px solid #b8c7d5;
+  border-radius: 5px;
+  background-color: #fff;
+  color: #27323f;
+  font-size: 0.82em;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
 .button {
   display: flex;
   align-items: center;
@@ -171,9 +223,7 @@ const closeSavedDeckModal = () => {
 .button:hover {
   background-color: #e8e8e8;
 }
-.radio-option {
-  margin-right: auto;
-}
+
 .dli-external-link {
   display: inline-block;
   vertical-align: middle;
@@ -218,6 +268,8 @@ const closeSavedDeckModal = () => {
   display: flex;
   gap: 4px;
   align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .save-button-with-text {
@@ -226,10 +278,27 @@ const closeSavedDeckModal = () => {
   gap: 4px;
 }
 
-/* スマホではテキストを非表示 */
 @media (max-width: 767px) {
-  .button-text {
-    display: none;
+  .sim-header {
+    align-items: stretch;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .button-group-horizontal {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .target-select-input {
+    width: 84px;
+    min-width: 84px;
+  }
+
+  .button {
+    min-width: 0;
+    padding: 4px 7px;
   }
 }
 </style>

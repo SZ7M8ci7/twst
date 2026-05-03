@@ -228,6 +228,7 @@ import {
 } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
 import { loadCachedImageUrl } from '@/utils/characterAssets';
+import { normalizeLegacyDeckBuff } from '@/utils/buffParser';
 
 const simulatorStore = useSimulatorStore();
 const handCollectionStore = useHandCollectionStore();
@@ -338,6 +339,44 @@ const dropInsertIndex = ref(null);
 
 const isBuffDragging = computed(() => buffDragPayload.fromBuffIndex !== null);
 const currentCharacter = computed(() => simulatorStore.deckCharacters[props.charaIndex]);
+
+const sanitizeLegacyBuffRows = (character) => {
+  if (!character || !Array.isArray(character.buffs)) return;
+
+  const sanitized = [];
+  let changed = false;
+
+  character.buffs.forEach((buff) => {
+    if (buff?.isManuallyAdded) {
+      sanitized.push(buff);
+      return;
+    }
+
+    const normalized = normalizeLegacyDeckBuff(buff);
+    if (!normalized) {
+      changed = true;
+      return;
+    }
+
+    sanitized.push(normalized);
+    if (normalized !== buff) {
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    character.buffs = sanitized;
+    simulatorStore.recalculateStats();
+  }
+};
+
+watch(currentCharacter, (character) => {
+  sanitizeLegacyBuffRows(character);
+}, { immediate: true });
+
+watch(() => currentCharacter.value?.buffs, () => {
+  sanitizeLegacyBuffRows(currentCharacter.value);
+}, { deep: true });
 
 const ensureBuddyGeneratedBuffOverrides = (character) => {
   if (!character) {

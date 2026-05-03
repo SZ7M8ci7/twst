@@ -100,7 +100,9 @@ watch(() => props.modelValue, (newValue) => {
 // buffOptionの変更を監視してpowerOptionをリセット
 watch(buffOption, (newBuffOption) => {
   if (newBuffOption === 'クリティカル') {
-    powerOption.value = '1/1'; // デフォルトのクリティカル値
+    if (!['0', '1/1', '1/2', '1/3', '2/3'].includes(powerOption.value)) {
+      powerOption.value = '1/1';
+    }
     levelOption.value = 10; // クリティカルはレベル無効だが形式上1を設定
   } else if (powerOption.value && ['0','1/1', '1/2', '1/3', '2/3'].includes(powerOption.value)) {
     powerOption.value = '小'; // 他のバフに変更時はデフォルトの'小'に戻す

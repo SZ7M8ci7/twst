@@ -1,6 +1,6 @@
 import type { Character } from '@/store/characters'
-import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
-import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
+import { normalizeLegacyDeckBuffs, parseMagicBuffsFromEtc } from '@/utils/buffParser';
+import { calculateLegacyBuddyContinueHealAmount, getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
 import { isM3Unlocked } from '@/utils/totsu';
 import { DeckSearchResultsManager, type DeckResult } from './TopNResultsManager';
 const charaIdMap = new Map<string, number>();
@@ -405,6 +405,12 @@ function getBuddyRates(status: string): { hp: number; atk: number; heal: number;
   return buddyRateMap[status] ?? defaultBuddyRates;
 }
 
+function calculateContinuousHealFromTotalRate(totalRate: number, hp: number): number {
+  if (totalRate <= 0 || hp <= 0) return 0;
+  const duration = 3;
+  return Math.ceil(hp * (totalRate / duration)) * duration;
+}
+
 function isHealCard(healStatus: string): boolean {
   // Opt-56: 空文字を先に判定して早期リターン
   if (healStatus === '') return false;
@@ -448,7 +454,7 @@ function getMagicBuffTotalsAll(
     return cached.totals;
   }
 
-  const parsed = parseMagicBuffsFromEtc(chara as any, { allowM3 });
+  const parsed = normalizeLegacyDeckBuffs(parseMagicBuffsFromEtc(chara as any, { allowM3 }));
   const totals: Array<{ atkDelta: number; dmgDelta: number }> = [
     { atkDelta: 0, dmgDelta: 0 },
     { atkDelta: 0, dmgDelta: 0 },
@@ -1870,7 +1876,9 @@ function prepareCharacterSearchCache(chara: Character): void {
   const magic2Rates = useM2 ? healRates.m2 : emptyHealRates;
   const magic3Rates = useM3 ? healRates.m3 : emptyHealRates;
   const hpHeal = (magic1Rates.heal + magic2Rates.heal + magic3Rates.heal) * chara.calcBaseATK;
-  const hpConHeal = (magic1Rates.conHeal + magic2Rates.conHeal + magic3Rates.conHeal) * chara.calcBaseHP;
+  const hpConHeal = calculateContinuousHealFromTotalRate(magic1Rates.conHeal, chara.calcBaseHP)
+    + calculateContinuousHealFromTotalRate(magic2Rates.conHeal, chara.calcBaseHP)
+    + calculateContinuousHealFromTotalRate(magic3Rates.conHeal, chara.calcBaseHP);
   charaAny.totalHealCached = hpHeal + hpConHeal;
   charaAny.healCardCountCached =
     (useM1 && isHealCard(chara.magic1heal) ? 1 : 0) +
@@ -1908,9 +1916,15 @@ function prepareCharacterSearchCache(chara: Character): void {
   charaAny.buddy1CriticalCached = buddy1Rates.criticalMultiplier;
   charaAny.buddy2CriticalCached = buddy2Rates.criticalMultiplier;
   charaAny.buddy3CriticalCached = buddy3Rates.criticalMultiplier;
-  charaAny.buddy1ContinueHealCached = baseHP * buddy1Rates.continueHealRate;
-  charaAny.buddy2ContinueHealCached = baseHP * buddy2Rates.continueHealRate;
-  charaAny.buddy3ContinueHealCached = baseHP * buddy3Rates.continueHealRate;
+  charaAny.buddy1ContinueHealCached = buddy1Rates.continueHealRate > 0
+    ? calculateLegacyBuddyContinueHealAmount(baseHP, 10)
+    : 0;
+  charaAny.buddy2ContinueHealCached = buddy2Rates.continueHealRate > 0
+    ? calculateLegacyBuddyContinueHealAmount(baseHP, 10)
+    : 0;
+  charaAny.buddy3ContinueHealCached = buddy3Rates.continueHealRate > 0
+    ? calculateLegacyBuddyContinueHealAmount(baseHP, 10)
+    : 0;
   charaAny.buddy1FireDamageRateCached = buddy1Rates.attributeDamageRates['火'] || 0;
   charaAny.buddy1WaterDamageRateCached = buddy1Rates.attributeDamageRates['水'] || 0;
   charaAny.buddy1WoodDamageRateCached = buddy1Rates.attributeDamageRates['木'] || 0;

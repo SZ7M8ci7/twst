@@ -102,6 +102,11 @@ const routes = [
     component: createAsyncRoute(() => import('@/views/calcBASIC.vue')),
   },
   {
+    path: '/twst/exam-simulator',
+    name: 'examSimulator',
+    component: () => import('@/views/examSimulator.vue'),
+  },
+  {
     path: '/twst/data',
     name: 'data',
     component: createAsyncRoute(() => import('@/views/data.vue')),

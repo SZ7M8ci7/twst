@@ -178,7 +178,7 @@ import characterData from '@/assets/characters_info.json';
 import charactersInfo from '@/assets/characters_info.json';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getDamageValueFromDetails, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
-import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
+import { normalizeLegacyDeckBuffs, parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { matchesSelectedEffect } from '@/utils/effectFilter';
 import { defaultSelectedEffectValues } from '@/store/searchResult';
 
@@ -191,7 +191,7 @@ characterData.forEach(char => {
 import { calculateCharacterStats, buddyHPDict, buddyATKDict, healDict, healContinueDict, recalculateHP, recalculateATK } from '@/utils/calculations';
 import { resolveDeckDuoAvailability } from '@/utils/duoLogic';
 import { applyMultiLevelSort, applyDefaultSort } from '@/utils/sortUtils';
-import { getBuddyAtkRate, getBuddyContinueHealRate, getBuddyHpRate, getBuddyStatusForCharacter } from '@/utils/buddyEffects';
+import { calculateLegacyBuddyContinueHealAmount, getBuddyAtkRate, getBuddyHpRate, getBuddyStatusForCharacter } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 
@@ -395,9 +395,13 @@ function calcHealRate(status, level = 10) {
 function calcConHealRate(status, level = 10) {
   if (!status) return 0;
   const key = `${status}${level}`;
-  const conHealValue = healContinueDict[key] || 0;
-  // 継続回復は3ターン分
-  return conHealValue * 3;
+  return healContinueDict[key] || 0;
+}
+
+function calcConHealAmount(status, characterHP, level = 10) {
+  const conHealRate = calcConHealRate(status, level);
+  if (conHealRate <= 0 || characterHP <= 0) return 0;
+  return Math.ceil(conHealRate * characterHP) * 3;
 }
 
 function getCharacterTotsu(character, handCard = null) {
@@ -430,7 +434,7 @@ function calculateBuddyContinueHealForDeck(character, memberNameSet, characterHP
 
     if (buddyStatus.includes('HP継続回復(極小)') || buddyStatus.includes('継続回復(極小)')) {
       const buddyLevel = Number(character[`buddy${buddyIndex}Lv`]) || 10;
-      buddyContinueHeal += characterHP * getBuddyContinueHealRate(buddyLevel);
+      buddyContinueHeal += calculateLegacyBuddyContinueHealAmount(characterHP, buddyLevel);
     }
   }
 
@@ -484,9 +488,9 @@ function calculateEffectiveCardHP(character, memberNameDict) {
                 (hasM3 ? calcHealRate(character.magic3heal, 10) : 0)) * characterATK;
   
   // 継続回復量（HP基準）
-  const conHeal = (calcConHealRate(character.magic1heal, 10) + 
-                   calcConHealRate(character.magic2heal, 10) + 
-                   (hasM3 ? calcConHealRate(character.magic3heal, 10) : 0)) * characterHP;
+  const conHeal = calcConHealAmount(character.magic1heal, characterHP, 10)
+    + calcConHealAmount(character.magic2heal, characterHP, 10)
+    + (hasM3 ? calcConHealAmount(character.magic3heal, characterHP, 10) : 0);
   
   const totalHP = characterHP + buddyHP + heal + conHeal;
   return totalHP;
@@ -699,7 +703,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       
       // 実編成時と同じく etc から複数バフを抽出する
       recalculatedChara.buffs.push(
-        ...parseMagicBuffsFromEtc(chara, { allowM3: chara.rare === 'SSR' })
+        ...normalizeLegacyDeckBuffs(parseMagicBuffsFromEtc(chara, { allowM3: chara.rare === 'SSR' }))
       );
     } else {
       // 既存のデッキキャラクター：現在の設定値を使用
@@ -822,15 +826,15 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       if (!isCandidate || isOwned) {
         if (chara.isM1Selected) {
           hpHeal += calcHealRate(chara.magic1heal, 10) * characterATK;
-          hpConHeal += calcConHealRate(chara.magic1heal, 10) * characterHP;
+          hpConHeal += calcConHealAmount(chara.magic1heal, characterHP, 10);
         }
         if (chara.isM2Selected) {
           hpHeal += calcHealRate(chara.magic2heal, 10) * characterATK;
-          hpConHeal += calcConHealRate(chara.magic2heal, 10) * characterHP;
+          hpConHeal += calcConHealAmount(chara.magic2heal, characterHP, 10);
         }
         if (chara.isM3Selected && hasM3) {
           hpHeal += calcHealRate(chara.magic3heal, 10) * characterATK;
-          hpConHeal += calcConHealRate(chara.magic3heal, 10) * characterHP;
+          hpConHeal += calcConHealAmount(chara.magic3heal, characterHP, 10);
         }
 
         hpConHeal += calculateBuddyContinueHealForDeck(chara, memberNameSet, characterHP, buddyTotsu);
