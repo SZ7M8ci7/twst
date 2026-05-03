@@ -1905,17 +1905,22 @@ function closeCharacterDialog() {
 }
 
 async function selectDeckCharacter(character: Character) {
-  const processed = await processCharacterSelection({ ...character }, undefined, true) as Character;
+  const processed = await processCharacterSelection({ ...character }) as Character;
   await setDeckCharacter(selectingDeckIndex.value, processed);
   resetDefaultCombos();
   closeCharacterDialog();
 }
 
 async function setDeckCharacter(index: number, character: Character) {
-  const totsu = 4;
+  const maxLevel = getStatScalingMaxLevel(character.rare);
+  const rawLevel = Number((character as any).level);
+  const level = Number.isFinite(rawLevel)
+    ? Math.min(maxLevel, Math.max(1, Math.floor(rawLevel)))
+    : maxLevel;
+  const totsu = clampTotsuCount((character as any).totsu ?? 4);
   const normalized = {
     ...character,
-    level: getStatScalingMaxLevel(character.rare),
+    level,
     totsu,
     isBonusSelected: isMaxLimitBreak(totsu),
     hasM3: isM3Unlocked(character.rare, totsu),
@@ -1941,7 +1946,7 @@ async function setDeckCharacter(index: number, character: Character) {
   ));
   deck.value[index] = {
     character: normalized,
-    level: getStatScalingMaxLevel(normalized.rare),
+    level,
     totsu,
     customHp: Math.max(1, Math.ceil(safeNumber(normalized.hp) || 1)),
     customAtk: Math.max(1, Math.ceil(safeNumber(normalized.atk) || 1)),
