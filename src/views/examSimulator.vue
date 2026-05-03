@@ -269,6 +269,45 @@
                 </transition>
               </div>
             </section>
+
+            <aside class="tool-panel plan-reference-panel" aria-label="選択中マジック詳細">
+              <div class="panel-heading">
+                <div>
+                  <h2>参考情報</h2>
+                </div>
+              </div>
+
+              <div v-if="planReferenceCards.length" class="plan-reference-list">
+                <article v-for="entry in planReferenceCards" :key="entry.deckIndex" class="plan-reference-card">
+                  <div class="plan-reference-image-wrap">
+                    <img :src="entry.imageUrl || defaultImg" alt="" class="plan-reference-image" />
+                    <div
+                      v-if="entry.duoPartner && getDuoIconSync(entry.duoPartner)"
+                      class="plan-reference-duo-icon-container"
+                      :class="{ 'duo-active': entry.duoActive }"
+                      :title="`デュオ相手: ${entry.duoPartner} (${entry.duoActive ? '有効' : '無効'})`"
+                    >
+                      <img
+                        :src="getDuoIconSync(entry.duoPartner) || defaultImg"
+                        alt=""
+                        class="plan-reference-duo-icon"
+                        @error="handleReferenceDuoIconError"
+                      />
+                    </div>
+                  </div>
+                  <div class="plan-reference-magic-list">
+                    <div v-for="magic in entry.magics" :key="magic.magicSlot" class="plan-reference-magic-row">
+                      <span class="reference-magic-label" :class="referenceMagicElementClass(magic.element)">M{{ magic.magicSlot }}</span>
+                      <span class="reference-effect-text">{{ magic.effectText }}</span>
+                    </div>
+                    <div v-if="!entry.magics.length" class="reference-effect-text muted">未選択</div>
+                  </div>
+                </article>
+              </div>
+              <div v-else class="plan-reference-empty">
+                編成の選択マジックを表示
+              </div>
+            </aside>
           </div>
         </section>
 
@@ -462,10 +501,11 @@ import fireIcon from '@/assets/img/fire.webp';
 import waterIcon from '@/assets/img/water.webp';
 import floraIcon from '@/assets/img/flora.webp';
 import cosmicIcon from '@/assets/img/cosmic.webp';
+import charactersInfo from '@/assets/characters_info.json';
 import { useCharacterStore, type Character } from '@/store/characters';
 import SimCharaModal from '@/components/SimCharaModal.vue';
 import SimCharaDetailModal from '@/components/SimCharaDetailModal.vue';
-import { loadCharacterImageUrl } from '@/utils/characterAssets';
+import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { atkbuffDict, calculateCharacterStats, criticalDict, dmgbuffDict, healContinueDict, healDict, magicDict, recalculateATK, recalculateHP } from '@/utils/calculations';
 import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
@@ -476,6 +516,10 @@ import { examPresetDefinitions, type ExamPresetDefinition } from '@/utils/examPr
 import { loadExamSimulatorDeckImportState } from '@/storage/simulatorStorage';
 
 Chart.register(...registerables);
+
+const jpNameToEnName = Object.fromEntries(
+  (charactersInfo as Array<{ name_ja: string; name_en: string }>).map((character) => [character.name_ja, character.name_en]),
+) as Record<string, string>;
 
 type ExamKind = 'BASIC' | 'DEFENCE' | 'ATTACK';
 type ExamElement = '火' | '水' | '木' | '無' | '全';
@@ -568,6 +612,18 @@ interface MagicCard {
   power: string;
   imageUrl: string;
   label: string;
+}
+
+interface PlanReferenceCard {
+  deckIndex: number;
+  imageUrl: string;
+  duoPartner: string;
+  duoActive: boolean;
+  magics: Array<{
+    magicSlot: MagicSlot;
+    element: ActionElement;
+    effectText: string;
+  }>;
 }
 
 interface TurnCombo {
@@ -942,6 +998,7 @@ const isRunning = ref(false);
 const simulationAggregate = ref<SimulationResultAggregate | null>(null);
 const bestSimulationResult = ref<SimulationStats | null>(null);
 const imageCache = ref<Record<string, string>>({});
+const duoIconCache = ref<Record<string, string>>({});
 const characterDialogOpen = ref(false);
 const selectingDeckIndex = ref(0);
 const deckDetailDialogOpen = ref(false);
@@ -1018,6 +1075,24 @@ const magicChoiceRows = computed(() => deck.value.map((slot, deckIndex) => ({
     magic: magicMap.value[makeMagicId(deckIndex, magicSlot)] ?? null,
   })),
 })));
+const planReferenceCards = computed<PlanReferenceCard[]>(() => deck.value.flatMap((slot, deckIndex) => {
+  if (!slot.character) return [];
+  const magics = slot.selectedMagicSlots
+    .slice()
+    .sort((a, b) => a - b)
+    .map((magicSlot) => ({
+      magicSlot,
+      element: slot.magicAttributes[magicSlot],
+      effectText: planReferenceEffectLines(deckIndex, magicSlot).join(' / ') || '効果なし',
+    }));
+  return [{
+    deckIndex,
+    imageUrl: slot.imageUrl,
+    duoPartner: String(slot.character.duo || ''),
+    duoActive: !!slot.character.duo && charaDict.value[slot.character.duo] === true,
+    magics,
+  }];
+}));
 const editingEnemySlot = computed(() => enemySlots.value[editingEnemySlotIndex.value] ?? null);
 
 interface ValidationIssue {
@@ -1365,6 +1440,15 @@ function elementIcon(element: ActionElement) {
   if (element === '水') return waterIcon;
   if (element === '木') return floraIcon;
   return cosmicIcon;
+}
+
+function referenceMagicElementClass(element: ActionElement) {
+  return {
+    'reference-magic-label--fire': element === '火',
+    'reference-magic-label--water': element === '水',
+    'reference-magic-label--flora': element === '木',
+    'reference-magic-label--cosmic': element === '無',
+  };
 }
 
 function isSystemLogLine(line: string) {
@@ -2152,6 +2236,37 @@ async function ensureImageUrl(character: Character) {
   return imageCache.value[character.name];
 }
 
+async function loadReferenceDuoIcon(duoPartner: string) {
+  if (!duoPartner || duoIconCache.value[duoPartner]) return;
+  const enName = jpNameToEnName[duoPartner];
+  if (!enName) return;
+  try {
+    const loaded = await loadCachedImageUrl(enName, 'icon/');
+    duoIconCache.value = {
+      ...duoIconCache.value,
+      [duoPartner]: loaded || defaultImg,
+    };
+  } catch {
+    duoIconCache.value = {
+      ...duoIconCache.value,
+      [duoPartner]: defaultImg,
+    };
+  }
+}
+
+function getDuoIconSync(duoPartner: string) {
+  if (!duoPartner) return '';
+  if (!duoIconCache.value[duoPartner]) {
+    void loadReferenceDuoIcon(duoPartner);
+  }
+  return duoIconCache.value[duoPartner] || '';
+}
+
+function handleReferenceDuoIconError(event: Event) {
+  const target = event.target as HTMLImageElement | null;
+  if (target) target.src = defaultImg;
+}
+
 function maxCardLevel(slot: DeckSlot) {
   return getStatScalingMaxLevel(slot.character?.rare);
 }
@@ -2195,6 +2310,34 @@ function parseMagicId(id: string) {
     deckIndex: Number(match[1]),
     magicSlot: Number(match[2]) as MagicSlot,
   };
+}
+
+function planReferenceEffectLines(deckIndex: number, magicSlot: MagicSlot) {
+  const slot = deck.value[deckIndex];
+  if (!slot?.character) return [];
+  const lines: string[] = [];
+  const healText = String(slot.magicHeals[magicSlot] || '').trim();
+  if (healText) {
+    lines.push(`自 / ${healText}`);
+  }
+  getAutomaticMagicBuffs(deckIndex, magicSlot).forEach((buff) => {
+    const duration = Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 1));
+    lines.push(`${parsedBuffReferenceTarget(buff)} / ${describePlayerBuff(buff, parsedRateFromBuff(buff), duration)}`);
+  });
+  getAutomaticOpponentDebuffs(deckIndex, magicSlot).forEach((buff) => {
+    const duration = Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 1));
+    lines.push(`${parsedBuffReferenceTarget(buff)} / ${describePlayerOpponentDebuff(buff, parsedRateFromBuff(buff), duration)}`);
+  });
+  return [...new Set(lines)];
+}
+
+function parsedBuffReferenceTarget(buff: ParsedBuff) {
+  if (buff.targetType === 'allySelected') return '味方選択';
+  if (buff.targetType === 'allyAll') return '味方全体';
+  if (buff.targetType === 'opponent') return '相手';
+  if (buff.targetType === 'opponentSelected') return '相手選択';
+  if (buff.targetType === 'opponentAll') return '相手全体';
+  return '自';
 }
 
 function deckCardHp(index: number) {
@@ -4773,7 +4916,7 @@ function formatRatePercent(value: number) {
 }
 
 .plan-layout {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(560px, 1fr) minmax(360px, 1fr);
 }
 
 .tool-panel {
@@ -4821,6 +4964,155 @@ function formatRatePercent(value: number) {
   gap: 8px;
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.plan-reference-panel {
+  position: sticky;
+  top: 10px;
+  align-self: start;
+}
+
+.plan-reference-list {
+  display: grid;
+  gap: 7px;
+}
+
+.plan-reference-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid #dfe7ee;
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.plan-reference-image-wrap {
+  position: relative;
+  width: 42px;
+  height: 42px;
+}
+
+.plan-reference-image {
+  width: 42px;
+  height: 42px;
+  display: block;
+  overflow: hidden;
+  border: 1px solid #ccd8e2;
+  border-radius: 8px;
+  background: #eef3f7;
+  object-fit: cover;
+}
+
+.plan-reference-duo-icon-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 21px;
+  height: 21px;
+  border: 1px solid #999;
+  border-radius: 10%;
+  background-color: #f5f5f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.plan-reference-duo-icon-container.duo-active {
+  border-color: #ff0000;
+  background-color: #e8f5e8;
+}
+
+.plan-reference-duo-icon-container:not(.duo-active) .plan-reference-duo-icon {
+  filter: grayscale(100%);
+}
+
+.plan-reference-duo-icon {
+  width: 19px;
+  height: 19px;
+  border-radius: 10%;
+  object-fit: cover;
+}
+
+.plan-reference-magic-list {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.plan-reference-magic-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reference-magic-label {
+  display: inline-grid;
+  min-width: 30px;
+  min-height: 22px;
+  place-items: center;
+  border: 1px solid #dbe5ed;
+  border-radius: 6px;
+  color: #334155;
+  background: #f4f7fa;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.reference-magic-label--fire {
+  border-color: #f3b4a7;
+  color: #9c3b2d;
+  background: #fff0ed;
+}
+
+.reference-magic-label--water {
+  border-color: #aac8f5;
+  color: #245894;
+  background: #eef6ff;
+}
+
+.reference-magic-label--flora {
+  border-color: #aad6ad;
+  color: #2e6740;
+  background: #effaf1;
+}
+
+.reference-magic-label--cosmic {
+  border-color: #c4cad4;
+  color: #53606f;
+  background: #f3f5f8;
+}
+
+.reference-effect-text {
+  min-width: 0;
+  overflow: hidden;
+  color: #263847;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-effect-text.muted,
+.plan-reference-empty {
+  color: #6a7b88;
+}
+
+.plan-reference-empty {
+  padding: 12px;
+  border: 1px dashed #c9d6df;
+  border-radius: 8px;
+  background: #fbfcfd;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
 }
 
 .preset-actions {
@@ -5795,6 +6087,10 @@ function formatRatePercent(value: number) {
   .exam-tab-grid,
   .plan-layout {
     grid-template-columns: 1fr;
+  }
+
+  .plan-reference-panel {
+    display: none;
   }
 
   .magic-panel {
