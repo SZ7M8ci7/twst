@@ -33,6 +33,46 @@ export const loadCharacterImage = async (characterName: string) => {
   return loadCharacterImageUrl(characterName);
 };
 
+const isHealBuffOption = (buffOption: string) => buffOption === '回復' || buffOption === '継続回復';
+
+const createHealBuffsFromMagicHeal = (magicOption: string, healValue: string) => {
+  const powerOption = getPowerOption(healValue);
+  const buffs: any[] = [];
+
+  if (healValue.includes('継続回復')) {
+    buffs.push({
+      magicOption,
+      buffOption: '継続回復',
+      powerOption,
+      levelOption: 10,
+    });
+  }
+
+  if (healValue.includes('回復') && (!healValue.includes('継続回復') || healValue.includes('回復&継続回復'))) {
+    buffs.push({
+      magicOption,
+      buffOption: '回復',
+      powerOption,
+      levelOption: 10,
+    });
+  }
+
+  return buffs;
+};
+
+const pushAutomaticBuff = (buffs: any[], buff: any) => {
+  const duplicate = buffs.some((existing) => (
+    !existing?.isManuallyAdded
+    && existing?.magicOption === buff?.magicOption
+    && existing?.buffOption === buff?.buffOption
+    && existing?.powerOption === buff?.powerOption
+    && existing?.attributeOption === buff?.attributeOption
+    && existing?.targetType === buff?.targetType
+    && existing?.durationTurns === buff?.durationTurns
+  ));
+  if (!duplicate) buffs.push(buff);
+};
+
 // キャラクター選択時の共通処理
 export const processCharacterSelection = async (chara: any, customLevel?: number, ignoreHandCollection = false) => {
   const handCollectionStore = useHandCollectionStore();
@@ -94,44 +134,20 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
     chara[`${magicKey}Attribute`] = chara[`${magicKey}atr`] || '';
     chara[`${magicKey}Power`] = chara[`${magicKey}pow`] || '単発(弱)';
     
-    // etc由来の複数バフを取り込み（magicNbufは参照しない）
-    parsedEtcBuffs
-      .filter(b => b.magicOption === `M${magicIndex}`)
-      .forEach(b => initialSettings.buffs.push(b));
-    
     // 回復の追加（healはmagicNhealを使用継続）
     const healValue = chara[`${magicKey}heal`];
-    
-    // 回復の追加
+
+    // etc由来の複数バフを取り込み（magicNbufは参照しない）
+    // 回復系は chara.json 上で etc と magicNheal の両方に入っているため、magicNheal を正とする。
+    // 将来 magicNheal が空で etc だけに回復が入った場合のみ、etc 側をフォールバックとして採用する。
+    parsedEtcBuffs
+      .filter(b => b.magicOption === `M${magicIndex}`)
+      .filter(b => !healValue || !isHealBuffOption(b.buffOption))
+      .forEach(b => pushAutomaticBuff(initialSettings.buffs, b));
+
     if (healValue) {
-      if (healValue.includes('回復&継続回復')) {
-        initialSettings.buffs.push({
-          magicOption: `M${magicIndex}`,
-          buffOption: '継続回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-        initialSettings.buffs.push({
-          magicOption: `M${magicIndex}`,
-          buffOption: '回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-      } else if (healValue.includes('継続回復')) {
-        initialSettings.buffs.push({
-          magicOption: `M${magicIndex}`,
-          buffOption: '継続回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-      } else if (healValue.includes('回復')) {
-        initialSettings.buffs.push({
-          magicOption: `M${magicIndex}`,
-          buffOption: '回復',
-          powerOption: getPowerOption(healValue),
-          levelOption: 10
-        });
-      }
+      createHealBuffsFromMagicHeal(`M${magicIndex}`, healValue)
+        .forEach(b => pushAutomaticBuff(initialSettings.buffs, b));
     }
   }
   

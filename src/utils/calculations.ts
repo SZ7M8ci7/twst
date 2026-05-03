@@ -507,12 +507,21 @@ function calculateHeal(character: any, charaDict: { [key: string]: boolean }) {
   if (character.isM3Selected) selectedMagic.push(3);
 
   const allBuffs = character.buffs && Array.isArray(character.buffs) ? character.buffs : [];
+  const appliedAutomaticHealBuffs = new Set<string>();
 
   // buffs配列からの回復値を追加
   if (allBuffs.length > 0) {
     allBuffs.forEach((buff: any) => {
       // 回復タイプのバフをチェック
       if ((buff.buffOption === '回復' || buff.buffOption === '継続回復') && buff.magicOption) {
+        const automaticHealKey = `${buff.magicOption}:${buff.buffOption}`;
+        if (!buff.isManuallyAdded && appliedAutomaticHealBuffs.has(automaticHealKey)) {
+          return;
+        }
+        if (!buff.isManuallyAdded) {
+          appliedAutomaticHealBuffs.add(automaticHealKey);
+        }
+
         const magicNum = Number(buff.magicOption.replace('M', ''));
         
         // 該当する魔法が選択されている場合のみ

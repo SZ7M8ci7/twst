@@ -340,10 +340,13 @@ const dropInsertIndex = ref(null);
 const isBuffDragging = computed(() => buffDragPayload.fromBuffIndex !== null);
 const currentCharacter = computed(() => simulatorStore.deckCharacters[props.charaIndex]);
 
+const isHealBuffOption = (buffOption) => buffOption === '回復' || buffOption === '継続回復';
+
 const sanitizeLegacyBuffRows = (character) => {
   if (!character || !Array.isArray(character.buffs)) return;
 
   const sanitized = [];
+  const seenAutomaticHealBuffs = new Set();
   let changed = false;
 
   character.buffs.forEach((buff) => {
@@ -356,6 +359,15 @@ const sanitizeLegacyBuffRows = (character) => {
     if (!normalized) {
       changed = true;
       return;
+    }
+
+    if (isHealBuffOption(normalized.buffOption)) {
+      const healKey = `${normalized.magicOption}:${normalized.buffOption}`;
+      if (seenAutomaticHealBuffs.has(healKey)) {
+        changed = true;
+        return;
+      }
+      seenAutomaticHealBuffs.add(healKey);
     }
 
     sanitized.push(normalized);
