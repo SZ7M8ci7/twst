@@ -156,7 +156,11 @@
             >
               <!-- キャラクター画像 -->
               <div class="data-cell character-col">
-                <img :src="item.imgUrl" :alt="item.name" class="character-image" @error="handleImageError" />
+                <LazyCharacterImage
+                  :src="item.imgUrl || defaultImg"
+                  :alt="item.name"
+                  class="character-image"
+                />
               </div>
               
               <!-- 所持チェックボックス -->
@@ -273,6 +277,7 @@ import { storeToRefs } from 'pinia';
 import defaultImg from '@/assets/img/default.webp';
 import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import FilterModal from '@/components/FilterModal.vue';
+import LazyCharacterImage from '@/components/LazyCharacterImage.vue';
 import charactersInfo from '@/assets/characters_info.json';
 import { useI18n } from 'vue-i18n';
 import { getInputMaxLevel } from '@/constants/levels';
@@ -717,11 +722,6 @@ function importFromText() {
       showSnackbar(t('handCollection.importError'), 'error');
     }
   }
-}
-
-function handleImageError(event: Event) {
-  const target = event.target as HTMLImageElement;
-  target.src = defaultImg;
 }
 
 // フィルターリセット機能

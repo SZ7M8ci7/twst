@@ -664,9 +664,15 @@ function areAllCharactersSelected(): boolean {
 }
 
 .button-container {
+  position: sticky;
+  bottom: 0;
   display: flex;
   gap: 10px; /* ボタン間のスペース */
   justify-content: center;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  padding: 10px 0 0;
+  z-index: 2;
 }
 
 .button, .apply-button {
@@ -686,6 +692,9 @@ function areAllCharactersSelected(): boolean {
 }
 
 .embedded-buttons {
+  position: static;
+  border-top: 0;
+  padding-top: 0;
   justify-content: center;
   margin-top: 1px;
 }

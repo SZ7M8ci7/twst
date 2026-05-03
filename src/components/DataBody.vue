@@ -64,7 +64,11 @@
             <div class="text-no-wrap">{{ formatBuddy(item.buddy3s_totsu) }}</div>
           </template>
           <template v-slot:[`item.name`]="{ item }">
-            <img :src="item.imgUrl" :alt="item.name" class="character-image" />
+            <LazyCharacterImage
+              :src="item.imgUrl || defaultImg"
+              :alt="item.name"
+              class="character-image"
+            />
           </template>
         </v-data-table>
       </v-card>
@@ -81,6 +85,8 @@ import { storeToRefs } from 'pinia';
 import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { useI18n } from 'vue-i18n';
+import defaultImg from '@/assets/img/default.webp';
+import LazyCharacterImage from '@/components/LazyCharacterImage.vue';
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
@@ -123,7 +129,7 @@ const visibleCharacters = computed(() => {
 });
 const search = ref('');
 const headers = [
-  { title: 'キャラ', value: 'name', sortable: false  },
+  { title: 'キャラ', value: 'name', sortable: false, width: 78 },
   { title: '名前', value: 'chara', sortable: true  },
   { title: '衣装', value: 'costume', sortable: true  },
   { title: 'レア', value: 'rare', sortable: true  },
@@ -215,6 +221,8 @@ onBeforeMount(() => {
   height: 45px;
   border-radius: 4px;
   object-fit: cover;
+  display: block;
+  margin: 0 auto;
 }
 
 .table-top {
@@ -247,7 +255,35 @@ onBeforeMount(() => {
   border-left: 1px solid #ddd;
   border-right: 1px solid #ddd;
 }
+.v-data-table :deep(thead th:first-child),
+.v-data-table :deep(tbody tr td:first-child) {
+  width: 78px;
+  min-width: 78px;
+  max-width: 78px;
+}
 .v-data-table :deep(.v-data-table-footer) {
    display: none; /* NOTE: フッタを非表示にする為 */
+}
+
+@media (max-width: 600px) {
+  .controls-container {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .controls-search {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .controls-toggle,
+  .controls-download {
+    flex: 1 1 100%;
+    justify-content: flex-start !important;
+  }
+
+  .controls-download :deep(.v-btn) {
+    width: 100%;
+  }
 }
 </style>

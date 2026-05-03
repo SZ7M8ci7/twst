@@ -514,7 +514,7 @@ function calculateHeal(character: any, charaDict: { [key: string]: boolean }) {
     allBuffs.forEach((buff: any) => {
       // 回復タイプのバフをチェック
       if ((buff.buffOption === '回復' || buff.buffOption === '継続回復') && buff.magicOption) {
-        const automaticHealKey = `${buff.magicOption}:${buff.buffOption}`;
+        const automaticHealKey = `${buff.magicOption}:${buff.buffOption}:${buff.powerOption}:${buff.levelOption ?? 10}`;
         if (!buff.isManuallyAdded && appliedAutomaticHealBuffs.has(automaticHealKey)) {
           return;
         }

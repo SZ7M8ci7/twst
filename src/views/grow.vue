@@ -35,7 +35,7 @@
     <v-row>
       <v-col cols="12" class="d-flex justify-center">
         <div>
-        <v-simple-table>
+        <v-table>
           <thead>
             <tr>
               <th class="text-left">
@@ -82,7 +82,7 @@
               <td colspan="2" class="text-center">{{ madol.toLocaleString() }}</td>
             </tr>
           </tbody>
-        </v-simple-table>
+        </v-table>
       </div>
       </v-col>
     </v-row>
@@ -223,7 +223,7 @@ watchEffect((): void => {
     height: calc(100% / 0.5);
     width: calc(100% / 0.5);
 }
-v-simple-table {
+.v-table {
   width: 100%;
   border-spacing: 0;
 }
@@ -233,12 +233,12 @@ table th {
   padding: 10px 10px;
 }
 
-v-simple-table th {
+.v-table th {
   border-bottom: solid 2px #fb5144;
   padding: 10px 10px;
 }
 
-v-simple-table td {
+.v-table td {
   border-bottom: solid 2px #ddd;
   text-align: center;
   padding: 10px 10px;

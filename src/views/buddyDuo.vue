@@ -66,15 +66,11 @@
   <v-dialog v-model="showModal" max-width="600px">
     <v-card>
       <v-card-text>
-        <v-simple-table style="display: flex; justify-content: center;">
-          <template v-slot:default>
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
-              <li v-for="(value, key) in selectedCharacter" :key="key" style="list-style: none;">
-                <CharacterIconWithType :imgSrc="value[0]" :wikiUrl="value[1]" :cardType="value[2]" :iconSize="62" />
-              </li>
-            </div>
-          </template>
-        </v-simple-table>
+        <div class="character-modal-grid">
+          <li v-for="(value, key) in selectedCharacter" :key="key">
+            <CharacterIconWithType :imgSrc="value[0]" :wikiUrl="value[1]" :cardType="value[2]" :iconSize="62" />
+          </li>
+        </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
@@ -482,6 +478,17 @@ td {
 
 .cell-button:hover {
   color: #e25513; 
+}
+
+.character-modal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+
+.character-modal-grid li {
+  list-style: none;
 }
 
 </style>

@@ -1,6 +1,6 @@
 <template>
   <!-- フィルターボタン -->
-  <v-row class="mb-1"> <!-- marginBottomを追加して下段との間隔を空けます -->
+  <v-row class="mb-1 search-header-row"> <!-- marginBottomを追加して下段との間隔を空けます -->
     <v-col cols="12" sm="3"/>
     <v-col cols="12" sm="2">
       <v-btn block @click="isFilterModalVisible = true">{{ $t('search.filter') }}</v-btn>
@@ -15,7 +15,7 @@
     </v-row>
 
     <!-- 下段のボタン -->
-    <v-row class="mb-1">
+    <v-row class="mb-1 search-header-row">
       <v-col cols="12" sm="3"/>
       <v-col cols="12" sm="2">
         <v-btn block color="red" @click="stopSearch">{{ $t('search.cancelSearch') }}</v-btn>
@@ -165,3 +165,16 @@ watch(
   { immediate: true }
 );
 </script>
+<style scoped>
+@media (max-width: 600px) {
+  .search-header-row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  .search-header-row :deep(.v-col) {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+</style>

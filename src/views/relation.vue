@@ -63,7 +63,7 @@
     <v-dialog v-model="showModal" max-width="350px">
       <v-card>
         <v-card-text>
-          <v-simple-table style="display: flex;justify-content: center;">
+          <v-table class="relation-modal-table">
             <template v-slot:default>
               <tbody>
                 <tr v-for="(value, key) in selectedCharacter" :key="key">
@@ -78,7 +78,7 @@
                 </tr>
               </tbody>
             </template>
-          </v-simple-table>
+          </v-table>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
@@ -872,6 +872,11 @@ onMounted(() => {
   height: auto;
   cursor: pointer;
   padding: 0;
+}
+
+.relation-modal-table {
+  display: flex;
+  justify-content: center;
 }
 
 .new-row {

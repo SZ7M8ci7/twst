@@ -1,14 +1,15 @@
 <template>
   <component :is="rootTag" v-bind="linkAttributes" class="character-icon-wrapper">
     <div class="character-image-container">
-      <img :src="finalImgSrc" class="character-image" :style="imageStyle" />
+      <img :src="finalImgSrc" :alt="altText" class="character-image" :style="imageStyle" />
       <span v-if="cardType && shouldShowCardType" class="character-card-type" :style="cardTypeStyle">{{ cardType }}</span>
     </div>
   </component>
 </template>
 
 <script setup lang="ts">
-import { defineProps, computed, StyleValue } from 'vue';
+import { computed, type StyleValue } from 'vue';
+import defaultImg from '@/assets/img/default.webp';
 
 const props = defineProps<{
   imgSrc?: string;      // 既存:直接画像URLを指定する場合
@@ -42,8 +43,10 @@ const finalImgSrc = computed(() => {
   if (props.iconKey && props.iconDictionary && props.iconDictionary[props.iconKey]) {
     return props.iconDictionary[props.iconKey];
   }
-  return props.imgSrc || (props.iconDictionary && props.iconDictionary['notyet']) || '';
+  return props.imgSrc || (props.iconDictionary && props.iconDictionary['notyet']) || defaultImg;
 });
+
+const altText = computed(() => props.iconKey || props.cardType || 'character');
 
 const shouldShowCardType = computed(() => currentIconSize.value >= MIN_SIZE_TO_SHOW_TYPE);
 

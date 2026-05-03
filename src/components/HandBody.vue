@@ -17,7 +17,11 @@
             <v-btn color="primary" @click="onAddClick(item)">{{ $t('hand.add') }}</v-btn>
           </template>
           <template v-slot:[`item.name`]="{ item }">
-            <img :src="item.imgUrl" :alt="item.name" class="character-image" />
+            <LazyCharacterImage
+              :src="item.imgUrl || defaultImg"
+              :alt="item.name"
+              class="character-image"
+            />
           </template>
         </v-data-table>
 
@@ -33,6 +37,8 @@ import { storeToRefs } from 'pinia';
 import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
+import defaultImg from '@/assets/img/default.webp';
+import LazyCharacterImage from '@/components/LazyCharacterImage.vue';
 const { t } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
@@ -58,8 +64,9 @@ const headers = computed(() =>[
 const onAddClick = (item:any) => {
   deckStore.addToDeck(item);
 };
+
 onBeforeMount(() => {
-  void hydrateCharacterImageUrls(characters.value, 'name')
+  void hydrateCharacterImageUrls(characters.value, 'name', { fallbackName: 'notyet' })
     .finally(() => {
       loadingImgUrl.value = false;
     });

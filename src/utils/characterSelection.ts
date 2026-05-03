@@ -60,6 +60,10 @@ const createHealBuffsFromMagicHeal = (magicOption: string, healValue: string) =>
   return buffs;
 };
 
+const healBuffDuplicateKey = (buff: any) => (
+  `${buff?.magicOption}:${buff?.buffOption}:${buff?.powerOption}:${buff?.levelOption ?? 10}`
+);
+
 const pushAutomaticBuff = (buffs: any[], buff: any) => {
   const duplicate = buffs.some((existing) => (
     !existing?.isManuallyAdded
@@ -136,17 +140,30 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
     
     // 回復の追加（healはmagicNhealを使用継続）
     const healValue = chara[`${magicKey}heal`];
+    const healBuffsFromMagicHeal = healValue ? createHealBuffsFromMagicHeal(`M${magicIndex}`, healValue) : [];
+    const pushedHealKeys = new Set<string>();
 
     // etc由来の複数バフを取り込み（magicNbufは参照しない）
     // 回復系は chara.json 上で etc と magicNheal の両方に入っているため、magicNheal を正とする。
     // 将来 magicNheal が空で etc だけに回復が入った場合のみ、etc 側をフォールバックとして採用する。
     parsedEtcBuffs
       .filter(b => b.magicOption === `M${magicIndex}`)
-      .filter(b => !healValue || !isHealBuffOption(b.buffOption))
-      .forEach(b => pushAutomaticBuff(initialSettings.buffs, b));
+      .forEach(b => {
+        if (healValue && isHealBuffOption(b.buffOption)) {
+          healBuffsFromMagicHeal
+            .filter(healBuff => healBuff.buffOption === b.buffOption)
+            .forEach(healBuff => {
+              pushedHealKeys.add(healBuffDuplicateKey(healBuff));
+              pushAutomaticBuff(initialSettings.buffs, healBuff);
+            });
+          return;
+        }
+        pushAutomaticBuff(initialSettings.buffs, b);
+      });
 
     if (healValue) {
-      createHealBuffsFromMagicHeal(`M${magicIndex}`, healValue)
+      healBuffsFromMagicHeal
+        .filter(b => !pushedHealKeys.has(healBuffDuplicateKey(b)))
         .forEach(b => pushAutomaticBuff(initialSettings.buffs, b));
     }
   }

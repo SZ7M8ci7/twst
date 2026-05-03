@@ -43,7 +43,7 @@
         <div>
           <v-row>
             <v-col cols="12">
-              <v-simple-table>
+              <v-table>
                 <thead>
                   <tr>
                     <th class="text-left">
@@ -128,7 +128,7 @@
                     <td class="text-right">{{ result_macarons.toLocaleString(undefined, { maximumFractionDigits: 1 }) }}</td>
                   </tr>
                 </tbody>
-              </v-simple-table>
+              </v-table>
             </v-col>
           </v-row>
         </div>
@@ -227,17 +227,17 @@ watchEffect((): void => {
 
 </script>
 <style scoped>
-v-simple-table {
+.v-table {
   width: 100%;
   border-spacing: 0;
 }
 
-v-simple-table th {
+.v-table th {
   border-bottom: solid 2px #fb5144;
   padding: 10px 10px;
 }
 
-v-simple-table td {
+.v-table td {
   border-bottom: solid 2px #ddd;
   text-align: center;
   padding: 10px 10px;
