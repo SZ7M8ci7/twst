@@ -104,18 +104,20 @@
                 <div class="deck-card-body">
                   <div class="deck-controls">
                     <v-text-field
-                      v-model.number="slot.level"
+                      :model-value="deckLevelInputValue(index)"
                       class="level-field"
-                      type="text"
+                      type="number"
                       inputmode="numeric"
                       pattern="[0-9]*"
                       label="Lv"
                       :min="1"
                       :max="maxCardLevel(slot)"
+                      :step="1"
                       density="compact"
                       variant="outlined"
                       hide-details
-                      @focus="selectLevelInput"
+                      @update:model-value="updateDeckLevelInput(index, $event)"
+                      @focus="focusDeckLevelInput(index, $event)"
                       @change="normalizeDeckLevel(index)"
                       @blur="normalizeDeckLevel(index)"
                       @keydown.enter="normalizeDeckLevel(index)"
@@ -992,6 +994,8 @@ const enemySlots = ref<EnemySlotDefinition[]>([
   createEnemySlot('敵3'),
 ]);
 const deck = ref<DeckSlot[]>(Array.from({ length: 5 }, () => createEmptyDeckSlot()));
+const deckLevelInputTexts = ref<string[]>(Array.from({ length: 5 }, (_, index) => String(deck.value[index]?.level ?? 1)));
+const deckLevelFocusPrefixes = ref<string[]>(Array.from({ length: 5 }, () => ''));
 const turnPlans = ref<TurnPlan[]>(Array.from({ length: 5 }, (_, index) => ({
   turn: index + 1,
   combos: [createTurnCombo('', '', true)],
@@ -1546,6 +1550,7 @@ async function restoreDeckFromSimulatorImport() {
   deck.value = await Promise.all(Array.from({ length: 5 }, (_, index) => (
     createDeckSlotFromSimulatorCharacter(importState.deckCharacters[index], characterStore)
   )));
+  syncAllDeckLevelInputs();
   editingDeckDetailCharacter.value = null;
   characterDialogOpen.value = false;
   deckDetailDialogOpen.value = false;
@@ -1984,16 +1989,72 @@ async function setDeckCharacter(index: number, character: Character) {
     imageUrl,
   };
   normalizeSelectedMagicSlots(deck.value[index]);
+  syncDeckLevelInput(index);
+}
+
+function deckLevelInputValue(index: number) {
+  return deckLevelInputTexts.value[index] ?? String(deck.value[index]?.level ?? '');
+}
+
+function syncDeckLevelInput(index: number) {
+  const slot = deck.value[index];
+  deckLevelInputTexts.value[index] = slot?.character ? String(slot.level) : '';
+  deckLevelFocusPrefixes.value[index] = '';
+}
+
+function syncAllDeckLevelInputs() {
+  deck.value.forEach((_slot, index) => syncDeckLevelInput(index));
+}
+
+function updateDeckLevelInput(index: number, value: unknown) {
+  const slot = deck.value[index];
+  const maxLevel = maxCardLevel(slot);
+  let text = String(value ?? '').replace(/[^\d]/g, '');
+
+  const focusPrefix = deckLevelFocusPrefixes.value[index] ?? '';
+  if (focusPrefix && text.startsWith(focusPrefix) && text.length > focusPrefix.length) {
+    const replacementText = text.slice(focusPrefix.length);
+    if (replacementText) {
+      text = replacementText;
+      deckLevelFocusPrefixes.value[index] = '';
+    }
+  }
+
+  if (!slot?.character) {
+    deckLevelInputTexts.value[index] = text;
+    return;
+  }
+
+  if (!text) {
+    deckLevelInputTexts.value[index] = '';
+    return;
+  }
+
+  let level = Math.floor(Number(text));
+  if (!Number.isFinite(level)) {
+    deckLevelInputTexts.value[index] = '';
+    return;
+  }
+
+  level = Math.min(maxLevel, Math.max(1, level));
+  deckLevelInputTexts.value[index] = String(level);
+  slot.level = level;
+  recalculateDeckStats(index);
 }
 
 function normalizeDeckLevel(index: number) {
   const slot = deck.value[index];
-  if (!slot.character) return;
+  if (!slot.character) {
+    syncDeckLevelInput(index);
+    return;
+  }
   slot.level = Math.min(maxCardLevel(slot), Math.max(1, Math.floor(safeNumber(slot.level) || 1)));
+  syncDeckLevelInput(index);
   recalculateDeckStats(index);
 }
 
-function selectLevelInput(event: FocusEvent) {
+function focusDeckLevelInput(index: number, event: FocusEvent) {
+  deckLevelFocusPrefixes.value[index] = deckLevelInputTexts.value[index] ?? String(deck.value[index]?.level ?? '');
   const target = event.target instanceof HTMLInputElement
     ? event.target
     : (event.target as HTMLElement | null)?.querySelector?.('input') as HTMLInputElement | null;
@@ -2087,6 +2148,7 @@ function saveDeckDetailChanges(updatedCharacter: any) {
   slot.customBuffs = [];
   normalizeSelectedMagicSlots(slot);
   editingDeckDetailCharacter.value = createDeckDetailCharacter(editingDeckIndex.value);
+  syncDeckLevelInput(editingDeckIndex.value);
   normalizeTurnCombosForAvailableMagic();
 }
 
