@@ -160,7 +160,7 @@
             <section class="tool-panel order-panel">
               <div class="panel-heading">
                 <div>
-                  <h2>許容組み合わせ</h2>
+                  <h2>許容優先度</h2>
                 </div>
                 <div class="plan-heading-actions">
                   <v-btn
