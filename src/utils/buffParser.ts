@@ -85,9 +85,13 @@ export function normalizeLegacyDeckBuff(buff: ParsedBuff): ParsedBuff | null {
         大: '2/3',
         極大: '1/1',
       };
+      const normalizedPowerOption = legacyCriticalPowerMap[buff.powerOption] ?? buff.powerOption;
+      if (normalizedPowerOption === buff.powerOption) {
+        return buff;
+      }
       return {
         ...buff,
-        powerOption: legacyCriticalPowerMap[buff.powerOption] ?? buff.powerOption,
+        powerOption: normalizedPowerOption,
       };
     }
 
