@@ -49,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import InfoModal from "@/components/InfoModal.vue";
 import FilterModal from "@/components/FilterModal.vue";
 import SettingModal from "@/components/SettingModal.vue";
@@ -121,6 +121,28 @@ watch(nowResults, () => {
 
 const emit = defineEmits(['search-started']);
 let searchRunToken = 0;
+
+function waitForBrowserPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    let done = false;
+    let fallbackId: ReturnType<typeof setTimeout> | undefined;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (fallbackId !== undefined) clearTimeout(fallbackId);
+      resolve();
+    };
+    fallbackId = setTimeout(finish, 100);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        setTimeout(finish, 0);
+      });
+    } else {
+      setTimeout(finish, 0);
+    }
+  });
+}
+
 async function startSearch(){
   if (isSearching.value) return;
   const runToken = ++searchRunToken;
@@ -130,8 +152,10 @@ async function startSearch(){
   remainingTime.value = '';
   emit('search-started',)
   event('search start')
-  await new Promise(resolve => setTimeout(resolve, 300)); // UI反映待ち
   try {
+    await nextTick();
+    await waitForBrowserPaint();
+    if (runToken !== searchRunToken || !isSearching.value) return;
     await runDeckSearch(t);
   } finally {
     if (runToken === searchRunToken) {

@@ -7,6 +7,7 @@ import {
 import { useCharacterStore } from '@/store/characters';
 import { useSearchResultStore } from '@/store/searchResult';
 import { useSearchSettingsStore } from '@/store/searchSetting';
+import { markRaw } from 'vue';
 
 function createDeckSearchSettings(): DeckSearchSettings {
   const searchSettingsStore = useSearchSettingsStore();
@@ -70,6 +71,17 @@ export async function runDeckSearch(t: (key: string) => string) {
   const searchResultStore = useSearchResultStore();
   const { characters } = storeToRefs(characterStore);
   const { totalResults, nowResults, results, isSearching, errorMessage } = storeToRefs(searchResultStore);
+  const timing = typeof performance !== 'undefined'
+    ? {
+      startMs: performance.now(),
+      beforeSetResultsMs: 0,
+      afterSetResultsMs: 0,
+      endMs: 0,
+    }
+    : undefined;
+  if (timing && typeof globalThis !== 'undefined') {
+    (globalThis as any).__TWST_LAST_SEARCH_TIMING__ = timing;
+  }
 
   errorMessage.value = '';
 
@@ -85,7 +97,9 @@ export async function runDeckSearch(t: (key: string) => string) {
         nowResults.value = value;
       },
       setResults: (value) => {
-        results.value = value;
+        if (timing) timing.beforeSetResultsMs = performance.now();
+        results.value = markRaw(value);
+        if (timing) timing.afterSetResultsMs = performance.now();
       },
       setErrorMessage: (value) => {
         errorMessage.value = value;
@@ -93,5 +107,9 @@ export async function runDeckSearch(t: (key: string) => string) {
     },
   };
 
-  await calcDecks(t, context);
+  try {
+    await calcDecks(t, context);
+  } finally {
+    if (timing) timing.endMs = performance.now();
+  }
 }

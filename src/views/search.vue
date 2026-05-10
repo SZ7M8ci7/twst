@@ -11,17 +11,20 @@
       <v-tab value="result">{{ $t('search.result') }}</v-tab>
     </v-tabs>
     <v-card-text class="search-page-card-text">
-      <v-window v-model="tab" disabled >
-        <v-window-item value="search">
-          <SearchBody :focus-request="focusRequest" />
-        </v-window-item>
-        <v-window-item value="support">
-          <SupportBody :focus-request="focusRequest" />
-        </v-window-item>
-        <v-window-item value="result">
-          <ResultBody @focus-character-setting="handleFocusCharacterSetting" />
-        </v-window-item>
-      </v-window>
+      <KeepAlive>
+        <SearchBody
+          v-if="tab === 'search'"
+          :focus-request="focusRequest"
+        />
+        <SupportBody
+          v-else-if="tab === 'support'"
+          :focus-request="focusRequest"
+        />
+        <ResultBody
+          v-else
+          @focus-character-setting="handleFocusCharacterSetting"
+        />
+      </KeepAlive>
     </v-card-text>
   </v-container>
 </template>

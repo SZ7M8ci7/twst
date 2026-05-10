@@ -1,21 +1,25 @@
 <template>
-  <v-app>
-    <v-container>
-      <v-data-table
-        :headers="headers"
-        :items="results"
-        item-value="simuURL"
-        class="elevation-1"
-        :items-per-page="-1"
-        :mobile-breakpoint="0"
-      >
-        <template v-slot:item="{ item }">
-          <tr :key="item.simuURL">
+  <div class="result-table-wrapper">
+    <table class="result-table">
+      <thead>
+        <tr>
+          <th v-for="header in headers" :key="header.value">
+            {{ header.title }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <template v-for="item in results" :key="item.simuURL">
+          <tr>
             <td>{{ item.hp }}</td>
             <td style="position: relative;">
-              <div class="css-fukidashi">
+              <div
+                class="css-fukidashi"
+                @mouseenter="hoveredDetailKey = item.simuURL + ':ehp'"
+                @mouseleave="hoveredDetailKey = ''"
+              >
                 <div class="text">{{ item.ehp }}</div>
-                <div class="fukidashi">
+                <div v-if="hoveredDetailKey === item.simuURL + ':ehp'" class="fukidashi">
                   <div>{{ $t('resultBody.healDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[0]" :key="index">
                     {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
@@ -37,9 +41,13 @@
             <td>{{ item.maxWater }}</td>
             <td>{{ item.maxFlora }}</td>
             <td style="position: relative;">
-              <div class="css-fukidashi">
+              <div
+                class="css-fukidashi"
+                @mouseenter="hoveredDetailKey = item.simuURL + ':referenceDamage'"
+                @mouseleave="hoveredDetailKey = ''"
+              >
                 <div class="text">{{ item.referenceDamage }}</div>
-                <div class="fukidashi">
+                <div v-if="hoveredDetailKey === item.simuURL + ':referenceDamage'" class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[1]" :key="index">
                     {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
@@ -48,9 +56,13 @@
               </div>
             </td>
             <td style="position: relative;">
-              <div class="css-fukidashi">
+              <div
+                class="css-fukidashi"
+                @mouseenter="hoveredDetailKey = item.simuURL + ':referenceAdvantageDamage'"
+                @mouseleave="hoveredDetailKey = ''"
+              >
                 <div class="text">{{ item.referenceAdvantageDamage }}</div>
-                <div class="fukidashi">
+                <div v-if="hoveredDetailKey === item.simuURL + ':referenceAdvantageDamage'" class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[2]" :key="index">
                     {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
@@ -59,9 +71,13 @@
               </div>
             </td>
             <td style="position: relative;">
-              <div class="css-fukidashi">
+              <div
+                class="css-fukidashi"
+                @mouseenter="hoveredDetailKey = item.simuURL + ':referenceVsHiDamage'"
+                @mouseleave="hoveredDetailKey = ''"
+              >
                 <div class="text">{{ item.referenceVsHiDamage }}</div>
-                <div class="fukidashi">
+                <div v-if="hoveredDetailKey === item.simuURL + ':referenceVsHiDamage'" class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[3]" :key="index">
                     {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
@@ -70,9 +86,13 @@
               </div>
             </td>
             <td style="position: relative;">
-              <div class="css-fukidashi">
+              <div
+                class="css-fukidashi"
+                @mouseenter="hoveredDetailKey = item.simuURL + ':referenceVsMizuDamage'"
+                @mouseleave="hoveredDetailKey = ''"
+              >
                 <div class="text">{{ item.referenceVsMizuDamage }}</div>
-                <div class="fukidashi">
+                <div v-if="hoveredDetailKey === item.simuURL + ':referenceVsMizuDamage'" class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[4]" :key="index">
                     {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
@@ -81,9 +101,13 @@
               </div>
             </td>
             <td style="position: relative;">
-              <div class="css-fukidashi">
+              <div
+                class="css-fukidashi"
+                @mouseenter="hoveredDetailKey = item.simuURL + ':referenceVsKiDamage'"
+                @mouseleave="hoveredDetailKey = ''"
+              >
                 <div class="text">{{ item.referenceVsKiDamage }}</div>
-                <div class="fukidashi">
+                <div v-if="hoveredDetailKey === item.simuURL + ':referenceVsKiDamage'" class="fukidashi">
                   <div>{{ $t('resultBody.damageDetail') }}</div>
                   <div v-for="(detail, index) in item.detailList[5]" :key="index">
                     {{ toDisplayIndex(index) }}: {{ Math.round(detail) }}
@@ -98,27 +122,38 @@
                 :aria-label="extractCharacterName(item.simuURL, n) || undefined"
                 @click="focusCharacterSetting(item.simuURL, n)"
               >
-                <v-img
+                <img
                   :src="item[`chara${n}`]"
-                  max-width="50"
                   width="50"
                   height="50"
+                  loading="lazy"
+                  decoding="async"
                   :class="['result-icon-image', { 'black-border': n === 5 && allowSameCharacter }]"
-                ></v-img>
+                  alt=""
+                >
               </button>
             </td>
-            <td><v-btn variant="text" v-on:click="openInNewTab(item.simuURL)" icon="mdi-open-in-new" size="x-small"></v-btn></td>
+            <td>
+              <button
+                type="button"
+                class="sim-open-button"
+                aria-label="Open SIM"
+                @click="openInNewTab(item.simuURL)"
+              >
+                SIM
+              </button>
+            </td>
           </tr>
         </template>
-      </v-data-table>
-    </v-container>
-  </v-app>
+      </tbody>
+    </table>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useI18n } from 'vue-i18n';
 
@@ -131,6 +166,8 @@ const searchSettingsStore = useSearchSettingsStore();
 const { results } = storeToRefs(searchResultStore);
 const allowSameCharacter = computed(() => searchSettingsStore.allowSameCharacter);
 const { t } = useI18n();
+const hoveredDetailKey = ref('');
+const characterNameCache = new Map<string, Array<string | null>>();
 
 type DataTableHeader = {
   title: string;
@@ -178,9 +215,27 @@ const headers = computed<DataTableHeader[]>(() => [
   { title: 'SIM', value: 'simuURL', sortable: false },
 ]);
 
-function extractCharacterName(url: string, slot: number): string | null {
+watch(results, () => {
+  characterNameCache.clear();
+});
+
+function getCharacterNames(url: string): Array<string | null> {
+  const cached = characterNameCache.get(url);
+  if (cached) return cached;
   const params = new URLSearchParams(url.startsWith('&') ? url.slice(1) : url);
-  return params.get(`name${slot}`);
+  const names = [
+    params.get('name1'),
+    params.get('name2'),
+    params.get('name3'),
+    params.get('name4'),
+    params.get('name5'),
+  ];
+  characterNameCache.set(url, names);
+  return names;
+}
+
+function extractCharacterName(url: string, slot: number): string | null {
+  return getCharacterNames(url)[slot - 1] ?? null;
 }
 
 function focusCharacterSetting(url: string, slot: number) {
@@ -204,54 +259,44 @@ function toDisplayIndex(index: string | number): number {
 </script>
 
 <style scoped>
-.table-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.result-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
 }
 
-.level-input {
-  max-width: 80px;
-  min-width: 70px;
+.result-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
 }
 
-.v-data-table :deep(.v-data-table-footer) {
-  display: none;
-}
-
-.right-align {
-  margin-left: auto;
-}
-
-:deep(.v-data-table td) {
-  padding: 1px 1px !important;
+.result-table th,
+.result-table td {
+  padding: 1px 4px;
   text-align: center;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-:deep(.v-data-table__td),
-:deep(.v-data-table-column--align-start),
-:deep(.v-data-table__th) {
-  padding: 1px 1px !important;
+.result-table th {
+  font-weight: 600;
+  background-color: #f5f5f5;
 }
 
-:deep(.v-data-table thead tr th) {
-  text-align: center !important;
-  justify-content: center !important;
-}
-
-:deep(.v-data-table thead tr th .v-data-table-header__content) {
-  justify-content: center !important;
-  text-align: center !important;
-}
-
-:deep(.v-data-table tr td:nth-child(odd)),
-:deep(.v-data-table thead tr th:nth-child(odd)) {
+.result-table td:nth-child(odd),
+.result-table th:nth-child(odd) {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-:deep(.v-data-table tr td:nth-child(even)),
-:deep(.v-data-table thead tr th:nth-child(even)) {
+.result-table td:nth-child(even),
+.result-table th:nth-child(even) {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+.result-table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: 54px;
 }
 
 .css-fukidashi {
@@ -267,7 +312,6 @@ function toDisplayIndex(index: string | number): number {
 }
 
 .fukidashi {
-  display: none;
   position: absolute;
   top: 100%;
   left: 50%;
@@ -280,10 +324,6 @@ function toDisplayIndex(index: string | number): number {
   font-weight: bold;
   white-space: nowrap;
   z-index: 2;
-}
-
-.text:hover + .fukidashi {
-  display: block;
 }
 
 .result-icon-button {
@@ -303,7 +343,31 @@ function toDisplayIndex(index: string | number): number {
 }
 
 .result-icon-image {
+  display: block;
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
   cursor: pointer;
+}
+
+.sim-open-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.sim-open-button:focus-visible {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
 }
 
 .black-border {
