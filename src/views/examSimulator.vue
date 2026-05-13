@@ -93,6 +93,11 @@
               <div>
                 <h2>デッキ編成</h2>
               </div>
+              <div class="deck-save-actions">
+                <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-content-save-outline" @click="openSaveExamSettingsDialog">
+                  編成
+                </v-btn>
+              </div>
             </div>
 
             <div class="deck-board">
@@ -492,6 +497,70 @@
       </v-card>
     </v-dialog>
 
+    <div v-if="settingsSaveDialogOpen" class="saved-deck-modal-overlay" @click.self="settingsSaveDialogOpen = false">
+      <div class="saved-deck-modal-content">
+        <div class="saved-deck-modal-body">
+          <div class="settings-save-section">
+            <div class="settings-save-row">
+              <v-text-field
+                v-model="settingsSetName"
+                placeholder="編成名（未入力で現在日時）"
+                hide-details
+                density="compact"
+                variant="outlined"
+                autofocus
+                @keydown.enter.prevent="saveCurrentExamSettingsSet"
+              />
+              <v-btn color="success" size="small" variant="flat" class="settings-save-btn" aria-label="保存" @click="saveCurrentExamSettingsSet">
+                <v-icon size="small">mdi-content-save</v-icon>
+              </v-btn>
+            </div>
+            <div v-if="settingsSaveError" class="settings-error-message">{{ settingsSaveError }}</div>
+          </div>
+
+          <div class="saved-decks-section">
+            <div v-if="!savedExamSettings.length" class="no-decks">
+              保存された編成はありません
+            </div>
+            <div v-else>
+              <div
+                v-for="setting in savedExamSettings"
+                :key="setting.id"
+                class="settings-deck-item"
+                @click="applySavedExamSettingsSet(setting)"
+              >
+                <div class="settings-deck-row">
+                  <div class="settings-deck-info">
+                    <div class="settings-deck-name">{{ setting.name }}</div>
+                    <div class="settings-character-icons">
+                      <div v-for="slotIndex in 5" :key="slotIndex" class="settings-icon-slot">
+                        <img
+                          v-if="savedSettingIcon(setting, slotIndex - 1)"
+                          :src="savedSettingIcon(setting, slotIndex - 1)"
+                          alt=""
+                          class="settings-icon"
+                        />
+                        <div v-else class="settings-empty-icon">
+                          <v-icon size="x-small" color="grey">mdi-account-plus</v-icon>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <v-btn size="x-small" color="error" variant="flat" class="settings-delete-btn" aria-label="削除" @click.stop="deleteSavedExamSettingsSet(setting.id)">
+                    <v-icon size="default">mdi-trash-can</v-icon>
+                  </v-btn>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-close-section">
+            <v-btn variant="text" block @click="settingsSaveDialogOpen = false">閉じる</v-btn>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <SimCharaDetailModal
       v-if="editingDeckDetailCharacter"
       v-model="deckDetailDialogOpen"
@@ -533,6 +602,11 @@ import { applyBuddyGeneratedBuffOverrides, createBuddyGeneratedBuffs, getBuddyAt
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
 import { examPresetDefinitions, type ExamPresetDefinition } from '@/utils/examPresets';
 import { loadExamSimulatorDeckImportState } from '@/storage/simulatorStorage';
+import {
+  loadSavedExamSimulatorSettings,
+  saveSavedExamSimulatorSettings,
+  type SavedExamSimulatorSettings,
+} from '@/storage/examSimulatorSettingsStorage';
 
 Chart.register(...registerables);
 
@@ -659,6 +733,11 @@ interface DisplayTurnCombo extends TurnCombo {
 interface TurnPlan {
   turn: number;
   combos: TurnCombo[];
+}
+
+interface ExamSettingsPayload {
+  deck: Array<Record<string, any>>;
+  turnPlans: TurnPlan[];
 }
 
 interface BattleLogEntry {
@@ -1072,6 +1151,10 @@ const magicPickerOpen = ref(false);
 const enemyDialogOpen = ref(false);
 const editingEnemySlotIndex = ref(0);
 const logDialogOpen = ref(false);
+const settingsSaveDialogOpen = ref(false);
+const settingsSetName = ref('');
+const settingsSaveError = ref('');
+const savedExamSettings = ref<SavedExamSimulatorSettings[]>([]);
 const enemyConditionsTouched = ref(false);
 const runAttemptWarning = ref('');
 
@@ -1357,6 +1440,7 @@ watch(activeTab, (tab) => {
 });
 
 onMounted(() => {
+  savedExamSettings.value = loadSavedExamSimulatorSettings();
   void restoreDeckFromSimulatorImport();
 });
 
@@ -1632,6 +1716,182 @@ function applyExamPreset(preset: ExamPresetDefinition) {
   enemyDialogOpen.value = false;
   clearResults();
   syncEnemyActionElementsToExam();
+}
+
+function clonePlain<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function createExamSettingsId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `exam-settings-${crypto.randomUUID()}`;
+  }
+  return `exam-settings-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function defaultExamSettingsName() {
+  const now = new Date();
+  return now.toLocaleDateString('ja-JP', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function serializeDeckSlotForSettings(slot: DeckSlot) {
+  return {
+    character: slot.character ? clonePlain(slot.character) : null,
+    level: slot.level,
+    totsu: slot.totsu,
+    customHp: slot.customHp,
+    customAtk: slot.customAtk,
+    maxHp: slot.maxHp,
+    maxAtk: slot.maxAtk,
+    magicLevels: clonePlain(slot.magicLevels),
+    buddyLevels: clonePlain(slot.buddyLevels),
+    magicAttributes: clonePlain(slot.magicAttributes),
+    magicPowers: clonePlain(slot.magicPowers),
+    magicHeals: clonePlain(slot.magicHeals),
+    magicEffects: clonePlain(slot.magicEffects),
+    customBuffs: clonePlain(slot.customBuffs ?? []),
+    selectedMagicSlots: [...slot.selectedMagicSlots],
+    imageUrl: slot.imageUrl,
+  };
+}
+
+function buildExamSettingsPayload(): ExamSettingsPayload {
+  return {
+    deck: deck.value.map(serializeDeckSlotForSettings),
+    turnPlans: turnPlans.value.map((turn) => ({
+      turn: turn.turn,
+      combos: turn.combos.map((combo) => ({
+        id: combo.id,
+        firstMagicId: combo.firstMagicId,
+        secondMagicId: combo.secondMagicId,
+        autoGenerated: combo.autoGenerated,
+      })),
+    })),
+  };
+}
+
+function openSaveExamSettingsDialog() {
+  settingsSetName.value = '';
+  settingsSaveError.value = '';
+  settingsSaveDialogOpen.value = true;
+}
+
+function saveCurrentExamSettingsSet() {
+  settingsSaveError.value = '';
+  const name = settingsSetName.value.trim() || defaultExamSettingsName();
+  if (savedExamSettings.value.some((setting) => setting.name === name)) {
+    settingsSaveError.value = 'この名前の編成は既に存在します';
+    return;
+  }
+  const now = new Date().toISOString();
+  const setting: SavedExamSimulatorSettings = {
+    id: createExamSettingsId(),
+    name,
+    createdAt: now,
+    updatedAt: now,
+    payload: buildExamSettingsPayload(),
+  };
+  savedExamSettings.value = [setting, ...savedExamSettings.value];
+  saveSavedExamSimulatorSettings(savedExamSettings.value);
+  settingsSetName.value = '';
+}
+
+function deleteSavedExamSettingsSet(id: string) {
+  savedExamSettings.value = savedExamSettings.value.filter((setting) => setting.id !== id);
+  saveSavedExamSimulatorSettings(savedExamSettings.value);
+}
+
+function savedSettingIcon(setting: SavedExamSimulatorSettings, index: number) {
+  const payload = setting.payload as Partial<ExamSettingsPayload> | null;
+  const savedSlot = payload?.deck?.[index];
+  if (!savedSlot?.character) return '';
+  return String(savedSlot.imageUrl || savedSlot.character.imgUrl || '');
+}
+
+async function applySavedExamSettingsSet(setting: SavedExamSimulatorSettings) {
+  const payload = setting.payload as Partial<ExamSettingsPayload> | null;
+  if (!payload?.deck && !payload?.turnPlans) return;
+
+  const characterStore = useCharacterStore();
+  deck.value = await Promise.all(Array.from({ length: 5 }, (_, index) => (
+    restoreDeckSlotFromSettings(payload.deck?.[index], characterStore)
+  )));
+  syncAllDeckLevelInputs();
+
+  const turnCount = maxTurnCount.value;
+  turnPlans.value = Array.from({ length: turnCount }, (_, index) => {
+    const savedTurn = payload.turnPlans?.[index];
+    const combos = Array.isArray(savedTurn?.combos)
+      ? savedTurn.combos.map((combo) => createTurnCombo(combo.firstMagicId, combo.secondMagicId, combo.autoGenerated))
+      : [];
+    const uniqueCombos = uniqueTurnCombos(combos);
+    return {
+      turn: index + 1,
+      combos: uniqueCombos.length ? uniqueCombos : [createTurnCombo('', '', true)],
+    };
+  });
+  normalizeTurnCombosForAvailableMagic();
+  editingDeckDetailCharacter.value = null;
+  characterDialogOpen.value = false;
+  deckDetailDialogOpen.value = false;
+  magicPickerOpen.value = false;
+  settingsSaveDialogOpen.value = false;
+  clearResults();
+}
+
+async function restoreDeckSlotFromSettings(
+  savedSlot: Record<string, any> | undefined,
+  characterStore: ReturnType<typeof useCharacterStore>,
+): Promise<DeckSlot> {
+  if (!savedSlot?.character) return createEmptyDeckSlot();
+  const selectedMagicSlots = Array.isArray(savedSlot.selectedMagicSlots)
+    ? savedSlot.selectedMagicSlots
+    : [];
+  const importedCharacter = {
+    ...savedSlot.character,
+    level: savedSlot.level,
+    totsu: savedSlot.totsu,
+    hp: savedSlot.customHp,
+    atk: savedSlot.customAtk,
+    originalMaxHP: savedSlot.maxHp,
+    originalMaxATK: savedSlot.maxAtk,
+    max_hp: savedSlot.maxHp,
+    max_atk: savedSlot.maxAtk,
+    imgUrl: savedSlot.imageUrl || savedSlot.character.imgUrl,
+    magic1Lv: savedSlot.magicLevels?.[1],
+    magic2Lv: savedSlot.magicLevels?.[2],
+    magic3Lv: savedSlot.magicLevels?.[3],
+    buddy1Lv: savedSlot.buddyLevels?.[1],
+    buddy2Lv: savedSlot.buddyLevels?.[2],
+    buddy3Lv: savedSlot.buddyLevels?.[3],
+    magic1atr: savedSlot.magicAttributes?.[1],
+    magic2atr: savedSlot.magicAttributes?.[2],
+    magic3atr: savedSlot.magicAttributes?.[3],
+    magic1Power: savedSlot.magicPowers?.[1],
+    magic2Power: savedSlot.magicPowers?.[2],
+    magic3Power: savedSlot.magicPowers?.[3],
+    magic1heal: savedSlot.magicHeals?.[1],
+    magic2heal: savedSlot.magicHeals?.[2],
+    magic3heal: savedSlot.magicHeals?.[3],
+    magic1etc: savedSlot.magicEffects?.[1],
+    magic2etc: savedSlot.magicEffects?.[2],
+    magic3etc: savedSlot.magicEffects?.[3],
+    isM1Selected: selectedMagicSlots.includes(1),
+    isM2Selected: selectedMagicSlots.includes(2),
+    isM3Selected: selectedMagicSlots.includes(3),
+  };
+  const slot = await createDeckSlotFromSimulatorCharacter(importedCharacter, characterStore);
+  slot.customBuffs = clonePlain(savedSlot.customBuffs ?? []);
+  slot.selectedMagicSlots = selectedMagicSlots
+    .map((value: unknown) => Math.floor(safeNumber(value)) as MagicSlot)
+    .filter((value: MagicSlot) => magicSlotOptions.includes(value));
+  normalizeSelectedMagicSlots(slot);
+  return slot;
 }
 
 async function restoreDeckFromSimulatorImport() {
@@ -5319,9 +5579,170 @@ function formatRatePercent(value: number) {
   min-width: 0;
 }
 
+.deck-save-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .preset-menu-list {
   min-width: 260px;
   max-width: min(420px, 92vw);
+}
+
+.saved-deck-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.saved-deck-modal-content {
+  width: min(500px, 90vw);
+  max-height: 80vh;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.saved-deck-modal-body {
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.settings-save-section {
+  margin-bottom: 20px;
+}
+
+.settings-save-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-save-btn {
+  min-width: 36px !important;
+  height: 36px !important;
+  border-radius: 6px !important;
+}
+
+.settings-error-message {
+  margin-top: 4px;
+  color: #d32f2f;
+  font-size: 0.8rem;
+}
+
+.saved-decks-section {
+  margin-bottom: 20px;
+}
+
+.no-decks {
+  padding: 24px;
+  color: #666666;
+  font-style: italic;
+  text-align: center;
+}
+
+.settings-deck-item {
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.settings-deck-item:hover {
+  background: #f5f5f5;
+}
+
+.settings-deck-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-deck-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-deck-name {
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.settings-character-icons {
+  display: flex;
+  flex-shrink: 0;
+  gap: 3px;
+}
+
+.settings-icon-slot {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.settings-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-empty-icon {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+}
+
+.settings-delete-btn {
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+  border-radius: 4px !important;
+}
+
+.settings-close-section {
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.v-theme--dark .saved-deck-modal-content {
+  background: #2c2c2c;
+}
+
+.v-theme--dark .settings-deck-item {
+  border-color: #424242;
+}
+
+.v-theme--dark .settings-deck-item:hover {
+  background: #3a3a3a;
+}
+
+.v-theme--dark .settings-close-section,
+.v-theme--dark .settings-icon-slot {
+  border-color: #424242;
+}
+
+.v-theme--dark .settings-empty-icon {
+  background: #424242;
 }
 
 .form-grid {
@@ -6275,7 +6696,8 @@ function formatRatePercent(value: number) {
 
   .header-actions,
   .result-actions,
-  .preset-actions {
+  .preset-actions,
+  .deck-save-actions {
     justify-content: flex-start;
   }
 
