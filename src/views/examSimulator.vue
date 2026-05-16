@@ -168,6 +168,18 @@
                   <h2>許容優先度</h2>
                 </div>
                 <div class="plan-heading-actions">
+                  <label
+                    class="smart-selection-toggle"
+                    :class="{ disabled: exam.enemyElement !== '全' }"
+                    title="全属性試験で公開敵属性と残り候補から有利確率を計算して選択"
+                  >
+                    <input
+                      v-model="allTurnElementCompatibilityPriority"
+                      type="checkbox"
+                      :disabled="exam.enemyElement !== '全'"
+                    />
+                    <span>属性相性優先</span>
+                  </label>
                   <v-btn
                     class="copy-prev-turn-button"
                     color="primary"
@@ -200,15 +212,48 @@
               </v-tabs>
 
               <div class="turn-page">
+                <div v-if="currentTurnPlan" class="turn-option-row">
+                  <label
+                    class="turn-smart-selection-toggle"
+                    :class="{ disabled: exam.enemyElement !== '全' }"
+                    title="このターンだけ属性相性優先を使う"
+                  >
+                    <input
+                      :checked="currentTurnPlan.useElementCompatibilityPriority === true"
+                      type="checkbox"
+                      :disabled="exam.enemyElement !== '全'"
+                      @change="updateActiveTurnElementCompatibilityPriority"
+                    />
+                    <span>{{ currentTurnPlan.turn }}T 属性相性優先</span>
+                  </label>
+                </div>
                 <div v-if="currentTurnPlan" class="combo-list">
                   <div
                     v-for="(combo, comboIndex) in currentTurnDisplayCombos"
                     :key="combo.id"
                     class="combo-row"
-                    :class="{ active: comboIndex === activeComboIndex && !combo.virtual, virtual: combo.virtual }"
+                    :class="{ active: comboIndex === activeComboIndex && !combo.virtual, virtual: combo.virtual, 'combo-drag-over': comboIndex === dragOverComboIndex && !combo.virtual }"
                     @click="combo.virtual ? openMagicPicker(comboIndex, 'firstMagicId') : selectComboTarget(comboIndex)"
+                    @dragenter="onComboRowDragEnter(comboIndex, combo.virtual, $event)"
+                    @dragover="onComboRowDragOver(comboIndex, combo.virtual, $event)"
+                    @dragleave="onComboRowDragLeave(comboIndex)"
+                    @drop="onComboRowDrop(activeTurnIndex, comboIndex, combo.virtual, $event)"
                   >
-                    <div class="combo-priority">{{ combo.virtual ? '' : comboIndex + 1 }}</div>
+                    <button
+                      v-if="!combo.virtual"
+                      class="combo-priority"
+                      type="button"
+                      draggable="true"
+                      aria-label="優先度をドラッグして並び替え"
+                      title="ドラッグして並び替え"
+                      @click.stop="selectComboTarget(comboIndex)"
+                      @dragstart.stop="onComboPriorityDragStart(activeTurnIndex, comboIndex, $event)"
+                      @dragend="onComboPriorityDragEnd"
+                    >
+                      <span class="combo-priority-grip" aria-hidden="true">⋮⋮</span>
+                      <span>{{ comboIndex + 1 }}</span>
+                    </button>
+                    <div v-else class="combo-priority combo-priority-empty" aria-hidden="true"></div>
                     <div class="combo-pair">
                       <div
                         class="combo-drop-slot"
@@ -246,10 +291,12 @@
                       </div>
                     </div>
                     <div class="combo-right">
+                      <label v-if="!combo.virtual" class="combo-auto-swap" title="属性スコアが高くなる場合だけ左右を自動で入れ替え" @click.stop>
+                        <input v-model="combo.allowAutoSwap" type="checkbox" @click.stop />
+                        <span>入替可</span>
+                      </label>
                       <div class="combo-actions" v-if="!combo.virtual">
                         <v-btn icon="mdi-swap-horizontal" size="small" variant="text" :disabled="!combo.firstMagicId || !combo.secondMagicId" aria-label="左右入れ替え" @click.stop="swapComboMagic(activeTurnIndex, comboIndex)" />
-                        <v-btn icon="mdi-arrow-up" size="small" variant="text" :disabled="comboIndex === 0" @click.stop="moveCombo(activeTurnIndex, comboIndex, -1)" />
-                        <v-btn icon="mdi-arrow-down" size="small" variant="text" :disabled="comboIndex === currentTurnPlan.combos.length - 1" @click.stop="moveCombo(activeTurnIndex, comboIndex, 1)" />
                         <v-btn icon="mdi-delete" size="small" variant="text" color="error" :disabled="currentTurnPlan.combos.length <= 1" @click.stop="removeCombo(activeTurnIndex, comboIndex)" />
                       </div>
                     </div>
@@ -724,6 +771,7 @@ interface TurnCombo {
   firstMagicId: string;
   secondMagicId: string;
   autoGenerated?: boolean;
+  allowAutoSwap?: boolean;
 }
 
 interface DisplayTurnCombo extends TurnCombo {
@@ -733,11 +781,14 @@ interface DisplayTurnCombo extends TurnCombo {
 interface TurnPlan {
   turn: number;
   combos: TurnCombo[];
+  useElementCompatibilityPriority?: boolean;
 }
 
 interface ExamSettingsPayload {
   deck: Array<Record<string, any>>;
   turnPlans: TurnPlan[];
+  useElementCompatibilityPriority?: boolean;
+  useAllElementSmartSelection?: boolean;
 }
 
 interface BattleLogEntry {
@@ -1128,6 +1179,7 @@ const deckLevelFocusPrefixes = ref<string[]>(Array.from({ length: 5 }, () => '')
 const turnPlans = ref<TurnPlan[]>(Array.from({ length: 5 }, (_, index) => ({
   turn: index + 1,
   combos: [createTurnCombo('', '', true)],
+  useElementCompatibilityPriority: false,
 })));
 const openedTurnPanels = ref<number[]>([0, 1, 2, 3, 4]);
 const iterations = ref(10000);
@@ -1143,6 +1195,8 @@ const deckDetailDialogOpen = ref(false);
 const editingDeckIndex = ref(0);
 const editingDeckDetailCharacter = ref<any | null>(null);
 const draggingMagicId = ref('');
+const draggingCombo = ref<{ turnIndex: number; comboIndex: number } | null>(null);
+const dragOverComboIndex = ref<number | null>(null);
 const activeTab = ref<ActiveTab>('exam');
 const activeTurnIndex = ref(0);
 const activeComboIndex = ref(0);
@@ -1194,6 +1248,12 @@ const magicMap = computed(() => Object.fromEntries(magicCards.value.map((magic) 
 const totalDeckHp = computed(() => deck.value.reduce((sum, _slot, index) => sum + deckCardTotalHp(index), 0));
 const maxTurnCount = computed(() => (exam.value.kind === 'ATTACK' ? 10 : 5));
 const currentTurnPlan = computed(() => turnPlans.value[activeTurnIndex.value] ?? null);
+const allTurnElementCompatibilityPriority = computed({
+  get: () => turnPlans.value.length > 0 && turnPlans.value.every((turn) => turn.useElementCompatibilityPriority === true),
+  set: (enabled: boolean) => {
+    setAllTurnElementCompatibilityPriority(enabled);
+  },
+});
 const currentTurnDisplayCombos = computed<DisplayTurnCombo[]>(() => {
   const combos = currentTurnPlan.value?.combos ?? [];
   const hasIncomplete = combos.some((combo) => !combo.firstMagicId || !combo.secondMagicId);
@@ -1420,8 +1480,13 @@ function markEnemyConditionsTouched() {
 
 function syncTurnPlans(turnCount: number) {
   const normalized = Math.min(10, Math.max(1, Math.floor(safeNumber(turnCount) || 1)));
+  const enableNewTurns = turnPlans.value.length > 0 && turnPlans.value.every((turn) => turn.useElementCompatibilityPriority === true);
   while (turnPlans.value.length < normalized) {
-    turnPlans.value.push({ turn: turnPlans.value.length + 1, combos: [createTurnCombo('', '', true)] });
+    turnPlans.value.push({
+      turn: turnPlans.value.length + 1,
+      combos: [createTurnCombo('', '', true)],
+      useElementCompatibilityPriority: enableNewTurns,
+    });
   }
   if (turnPlans.value.length > normalized) {
     turnPlans.value.splice(normalized);
@@ -1763,13 +1828,16 @@ function serializeDeckSlotForSettings(slot: DeckSlot) {
 function buildExamSettingsPayload(): ExamSettingsPayload {
   return {
     deck: deck.value.map(serializeDeckSlotForSettings),
+    useElementCompatibilityPriority: allTurnElementCompatibilityPriority.value,
     turnPlans: turnPlans.value.map((turn) => ({
       turn: turn.turn,
+      useElementCompatibilityPriority: turn.useElementCompatibilityPriority === true,
       combos: turn.combos.map((combo) => ({
         id: combo.id,
         firstMagicId: combo.firstMagicId,
         secondMagicId: combo.secondMagicId,
         autoGenerated: combo.autoGenerated,
+        allowAutoSwap: combo.allowAutoSwap,
       })),
     })),
   };
@@ -1822,16 +1890,19 @@ async function applySavedExamSettingsSet(setting: SavedExamSimulatorSettings) {
     restoreDeckSlotFromSettings(payload.deck?.[index], characterStore)
   )));
   syncAllDeckLevelInputs();
+  const legacyElementCompatibilityPriority = payload.useElementCompatibilityPriority === true
+    || payload.useAllElementSmartSelection === true;
 
   const turnCount = maxTurnCount.value;
   turnPlans.value = Array.from({ length: turnCount }, (_, index) => {
     const savedTurn = payload.turnPlans?.[index];
     const combos = Array.isArray(savedTurn?.combos)
-      ? savedTurn.combos.map((combo) => createTurnCombo(combo.firstMagicId, combo.secondMagicId, combo.autoGenerated))
+      ? savedTurn.combos.map((combo) => createTurnCombo(combo.firstMagicId, combo.secondMagicId, combo.autoGenerated, combo.allowAutoSwap))
       : [];
     const uniqueCombos = uniqueTurnCombos(combos);
     return {
       turn: index + 1,
+      useElementCompatibilityPriority: savedTurn?.useElementCompatibilityPriority === true || legacyElementCompatibilityPriority,
       combos: uniqueCombos.length ? uniqueCombos : [createTurnCombo('', '', true)],
     };
   });
@@ -2052,12 +2123,13 @@ function createEmptyDeckSlot(): DeckSlot {
   };
 }
 
-function createTurnCombo(firstMagicId = '', secondMagicId = '', autoGenerated = false): TurnCombo {
+function createTurnCombo(firstMagicId = '', secondMagicId = '', autoGenerated = false, allowAutoSwap = false): TurnCombo {
   return {
     id: makeId('turn-combo'),
     firstMagicId,
     secondMagicId,
     autoGenerated,
+    allowAutoSwap,
   };
 }
 
@@ -2124,13 +2196,28 @@ function requestTurnChange(value: unknown) {
   activeTurnIndex.value = nextIndex;
 }
 
+function setAllTurnElementCompatibilityPriority(enabled: boolean) {
+  turnPlans.value.forEach((turn) => {
+    turn.useElementCompatibilityPriority = enabled;
+  });
+}
+
+function updateActiveTurnElementCompatibilityPriority(event: Event) {
+  const target = event.target as HTMLInputElement | null;
+  const turn = currentTurnPlan.value;
+  if (!turn || !target) return;
+  turn.useElementCompatibilityPriority = target.checked;
+}
+
 function copyPreviousTurnCombos() {
   const currentIndex = activeTurnIndex.value;
   const currentTurn = turnPlans.value[currentIndex];
   const previousTurn = turnPlans.value[currentIndex - 1];
   if (!currentTurn || !previousTurn) return;
   if (magicPickerOpen.value) magicPickerOpen.value = false;
-  currentTurn.combos = previousTurn.combos.map((combo) => createTurnCombo(combo.firstMagicId, combo.secondMagicId));
+  currentTurn.combos = previousTurn.combos.map((combo) => (
+    createTurnCombo(combo.firstMagicId, combo.secondMagicId, false, combo.allowAutoSwap === true)
+  ));
   if (!currentTurn.combos.length) currentTurn.combos = [createTurnCombo()];
   activeComboIndex.value = 0;
   activeComboSlot.value = 'firstMagicId';
@@ -2153,7 +2240,7 @@ function addAllTurnCombos() {
     ids.slice(firstIndex + 1).forEach((secondMagicId) => {
       const key = comboPairKey(firstMagicId, secondMagicId);
       if (existingPairs.has(key)) return;
-      nextCombos.push(createTurnCombo(firstMagicId, secondMagicId));
+      nextCombos.push(createTurnCombo(firstMagicId, secondMagicId, false, true));
       existingPairs.add(key);
     });
   });
@@ -2201,14 +2288,65 @@ function swapComboMagic(turnIndex: number, comboIndex: number) {
   }
 }
 
-function moveCombo(turnIndex: number, comboIndex: number, direction: -1 | 1) {
+function onComboPriorityDragStart(turnIndex: number, comboIndex: number, event: DragEvent) {
+  const combos = turnPlans.value[turnIndex]?.combos;
+  if (!combos?.[comboIndex]) return;
+  draggingCombo.value = { turnIndex, comboIndex };
+  dragOverComboIndex.value = comboIndex;
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-twst-combo-index', String(comboIndex));
+  }
+}
+
+function onComboPriorityDragEnd() {
+  draggingCombo.value = null;
+  dragOverComboIndex.value = null;
+}
+
+function onComboRowDragEnter(comboIndex: number, isVirtual: boolean | undefined, event: DragEvent) {
+  if (!draggingCombo.value || isVirtual) return;
+  event.preventDefault();
+  dragOverComboIndex.value = comboIndex;
+}
+
+function onComboRowDragOver(comboIndex: number, isVirtual: boolean | undefined, event: DragEvent) {
+  if (!draggingCombo.value || isVirtual) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  dragOverComboIndex.value = comboIndex;
+}
+
+function onComboRowDragLeave(comboIndex: number) {
+  if (dragOverComboIndex.value === comboIndex) dragOverComboIndex.value = null;
+}
+
+function onComboRowDrop(turnIndex: number, targetIndex: number, isVirtual: boolean | undefined, event: DragEvent) {
+  if (!draggingCombo.value || isVirtual) return;
+  event.preventDefault();
+  const sourceIndex = draggingCombo.value.comboIndex;
+  const sourceTurnIndex = draggingCombo.value.turnIndex;
+  draggingCombo.value = null;
+  dragOverComboIndex.value = null;
+  if (sourceTurnIndex !== turnIndex) return;
+  reorderCombo(turnIndex, sourceIndex, targetIndex);
+}
+
+function reorderCombo(turnIndex: number, sourceIndex: number, targetIndex: number) {
   const combos = turnPlans.value[turnIndex]?.combos;
   if (!combos) return;
-  const nextIndex = comboIndex + direction;
-  if (nextIndex < 0 || nextIndex >= combos.length) return;
-  [combos[comboIndex], combos[nextIndex]] = [combos[nextIndex], combos[comboIndex]];
-  if (turnIndex === activeTurnIndex.value && activeComboIndex.value === comboIndex) {
-    activeComboIndex.value = nextIndex;
+  if (sourceIndex === targetIndex) return;
+  if (sourceIndex < 0 || sourceIndex >= combos.length || targetIndex < 0 || targetIndex >= combos.length) return;
+  const [moved] = combos.splice(sourceIndex, 1);
+  combos.splice(targetIndex, 0, moved);
+  if (turnIndex === activeTurnIndex.value) {
+    if (activeComboIndex.value === sourceIndex) {
+      activeComboIndex.value = targetIndex;
+    } else if (sourceIndex < activeComboIndex.value && activeComboIndex.value <= targetIndex) {
+      activeComboIndex.value -= 1;
+    } else if (targetIndex <= activeComboIndex.value && activeComboIndex.value < sourceIndex) {
+      activeComboIndex.value += 1;
+    }
   }
 }
 
@@ -3051,7 +3189,7 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     }
     const firstEnemy = enemyDeck[turnIndex * 2];
     const secondEnemy = enemyDeck[turnIndex * 2 + 1];
-    const selected = choosePlayerPair(turnIndex, handState.visible, stats);
+    const selected = choosePlayerPair(turnIndex, handState.visible, stats, enemyDeck);
     if (!selected) {
       stats.finishTurn = turnIndex + 1;
       retire(stats, `${turnIndex + 1}T 許容組み合わせなし`);
@@ -3174,20 +3312,104 @@ function createHandCycle(rng: () => number) {
   };
 }
 
-function choosePlayerPair(turnIndex: number, visible: string[], stats: SimulationStats): [string, string] | null {
+function choosePlayerPair(
+  turnIndex: number,
+  visible: string[],
+  stats: SimulationStats,
+  enemyDeck: RuntimeEnemyAction[],
+): [string, string] | null {
   const combos = turnPlans.value[turnIndex]?.combos ?? [];
   const visibleSet = new Set(visible);
-  const matched = combos.find((combo) => (
-    combo.firstMagicId
-    && combo.secondMagicId
-    && combo.firstMagicId !== combo.secondMagicId
-    && visibleSet.has(combo.firstMagicId)
-    && visibleSet.has(combo.secondMagicId)
-  ));
-  if (matched) return [matched.firstMagicId, matched.secondMagicId];
+  const matched = combos
+    .map((combo, priority) => ({ combo, priority }))
+    .filter(({ combo }) => (
+      combo.firstMagicId
+      && combo.secondMagicId
+      && combo.firstMagicId !== combo.secondMagicId
+      && visibleSet.has(combo.firstMagicId)
+      && visibleSet.has(combo.secondMagicId)
+    ));
+  if (matched.length) {
+    if (shouldUseAllElementSmartSelection(turnIndex)) {
+      return chooseAllElementSmartPair(turnIndex, matched, enemyDeck);
+    }
+    const firstMatched = matched[0].combo;
+    return [firstMatched.firstMagicId, firstMatched.secondMagicId];
+  }
   stats.fallback += 1;
   pushLog(stats, `${turnIndex + 1}T 許容外のみ: ${visible.map((magicId) => describeMagic(magicId)).join(' / ')}`);
   return null;
+}
+
+function shouldUseAllElementSmartSelection(turnIndex: number) {
+  return exam.value.enemyElement === '全'
+    && turnPlans.value[turnIndex]?.useElementCompatibilityPriority === true;
+}
+
+function chooseAllElementSmartPair(
+  turnIndex: number,
+  matched: Array<{ combo: TurnCombo; priority: number }>,
+  enemyDeck: RuntimeEnemyAction[],
+): [string, string] {
+  let best: { selected: [string, string]; score: number; priority: number } | null = null;
+  matched.forEach(({ combo, priority }) => {
+    const normalSelected: [string, string] = [combo.firstMagicId, combo.secondMagicId];
+    const normalScore = calculateAllElementPairScore(turnIndex, normalSelected, enemyDeck);
+    let candidate = {
+      selected: normalSelected,
+      score: normalScore,
+      priority,
+    };
+    if (combo.allowAutoSwap === true) {
+      const swappedSelected: [string, string] = [combo.secondMagicId, combo.firstMagicId];
+      const swappedScore = calculateAllElementPairScore(turnIndex, swappedSelected, enemyDeck);
+      if (swappedScore > normalScore) {
+        candidate = {
+          selected: swappedSelected,
+          score: swappedScore,
+          priority,
+        };
+      }
+    }
+    if (!best || candidate.score > best.score) {
+      best = candidate;
+    }
+  });
+  return best?.selected ?? [matched[0].combo.firstMagicId, matched[0].combo.secondMagicId];
+}
+
+function calculateAllElementPairScore(turnIndex: number, selected: [string, string], enemyDeck: RuntimeEnemyAction[]) {
+  const knownSlotIndex = knownEnemySlotIndexForTurn(turnIndex);
+  const unknownSlotIndex = knownSlotIndex === 0 ? 1 : 0;
+  const knownEnemy = enemyDeck[turnIndex * 2 + knownSlotIndex];
+  const knownScore = advantageScoreAgainstEnemy(selected[knownSlotIndex], knownEnemy);
+  const unknownCandidates = unknownEnemyCandidatesForTurn(enemyDeck, turnIndex);
+  const unknownScore = unknownCandidates.length
+    ? unknownCandidates.reduce((sum, enemy) => sum + advantageScoreAgainstEnemy(selected[unknownSlotIndex], enemy), 0) / unknownCandidates.length
+    : 0;
+  return knownScore + unknownScore;
+}
+
+function knownEnemySlotIndexForTurn(turnIndex: number): 0 | 1 {
+  return (turnIndex + 1) % 2 === 1 ? 0 : 1;
+}
+
+function unknownEnemyCandidatesForTurn(enemyDeck: RuntimeEnemyAction[], turnIndex: number) {
+  const knownSlotIndex = knownEnemySlotIndexForTurn(turnIndex);
+  const knownEnemyDeckIndex = turnIndex * 2 + knownSlotIndex;
+  const blockStart = Math.floor(turnIndex / 5) * 10;
+  const turnInBlock = turnIndex % 5;
+  const visibleStart = blockStart + turnInBlock * 2;
+  const visibleEnd = Math.min(enemyDeck.length, blockStart + 10, visibleStart + 5);
+  return enemyDeck
+    .slice(visibleStart, visibleEnd)
+    .filter((_enemy, offset) => visibleStart + offset !== knownEnemyDeckIndex);
+}
+
+function advantageScoreAgainstEnemy(magicId: string, enemyAction: RuntimeEnemyAction | undefined) {
+  const magic = magicById(magicId);
+  if (!magic || !enemyAction) return 0;
+  return getCompatibility(magic.element, effectiveEnemyActionElement(enemyAction)) === 'advantage' ? 1 : 0;
 }
 
 function consumeHand(handState: { visible: string[]; hidden: string[] }, selected: [string, string]) {
@@ -5402,24 +5624,97 @@ function formatRatePercent(value: number) {
 }
 
 .order-panel > .panel-heading {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .order-panel > .panel-heading > div:first-child {
-  justify-self: start;
+  flex: 0 0 auto;
+}
+
+.order-panel > .panel-heading h2 {
+  white-space: nowrap;
 }
 
 .plan-heading-actions {
-  grid-column: 2;
-  justify-self: center;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 1 1 360px;
   gap: 8px;
   min-width: 0;
   flex-wrap: wrap;
+}
+
+.smart-selection-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid #c8dbe7;
+  border-radius: 999px;
+  color: #164d68;
+  background: #f3f9fc;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.smart-selection-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #236c8e;
+}
+
+.smart-selection-toggle.disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.turn-option-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.turn-smart-selection-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 27px;
+  padding: 3px 9px;
+  border: 1px solid #d7e4ed;
+  border-radius: 999px;
+  color: #35586d;
+  background: #fbfdff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.turn-smart-selection-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #236c8e;
+}
+
+.turn-smart-selection-toggle:has(input:checked) {
+  border-color: #9bc7dc;
+  color: #164d68;
+  background: #eef8fd;
+}
+
+.turn-smart-selection-toggle.disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
 }
 
 .plan-reference-panel {
@@ -6122,26 +6417,68 @@ function formatRatePercent(value: number) {
   box-shadow: inset 3px 0 0 #236c8e;
 }
 
+.combo-row.combo-drag-over {
+  border-color: #d36b36;
+  background: #fff7f1;
+  box-shadow: inset 4px 0 0 #d36b36, 0 0 0 2px rgba(211, 107, 54, 0.16);
+}
+
 .combo-row.virtual {
   border-style: dashed;
   background: #ffffff;
 }
 
 .combo-priority {
-  display: grid;
+  display: inline-grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px;
   flex: 0 0 28px;
-  width: 28px;
+  width: 32px;
   height: 28px;
+  align-items: center;
   place-items: center;
+  border: 1px solid rgba(35, 108, 142, 0.25);
   border-radius: 7px;
   color: #ffffff;
-  background: #236c8e;
+  background: linear-gradient(135deg, #236c8e 0%, #2b7fa5 100%);
   font-weight: 900;
   line-height: 1;
+  cursor: grab;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(24, 62, 82, 0.18);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+button.combo-priority {
+  padding: 0;
+  appearance: none;
+}
+
+.combo-priority:hover {
+  background: linear-gradient(135deg, #1e5f7e 0%, #2d89b2 100%);
+  box-shadow: 0 2px 6px rgba(24, 62, 82, 0.24);
+}
+
+.combo-priority:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+}
+
+.combo-priority-grip {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  letter-spacing: -2px;
 }
 
 .combo-row.virtual .combo-priority {
   background: transparent;
+  border: 0;
+  box-shadow: none;
+  cursor: default;
+}
+
+.combo-priority-empty {
+  pointer-events: none;
 }
 
 .combo-pair {
@@ -6178,6 +6515,36 @@ function formatRatePercent(value: number) {
   align-items: center;
   gap: 4px;
   margin-left: auto;
+}
+
+.combo-auto-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 7px;
+  border: 1px solid #d3e2ec;
+  border-radius: 999px;
+  color: #466577;
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.combo-auto-swap input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: #236c8e;
+}
+
+.combo-auto-swap:has(input:checked) {
+  border-color: #9bc7dc;
+  color: #164d68;
+  background: #eef8fd;
 }
 
 .combo-actions {
@@ -6692,6 +7059,8 @@ function formatRatePercent(value: number) {
 
   .plan-heading-actions {
     justify-content: flex-start;
+    flex: 0 1 auto;
+    width: 100%;
   }
 
   .header-actions,
@@ -6810,6 +7179,51 @@ function formatRatePercent(value: number) {
   .exam-header,
   .tool-panel {
     padding: 10px;
+  }
+
+  .panel-heading {
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+  }
+
+  .order-panel > .panel-heading {
+    align-items: flex-start;
+  }
+
+  .order-panel > .panel-heading h2 {
+    font-size: 18px;
+  }
+
+  .plan-heading-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .smart-selection-toggle,
+  .plan-heading-actions :deep(.v-btn) {
+    width: 100%;
+    min-height: 30px;
+  }
+
+  .smart-selection-toggle {
+    justify-content: center;
+    padding: 3px 7px;
+  }
+
+  .turn-page {
+    padding: 8px;
+  }
+
+  .turn-option-row {
+    justify-content: flex-start;
+    margin-bottom: 6px;
+  }
+
+  .turn-smart-selection-toggle {
+    min-height: 28px;
+    padding: 3px 8px;
   }
 
   .header-actions > *,
