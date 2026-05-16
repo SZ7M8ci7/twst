@@ -49,6 +49,80 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/05-2全ATK',
+    title: '2026/05-2全ATK',
+    kind: 'ATTACK',
+    enemyElement: '全',
+    enemyHp: 225000,
+    enemies: [
+      {
+        name: 'カリム',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジャミル',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'バフ解除弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'buffRemoval', effectTarget: '相手選択', effectValue: 0, duration: 1 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'フロイド',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'アズール',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/05-2無BS',
+    title: '2026/05-2無BS',
+    kind: 'BASIC',
+    enemyElement: '無',
+    enemyHp: 90000,
+    enemies: [
+      {
+        name: 'トレイ',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '相手選択凍結強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'freeze', effectTarget: '相手選択', effectValue: 100, duration: 3 },
+        ],
+      },
+      {
+        name: 'ルーク',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジェイド',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/05-1火BS',
     title: '2026/05-1火BS',
     kind: 'BASIC',
