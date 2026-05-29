@@ -2,7 +2,7 @@
   <component :is="rootTag" v-bind="linkAttributes" class="character-icon-wrapper">
     <div class="character-image-container">
       <img :src="finalImgSrc" :alt="altText" class="character-image" :style="imageStyle" />
-      <span v-if="cardType && shouldShowCardType" class="character-card-type" :style="cardTypeStyle">{{ cardType }}</span>
+      <span v-if="displayCardType && shouldShowCardType" class="character-card-type" :style="cardTypeStyle">{{ displayCardType }}</span>
     </div>
   </component>
 </template>
@@ -10,6 +10,8 @@
 <script setup lang="ts">
 import { computed, type StyleValue } from 'vue';
 import defaultImg from '@/assets/img/default.webp';
+import { useI18n } from 'vue-i18n';
+import { isEnglishLocale } from '@/utils/localizedDisplay';
 
 const props = defineProps<{
   imgSrc?: string;      // 既存:直接画像URLを指定する場合
@@ -22,6 +24,7 @@ const props = defineProps<{
 
 const DEFAULT_ICON_SIZE = 60;
 const MIN_SIZE_TO_SHOW_TYPE = 30; // カードタイプを表示する最小アイコンサイズ
+const { locale } = useI18n();
 
 const rootTag = computed(() => (props.wikiUrl ? 'a' : 'div'));
 
@@ -46,7 +49,19 @@ const finalImgSrc = computed(() => {
   return props.imgSrc || (props.iconDictionary && props.iconDictionary['notyet']) || defaultImg;
 });
 
-const altText = computed(() => props.iconKey || props.cardType || 'character');
+const englishCardTypeLabels: Record<string, string> = {
+  アタック: 'Atk',
+  バランス: 'Bal',
+  ディフェンス: 'Def',
+};
+
+const displayCardType = computed(() => {
+  const cardType = props.cardType || '';
+  if (!isEnglishLocale(locale.value)) return cardType;
+  return englishCardTypeLabels[cardType] ?? cardType;
+});
+
+const altText = computed(() => props.iconKey || displayCardType.value || 'character');
 
 const shouldShowCardType = computed(() => currentIconSize.value >= MIN_SIZE_TO_SHOW_TYPE);
 

@@ -53,40 +53,24 @@
 
     <div v-if="deckCharactersWithBuddies.length === 0" class="no-characters">
       <v-icon size="48" color="grey">mdi-account-search</v-icon>
-      <div>{{ t('noCharacters') }}</div>
+      <div>{{ t('common.noCharacters') }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import defaultImg from '@/assets/img/default.webp';
 import charactersInfo from '@/assets/characters_info.json';
 import { getBuddyStatusForCharacter } from '@/utils/buddyEffects';
 import { isTotsuBuddyEnhanced } from '@/utils/totsu';
 import { loadCachedImageUrl } from '@/utils/characterAssets';
+import { localizeGameText } from '@/utils/localizedDisplay';
 
 const simulatorStore = useSimulatorStore();
-
-// 多言語対応
-const translations = {
-  ja: {
-    noCharacters: 'デッキにキャラクターを追加してください'
-  },
-  en: {
-    noCharacters: 'Please add characters to your deck'
-  }
-} as const;
-
-// ブラウザの言語設定を検出
-const detectLanguage = (): keyof typeof translations => {
-  const browserLang = navigator.language || 'ja';
-  return browserLang.startsWith('en') ? 'en' : 'ja';
-};
-
-const currentLang = ref(detectLanguage());
-const t = (key: keyof typeof translations['ja']): string => translations[currentLang.value][key] || key;
+const { t, locale } = useI18n();
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
 const jpName2enName = charactersInfo.reduce((map, character) => {
@@ -106,9 +90,9 @@ const deckCharactersWithBuddies = computed(() => {
         const inDeck = isCharacterInDeck(char.buddy1c);
         buddyList.push({
           charaCode: char.buddy1c,
-          effect: (getBuddyStatusForCharacter(char, 1, {
+          effect: localizeGameText((getBuddyStatusForCharacter(char, 1, {
             forceTotsu: isTotsuBuddyEnhanced(char.rare, char.totsu ?? 0),
-          }) || 'ATK UP').replace(/UP/g, '').trim(),
+          }) || 'ATK UP').replace(/UP/g, '').trim(), locale.value),
           inDeck
         });
       }
@@ -118,9 +102,9 @@ const deckCharactersWithBuddies = computed(() => {
         const inDeck = isCharacterInDeck(char.buddy2c);
         buddyList.push({
           charaCode: char.buddy2c,
-          effect: (getBuddyStatusForCharacter(char, 2, {
+          effect: localizeGameText((getBuddyStatusForCharacter(char, 2, {
             forceTotsu: isTotsuBuddyEnhanced(char.rare, char.totsu ?? 0),
-          }) || 'HP UP').replace(/UP/g, '').trim(),
+          }) || 'HP UP').replace(/UP/g, '').trim(), locale.value),
           inDeck
         });
       }
@@ -130,9 +114,9 @@ const deckCharactersWithBuddies = computed(() => {
         const inDeck = isCharacterInDeck(char.buddy3c);
         buddyList.push({
           charaCode: char.buddy3c,
-          effect: (getBuddyStatusForCharacter(char, 3, {
+          effect: localizeGameText((getBuddyStatusForCharacter(char, 3, {
             forceTotsu: isTotsuBuddyEnhanced(char.rare, char.totsu ?? 0),
-          }) || 'SKILL UP').replace(/UP/g, '').trim(),
+          }) || 'SKILL UP').replace(/UP/g, '').trim(), locale.value),
           inDeck
         });
       }

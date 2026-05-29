@@ -31,7 +31,7 @@
         />
       </v-col>
       <v-col cols="auto" class="controls-download d-flex justify-end">
-        <v-btn color="green" @click="exportToExcel">Excelでダウンロード</v-btn>
+        <v-btn color="green" @click="exportToExcel">{{ t('data.downloadExcel') }}</v-btn>
       </v-col>
     </v-row>
 
@@ -85,12 +85,17 @@ import { storeToRefs } from 'pinia';
 import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import { useI18n } from 'vue-i18n';
+import {
+  localizeCharacterName,
+  localizeCostumeName,
+  localizeGameText,
+} from '@/utils/localizedDisplay';
 import defaultImg from '@/assets/img/default.webp';
 import LazyCharacterImage from '@/components/LazyCharacterImage.vue';
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
 const { characters } = storeToRefs(characterStore);
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const loadingImgUrl = ref(true);
 const useHandCollectionFilter = ref(false);
 
@@ -124,77 +129,103 @@ const visibleCharacters = computed(() => {
   });
   return applyDefaultSort(filteredCharacters).map(character => ({
     ...character,
+    chara: localizeCharacterName(character.chara, locale.value),
+    costume: localizeCostumeName(character, locale.value),
     type: getTypeFromAttr(character.attr),
+    growtype: localizeGameText(character.growtype, locale.value),
+    duo: localizeCharacterName(character.duo, locale.value),
+    magic1atr: localizeGameText(character.magic1atr, locale.value),
+    magic1pow: localizeGameText(character.magic1pow, locale.value),
+    magic1buf: localizeGameText(character.magic1buf, locale.value),
+    magic1heal: localizeGameText(character.magic1heal, locale.value),
+    magic2atr: localizeGameText(character.magic2atr, locale.value),
+    magic2pow: localizeGameText(character.magic2pow, locale.value),
+    magic2buf: localizeGameText(character.magic2buf, locale.value),
+    magic2heal: localizeGameText(character.magic2heal, locale.value),
+    magic3atr: localizeGameText(character.magic3atr, locale.value),
+    magic3pow: localizeGameText(character.magic3pow, locale.value),
+    magic3buf: localizeGameText(character.magic3buf, locale.value),
+    magic3heal: localizeGameText(character.magic3heal, locale.value),
+    buddy1c: localizeCharacterName(character.buddy1c, locale.value),
+    buddy1s: localizeGameText(character.buddy1s, locale.value),
+    buddy1s_totsu: localizeGameText(character.buddy1s_totsu, locale.value),
+    buddy2c: localizeCharacterName(character.buddy2c, locale.value),
+    buddy2s: localizeGameText(character.buddy2s, locale.value),
+    buddy2s_totsu: localizeGameText(character.buddy2s_totsu, locale.value),
+    buddy3c: localizeCharacterName(character.buddy3c, locale.value),
+    buddy3s: localizeGameText(character.buddy3s, locale.value),
+    buddy3s_totsu: localizeGameText(character.buddy3s_totsu, locale.value),
+    etc: localizeGameText(character.etc, locale.value),
   }));
 });
 const search = ref('');
-const headers = [
-  { title: 'キャラ', value: 'name', sortable: false, width: 78 },
-  { title: '名前', value: 'chara', sortable: true  },
-  { title: '衣装', value: 'costume', sortable: true  },
-  { title: 'レア', value: 'rare', sortable: true  },
-  { title: 'タイプ', value: 'type', sortable: true },
-  { title: '非公式タイプ', value: 'growtype', sortable: true  },
+const headers = computed(() => [
+  { title: t('data.headers.card'), value: 'name', sortable: false, width: 78 },
+  { title: t('data.headers.name'), value: 'chara', sortable: true  },
+  { title: t('data.headers.costume'), value: 'costume', sortable: true  },
+  { title: t('data.headers.rarity'), value: 'rare', sortable: true  },
+  { title: t('data.headers.type'), value: 'type', sortable: true },
+  { title: t('data.headers.growthType'), value: 'growtype', sortable: true  },
   { title: 'HP', value: 'hp', sortable: true  },
   { title: 'ATK', value: 'atk', sortable: true  },
-  { title: 'デュオ', value: 'duo', sortable: true  },
+  { title: t('data.headers.duo'), value: 'duo', sortable: true  },
   { title: 'M1', value: 'magic1atr', sortable: true  },
-  { title: 'M1種', value: 'magic1pow', sortable: true  },
-  { title: 'M1バフ', value: 'magic1buf', sortable: true  },
-  { title: 'M1回復', value: 'magic1heal', sortable: true  },
+  { title: t('data.headers.magicType', { magic: 'M1' }), value: 'magic1pow', sortable: true  },
+  { title: t('data.headers.magicBuff', { magic: 'M1' }), value: 'magic1buf', sortable: true  },
+  { title: t('data.headers.magicHeal', { magic: 'M1' }), value: 'magic1heal', sortable: true  },
   { title: 'M2', value: 'magic2atr', sortable: true  },
-  { title: 'M2種', value: 'magic2pow', sortable: true  },
-  { title: 'M2バフ', value: 'magic2buf', sortable: true  },
-  { title: 'M2回復', value: 'magic2heal', sortable: true  },
+  { title: t('data.headers.magicType', { magic: 'M2' }), value: 'magic2pow', sortable: true  },
+  { title: t('data.headers.magicBuff', { magic: 'M2' }), value: 'magic2buf', sortable: true  },
+  { title: t('data.headers.magicHeal', { magic: 'M2' }), value: 'magic2heal', sortable: true  },
   { title: 'M3', value: 'magic3atr', sortable: true  },
-  { title: 'M3種', value: 'magic3pow', sortable: true  },
-  { title: 'M3バフ', value: 'magic3buf', sortable: true  },
-  { title: 'M3回復', value: 'magic3heal', sortable: true  },
-  { title: 'バディ1', value: 'buddy1c', sortable: true  },
-  { title: 'バディ1', value: 'buddy1s', sortable: true  },
-  { title: 'バディ1凸', value: 'buddy1s_totsu', sortable: true  },
-  { title: 'バディ2', value: 'buddy2c', sortable: true  },
-  { title: 'バディ2', value: 'buddy2s', sortable: true  },
-  { title: 'バディ2凸', value: 'buddy2s_totsu', sortable: true  },
-  { title: 'バディ3', value: 'buddy3c', sortable: true  },
-  { title: 'バディ3', value: 'buddy3s', sortable: true  },
-  { title: 'バディ3凸', value: 'buddy3s_totsu', sortable: true  },
-  { title: 'その他', value: 'etc', sortable: false  },
-];
+  { title: t('data.headers.magicType', { magic: 'M3' }), value: 'magic3pow', sortable: true  },
+  { title: t('data.headers.magicBuff', { magic: 'M3' }), value: 'magic3buf', sortable: true  },
+  { title: t('data.headers.magicHeal', { magic: 'M3' }), value: 'magic3heal', sortable: true  },
+  { title: t('data.headers.buddy', { number: 1 }), value: 'buddy1c', sortable: true  },
+  { title: t('data.headers.buddy', { number: 1 }), value: 'buddy1s', sortable: true  },
+  { title: t('data.headers.buddyLimit', { number: 1 }), value: 'buddy1s_totsu', sortable: true  },
+  { title: t('data.headers.buddy', { number: 2 }), value: 'buddy2c', sortable: true  },
+  { title: t('data.headers.buddy', { number: 2 }), value: 'buddy2s', sortable: true  },
+  { title: t('data.headers.buddyLimit', { number: 2 }), value: 'buddy2s_totsu', sortable: true  },
+  { title: t('data.headers.buddy', { number: 3 }), value: 'buddy3c', sortable: true  },
+  { title: t('data.headers.buddy', { number: 3 }), value: 'buddy3s', sortable: true  },
+  { title: t('data.headers.buddyLimit', { number: 3 }), value: 'buddy3s_totsu', sortable: true  },
+  { title: t('data.headers.other'), value: 'etc', sortable: false  },
+]);
 import * as XLSX from 'xlsx';
 
 const exportToExcel = () => {
   const data = visibleCharacters.value.map(character => ({
-    名前: character.chara,
-    衣装: character.costume,
-    レア: character.rare,
-    タイプ: getTypeFromAttr(character.attr),
-    非公式タイプ: character.growtype,
+    [t('data.headers.name')]: character.chara,
+    [t('data.headers.costume')]: character.costume,
+    [t('data.headers.rarity')]: character.rare,
+    [t('data.headers.type')]: character.type,
+    [t('data.headers.growthType')]: character.growtype,
     HP: character.hp,
     ATK: character.atk,
-    デュオ: character.duo,
-    M1属性: character.magic1atr,
-    M1種: character.magic1pow,
-    M1バフ: character.magic1buf,
-    M1回復: character.magic1heal,
-    M2属性: character.magic2atr,
-    M2種: character.magic2pow,
-    M2バフ: character.magic2buf,
-    M2回復: character.magic2heal,
-    M3属性: character.magic3atr,
-    M3種: character.magic3pow,
-    M3バフ: character.magic3buf,
-    M3回復: character.magic3heal,
-    バディ1: character.buddy1c,
-    バディ1スキル: character.buddy1s,
-    バディ1凸スキル: character.buddy1s_totsu,
-    バディ2: character.buddy2c,
-    バディ2スキル: character.buddy2s,
-    バディ2凸スキル: character.buddy2s_totsu,
-    バディ3: character.buddy3c,
-    バディ3スキル: character.buddy3s,
-    バディ3凸スキル: character.buddy3s_totsu,
-    その他: character.etc
+    [t('data.headers.duo')]: character.duo,
+    [t('data.headers.attribute', { magic: 'M1' })]: character.magic1atr,
+    [t('data.headers.magicType', { magic: 'M1' })]: character.magic1pow,
+    [t('data.headers.magicBuff', { magic: 'M1' })]: character.magic1buf,
+    [t('data.headers.magicHeal', { magic: 'M1' })]: character.magic1heal,
+    [t('data.headers.attribute', { magic: 'M2' })]: character.magic2atr,
+    [t('data.headers.magicType', { magic: 'M2' })]: character.magic2pow,
+    [t('data.headers.magicBuff', { magic: 'M2' })]: character.magic2buf,
+    [t('data.headers.magicHeal', { magic: 'M2' })]: character.magic2heal,
+    [t('data.headers.attribute', { magic: 'M3' })]: character.magic3atr,
+    [t('data.headers.magicType', { magic: 'M3' })]: character.magic3pow,
+    [t('data.headers.magicBuff', { magic: 'M3' })]: character.magic3buf,
+    [t('data.headers.magicHeal', { magic: 'M3' })]: character.magic3heal,
+    [t('data.headers.buddy', { number: 1 })]: character.buddy1c,
+    [t('data.headers.buddySkill', { number: 1 })]: character.buddy1s,
+    [t('data.headers.buddyLimitSkill', { number: 1 })]: character.buddy1s_totsu,
+    [t('data.headers.buddy', { number: 2 })]: character.buddy2c,
+    [t('data.headers.buddySkill', { number: 2 })]: character.buddy2s,
+    [t('data.headers.buddyLimitSkill', { number: 2 })]: character.buddy2s_totsu,
+    [t('data.headers.buddy', { number: 3 })]: character.buddy3c,
+    [t('data.headers.buddySkill', { number: 3 })]: character.buddy3s,
+    [t('data.headers.buddyLimitSkill', { number: 3 })]: character.buddy3s_totsu,
+    [t('data.headers.other')]: character.etc
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(data);

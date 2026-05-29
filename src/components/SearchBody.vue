@@ -81,8 +81,11 @@
           <template v-slot:[`item.name`]="{ item }">
             <img :src="item.imgUrl" :alt="item.name" class="character-image" />
           </template>
+          <template v-slot:[`item.etc`]="{ item }">
+            {{ localizeGameText(item.etc, locale) }}
+          </template>
           <template v-slot:[`item.edit`]="{ item }">
-            <v-btn @click="openEditModal(item)">Edit</v-btn>
+            <v-btn @click="openEditModal(item)">{{ $t('common.edit') }}</v-btn>
           </template>
         </v-data-table-virtual>
 
@@ -93,30 +96,30 @@
               <v-select v-model="selectedCharacter.rare" :items="['R', 'SR', 'SSR']"  label="Rare" hide-details></v-select>
               <v-text-field v-model.number="selectedCharacter.hp" label="HP" type="number" :min="0" :max="99999" hide-details></v-text-field>
               <v-text-field v-model.number="selectedCharacter.atk" label="ATK" type="number" :min="0" :max="99999" hide-details></v-text-field>
-              <v-select v-model="selectedCharacter.duo" :items=buddyCharacter  label="デュオ" hide-details></v-select>
-              <v-select v-model="selectedCharacter.buddy1c" :items=buddyCharacter  label="バディ1相手" hide-details></v-select>
-              <v-select v-model="selectedCharacter.buddy1s" :items=buddyStatus  label="バディ1" hide-details></v-select>
-              <v-select v-model="selectedCharacter.buddy2c" :items=buddyCharacter  label="バディ2相手" hide-details></v-select>
-              <v-select v-model="selectedCharacter.buddy2s" :items=buddyStatus  label="バディ2" hide-details></v-select>
-              <v-select v-model="selectedCharacter.buddy3c" :items=buddyCharacter  label="バディ3相手" hide-details></v-select>
-              <v-select v-model="selectedCharacter.buddy3s" :items=buddyStatus  label="バディ3" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic1atr" :items=attr  label="M1属性" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic1pow" :items=pow  label="M1威力" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic1buf" :items=buff  label="M1バフ" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic1heal" :items=heal  label="M1回復" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic2atr" :items=attr  label="M2属性" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic2pow" :items=pow  label="M2威力" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic2buf" :items=buff  label="M2バフ" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic2heal" :items=heal  label="M2回復" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic3atr" :items=attr  label="M3属性" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic3pow" :items=pow  label="M3威力" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic3buf" :items=buff  label="M3バフ" hide-details></v-select>
-              <v-select v-model="selectedCharacter.magic3heal" :items=heal  label="M3回復" hide-details></v-select>
+              <v-select v-model="selectedCharacter.duo" :items="buddyCharacterOptions" item-title="title" item-value="value" :label="$t('statusPlot.duoLabel')" hide-details></v-select>
+              <v-select v-model="selectedCharacter.buddy1c" :items="buddyCharacterOptions" item-title="title" item-value="value" :label="$t('simulator.buddyCharacter', { number: 1 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.buddy1s" :items="buddyStatusOptions" item-title="title" item-value="value" :label="$t('simulator.buddySkill', { number: 1 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.buddy2c" :items="buddyCharacterOptions" item-title="title" item-value="value" :label="$t('simulator.buddyCharacter', { number: 2 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.buddy2s" :items="buddyStatusOptions" item-title="title" item-value="value" :label="$t('simulator.buddySkill', { number: 2 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.buddy3c" :items="buddyCharacterOptions" item-title="title" item-value="value" :label="$t('simulator.buddyCharacter', { number: 3 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.buddy3s" :items="buddyStatusOptions" item-title="title" item-value="value" :label="$t('simulator.buddySkill', { number: 3 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic1atr" :items="attrOptions" item-title="title" item-value="value" :label="$t('data.headers.attribute', { magic: 'M1' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic1pow" :items="powOptions" item-title="title" item-value="value" :label="$t('simulator.magicNumber', { number: 1 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic1buf" :items="buffOptions" item-title="title" item-value="value" :label="$t('data.headers.magicBuff', { magic: 'M1' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic1heal" :items="healOptions" item-title="title" item-value="value" :label="$t('data.headers.magicHeal', { magic: 'M1' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic2atr" :items="attrOptions" item-title="title" item-value="value" :label="$t('data.headers.attribute', { magic: 'M2' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic2pow" :items="powOptions" item-title="title" item-value="value" :label="$t('simulator.magicNumber', { number: 2 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic2buf" :items="buffOptions" item-title="title" item-value="value" :label="$t('data.headers.magicBuff', { magic: 'M2' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic2heal" :items="healOptions" item-title="title" item-value="value" :label="$t('data.headers.magicHeal', { magic: 'M2' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic3atr" :items="attrOptions" item-title="title" item-value="value" :label="$t('data.headers.attribute', { magic: 'M3' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic3pow" :items="powOptions" item-title="title" item-value="value" :label="$t('simulator.magicNumber', { number: 3 })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic3buf" :items="buffOptions" item-title="title" item-value="value" :label="$t('data.headers.magicBuff', { magic: 'M3' })" hide-details></v-select>
+              <v-select v-model="selectedCharacter.magic3heal" :items="healOptions" item-title="title" item-value="value" :label="$t('data.headers.magicHeal', { magic: 'M3' })" hide-details></v-select>
             </v-card-text>
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn color="blue darken-1" @click="closeEditModal">Cancel</v-btn>
-              <v-btn color="blue darken-1" @click="saveCharacter">Save</v-btn>
+              <v-btn color="blue darken-1" @click="closeEditModal">{{ $t('common.cancel') }}</v-btn>
+              <v-btn color="blue darken-1" @click="saveCharacter">{{ $t('common.save') }}</v-btn>
             </v-card-actions>
           </v-card>
         </v-dialog>
@@ -182,6 +185,11 @@ import { getInputMaxLevel } from '@/constants/levels';
 import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import { clampTotsuCount, isM3Unlocked } from '@/utils/totsu';
 import { SEARCH_PRESET_CONFIGURATIONS } from '@/constants/searchPresets';
+import {
+  localizeCharacterName,
+  localizeGameText,
+  localizeOptionItems,
+} from '@/utils/localizedDisplay';
 
 type FocusRequest = {
   requestId: number;
@@ -195,7 +203,7 @@ const props = defineProps<{
   focusRequest: FocusRequest | null;
 }>();
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
 const searchSettingsStore = useSearchSettingsStore();
@@ -221,6 +229,15 @@ const buff = [
 ];
 const heal = ['回復&継続回復(中)','回復&継続回復(小)', '回復(中)', '回復(小)', '回復(極小)', '継続回復(中)', '継続回復(小)'];
 const pow = ['単発(弱)', '単発(強)','連撃(弱)', '連撃(強)'];
+const buddyCharacterOptions = computed(() => buddyCharacter.map((value) => ({
+  title: localizeCharacterName(value, locale.value),
+  value,
+})));
+const buddyStatusOptions = computed(() => localizeOptionItems(buddyStatus, locale.value));
+const attrOptions = computed(() => localizeOptionItems(attr, locale.value));
+const buffOptions = computed(() => localizeOptionItems(buff, locale.value));
+const healOptions = computed(() => localizeOptionItems(heal, locale.value));
+const powOptions = computed(() => localizeOptionItems(pow, locale.value));
 const dataModal = ref(false);
 const dataText = ref('');
 const snackbar = ref({

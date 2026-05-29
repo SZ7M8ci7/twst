@@ -66,7 +66,7 @@
                 class="clickable-damage"
                 @click="openAllCharactersModal(element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic')"
               >
-                {{ getMaxDamage('全キャラ', element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic') }}
+                {{ getMaxDamage(ALL_CHARACTERS_DAMAGE_KEY, element.toLowerCase() as 'fire' | 'water' | 'flora' | 'cosmic') }}
               </span>
             </div>
           </div>
@@ -150,7 +150,7 @@
                       class="buff-icon clickable-icon"
                       @click="openWikiPage(entry.name)"
                     />
-                    <span class="buff-source" v-if="entry.buffSource">{{ entry.buffSource }}</span>
+                    <span class="buff-source" v-if="entry.buffSource">{{ displayGameText(entry.buffSource) }}</span>
                   </div>
                 </div>
                 <div class="damage-value">
@@ -251,7 +251,7 @@
           >
             {{ getCriticalButtonText(criticalLevel) }}
           </v-btn>
-          <v-btn color="grey" variant="outlined" class="close-btn" @click="dialogVisible = false">CLOSE</v-btn>
+          <v-btn color="grey" variant="outlined" class="close-btn" @click="dialogVisible = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -302,7 +302,7 @@
                       class="buff-icon clickable-icon"
                       @click="openWikiPage(entry.buffName)"
                     />
-                    <span class="buff-source" v-if="entry.buffSource">{{ entry.buffSource }}</span>
+                    <span class="buff-source" v-if="entry.buffSource">{{ displayGameText(entry.buffSource) }}</span>
                   </div>
                 </div>
                 <div class="damage-value">
@@ -403,7 +403,7 @@
           >
             {{ getCriticalButtonText(allCharactersCriticalLevel) }}
           </v-btn>
-          <v-btn color="grey" variant="outlined" class="close-btn" @click="allCharactersDialogVisible = false">CLOSE</v-btn>
+          <v-btn color="grey" variant="outlined" class="close-btn" @click="allCharactersDialogVisible = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -427,12 +427,14 @@ import { parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { SEARCH_PRESET_CONFIGURATIONS } from '@/constants/searchPresets';
 import characterDataJson from '@/assets/characters_info.json';
 import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
-const { t } = useI18n();
+import { localizeGameText } from '@/utils/localizedDisplay';
+const { t, locale } = useI18n();
 const characterStore = useCharacterStore();
 const handCollectionStore = useHandCollectionStore();
 const searchSettingsStore = useSearchSettingsStore();
 const router = useRouter();
 const { characters } = storeToRefs(characterStore);
+const ALL_CHARACTERS_DAMAGE_KEY = '全キャラ';
 // 独自の手持ち設定状態を管理（ストアとは独立）
 const useHandCollection = ref(false);
 
@@ -1436,7 +1438,7 @@ const sortedCharacterData = computed(() => {
 
 // getMaxDamage関数を修正して小数点を切り捨て
 function getMaxDamage(charaName: string, element: ElementType): number | string {
-  if (charaName === '全キャラ') {
+  if (charaName === ALL_CHARACTERS_DAMAGE_KEY) {
     const damageDict = getDamageListByElement(element);
     let maxDamage = 0;
     
@@ -1492,6 +1494,10 @@ const sortedDamageList = computed(() => {
 function getEnglishName(japaneseName: string): string {
   const character = characterDataJson.find(char => char.name_ja === japaneseName);
   return character?.name_en as string || '';
+}
+
+function displayGameText(value: unknown): string {
+  return localizeGameText(value, locale.value);
 }
 
 // Wikiページを開く関数を修正

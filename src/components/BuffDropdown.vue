@@ -8,15 +8,13 @@
   </div>
   <div class="select-wrapper">
     <select v-model="buffOption" :disabled="lockBuffOption" @change="updateValue">
-      <option>ATKUP</option>
-      <option>ダメージUP</option>
-      <option>属性ダメUP</option>
-      <option>継続回復</option>
-      <option>回復</option>
-      <option>クリティカル</option>
-      <option>ATKDOWN</option>
-      <option>ダメージDOWN</option>
-      <option>属性ダメDOWN</option>
+      <option
+        v-for="option in buffOptions"
+        :key="option.value"
+        :value="option.value"
+      >
+        {{ option.title }}
+      </option>
     </select>
   </div>
   <div class="select-wrapper">
@@ -29,11 +27,13 @@
         <option>2/3</option>
       </template>
       <template v-else>
-        <option>極小</option>
-        <option>小</option>
-        <option>中</option>
-        <option>大</option>
-        <option>極大</option>
+        <option
+          v-for="option in powerOptions"
+          :key="option.value"
+          :value="option.value"
+        >
+          {{ option.title }}
+        </option>
       </template>
     </select>
   </div>
@@ -50,7 +50,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { localizeOptionItems } from '@/utils/localizedDisplay';
 
 const props = defineProps({
   modelValue: {
@@ -81,6 +83,22 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue', 'buff-changed']);
+const { locale } = useI18n();
+
+const buffValues = [
+  'ATKUP',
+  'ダメージUP',
+  '属性ダメUP',
+  '継続回復',
+  '回復',
+  'クリティカル',
+  'ATKDOWN',
+  'ダメージDOWN',
+  '属性ダメDOWN',
+] as const;
+const powerValues = ['極小', '小', '中', '大', '極大'] as const;
+const buffOptions = computed(() => localizeOptionItems(buffValues, locale.value));
+const powerOptions = computed(() => localizeOptionItems(powerValues, locale.value));
 
 const magicOption = ref(props.modelValue.magicOption || '');
 const buffOption = ref(props.modelValue.buffOption || '');

@@ -23,6 +23,9 @@
               class="character-image"
             />
           </template>
+          <template v-slot:[`item.etc`]="{ item }">
+            {{ localizeGameText(item.etc, locale) }}
+          </template>
         </v-data-table>
 
       </div>
@@ -39,7 +42,8 @@ import { useI18n } from 'vue-i18n';
 import { applyDefaultSort } from '@/utils/sortUtils';
 import defaultImg from '@/assets/img/default.webp';
 import LazyCharacterImage from '@/components/LazyCharacterImage.vue';
-const { t } = useI18n();
+import { localizeGameText } from '@/utils/localizedDisplay';
+const { t, locale } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 import { useDeckStore } from '@/store/deckStore';

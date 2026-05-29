@@ -220,7 +220,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" @click="showModal = false">Close</v-btn>
+          <v-btn color="primary" @click="showModal = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -267,10 +267,12 @@
 
 <script setup lang="ts">
 import { onMounted, ref, computed, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useCharacterStore } from '@/store/characters';
 import charactersInfo from '@/assets/characters_info.json';
 import { loadImageUrls } from '@/utils/characterAssets';
 import { clearRetireState, loadRetireState, saveRetireState } from '@/storage/retireStorage';
+import { localizeGameText } from '@/utils/localizedDisplay';
 
 interface CharacterInfo {
   name_ja: string;
@@ -298,6 +300,7 @@ interface InputValues {
 }
 
 const characterStore = useCharacterStore();
+const { t, locale } = useI18n();
 const loadingImgUrl = ref(true);
 const showModal = ref(false);
 const selectedSlotIndex = ref(-1);
@@ -447,7 +450,7 @@ const getAttributeIcon = (value: string) => {
 // 属性名を取得する
 const getAttributeName = (value: string) => {
   const attr = attributes.value.find(a => a.value === value);
-  return attr?.name || '';
+  return localizeGameText(attr?.name || '', locale.value);
 };
 
 // カウンターをインクリメントする

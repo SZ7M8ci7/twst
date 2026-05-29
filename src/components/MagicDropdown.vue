@@ -5,19 +5,21 @@
       @change="updateValue"
       :class="{ 'duo-warning-select': duoWarning && selectedOption === 'デュオ' }"
     >
-      <option>単発(弱)</option>
-      <option>単発(強)</option>
-      <option>連撃(弱)</option>
-      <option>連撃(強)</option>
-      <option>3連撃(弱)</option>
-      <option>3連撃(強)</option>
-      <option value="デュオ">デュオ</option>
+      <option
+        v-for="option in magicOptions"
+        :key="option.value"
+        :value="option.value"
+      >
+        {{ option.title }}
+      </option>
     </select>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { localizeOptionItems } from '@/utils/localizedDisplay';
 
 const props = defineProps({
   modelValue: {
@@ -31,9 +33,20 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
+const { locale } = useI18n();
 
 const selectedOption = ref(props.modelValue || '単発(弱)');
 const duoWarning = computed(() => props.duoWarning);
+const magicValues = [
+  '単発(弱)',
+  '単発(強)',
+  '連撃(弱)',
+  '連撃(強)',
+  '3連撃(弱)',
+  '3連撃(強)',
+  'デュオ',
+] as const;
+const magicOptions = computed(() => localizeOptionItems(magicValues, locale.value));
 
 const updateValue = () => {
   emit('update:modelValue', selectedOption.value);

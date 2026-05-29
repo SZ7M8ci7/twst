@@ -78,7 +78,7 @@
     <!-- 埋め込みモード用ボタン -->
     <div class="button-container embedded-buttons" v-else>
       <v-btn class="button reset-button" @click="resetFilter" variant="outlined" size="small">
-        フィルターリセット
+        {{ t('common.filterReset') }}
       </v-btn>
     </div>
   </div>

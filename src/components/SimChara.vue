@@ -26,7 +26,7 @@
         <v-col cols="3" class="center">
           <div class="stats-section">
             <div class="stat">
-              <label>凸</label>
+              <label>{{ t('common.limitBreak') }}</label>
               <select
                 :value="simulatorStore.deckCharacters[props.charaIndex].totsu ?? 0"
                 class="totsu-select"
@@ -92,9 +92,9 @@
                 <img
                   v-if="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`] && getBuddyIconSync(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`])"
                   :src="getBuddyIconSync(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`])"
-                  :alt="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`]"
+                  :alt="localizeCharacterName(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`], locale)"
                   class="buddy-icon"
-                  :title="simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`]"
+                  :title="localizeCharacterName(simulatorStore.deckCharacters[props.charaIndex][`buddy${index}c`], locale)"
                 />
               </v-col>
               <!-- バディ効果値 -->
@@ -108,13 +108,13 @@
         </v-col>
         <v-col cols="2" class="center">
           <div class="buttons-section">
-            <button class="details-btn tall" @click="openDetailModal" title="詳細編集">
+            <button class="details-btn tall" @click="openDetailModal" :title="t('common.detailEdit')">
               <v-icon size="16">mdi-cog</v-icon>
             </button>
             <button
               class="buff-btn bottom-aligned"
               @click="addBuff"
-              title="バフ追加"
+              :title="t('common.addBuff')"
               :class="{ 'drop-target': isBuffDragging }"
               @dragenter.prevent="onBuffButtonDragEnter"
               @dragover.prevent="onBuffButtonDragOver"
@@ -166,8 +166,8 @@
               :draggable="canReorderBuffs"
               @dragstart.stop="onBuffDragStart(index, $event)"
               @dragend="onBuffDragEnd"
-              title="ドラッグで順番を変更"
-              aria-label="バフの並び替え"
+              :title="t('common.dragToReorder')"
+              :aria-label="t('common.reorderBuff')"
             >
               <v-icon size="14">mdi-drag-vertical</v-icon>
             </button>
@@ -181,7 +181,7 @@
         </template>
         <template v-for="(buff, index) in displayBuddyGeneratedBuffs" :key="`buddy-buff-${buff.buddyIndex}-${buff.magicOption}-${buff.status}-${index}`">
           <div class="buff-section buddy-generated">
-            <div class="drag-placeholder" title="バディ追加効果">
+            <div class="drag-placeholder" :title="t('common.buddyGeneratedEffect')">
               <v-icon size="14">mdi-link-variant</v-icon>
             </div>
             <div class="buff-dropdown-wrapper">
@@ -208,6 +208,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import defaultImg from '@/assets/img/default.webp';
 import ElementDropdown from './ElementDropdown.vue';
 import SimCharaModal from './SimCharaModal.vue';
@@ -229,9 +230,11 @@ import {
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
 import { loadCachedImageUrl } from '@/utils/characterAssets';
 import { normalizeLegacyDeckBuff } from '@/utils/buffParser';
+import { localizeCharacterName, localizeGameText } from '@/utils/localizedDisplay';
 
 const simulatorStore = useSimulatorStore();
 const handCollectionStore = useHandCollectionStore();
+const { t, locale } = useI18n();
 
 const imgpath = ref(defaultImg);
 const props = defineProps(['charaIndex', 'selectedAttribute']);
@@ -786,7 +789,7 @@ const showBuddyEffect = () => {
 // バディ効果値のフォーマット関数（UPを削除）
 const formatBuddyEffect = (effectText) => {
   if (!effectText) return '';
-  return effectText.replace(/UP/gi, '');
+  return localizeGameText(effectText.replace(/UP/gi, ''), locale.value);
 };
 
 const getDisplayedBuddyEffect = (buddyIndex) => {
@@ -897,7 +900,9 @@ const showDuoInsufficientWarning = computed(() => {
 const duoWarningText = computed(() => {
   const character = simulatorStore.deckCharacters[props.charaIndex];
   if (!character?.duo) return '';
-  return `デュオ相手: ${character.duo} (相手あり・デュオ数不足)`;
+  return t('simulator.duoPartnerShortUnavailable', {
+    name: localizeCharacterName(character.duo, locale.value),
+  });
 });
 
 const shouldShowMagicDuoWarning = (magicIndex) => (
@@ -917,9 +922,13 @@ const duoTooltipText = computed(() => {
     return duoWarningText.value;
   }
   
-  return isActive 
-    ? `デュオ相手: ${duoPartnerName} (有効)` 
-    : `デュオ相手: ${duoPartnerName} (無効)`;
+  return isActive
+    ? t('simulator.duoPartnerShortActive', {
+      name: localizeCharacterName(duoPartnerName, locale.value),
+    })
+    : t('simulator.duoPartnerShortInactive', {
+      name: localizeCharacterName(duoPartnerName, locale.value),
+    });
 });
 
 // デュオアイコンの読み込みエラーハンドリング

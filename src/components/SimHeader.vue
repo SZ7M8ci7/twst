@@ -1,10 +1,10 @@
 <template>
   <div class="sim-header">
     <label class="target-select">
-      <span class="target-select-label">対象</span>
-      <select v-model="selectedOption" class="target-select-input" aria-label="対象属性" @change="updateFilter">
-        <option v-for="option in options" :key="option" :value="option">
-          {{ option }}
+      <span class="target-select-label">{{ t('simulator.target') }}</span>
+      <select v-model="selectedOption" class="target-select-input" :aria-label="t('simulator.targetAttribute')" @change="updateFilter">
+        <option v-for="option in options" :key="option.value" :value="option.value">
+          {{ option.title }}
         </option>
       </select>
     </label>
@@ -12,15 +12,15 @@
     <div class="button-group-horizontal">
       <button class="button save-button-with-text" @click="openSavedDeckModal">
         <v-icon size="small">mdi-content-save</v-icon>
-        <span class="button-text">編成</span>
+        <span class="button-text">{{ t('simulator.deck') }}</span>
       </button>
       <button class="button" @click="openInNewTab">
         <span class="dli-external-link"><span></span></span>
-        <span class="button-text">別タブ</span>
+        <span class="button-text">{{ t('simulator.openInNewTab') }}</span>
       </button>
       <button class="button" @click="openInExamSimulator">
         <v-icon size="small">mdi-chart-box-outline</v-icon>
-        <span class="button-text">試験シミュ</span>
+        <span class="button-text">{{ t('simulator.examSimulatorShort') }}</span>
       </button>
     </div>
   </div>
@@ -33,10 +33,12 @@
 </template>
   
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { saveExamSimulatorDeckImportState, saveSimulatorWindowState } from '@/storage/simulatorStorage';
 import SavedDeckModal from '@/components/SavedDeckModal.vue';
+import { localizeOptionItems } from '@/utils/localizedDisplay';
 
 const props = defineProps({
   modelValue: {
@@ -45,7 +47,9 @@ const props = defineProps({
   }
 });
 
-const options = ['対全', '対火', '対水', '対木', '対無'];
+const { t, locale } = useI18n();
+const optionValues = ['対全', '対火', '対水', '対木', '対無'];
+const options = computed(() => localizeOptionItems(optionValues, locale.value));
 const selectedOption = ref(props.modelValue);
 const simulatorStore = useSimulatorStore();
 const showSavedDeckModal = ref(false);

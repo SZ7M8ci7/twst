@@ -9,7 +9,7 @@
             :class="{ active: activeTab === 'filter' }"
             @click="handleTabClick('filter')"
           >
-            <span>フィルター</span>
+            <span>{{ t('common.filter') }}</span>
             <v-icon>{{ activeTab === 'filter' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
           </div>
           <div 
@@ -17,7 +17,7 @@
             :class="{ active: activeTab === 'sort' }"
             @click="handleTabClick('sort')"
           >
-            <span>ソート</span>
+            <span>{{ t('common.sort') }}</span>
             <v-icon>{{ activeTab === 'sort' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
           </div>
           <div 
@@ -25,7 +25,7 @@
             :class="{ active: activeTab === 'handCollection' }"
             @click="handleTabClick('handCollection')"
           >
-            <span>手持ち</span>
+            <span>{{ t('common.hand') }}</span>
             <v-icon>{{ activeTab === 'handCollection' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
           </div>
         </div>
@@ -48,7 +48,7 @@
                   <v-select
                     v-model="sortBy"
                     :items="sortOptions"
-                    label="並び順"
+                    :label="t('simulator.sortBy')"
                     item-title="text"
                     item-value="value"
                     variant="outlined"
@@ -59,7 +59,7 @@
                   <v-select
                     v-model="sortOrder"
                     :items="sortOrderOptions"
-                    label="順序"
+                    :label="t('simulator.order')"
                     item-title="text"
                     item-value="value"
                     variant="outlined"
@@ -77,17 +77,17 @@
                   <div class="hand-collection-options">
                     <v-switch
                       v-model="handCollectionStore.useHandCollection"
-                      label="手持ちカードから選択"
+                      :label="t('simulator.selectOwnedCards')"
                       color="primary"
                       hide-details
                       inset
                     />
                     <div class="mt-2 text-caption text-grey">
                       <template v-if="handCollectionStore.useHandCollection">
-                        所持しているカードのみ表示され、設定されたレベル・状態が適用されます
+                        {{ t('simulator.ownedCardsDescription') }}
                       </template>
                       <template v-else>
-                        全てのカードが表示され、最大レベル・完凸状態が適用されます
+                        {{ t('simulator.allCardsDescription') }}
                       </template>
                     </div>
                     <div class="mt-3">
@@ -97,7 +97,7 @@
                         size="small"
                         prepend-icon="mdi-cog"
                       >
-                        手持ち設定を管理
+                        {{ t('simulator.manageCardSettings') }}
                       </v-btn>
                     </div>
                   </div>
@@ -111,13 +111,13 @@
       <!-- キャラクターグリッド -->
       <div class="character-grid-container">
         <div v-if="loadingImgUrl" class="loading-message">
-          キャラクター画像を読み込み中...
+          {{ t('simulator.loadingImages') }}
         </div>
         <div v-else-if="isSorting && ['effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'].includes(sortBy)" class="loading-message">
-          ソート処理中...
+          {{ t('simulator.sorting') }}
         </div>
         <div v-else-if="filteredCharacters.length === 0" class="no-results">
-          条件に一致するキャラクターがありません。フィルターか手持ち設定を確認して下さい。
+          {{ t('simulator.noMatchingCharacters') }}
         </div>
         <div v-else class="character-grid">
           <div 
@@ -133,7 +133,7 @@
                 :src="character.imgUrl" 
                 :alt="character.name" 
                 class="character-image" 
-                :title="character.chara || character.name"
+                :title="localizeCharacterName(character.chara, locale)"
                 @error="handleImageError(character)"
                 loading="lazy"
               />
@@ -147,7 +147,7 @@
                 v-if="character.duo && getDuoIconSync(character.duo)" 
                 class="modal-duo-icon-container"
                 :class="{ 'duo-active': isDuoActive(character) }"
-                :title="isDuoActive(character) ? `DUO: ${character.duo} (有効)` : `DUO: ${character.duo} (無効)`"
+                :title="duoTitle(character)"
               >
                 <img 
                   :src="getDuoIconSync(character.duo)" 
@@ -167,6 +167,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useCharacterStore } from '@/store/characters';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { useFilterdStore } from '@/store/filterd';
@@ -181,6 +182,10 @@ import { getDamageValueFromDetails, getMagicTargetAttribute } from '@/utils/simu
 import { normalizeLegacyDeckBuffs, parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { matchesSelectedEffect } from '@/utils/effectFilter';
 import { defaultSelectedEffectValues } from '@/store/searchResult';
+import {
+  localizeCharacterName,
+  localizeGameText,
+} from '@/utils/localizedDisplay';
 
 // characterDataの高速検索用Mapを事前に作成
 const characterDataMap = new Map();
@@ -194,6 +199,7 @@ import { applyMultiLevelSort, applyDefaultSort } from '@/utils/sortUtils';
 import { calculateLegacyBuddyContinueHealAmount, getBuddyAtkRate, getBuddyHpRate, getBuddyStatusForCharacter } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
+const { t, locale } = useI18n();
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
 const jpName2enName = charactersInfo.reduce((map, character) => {
@@ -325,26 +331,26 @@ const { sortBy, sortOrder } = storeToRefs(filterdStore);
 const sortUpdateCounter = ref(0);
 
 // ソートオプション
-const sortOptions = [
-  { text: 'デフォルト順', value: 'default' },
-  { text: 'レア度', value: 'rarity' },
+const sortOptions = computed(() => [
+  { text: t('simulator.sortDefault'), value: 'default' },
+  { text: t('simulator.sortRarity'), value: 'rarity' },
   { text: 'HP', value: 'hp' },
   { text: 'ATK', value: 'atk' },
-  { text: '実質HP（カード）', value: 'effectiveCardHP' },
-  { text: '実質ATK（カード）', value: 'effectiveCardATK' },
-  { text: '実質HP（デッキ）', value: 'effectiveDeckHP' },
-  { text: '与ダメージ（デッキ）', value: 'deckDamage' },
-  { text: 'HPバディ数（デッキ）', value: 'deckHPBuddyCount' },
-  { text: 'バディ数（デッキ）', value: 'deckBuddyCount' },
-  { text: 'バディ増加HP最低値', value: 'minBuddyHPIncrease' },
-  { text: 'DUO数', value: 'duoCount' },
-  { text: 'DUO相手', value: 'duoPartner' }
-];
+  { text: t('simulator.effectiveCardHp'), value: 'effectiveCardHP' },
+  { text: t('simulator.effectiveCardAtk'), value: 'effectiveCardATK' },
+  { text: t('simulator.effectiveDeckHp'), value: 'effectiveDeckHP' },
+  { text: t('simulator.deckDamage'), value: 'deckDamage' },
+  { text: t('simulator.deckHpBuddyCount'), value: 'deckHPBuddyCount' },
+  { text: t('simulator.deckBuddyCount'), value: 'deckBuddyCount' },
+  { text: t('simulator.minBuddyHpIncrease'), value: 'minBuddyHPIncrease' },
+  { text: t('simulator.duoCount'), value: 'duoCount' },
+  { text: t('simulator.duoPartner'), value: 'duoPartner' }
+]);
 
-const sortOrderOptions = [
-  { text: '昇順', value: 'asc' },
-  { text: '降順', value: 'desc' }
-];
+const sortOrderOptions = computed(() => [
+  { text: localizeGameText('昇順', locale.value), value: 'asc' },
+  { text: localizeGameText('降順', locale.value), value: 'desc' }
+]);
 
 // ソート設定の保存と監視
 watch(sortBy, (newValue, oldValue) => {
@@ -1307,7 +1313,7 @@ function getDisplayText(character) {
   
   switch (currentSortBy) {
     case 'default':
-      return character.chara || character.name;
+      return localizeCharacterName(character.chara, locale.value) || character.name;
     case 'rarity':
       return character.rare;
     case 'hp':
@@ -1331,10 +1337,19 @@ function getDisplayText(character) {
       return Math.round(value);
     }
     case 'duoPartner':
-      return character.duo || 'なし';
+      return character.duo
+        ? localizeCharacterName(character.duo, locale.value)
+        : t('common.none');
     default:
-      return character.chara || character.name;
+      return localizeCharacterName(character.chara, locale.value) || character.name;
   }
+}
+
+function duoTitle(character) {
+  const duoName = localizeCharacterName(character.duo, locale.value);
+  return isDuoActive(character)
+    ? t('simulator.duoPartnerActive', { name: duoName })
+    : t('simulator.duoPartnerInactive', { name: duoName });
 }
 
 // 画像読み込みエラーのハンドラー

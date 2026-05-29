@@ -100,7 +100,7 @@
                 size="default"
                 class="data-btn"
               >
-                {{ $t('handCollection.dataManagement') }}
+                {{ $t('handCollection.dataManagementShort') }}
               </v-btn>
             </div>
           </div>
@@ -209,7 +209,7 @@
               
               <!-- 衣装 -->
               <div class="data-cell costume-col" v-if="windowWidth > 600">
-                {{ item.costume }}
+                {{ localizeCostumeName(item, locale) }}
               </div>
             </div>
           </div>
@@ -282,9 +282,10 @@ import charactersInfo from '@/assets/characters_info.json';
 import { useI18n } from 'vue-i18n';
 import { getInputMaxLevel } from '@/constants/levels';
 import { clampTotsuCount, deriveTotsuCount } from '@/utils/totsu';
+import { localizeCostumeName } from '@/utils/localizedDisplay';
 
 // Stores and i18n
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const handCollectionStore = useHandCollectionStore();
 const characterStore = useCharacterStore();
 const filterdStore = useFilterdStore();
@@ -1093,7 +1094,8 @@ onUnmounted(() => {
 .manual-table {
   border: 1px solid #ddd;
   border-radius: 4px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .table-header {
@@ -1101,6 +1103,7 @@ onUnmounted(() => {
   background-color: #f5f5f5;
   font-weight: bold;
   border-bottom: 2px solid #ddd;
+  min-width: 740px;
 }
 
 .sortable-header {
@@ -1131,6 +1134,7 @@ onUnmounted(() => {
   border-bottom: 1px solid #eee;
   min-height: 60px;
   align-items: center;
+  min-width: 740px;
 }
 
 .table-row:hover {
@@ -1149,23 +1153,30 @@ onUnmounted(() => {
   border-right: 1px solid #eee;
 }
 
+.header-cell {
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: normal;
+}
+
 .header-cell:last-child, .data-cell:last-child {
   border-right: none;
 }
 
 .character-col {
-  flex: 0 0 80px;
-  min-width: 80px;
+  flex: 0 0 120px;
+  min-width: 120px;
 }
 
 .checkbox-col {
-  flex: 0 0 60px;
-  min-width: 60px;
+  flex: 0 0 88px;
+  min-width: 88px;
 }
 
 .totsu-col {
-  flex: 0 0 90px;
-  min-width: 90px;
+  flex: 0 0 120px;
+  min-width: 120px;
 }
 
 .level-col {
@@ -1174,8 +1185,8 @@ onUnmounted(() => {
 }
 
 .rare-col {
-  flex: 0 0 80px;
-  min-width: 80px;
+  flex: 0 0 90px;
+  min-width: 90px;
 }
 
 .costume-col {
@@ -1194,19 +1205,24 @@ onUnmounted(() => {
 
 /* モバイル対応 */
 @media (max-width: 600px) {
+  .table-header,
+  .table-row {
+    min-width: 420px;
+  }
+
   .character-col {
-    flex: 0 0 60px;
-    min-width: 60px;
+    flex: 0 0 90px;
+    min-width: 90px;
   }
   
   .checkbox-col {
-    flex: 0 0 50px;
-    min-width: 50px;
+    flex: 0 0 72px;
+    min-width: 72px;
   }
 
   .totsu-col {
-    flex: 0 0 84px;
-    min-width: 84px;
+    flex: 0 0 108px;
+    min-width: 108px;
   }
   
   .level-col {

@@ -99,7 +99,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue';
+import { computed, ref, onMounted, nextTick, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import SimChara from '@/components/SimChara.vue';
 import SimChart from '@/components/SimChart.vue';
 import SimHeader from '@/components/SimHeader.vue';
@@ -118,6 +119,7 @@ const isLargeScreen = ref(window.innerWidth >= 768);
 const selectedAttribute = ref('対全');
 const carouselModel = ref(0);
 const simulatorStore = useSimulatorStore();
+const { t } = useI18n();
 
 watch(selectedAttribute, (value) => {
   if (simulatorStore.selectedAttribute !== value) {
@@ -131,13 +133,13 @@ watch(() => simulatorStore.selectedAttribute, (value) => {
   }
 });
 
-const calcTitles = [
-  'バディ情報',
-  '付与効果',
-  'ベーシック試験スコア計算',
-  'ディフェンス試験スコア計算', 
-  'アタック試験スコア計算'
-];
+const calcTitles = computed(() => [
+  t('simulator.buddyInfo'),
+  t('simulator.grantedEffects'),
+  t('tool.basicExamScoreCalculator'),
+  t('tool.defencexamScoreCalculator'),
+  t('tool.attackExamScoreCalculator')
+]);
 
 function nextCalc() {
   carouselModel.value = (carouselModel.value + 1) % 5;

@@ -2,7 +2,7 @@
   <v-dialog v-model="isOpen" max-width="800px">
     <v-card>
       <v-card-title class="text-h5">
-        キャラクター詳細設定
+        {{ t('simulator.characterDetailSettings') }}
       </v-card-title>
 
       <v-card-text class="pa-1">
@@ -12,7 +12,9 @@
               <v-select
                 v-model="character.chara"
                 :items="characterOptions"
-                label="キャラクター名"
+                item-title="title"
+                item-value="value"
+                :label="t('simulator.characterName')"
                 variant="outlined"
                 density="compact"
               ></v-select>
@@ -22,7 +24,7 @@
               <v-text-field
                 v-model="character.level"
                 type="number"
-                label="レベル"
+                :label="t('common.level')"
                 variant="outlined"
                 density="compact"
                 :max="getMaxLevel(character.rare)"
@@ -52,14 +54,14 @@
             <!-- 魔法レベル設定 -->
             <v-col cols="12">
               <v-card elevation="2" class="mb-1">
-                <v-card-title class="text-subtitle-1 py-1">魔法レベル設定</v-card-title>
+                <v-card-title class="text-subtitle-1 py-1">{{ t('simulator.magicLevelSettings') }}</v-card-title>
                 <v-card-text class="pa-1">
                   <v-row dense>
                     <v-col cols="4">
                       <v-select
                         v-model="character.magic1Lv"
                         :items="magicLevelOptions"
-                        label="魔法1"
+                        :label="t('simulator.magicNumber', { number: 1 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
@@ -68,7 +70,7 @@
                       <v-select
                         v-model="character.magic2Lv"
                         :items="magicLevelOptions"
-                        label="魔法2"
+                        :label="t('simulator.magicNumber', { number: 2 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
@@ -77,7 +79,7 @@
                       <v-select
                         v-model="character.magic3Lv"
                         :items="magicLevelOptions"
-                        label="魔法3"
+                        :label="t('simulator.magicNumber', { number: 3 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
@@ -90,28 +92,32 @@
             <!-- バディ設定 -->
             <v-col cols="12">
               <v-card elevation="2" class="mb-1">
-                <v-card-title class="text-subtitle-1 py-1">バディ設定</v-card-title>
+                <v-card-title class="text-subtitle-1 py-1">{{ t('simulator.buddySettings') }}</v-card-title>
                 <v-card-text class="pa-1">
                   <v-row dense>
                     <v-col cols="12" sm="4" class="buddy-item">
                       <v-select
                         v-model="character.buddy1c"
                         :items="characterOptions"
-                        label="バディ1キャラ"
+                        item-title="title"
+                        item-value="value"
+                        :label="t('simulator.buddyCharacter', { number: 1 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
                       <v-select
                         v-model="character.buddy1s"
                         :items="buddySkillOptions"
-                        label="バディ1スキル"
+                        item-title="title"
+                        item-value="value"
+                        :label="t('simulator.buddySkill', { number: 1 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
                       <v-select
                         v-model="character.buddy1Lv"
                         :items="buddyLevelOptions"
-                        label="バディ1レベル"
+                        :label="t('simulator.buddyLevel', { number: 1 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
@@ -120,21 +126,25 @@
                       <v-select
                         v-model="character.buddy2c"
                         :items="characterOptions"
-                        label="バディ2キャラ"
+                        item-title="title"
+                        item-value="value"
+                        :label="t('simulator.buddyCharacter', { number: 2 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
                       <v-select
                         v-model="character.buddy2s"
                         :items="buddySkillOptions"
-                        label="バディ2スキル"
+                        item-title="title"
+                        item-value="value"
+                        :label="t('simulator.buddySkill', { number: 2 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
                       <v-select
                         v-model="character.buddy2Lv"
                         :items="buddyLevelOptions"
-                        label="バディ2レベル"
+                        :label="t('simulator.buddyLevel', { number: 2 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
@@ -143,21 +153,25 @@
                       <v-select
                         v-model="character.buddy3c"
                         :items="characterOptions"
-                        label="バディ3キャラ"
+                        item-title="title"
+                        item-value="value"
+                        :label="t('simulator.buddyCharacter', { number: 3 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
                       <v-select
                         v-model="character.buddy3s"
                         :items="buddySkillOptions"
-                        label="バディ3スキル"
+                        item-title="title"
+                        item-value="value"
+                        :label="t('simulator.buddySkill', { number: 3 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
                       <v-select
                         v-model="character.buddy3Lv"
                         :items="buddyLevelOptions"
-                        label="バディ3レベル"
+                        :label="t('simulator.buddyLevel', { number: 3 })"
                         variant="outlined"
                         density="compact"
                       ></v-select>
@@ -170,7 +184,7 @@
             <!-- バフ設定 -->
             <v-col v-if="!hideBuffSection" cols="12">
               <v-card elevation="2">
-                <v-card-title class="text-subtitle-1 py-1">バフ設定</v-card-title>
+                <v-card-title class="text-subtitle-1 py-1">{{ t('simulator.buffSettings') }}</v-card-title>
                 <v-card-text class="pa-1">
                   <div v-for="(buff, index) in character.buffs" :key="index" class="buff-item mb-1">
                     <v-row dense>
@@ -178,7 +192,7 @@
                         <v-select
                           v-model="buff.magicOption"
                           :items="['M1', 'M2', 'M3']"
-                          label="魔法"
+                          :label="t('simulator.magic')"
                           variant="outlined"
                           density="compact"
                         ></v-select>
@@ -186,8 +200,10 @@
                       <v-col cols="6">
                         <v-select
                           v-model="buff.buffOption"
-                          :items="['ATKUP', 'ATKDOWN', 'ダメージUP', 'ダメージDOWN', '属性ダメUP', '属性ダメDOWN', '継続回復', '回復', 'クリティカル']"
-                          label="バフ種類"
+                          :items="buffOptionItems"
+                          item-title="title"
+                          item-value="value"
+                          :label="t('simulator.buffType')"
                           variant="outlined"
                           density="compact"
                         ></v-select>
@@ -195,8 +211,10 @@
                       <v-col cols="6">
                         <v-select
                           v-model="buff.powerOption"
-                          :items="['極小', '小', '中', '大', '極大']"
-                          label="威力"
+                          :items="powerOptionItems"
+                          item-title="title"
+                          item-value="value"
+                          :label="t('simulator.power')"
                           variant="outlined"
                           density="compact"
                         ></v-select>
@@ -205,7 +223,7 @@
                         <v-text-field
                           v-model="buff.levelOption"
                           type="number"
-                          label="レベル"
+                          :label="t('common.level')"
                           variant="outlined"
                           density="compact"
                         ></v-text-field>
@@ -228,7 +246,7 @@
                     class="mt-1"
                     size="small"
                   >
-                    バフを追加
+                    {{ t('simulator.addBuff') }}
                   </v-btn>
                 </v-card-text>
               </v-card>
@@ -240,10 +258,10 @@
       <v-card-actions class="pa-1">
         <v-spacer></v-spacer>
         <v-btn color="primary" variant="text" @click="saveChanges" size="small">
-          保存
+          {{ t('common.save') }}
         </v-btn>
         <v-btn color="error" variant="text" @click="closeModal" size="small">
-          キャンセル
+          {{ t('common.cancel') }}
         </v-btn>
       </v-card-actions>
     </v-card>
@@ -252,8 +270,10 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { getInputMaxLevel } from '@/constants/levels';
 import charactersInfo from '@/assets/characters_info.json';
+import { localizeCharacterName, localizeOptionItems } from '@/utils/localizedDisplay';
 
 const props = defineProps({
   modelValue: Boolean,
@@ -263,6 +283,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue', 'save']);
+const { t, locale } = useI18n();
 
 const isOpen = ref(props.modelValue);
 const character = ref({ ...props.character });
@@ -311,12 +332,15 @@ const closeModal = () => {
 };
 
 // キャラクター選択肢
-const characterOptions = computed(() => 
-  charactersInfo.map(char => char.name_ja)
+const characterOptions = computed(() =>
+  charactersInfo.map(char => ({
+    title: localizeCharacterName(char.name_ja, locale.value),
+    value: char.name_ja,
+  }))
 );
 
 // バディスキル選択肢
-const buddySkillOptions = [
+const buddySkillValues = [
   'ATKUP(小)',
   'ATKUP(中)',
   'ATKUP(大)',
@@ -327,6 +351,11 @@ const buddySkillOptions = [
   'HP&ATKUP(中)',
   'HP&ATKUP(大)'
 ];
+const buddySkillOptions = computed(() => localizeOptionItems(buddySkillValues, locale.value));
+const buffOptionValues = ['ATKUP', 'ATKDOWN', 'ダメージUP', 'ダメージDOWN', '属性ダメUP', '属性ダメDOWN', '継続回復', '回復', 'クリティカル'];
+const powerOptionValues = ['極小', '小', '中', '大', '極大'];
+const buffOptionItems = computed(() => localizeOptionItems(buffOptionValues, locale.value));
+const powerOptionItems = computed(() => localizeOptionItems(powerOptionValues, locale.value));
 
 // バディレベル選択肢
 const buddyLevelOptions = Array.from({length: 10}, (_, i) => i + 1);

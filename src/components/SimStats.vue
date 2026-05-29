@@ -2,15 +2,15 @@
   <div class="stats-container">
     <!-- 合計HP表示 -->
     <div class="margin">
-      実質HP:<span id="totalHealHP">{{ formatNumber(totalEffectiveHP) }}</span>
-      <span class="hp-breakdown">(HP:{{ formatNumber(totalHP) }}+バディ:{{ formatNumber(totalBuddyHP) }}+回復:{{ formatNumber(totalHeal) }})</span>
+      {{ t('simulator.effectiveHp') }}:<span id="totalHealHP">{{ formatNumber(totalEffectiveHP) }}</span>
+      <span class="hp-breakdown">(HP:{{ formatNumber(totalHP) }}+{{ t('simulator.buddy') }}:{{ formatNumber(totalBuddyHP) }}+{{ t('simulator.heal') }}:{{ formatNumber(totalHeal) }})</span>
     </div>
     
     <!-- 合計ダメージとBasicスコア表示 -->
     <div class="margin stats-header">
-      <span>合計ダメージとBasic Extraスコア</span>
+      <span>{{ t('simulator.damageAndBasicExtra') }}</span>
       <span class="selected-magic-count">
-        選択魔法数:<span class="selected-magic-count-value">{{ selectedMagicCount }}</span>
+        {{ t('simulator.selectedMagicCount') }}:<span class="selected-magic-count-value">{{ selectedMagicCount }}</span>
       </span>
     </div>
     <table class="damage-table">
@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import {
   getCompatibilityType,
@@ -69,6 +70,7 @@ const props = defineProps<{
 }>();
 
 const simulatorStore = useSimulatorStore();
+const { t } = useI18n();
 
 const selectedMagicCount = computed(() => {
   let count = 0;

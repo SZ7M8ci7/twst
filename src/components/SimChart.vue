@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import Chart from 'chart.js/auto';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import {
@@ -30,6 +31,7 @@ import {
   getMagicTargetAttribute,
   getTargetElementFromAttribute
 } from '@/utils/simulatorAttributes';
+import { localizeGameText } from '@/utils/localizedDisplay';
 
 const props = defineProps<{
   filterAttribute: string;
@@ -37,6 +39,7 @@ const props = defineProps<{
 
 const chartCanvas = ref<HTMLCanvasElement | null>(null);
 const simulatorStore = useSimulatorStore();
+const { t, locale } = useI18n();
 let chart: Chart | null = null;
 
 // 属性ごとの色を定義
@@ -109,13 +112,13 @@ function createChart() {
       data: simulatorStore.characterStats.map(stats => stats.hp)
     },
     {
-      label: 'バディHP',
+      label: `${t('simulator.buddy')} HP`,
       stack: 'Stack HP',
       backgroundColor: 'rgba(100, 100, 100, 0.4)',
       data: simulatorStore.characterStats.map(stats => stats.buddyHP)
     },
     {
-      label: '回復',
+      label: t('simulator.heal'),
       stack: 'Stack HP',
       backgroundColor: 'rgba(100, 100, 100, 0.2)',
       data: simulatorStore.characterStats.map(stats => stats.heal)
@@ -145,7 +148,7 @@ function createChart() {
       }
 
       datasets.push({
-        label: `対${element}(${magicType})`,
+        label: `${localizeGameText(`対${element}`, locale.value)} (${magicType})`,
         stack: `Stack ${element}${magicType}`,
         backgroundColor: simulatorStore.deckCharacters.map((char) => {
           const isMagicSelected = char[`isM${magicNumber}Selected` as keyof typeof char];
@@ -227,12 +230,12 @@ function createChart() {
             },
             afterBody: function(context) {
               const totalHP = context.reduce((sum, item) => {
-                if (item.dataset.label === 'HP' || item.dataset.label === 'バディHP' || item.dataset.label === '回復') {
+                if (item.dataset.label === 'HP' || item.dataset.label === `${t('simulator.buddy')} HP` || item.dataset.label === t('simulator.heal')) {
                   return sum + Math.ceil(item.parsed.y);
                 }
                 return sum;
               }, 0);
-              return [`総HP: ${totalHP}`];
+              return [`${t('simulator.totalHp')}: ${totalHP}`];
             }
           }
         }
@@ -271,6 +274,8 @@ watch(() => ({
     magic3DamageDetails: char.magic3DamageDetails
   }))
 }), debouncedCreateChart, { deep: true });
+
+watch(locale, debouncedCreateChart);
 
 onMounted(createChart);
 </script>

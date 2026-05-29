@@ -65,8 +65,8 @@
               <div v-else class="selected-image placeholder"></div>
 
               <div class="selected-copy">
-                <h3 class="selected-name">{{ selectedCharacter.chara }}</h3>
-                <p class="selected-costume">{{ selectedCharacter.costume }}</p>
+                <h3 class="selected-name">{{ localizeCharacterName(selectedCharacter.chara, locale) }}</h3>
+                <p class="selected-costume">{{ localizeCostumeName(selectedCharacter, locale) }}</p>
                 <div class="selected-tags">
                   <span class="tag">{{ selectedCharacter.rare }}</span>
                   <span class="tag" :style="{ borderColor: getTypeColor(selectedCharacter.attr), color: getTypeColor(selectedCharacter.attr) }">
@@ -105,7 +105,7 @@
             <div class="meta-list">
               <div class="meta-item">
                 <span class="meta-key">{{ $t('statusPlot.duoLabel') }}</span>
-                <strong class="meta-value">{{ selectedCharacter.duo || '-' }}</strong>
+                <strong class="meta-value">{{ selectedCharacter.duo ? localizeCharacterName(selectedCharacter.duo, locale) : '-' }}</strong>
               </div>
               <div class="meta-item">
                 <span class="meta-key">{{ $t('statusPlot.implementationDateLabel') }}</span>
@@ -150,6 +150,11 @@ import type { Character } from '@/store/characters'
 import { useCharacterStore } from '@/store/characters'
 import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects'
 import { hydrateCharacterImageUrls } from '@/utils/characterAssets'
+import {
+  localizeCharacterName,
+  localizeCostumeName,
+  localizeGameText,
+} from '@/utils/localizedDisplay'
 
 type StatMode = 'current' | 'allBuddy'
 
@@ -213,8 +218,8 @@ const plotPoints = computed<PlotPoint[]>(() => (
       x: statMode.value === 'current' ? character.hp : buddyStats.hp,
       y: statMode.value === 'current' ? character.atk : buddyStats.atk,
       cardName: character.name,
-      chara: character.chara,
-      costume: character.costume,
+      chara: localizeCharacterName(character.chara, locale.value),
+      costume: localizeCostumeName(character, locale.value),
       attr: character.attr,
       rare: character.rare,
       currentHp: character.hp,
@@ -245,8 +250,8 @@ const selectedBuddyDetails = computed(() => {
 
   return [1, 2, 3].map((buddyIndex) => ({
     index: buddyIndex,
-    character: selectedCharacter.value?.[`buddy${buddyIndex}c` as keyof Character] as string,
-    effect: getBuddyStatusForCharacter(selectedCharacter.value, buddyIndex, { forceTotsu: true }),
+    character: localizeCharacterName(selectedCharacter.value?.[`buddy${buddyIndex}c` as keyof Character], locale.value),
+    effect: localizeGameText(getBuddyStatusForCharacter(selectedCharacter.value, buddyIndex, { forceTotsu: true }), locale.value),
   }))
 })
 

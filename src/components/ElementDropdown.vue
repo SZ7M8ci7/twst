@@ -30,7 +30,7 @@
             :class="{ active: option.value === magicAttribute }"
             @click.stop="selectMagicOption(option)"
           >
-            <img :src="option.image" class="dropdown-image" :alt="option.label" />
+            <img :src="option.image" class="dropdown-image" :alt="localizedLabel(option.label)" />
           </button>
         </div>
 
@@ -51,7 +51,7 @@
           :class="{ active: option.value === magicTargetAttribute }"
           @click.stop="selectTargetOption(option)"
         >
-          <img :src="option.image" class="dropdown-image" :alt="option.label" />
+          <img :src="option.image" class="dropdown-image" :alt="localizedLabel(option.label)" />
         </button>
         </div>
       </div>
@@ -61,14 +61,17 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import fire from '@/assets/img/fire.webp';
 import water from '@/assets/img/water.webp';
 import flora from '@/assets/img/flora.webp';
 import cosmic from '@/assets/img/cosmic.webp';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { getMagicTargetAttribute, SIMULATOR_TARGET_ATTRIBUTES } from '@/utils/simulatorAttributes';
+import { localizeGameText } from '@/utils/localizedDisplay';
 
 const simulatorStore = useSimulatorStore();
+const { locale } = useI18n();
 
 const props = defineProps({
   charaIndex: {
@@ -98,6 +101,8 @@ const targetOptions = [
   { label: '対木', value: SIMULATOR_TARGET_ATTRIBUTES[2], element: '木', image: flora },
   { label: '対無', value: SIMULATOR_TARGET_ATTRIBUTES[3], element: '無', image: cosmic }
 ];
+
+const localizedLabel = (label) => localizeGameText(label, locale.value);
 
 const dropdown = ref(null);
 const dropdownMenu = ref(null);

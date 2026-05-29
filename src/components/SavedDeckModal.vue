@@ -7,7 +7,7 @@
           <div class="save-row">
             <v-text-field
               v-model="newDeckName"
-              placeholder="編成名（未入力で現在日時）"
+              :placeholder="t('common.saveDeckPlaceholder')"
               hide-details
               density="compact"
               variant="outlined"
@@ -28,7 +28,7 @@
         <!-- 保存済み編成一覧 -->
         <div class="saved-decks-section">
           <div v-if="!hasAnyDecks" class="no-decks">
-            保存された編成はありません
+            {{ t('common.noSavedDecks') }}
           </div>
           <div v-else>
             <div 
@@ -78,7 +78,7 @@
         <!-- 閉じるボタン -->
         <div class="close-section">
           <v-btn @click="closeModal" variant="text" block>
-            閉じる
+            {{ t('common.close') }}
           </v-btn>
         </div>
       </div>
@@ -88,6 +88,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import {
   loadStoredAutoSaveDeck,
@@ -108,6 +109,7 @@ interface SavedDeck {
 
 const emit = defineEmits(['close']);
 const simulatorStore = useSimulatorStore();
+const { t } = useI18n();
 
 const newDeckName = ref('');
 const saveError = ref('');
@@ -313,14 +315,14 @@ async function saveDeck() {
   const deckName = newDeckName.value.trim() || getCurrentDateTime();
 
   if (savedDecks.value.find(deck => deck.name === deckName)) {
-    saveError.value = 'この名前の編成は既に存在します';
+    saveError.value = t('common.duplicateDeckName');
     return;
   }
 
   try {
     // deckCharactersが存在し、配列であることを確認
     if (!simulatorStore.deckCharacters || !Array.isArray(simulatorStore.deckCharacters)) {
-      saveError.value = '編成データが見つかりません';
+      saveError.value = t('common.deckDataMissing');
       return;
     }
 
@@ -340,7 +342,7 @@ async function saveDeck() {
     
   } catch (error) {
     console.error('編成の保存に失敗しました:', error);
-    saveError.value = '編成の保存に失敗しました';
+    saveError.value = t('common.deckSaveFailed');
   }
 }
 

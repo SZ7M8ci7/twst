@@ -29,7 +29,7 @@
             {{ effect.text }}
           </div>
           <div v-if="character.etcEffects.length === 0" class="no-effects">
-            効果なし
+            {{ t('common.noEffects') }}
           </div>
         </div>
       </div>
@@ -37,36 +37,21 @@
 
     <div v-if="deckCharactersWithEtc.length === 0" class="no-characters">
       <v-icon size="48" color="grey">mdi-account-search</v-icon>
-      <div>{{ t('noCharacters') }}</div>
+      <div>{{ t('common.noCharacters') }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import defaultImg from '@/assets/img/default.webp';
 import charaData from '@/assets/chara.json';
+import { localizeGameText } from '@/utils/localizedDisplay';
 
 const simulatorStore = useSimulatorStore();
-
-// 多言語対応
-const translations = {
-  ja: {
-    noCharacters: 'デッキにキャラクターを追加してください'
-  },
-  en: {
-    noCharacters: 'Please add characters to your deck'
-  }
-} as const;
-
-const detectLanguage = (): keyof typeof translations => {
-  const browserLang = navigator.language || 'ja';
-  return browserLang.startsWith('en') ? 'en' : 'ja';
-};
-
-const currentLang = ref(detectLanguage());
-const t = (key: keyof typeof translations['ja']): string => translations[currentLang.value][key] || key;
+const { t, locale } = useI18n();
 
 // デッキ内のキャラクターとそのetc情報
 const deckCharactersWithEtc = computed(() => {
@@ -102,7 +87,7 @@ const deckCharactersWithEtc = computed(() => {
           }
           
           return {
-            text: effect,
+            text: localizeGameText(effect, locale.value),
             magicNumber,
             isSelected
           };

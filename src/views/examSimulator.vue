@@ -2,10 +2,10 @@
   <v-container class="exam-simulator" data-testid="exam-simulator" fluid>
     <div class="exam-shell">
       <v-tabs v-model="activeTab" class="main-tabs" color="primary" fixed-tabs :mobile-breakpoint="Infinity">
-        <v-tab value="exam" prepend-icon="mdi-file-document-edit-outline">敵条件</v-tab>
-        <v-tab value="deck" prepend-icon="mdi-cards-outline">編成</v-tab>
-        <v-tab value="plan" prepend-icon="mdi-call-split">行動</v-tab>
-        <v-tab value="result" prepend-icon="mdi-chart-bar">シミュ</v-tab>
+        <v-tab value="exam" prepend-icon="mdi-file-document-edit-outline">{{ t('examSimulator.tabs.exam') }}</v-tab>
+        <v-tab value="deck" prepend-icon="mdi-cards-outline">{{ t('examSimulator.tabs.deck') }}</v-tab>
+        <v-tab value="plan" prepend-icon="mdi-call-split">{{ t('examSimulator.tabs.plan') }}</v-tab>
+        <v-tab value="result" prepend-icon="mdi-chart-bar">{{ t('examSimulator.tabs.result') }}</v-tab>
       </v-tabs>
 
       <div class="tab-window">
@@ -20,20 +20,20 @@
                 size="small"
                 @click="preset.apply"
               >
-                {{ preset.title }}
+                {{ displayPresetTitle(preset.title) }}
               </v-btn>
             </div>
             <v-menu location="bottom end" max-height="420">
               <template #activator="{ props }">
                 <v-btn v-bind="props" color="primary" variant="outlined" size="small">
-                  過去分
+                  {{ t('examSimulator.pastPresets') }}
                 </v-btn>
               </template>
               <v-list class="preset-menu-list" density="compact" nav>
                 <v-list-item
                   v-for="preset in examPresets"
                   :key="preset.id"
-                  :title="preset.title"
+                  :title="displayPresetTitle(preset.title)"
                   @click="preset.apply"
                 />
               </v-list>
@@ -44,41 +44,41 @@
             <section class="tool-panel">
               <div class="panel-heading">
                 <div>
-                  <h2>試験条件</h2>
+                  <h2>{{ t('examSimulator.examConditions') }}</h2>
                 </div>
               </div>
               <div class="form-grid exam-grid">
-                <v-select v-model="exam.kind" class="exam-kind-select" :items="examKindOptions" label="形式" density="compact" variant="outlined" hide-details />
-                <v-select v-model="exam.enemyElement" :items="elementOptions" label="敵属性" density="compact" variant="outlined" hide-details />
+                <v-select v-model="exam.kind" class="exam-kind-select" :items="examKindOptions" :label="t('examSimulator.kind')" density="compact" variant="outlined" hide-details />
+                <v-select v-model="exam.enemyElement" :items="elementOptionItems" item-title="title" item-value="value" :label="t('examSimulator.enemyElement')" density="compact" variant="outlined" hide-details />
                 <v-select
                   v-model="exam.difficulty"
                   :items="difficultyOptions"
                   item-title="title"
                   item-value="value"
-                  label="難易度"
+                  :label="t('examSimulator.difficulty')"
                   density="compact"
                   variant="outlined"
                   hide-details
                 />
-                <v-text-field v-model.number="exam.enemyHp" type="number" label="敵HP" min="1" density="compact" variant="outlined" hide-details />
+                <v-text-field v-model.number="exam.enemyHp" type="number" :label="t('examSimulator.enemyHp')" min="1" density="compact" variant="outlined" hide-details />
               </div>
             </section>
 
             <section class="tool-panel">
               <div class="panel-heading">
                 <div>
-                  <h2>敵行動</h2>
+                  <h2>{{ t('examSimulator.enemyActions') }}</h2>
                 </div>
-                <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" @click="addEnemySlot">敵を追加</v-btn>
+                <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" @click="addEnemySlot">{{ t('examSimulator.addEnemy') }}</v-btn>
               </div>
               <div class="enemy-card-list">
                 <article v-for="(slot, slotIndex) in enemySlots" :key="slot.id" class="enemy-summary-card">
                   <div>
-                    <div class="summary-title">{{ slot.name || `敵${slotIndex + 1}` }}</div>
-                    <div class="summary-sub">{{ slot.actions.length }}行動</div>
+                    <div class="summary-title">{{ displayEnemySlotName(slot.name, slotIndex) }}</div>
+                    <div class="summary-sub">{{ t('examSimulator.actionCount', { count: slot.actions.length }) }}</div>
                   </div>
                   <div class="enemy-actions">
-                    <v-btn size="small" variant="tonal" prepend-icon="mdi-pencil" @click="openEnemyDialog(slotIndex)">編集</v-btn>
+                    <v-btn size="small" variant="tonal" prepend-icon="mdi-pencil" @click="openEnemyDialog(slotIndex)">{{ t('common.edit') }}</v-btn>
                     <v-btn size="small" variant="text" color="error" icon="mdi-delete" @click="removeEnemySlot(slotIndex)" />
                   </div>
                 </article>
@@ -91,11 +91,11 @@
           <section class="tool-panel">
             <div class="panel-heading">
               <div>
-                <h2>デッキ編成</h2>
+                <h2>{{ t('examSimulator.deckSetup') }}</h2>
               </div>
               <div class="deck-save-actions">
                 <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-content-save-outline" @click="openSaveExamSettingsDialog">
-                  編成
+                  {{ t('simulator.deck') }}
                 </v-btn>
               </div>
             </div>
@@ -133,7 +133,7 @@
                       :items="totsuOptions"
                       item-title="title"
                       item-value="value"
-                      label="凸"
+                      :label="t('common.limitBreak')"
                       density="compact"
                       variant="outlined"
                       hide-details
@@ -152,7 +152,7 @@
                         M{{ magicSlot }}
                       </button>
                     </div>
-                    <v-btn icon="mdi-tune-variant" class="deck-detail-button" :data-testid="`deck-detail-${index}`" size="small" variant="tonal" :disabled="!slot.character" aria-label="詳細編集" @click="openDeckDetailDialog(index)" />
+                    <v-btn icon="mdi-tune-variant" class="deck-detail-button" :data-testid="`deck-detail-${index}`" size="small" variant="tonal" :disabled="!slot.character" :aria-label="t('common.detailEdit')" @click="openDeckDetailDialog(index)" />
                   </div>
                 </div>
               </article>
@@ -165,20 +165,20 @@
             <section class="tool-panel order-panel">
               <div class="panel-heading">
                 <div>
-                  <h2>許容優先度</h2>
+                  <h2>{{ t('examSimulator.priority') }}</h2>
                 </div>
                 <div class="plan-heading-actions">
                   <label
                     class="smart-selection-toggle"
                     :class="{ disabled: exam.enemyElement !== '全' }"
-                    title="全属性試験で公開敵属性と残り候補から有利確率を計算して選択"
+                    :title="t('examSimulator.elementCompatibilityPriorityTitle')"
                   >
                     <input
                       v-model="allTurnElementCompatibilityPriority"
                       type="checkbox"
                       :disabled="exam.enemyElement !== '全'"
                     />
-                    <span>属性相性優先</span>
+                    <span>{{ t('examSimulator.elementCompatibilityPriority') }}</span>
                   </label>
                   <v-btn
                     class="copy-prev-turn-button"
@@ -189,7 +189,7 @@
                     :disabled="activeTurnIndex === 0"
                     @click="copyPreviousTurnCombos"
                   >
-                    前Tコピー
+                    {{ t('examSimulator.copyPreviousTurn') }}
                   </v-btn>
                   <v-btn
                     color="primary"
@@ -199,7 +199,7 @@
                     :disabled="magicCards.length < 2"
                     @click="addAllTurnCombos"
                   >
-                    全組み合わせ
+                    {{ t('examSimulator.allCombinations') }}
                   </v-btn>
                 </div>
               </div>
@@ -216,7 +216,7 @@
                   <label
                     class="turn-smart-selection-toggle"
                     :class="{ disabled: exam.enemyElement !== '全' }"
-                    title="このターンだけ属性相性優先を使う"
+                    :title="t('examSimulator.turnElementCompatibilityPriorityTitle')"
                   >
                     <input
                       :checked="currentTurnPlan.useElementCompatibilityPriority === true"
@@ -224,7 +224,7 @@
                       :disabled="exam.enemyElement !== '全'"
                       @change="updateActiveTurnElementCompatibilityPriority"
                     />
-                    <span>{{ currentTurnPlan.turn }}T 属性相性優先</span>
+                    <span>{{ currentTurnPlan.turn }}T {{ t('examSimulator.elementCompatibilityPriority') }}</span>
                   </label>
                 </div>
                 <div v-if="currentTurnPlan" class="combo-list">
@@ -244,8 +244,8 @@
                       class="combo-priority"
                       type="button"
                       draggable="true"
-                      aria-label="優先度をドラッグして並び替え"
-                      title="ドラッグして並び替え"
+                      :aria-label="t('examSimulator.dragPriority')"
+                      :title="t('common.dragToReorder')"
                       @click.stop="selectComboTarget(comboIndex)"
                       @dragstart.stop="onComboPriorityDragStart(activeTurnIndex, comboIndex, $event)"
                       @dragend="onComboPriorityDragEnd"
@@ -291,12 +291,12 @@
                       </div>
                     </div>
                     <div class="combo-right">
-                      <label v-if="!combo.virtual" class="combo-auto-swap" title="属性スコアが高くなる場合だけ左右を自動で入れ替え" @click.stop>
+                    <label v-if="!combo.virtual" class="combo-auto-swap" :title="t('examSimulator.autoSwapTitle')" @click.stop>
                         <input v-model="combo.allowAutoSwap" type="checkbox" @click.stop />
-                        <span>入替可</span>
+                      <span>{{ t('examSimulator.allowSwap') }}</span>
                       </label>
                       <div class="combo-actions" v-if="!combo.virtual">
-                        <v-btn icon="mdi-swap-horizontal" size="small" variant="text" :disabled="!combo.firstMagicId || !combo.secondMagicId" aria-label="左右入れ替え" @click.stop="swapComboMagic(activeTurnIndex, comboIndex)" />
+                    <v-btn icon="mdi-swap-horizontal" size="small" variant="text" :disabled="!combo.firstMagicId || !combo.secondMagicId" :aria-label="t('examSimulator.swapLeftRight')" @click.stop="swapComboMagic(activeTurnIndex, comboIndex)" />
                         <v-btn icon="mdi-delete" size="small" variant="text" color="error" :disabled="currentTurnPlan.combos.length <= 1" @click.stop="removeCombo(activeTurnIndex, comboIndex)" />
                       </div>
                     </div>
@@ -329,10 +329,10 @@
               </div>
             </section>
 
-            <aside class="tool-panel plan-reference-panel" aria-label="選択中マジック詳細">
+            <aside class="tool-panel plan-reference-panel" :aria-label="t('examSimulator.selectedMagicDetails')">
               <div class="panel-heading">
                 <div>
-                  <h2>参考情報</h2>
+                <h2>{{ t('examSimulator.referenceInfo') }}</h2>
                 </div>
               </div>
 
@@ -344,7 +344,7 @@
                       v-if="entry.duoPartner && getDuoIconSync(entry.duoPartner)"
                       class="plan-reference-duo-icon-container"
                       :class="{ 'duo-active': entry.duoActive }"
-                      :title="`デュオ相手: ${entry.duoPartner} (${entry.duoActive ? '有効' : '無効'})`"
+                    :title="duoReferenceTitle(entry)"
                     >
                       <img
                         :src="getDuoIconSync(entry.duoPartner) || defaultImg"
@@ -359,12 +359,12 @@
                       <span class="reference-magic-label" :class="referenceMagicElementClass(magic.element)">M{{ magic.magicSlot }}</span>
                       <span class="reference-effect-text">{{ magic.effectText }}</span>
                     </div>
-                    <div v-if="!entry.magics.length" class="reference-effect-text muted">未選択</div>
+                    <div v-if="!entry.magics.length" class="reference-effect-text muted">{{ t('examSimulator.unselected') }}</div>
                   </div>
                 </article>
               </div>
               <div v-else class="plan-reference-empty">
-                編成の選択マジックを表示
+                  {{ t('examSimulator.showSelectedDeckMagic') }}
               </div>
             </aside>
           </div>
@@ -374,50 +374,50 @@
           <section class="tool-panel result-panel">
             <div class="panel-heading">
               <div>
-                <h2>シミュレーション結果</h2>
+                <h2>{{ t('examSimulator.simulationResult') }}</h2>
               </div>
               <div class="result-actions">
-                <v-text-field v-model.number="iterations" class="run-field" type="number" min="1" max="100000" label="回数" density="compact" variant="outlined" hide-details />
+                <v-text-field v-model.number="iterations" class="run-field" type="number" min="1" max="100000" :label="t('examSimulator.iterations')" density="compact" variant="outlined" hide-details />
                 <v-text-field v-model.number="seed" class="seed-field" type="number" label="seed" density="compact" variant="outlined" hide-details />
-                <v-btn color="primary" data-testid="run-simulation" size="large" :loading="isRunning" :disabled="!!validationMessage || isRunning" prepend-icon="mdi-play" @click="runSimulation">実行</v-btn>
-                <v-btn icon="mdi-refresh" variant="tonal" aria-label="クリア" :disabled="!resultSummary || isRunning" @click="clearResults" />
+              <v-btn color="primary" data-testid="run-simulation" size="large" :loading="isRunning" :disabled="!!validationMessage || isRunning" prepend-icon="mdi-play" @click="runSimulation">{{ t('examSimulator.run') }}</v-btn>
+              <v-btn icon="mdi-refresh" variant="tonal" :aria-label="t('examSimulator.clear')" :disabled="!resultSummary || isRunning" @click="clearResults" />
               </div>
             </div>
 
             <div v-if="resultSummary" class="retire-summary">
               <div class="metric retire-metric">
-                <div class="metric-label">リタイア</div>
+                <div class="metric-label">{{ t('examSimulator.retire') }}</div>
                 <div class="metric-value">{{ formatNumber(resultSummary.retiredCount) }} / {{ formatNumber(resultSummary.count) }}</div>
               </div>
             </div>
-            <div v-else class="empty-result">未実行</div>
+                <div v-else class="empty-result">{{ t('examSimulator.notRun') }}</div>
 
             <div class="chart-grid">
               <div v-if="scoreDistributionData.labels.length" class="chart-panel wide">
-                <div class="chart-heading">スコア分布 / 達成確率</div>
+              <div class="chart-heading">{{ t('examSimulator.scoreDistribution') }}</div>
                 <div class="chart-body">
                   <Bar :data="scoreDistributionChartData" :options="scoreDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
                 </div>
               </div>
               <div v-if="retireReasonDistributionData.labels.length" class="chart-panel">
-                <div class="chart-heading">リタイア理由</div>
+              <div class="chart-heading">{{ t('examSimulator.retireReason') }}</div>
                 <div class="chart-body compact">
                   <Bar :data="retireReasonDistributionData" :options="retireReasonDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
                 </div>
               </div>
               <div v-if="retireTurnDistributionData.labels.length" class="chart-panel">
-                <div class="chart-heading">リタイアターン</div>
+              <div class="chart-heading">{{ t('examSimulator.retireTurn') }}</div>
                 <div class="chart-body compact">
                   <Bar :data="retireTurnDistributionData" :options="retireTurnDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
                 </div>
               </div>
             </div>
-            <div v-if="resultSummary && !scoreDistributionData.labels.length" class="empty-result">スコア0以外の結果なし</div>
+              <div v-if="resultSummary && !scoreDistributionData.labels.length" class="empty-result">{{ t('examSimulator.noNonZeroScores') }}</div>
 
             <div v-if="bestLog.length" class="best-log-strip">
-              <div data-testid="best-log-title">{{ bestLogTitle }}</div>
+          <div data-testid="best-log-title">{{ bestLogTitle }}</div>
               <div class="best-log-actions">
-                <v-btn variant="tonal" size="small" prepend-icon="mdi-text-box-search-outline" @click="logDialogOpen = true">ログを開く</v-btn>
+              <v-btn variant="tonal" size="small" prepend-icon="mdi-text-box-search-outline" @click="logDialogOpen = true">{{ t('examSimulator.openLog') }}</v-btn>
               </div>
             </div>
           </section>
@@ -432,26 +432,34 @@
     <v-dialog v-model="enemyDialogOpen" max-width="1320">
       <v-card class="modal-card" v-if="editingEnemySlot">
         <v-card-title class="modal-title">
-          <span>{{ editingEnemySlot.name || `敵${editingEnemySlotIndex + 1}` }} の行動</span>
+          <span>{{ t('examSimulator.enemyActionTitle', { name: displayEnemySlotName(editingEnemySlot.name, editingEnemySlotIndex) }) }}</span>
           <v-btn icon="mdi-close" variant="text" @click="enemyDialogOpen = false" />
         </v-card-title>
         <v-card-text>
           <div class="enemy-toolbar">
-            <v-text-field v-model="editingEnemySlot.name" class="enemy-name-field" label="敵名" density="compact" variant="outlined" hide-details />
-            <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" @click="addEnemyAction(editingEnemySlotIndex)">行動追加</v-btn>
+            <v-text-field
+              :model-value="displayEnemySlotName(editingEnemySlot.name, editingEnemySlotIndex)"
+              class="enemy-name-field"
+              :label="t('examSimulator.enemyName')"
+              density="compact"
+              variant="outlined"
+              hide-details
+              @update:model-value="updateEditingEnemySlotName"
+            />
+            <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" @click="addEnemyAction(editingEnemySlotIndex)">{{ t('examSimulator.addAction') }}</v-btn>
           </div>
 
           <div class="table-scroll">
             <v-table class="enemy-table" density="compact">
               <thead>
                 <tr>
-                  <th>属性</th>
-                  <th>行動</th>
-                  <th>等倍火力</th>
-                  <th>効果</th>
-                  <th>値</th>
+                  <th>{{ t('examSimulator.attribute') }}</th>
+                  <th>{{ t('examSimulator.action') }}</th>
+                  <th>{{ t('examSimulator.neutralDamage') }}</th>
+                  <th>{{ t('examSimulator.effect') }}</th>
+                  <th>{{ t('examSimulator.value') }}</th>
                   <th>T</th>
-                  <th>範囲</th>
+                  <th>{{ t('examSimulator.range') }}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -461,21 +469,23 @@
                     <v-select
                       v-if="exam.enemyElement === '全'"
                       v-model="action.element"
-                      :items="actionElementOptions"
+                      :items="actionElementOptionItems"
+                      item-title="title"
+                      item-value="value"
                       density="compact"
                       variant="outlined"
                       hide-details
                     />
-                    <div v-else class="fixed-attribute">{{ exam.enemyElement }}</div>
+                    <div v-else class="fixed-attribute">{{ localizeGameText(exam.enemyElement, locale) }}</div>
                   </td>
-                  <td class="power-cell"><v-select v-model="action.power" :items="enemyMagicPowerOptions" density="compact" variant="outlined" hide-details @update:model-value="syncEnemyPower(action)" /></td>
+                  <td class="power-cell"><v-select v-model="action.power" :items="enemyMagicPowerOptionItems" item-title="title" item-value="value" density="compact" variant="outlined" hide-details @update:model-value="syncEnemyPower(action)" /></td>
                   <td class="damage-cell"><v-text-field v-model.number="action.estimatedDamage" type="number" min="0" density="compact" variant="outlined" hide-details /></td>
                   <td class="effect-cell">
                     <v-select v-model="action.effectKind" :items="effectOptions" item-title="title" item-value="value" density="compact" variant="outlined" hide-details @update:model-value="syncEnemyEffectTarget(action)" />
                   </td>
                   <td class="value-cell"><v-text-field v-model.number="action.effectValue" type="number" density="compact" variant="outlined" hide-details /></td>
                   <td class="turn-cell"><v-select v-model.number="action.duration" :items="durationOptions" density="compact" variant="outlined" hide-details /></td>
-                  <td class="range-cell"><v-select v-model="action.effectTarget" :items="effectTargetOptions" density="compact" variant="outlined" hide-details /></td>
+                  <td class="range-cell"><v-select v-model="action.effectTarget" :items="effectTargetOptionItems" item-title="title" item-value="value" density="compact" variant="outlined" hide-details /></td>
                   <td class="delete-cell"><v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="removeEnemyAction(editingEnemySlotIndex, actionIndex)" /></td>
                 </tr>
               </tbody>
@@ -484,7 +494,7 @@
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn color="primary" variant="tonal" @click="enemyDialogOpen = false">閉じる</v-btn>
+          <v-btn color="primary" variant="tonal" @click="enemyDialogOpen = false">{{ t('common.close') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -498,7 +508,7 @@
         <v-card-text>
           <div class="log-body" data-testid="best-log-body">
             <section v-for="group in groupedBestLog" :key="group.title" class="log-turn-group">
-              <div class="log-turn-title">{{ group.title }}</div>
+              <div class="log-turn-title">{{ localizeExamLogText(group.title) }}</div>
               <div
                 v-for="(entry, index) in group.entries"
                 :key="`${group.title}-${index}-${entry.line}`"
@@ -507,16 +517,16 @@
               >
                 <template v-if="entry.side === 'enemy'">
                   <div class="log-marker">
-                    <div class="log-combatant enemy-combatant">{{ entry.label || '敵' }}</div>
+                    <div class="log-combatant enemy-combatant">{{ entry.label ? localizeExamLogText(entry.label) : t('examSimulator.enemy') }}</div>
                     <img v-if="entry.sourceElement" class="log-element-icon" :src="elementIcon(entry.sourceElement)" alt="" />
                   </div>
                   <div class="log-arrow">→</div>
-                  <div class="log-bubble">{{ entry.displayLine }}</div>
+                  <div class="log-bubble">{{ localizeExamLogText(entry.displayLine) }}</div>
                   <template v-if="entry.targetIcon || entry.targetLabel">
                     <div class="log-arrow">→</div>
                     <div class="log-marker">
                       <img v-if="entry.targetIcon" class="log-avatar" :src="entry.targetIcon" alt="" />
-                      <div v-else class="log-combatant target-combatant">{{ entry.targetLabel }}</div>
+                      <div v-else class="log-combatant target-combatant">{{ localizeExamLogText(entry.targetLabel) }}</div>
                       <img v-if="entry.targetElement" class="log-element-icon" :src="elementIcon(entry.targetElement)" alt="" />
                     </div>
                   </template>
@@ -524,19 +534,19 @@
                 <template v-else-if="entry.side === 'player'">
                   <template v-if="entry.targetLabel">
                     <div class="log-marker">
-                      <div class="log-combatant target-combatant">{{ entry.targetLabel }}</div>
+                      <div class="log-combatant target-combatant">{{ localizeExamLogText(entry.targetLabel) }}</div>
                       <img v-if="entry.targetElement" class="log-element-icon" :src="elementIcon(entry.targetElement)" alt="" />
                     </div>
                     <div class="log-arrow">←</div>
                   </template>
-                  <div class="log-bubble">{{ entry.displayLine }}</div>
+                  <div class="log-bubble">{{ localizeExamLogText(entry.displayLine) }}</div>
                   <div class="log-arrow">←</div>
                   <div class="log-marker">
                     <img class="log-avatar" :src="entry.icon || defaultImg" alt="" />
                     <img v-if="entry.sourceElement" class="log-element-icon" :src="elementIcon(entry.sourceElement)" alt="" />
                   </div>
                 </template>
-                <div v-else class="log-system-line">{{ entry.displayLine }}</div>
+                <div v-else class="log-system-line">{{ localizeExamLogText(entry.displayLine) }}</div>
               </div>
             </section>
           </div>
@@ -551,14 +561,14 @@
             <div class="settings-save-row">
               <v-text-field
                 v-model="settingsSetName"
-                placeholder="編成名（未入力で現在日時）"
+                :placeholder="t('common.saveDeckPlaceholder')"
                 hide-details
                 density="compact"
                 variant="outlined"
                 autofocus
                 @keydown.enter.prevent="saveCurrentExamSettingsSet"
               />
-              <v-btn color="success" size="small" variant="flat" class="settings-save-btn" aria-label="保存" @click="saveCurrentExamSettingsSet">
+              <v-btn color="success" size="small" variant="flat" class="settings-save-btn" :aria-label="t('common.save')" @click="saveCurrentExamSettingsSet">
                 <v-icon size="small">mdi-content-save</v-icon>
               </v-btn>
             </div>
@@ -567,7 +577,7 @@
 
           <div class="saved-decks-section">
             <div v-if="!savedExamSettings.length" class="no-decks">
-              保存された編成はありません
+              {{ t('common.noSavedDecks') }}
             </div>
             <div v-else>
               <div
@@ -593,7 +603,7 @@
                       </div>
                     </div>
                   </div>
-                  <v-btn size="x-small" color="error" variant="flat" class="settings-delete-btn" aria-label="削除" @click.stop="deleteSavedExamSettingsSet(setting.id)">
+                  <v-btn size="x-small" color="error" variant="flat" class="settings-delete-btn" :aria-label="t('common.delete')" @click.stop="deleteSavedExamSettingsSet(setting.id)">
                     <v-icon size="default">mdi-trash-can</v-icon>
                   </v-btn>
                 </div>
@@ -602,7 +612,7 @@
           </div>
 
           <div class="settings-close-section">
-            <v-btn variant="text" block @click="settingsSaveDialogOpen = false">閉じる</v-btn>
+            <v-btn variant="text" block @click="settingsSaveDialogOpen = false">{{ t('common.close') }}</v-btn>
           </div>
         </div>
       </div>
@@ -629,6 +639,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { Bar } from 'vue-chartjs';
 import { Chart, registerables } from 'chart.js';
 import defaultImg from '@/assets/img/default.webp';
@@ -654,8 +665,14 @@ import {
   saveSavedExamSimulatorSettings,
   type SavedExamSimulatorSettings,
 } from '@/storage/examSimulatorSettingsStorage';
+import {
+  localizeCharacterName,
+  localizeGameText,
+  localizeOptionItems,
+} from '@/utils/localizedDisplay';
 
 Chart.register(...registerables);
+const { t, locale } = useI18n();
 
 const jpNameToEnName = Object.fromEntries(
   (charactersInfo as Array<{ name_ja: string; name_en: string }>).map((character) => [character.name_ja, character.name_en]),
@@ -970,6 +987,10 @@ const actionElementOptions: ActionElement[] = ['火', '水', '木', '無'];
 const enemyMagicPowerOptions: EnemyMagicPower[] = ['単発(弱)', '単発(強)', '2連撃(弱)', '2連撃(強)', '3連撃(弱)', '3連撃(強)'];
 const magicSlotOptions: MagicSlot[] = [1, 2, 3];
 const effectTargetOptions: EffectTarget[] = ['自', '相手', '味方選択', '相手選択', '味方全体', '相手全体'];
+const elementOptionItems = computed(() => localizeOptionItems(elementOptions, locale.value));
+const actionElementOptionItems = computed(() => localizeOptionItems(actionElementOptions, locale.value));
+const enemyMagicPowerOptionItems = computed(() => localizeOptionItems(enemyMagicPowerOptions, locale.value));
+const effectTargetOptionItems = computed(() => localizeOptionItems(effectTargetOptions, locale.value));
 const durationOptions = [1, 2, 3, 4, 5];
 const totsuOptions = [0, 1, 2, 3, 4].map((value) => ({
   title: value.toString(),
@@ -1046,7 +1067,7 @@ const difficultyOptions = [
   { title: 'Hard', value: 1.2 },
   { title: 'Extra', value: 1.5 },
 ];
-const effectOptions: { title: string; value: EffectKind }[] = [
+const rawEffectOptions: { title: string; value: EffectKind }[] = [
   { title: 'なし', value: 'none' },
   { title: 'ATKUP', value: 'atkUp' },
   { title: 'ダメージUP', value: 'damageUp' },
@@ -1062,6 +1083,10 @@ const effectOptions: { title: string; value: EffectKind }[] = [
   { title: 'バフ解除', value: 'buffRemoval' },
   { title: 'ガッツ', value: 'guts' },
 ];
+const effectOptions = computed(() => rawEffectOptions.map((option) => ({
+  ...option,
+  title: localizeGameText(option.title, locale.value),
+})));
 const examPresets = computed(() => [...examPresetDefinitions]
   .sort((a, b) => b.title.localeCompare(a.title, 'ja'))
   .map((preset) => ({
@@ -1084,7 +1109,7 @@ const scoreDistributionOptions = computed(() => {
         position: 'left' as const,
         beginAtZero: true,
         ticks: { precision: 0 },
-        title: { display: true, text: '回数' },
+        title: { display: true, text: t('examSimulator.count') },
         grid: { drawOnChartArea: true },
       },
       percentage: {
@@ -1092,7 +1117,7 @@ const scoreDistributionOptions = computed(() => {
         position: 'right' as const,
         min: yRange.min,
         max: yRange.max,
-        title: { display: true, text: '達成確率' },
+        title: { display: true, text: t('examSimulator.achievementRate') },
         ticks: {
           callback: (value: string | number) => `${formatTruncatedDecimal(value, 2)}%`,
         },
@@ -1108,10 +1133,12 @@ const scoreDistributionOptions = computed(() => {
           label: (context: any) => {
             if (context.dataset.yAxisID === 'percentage') {
               const threshold = scoreBuckets.value.thresholds[context.dataIndex];
-              const thresholdText = threshold !== undefined ? `${formatNumber(threshold)}以上` : context.label;
-              return `達成確率 (${thresholdText}): ${formatPercentage(context.parsed.y)}%`;
+              const thresholdText = threshold !== undefined
+                ? t('examSimulator.atLeast', { value: formatNumber(threshold) })
+                : context.label;
+              return `${t('examSimulator.achievementRate')} (${thresholdText}): ${formatPercentage(context.parsed.y)}%`;
             }
-            return `回数: ${formatNumber(context.parsed.y)}`;
+            return `${t('examSimulator.count')}: ${formatNumber(context.parsed.y)}`;
           },
         },
       },
@@ -1129,12 +1156,12 @@ function createRetireDistributionOptions(kind: 'reason' | 'turn') {
       x: {
         beginAtZero: true,
         ticks: { precision: 0 },
-        title: { display: kind === 'reason', text: '回数' },
+        title: { display: kind === 'reason', text: t('examSimulator.count') },
       },
       y: {
         beginAtZero: true,
         ticks: { precision: 0 },
-        title: { display: kind === 'turn', text: '回数' },
+        title: { display: kind === 'turn', text: t('examSimulator.count') },
       },
     },
     plugins: {
@@ -1147,7 +1174,7 @@ function createRetireDistributionOptions(kind: 'reason' | 'turn') {
               : Number(context.parsed.y ?? 0);
             const total = simulationAggregate.value?.retiredCount ?? 0;
             const rate = total > 0 ? (count / total) * 100 : 0;
-            return `回数: ${formatNumber(count)} (${formatPercentage(rate)}%)`;
+            return `${t('examSimulator.count')}: ${formatNumber(count)} (${formatPercentage(rate)}%)`;
           },
         },
       },
@@ -1159,6 +1186,34 @@ let nextId = 0;
 function makeId(prefix: string) {
   nextId += 1;
   return `${prefix}-${nextId}`;
+}
+
+function enemyName(index: number) {
+  return `${t('examSimulator.enemy')}${index + 1}`;
+}
+
+function displayEnemySlotName(name: string, index: number) {
+  return localizeGameText(name || enemyName(index), locale.value);
+}
+
+function updateEditingEnemySlotName(value: unknown) {
+  if (!editingEnemySlot.value) return;
+  editingEnemySlot.value.name = String(value ?? '');
+}
+
+function duoReferenceTitle(entry: { duoPartner: string; duoActive: boolean }) {
+  const name = localizeCharacterName(entry.duoPartner, locale.value);
+  return entry.duoActive
+    ? t('simulator.duoPartnerShortActive', { name })
+    : t('simulator.duoPartnerShortInactive', { name });
+}
+
+function displayPresetTitle(title: string) {
+  return localizeGameText(title, locale.value);
+}
+
+function localizeExamLogText(text: string) {
+  return localizeGameText(text, locale.value);
 }
 
 const exam = ref<ExamDefinition>({
@@ -1304,9 +1359,9 @@ interface ValidationIssue {
 
 const validationIssues = computed<ValidationIssue[]>(() => {
   const issues: ValidationIssue[] = [];
-  if (selectedCharacters.value.length !== 5) issues.push({ tab: 'deck', message: '5枚のカードを選択してください。' });
-  if (enemyActionPool().length === 0) issues.push({ tab: 'exam', message: '敵行動を1つ以上入力してください。' });
-  if (totalDeckHp.value <= 0) issues.push({ tab: 'deck', message: 'デッキHPを計算できません。' });
+  if (selectedCharacters.value.length !== 5) issues.push({ tab: 'deck', message: t('examSimulator.validation.selectFiveCards') });
+  if (enemyActionPool().length === 0) issues.push({ tab: 'exam', message: t('examSimulator.validation.enterEnemyAction') });
+  if (totalDeckHp.value <= 0) issues.push({ tab: 'deck', message: t('examSimulator.validation.deckHpUnavailable') });
   return issues;
 });
 const validationMessage = computed(() => validationIssues.value[0]?.message ?? '');
@@ -1338,9 +1393,9 @@ const retireReasonDistributionData = computed<any>(() => {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'));
   const entries = [...knownReasons, ...extraReasons];
   return {
-    labels: entries.map(([reason]) => reason),
+    labels: entries.map(([reason]) => localizeExamLogText(reason)),
     datasets: [{
-      label: '回数',
+      label: t('examSimulator.count'),
       data: entries.map(([, count]) => count),
       backgroundColor: '#b35d5d',
       borderColor: '#8f3d3d',
@@ -1357,7 +1412,7 @@ const retireTurnDistributionData = computed<any>(() => {
   return {
     labels: turns.map((turn) => `${turn}T`),
     datasets: [{
-      label: '回数',
+      label: t('examSimulator.count'),
       data: turns.map((turn) => aggregate.retireTurnFrequencies[turn] ?? 0),
       backgroundColor: '#7d8fb3',
       borderColor: '#526b94',
@@ -1410,7 +1465,7 @@ const scoreDistributionData = computed<any>(() => {
     datasets: [
       {
         type: 'bar' as const,
-        label: '回数',
+        label: t('examSimulator.count'),
         data: bucketData.buckets,
         yAxisID: 'count',
         backgroundColor: '#4f7cac',
@@ -1420,7 +1475,7 @@ const scoreDistributionData = computed<any>(() => {
       },
       {
         type: 'line' as const,
-        label: '達成確率',
+        label: t('examSimulator.achievementRate'),
         data: achievementData,
         yAxisID: 'percentage',
         borderColor: '#d36b36',
@@ -1437,9 +1492,11 @@ const scoreDistributionChartData = computed<any>(() => scoreDistributionData.val
 const bestResult = computed(() => bestSimulationResult.value);
 const bestLog = computed(() => bestResult.value?.log ?? []);
 const bestLogTitle = computed(() => {
-  if (!bestResult.value) return '最高スコアログ';
-  const suffix = bestResult.value.retired ? ` / リタイア: ${bestResult.value.retireReason}` : '';
-  return `最高スコアログ: ${formatNumber(bestResult.value.score)}${suffix}`;
+  if (!bestResult.value) return t('examSimulator.bestScoreLog');
+  const suffix = bestResult.value.retired
+    ? ` / ${t('examSimulator.retire')}: ${localizeExamLogText(bestResult.value.retireReason)}`
+    : '';
+  return `${t('examSimulator.bestScoreLogWithScore', { score: formatNumber(bestResult.value.score) })}${suffix}`;
 });
 const groupedBestLog = computed<BattleLogGroup[]>(() => {
   const groups: BattleLogGroup[] = [];
@@ -1853,7 +1910,7 @@ function saveCurrentExamSettingsSet() {
   settingsSaveError.value = '';
   const name = settingsSetName.value.trim() || defaultExamSettingsName();
   if (savedExamSettings.value.some((setting) => setting.name === name)) {
-    settingsSaveError.value = 'この名前の編成は既に存在します';
+    settingsSaveError.value = t('common.duplicateDeckName');
     return;
   }
   const now = new Date().toISOString();
@@ -3060,7 +3117,7 @@ function getSimulationClock() {
 async function runSimulation() {
   if (validationMessage.value || isRunning.value) return;
   if (!enemyConditionsTouched.value) {
-    runAttemptWarning.value = '敵条件が初期状態のままです。過去分から選択するか、敵条件を入力してください。';
+    runAttemptWarning.value = t('examSimulator.enemyConditionsUntouched');
     activeTab.value = 'exam';
     return;
   }
