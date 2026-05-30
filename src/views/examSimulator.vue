@@ -5945,7 +5945,7 @@ function formatRatePercent(value: number) {
 
 .exam-preset-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(340px, 0.58fr) minmax(760px, 1.42fr);
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
@@ -5970,6 +5970,14 @@ function formatRatePercent(value: number) {
 .preset-group-unified {
   background: #fffaf2;
   border-color: #ead9bd;
+}
+
+.preset-group-unified .preset-actions {
+  flex-wrap: nowrap;
+}
+
+.preset-group-unified :deep(.v-btn) {
+  white-space: nowrap;
 }
 
 .preset-group-label {
