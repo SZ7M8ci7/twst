@@ -5857,6 +5857,7 @@ function formatRatePercent(value: number) {
 
 .exam-shell {
   max-width: 1500px;
+  min-width: 0;
   margin: 0 auto;
 }
 
@@ -5940,6 +5941,7 @@ function formatRatePercent(value: number) {
 }
 
 .tab-window {
+  min-width: 0;
   margin-top: 10px;
 }
 
@@ -5948,6 +5950,8 @@ function formatRatePercent(value: number) {
   grid-template-columns: minmax(340px, 0.58fr) minmax(760px, 1.42fr);
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
   margin-bottom: 10px;
   padding: 10px 12px;
   border: 1px solid #d9e2ea;
@@ -5973,11 +5977,12 @@ function formatRatePercent(value: number) {
 }
 
 .preset-group-unified .preset-actions {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .preset-group-unified :deep(.v-btn) {
-  white-space: nowrap;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .preset-group-label {
@@ -6040,7 +6045,7 @@ function formatRatePercent(value: number) {
 
 .special-challenge-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
   gap: 8px;
 }
 
@@ -6335,6 +6340,7 @@ function formatRatePercent(value: number) {
   justify-content: flex-start;
   gap: 8px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .deck-save-actions {
@@ -7708,7 +7714,42 @@ button.combo-priority {
   }
 
   .exam-preset-strip {
+    grid-template-columns: minmax(0, 1fr);
     padding: 10px;
+  }
+
+  .preset-group {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .preset-group-label {
+    white-space: normal;
+  }
+
+  .preset-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .preset-actions :deep(.v-btn),
+  .preset-group > :deep(.v-btn) {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .special-challenge-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .special-challenge-item {
+    grid-template-columns: 18px 28px minmax(0, 1fr);
+  }
+
+  .special-score {
+    grid-column: 3;
+    justify-self: end;
   }
 
   .span-2 {
