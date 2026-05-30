@@ -11,33 +11,66 @@
       <div class="tab-window">
         <section v-show="activeTab === 'exam'">
           <div class="exam-preset-strip">
-            <div class="preset-actions">
-              <v-btn
-                v-for="preset in recentExamPresets"
-                :key="preset.id"
-                color="primary"
-                variant="tonal"
-                size="small"
-                @click="preset.apply"
-              >
-                {{ displayPresetTitle(preset.title) }}
-              </v-btn>
-            </div>
-            <v-menu location="bottom end" max-height="420">
-              <template #activator="{ props }">
-                <v-btn v-bind="props" color="primary" variant="outlined" size="small">
-                  {{ t('examSimulator.pastPresets') }}
-                </v-btn>
-              </template>
-              <v-list class="preset-menu-list" density="compact" nav>
-                <v-list-item
-                  v-for="preset in examPresets"
+            <div class="preset-group">
+              <span class="preset-group-label">{{ t('examSimulator.normalPresets') }}</span>
+              <div class="preset-actions">
+                <v-btn
+                  v-for="preset in recentNormalExamPresets"
                   :key="preset.id"
-                  :title="displayPresetTitle(preset.title)"
+                  color="primary"
+                  variant="tonal"
+                  size="small"
                   @click="preset.apply"
-                />
-              </v-list>
-            </v-menu>
+                >
+                  {{ displayPresetTitle(preset.title) }}
+                </v-btn>
+              </div>
+              <v-menu location="bottom end" max-height="420">
+                <template #activator="{ props }">
+                  <v-btn v-bind="props" color="primary" variant="outlined" size="small">
+                    {{ t('examSimulator.pastPresets') }}
+                  </v-btn>
+                </template>
+                <v-list class="preset-menu-list" density="compact" nav>
+                  <v-list-item
+                    v-for="preset in normalExamPresets"
+                    :key="preset.id"
+                    :title="displayPresetTitle(preset.title)"
+                    @click="preset.apply"
+                  />
+                </v-list>
+              </v-menu>
+            </div>
+            <div class="preset-group preset-group-unified">
+              <span class="preset-group-label">{{ t('examSimulator.unifiedPresets') }}</span>
+              <div class="preset-actions">
+                <v-btn
+                  v-for="preset in recentUnifiedExamPresets"
+                  :key="preset.id"
+                  color="primary"
+                  variant="tonal"
+                  size="small"
+                  @click="preset.apply"
+                >
+                  {{ displayPresetTitle(preset.title) }}
+                </v-btn>
+              </div>
+              <v-menu location="bottom end" max-height="420">
+                <template #activator="{ props }">
+                  <v-btn v-bind="props" color="primary" variant="outlined" size="small">
+                    {{ t('examSimulator.pastPresets') }}
+                  </v-btn>
+                </template>
+                <v-list class="preset-menu-list" density="compact" nav>
+                  <v-list-item
+                    v-for="preset in unifiedExamPresets"
+                    :key="preset.id"
+                    :title="displayPresetTitle(preset.title)"
+                    @click="preset.apply"
+                  />
+                </v-list>
+              </v-menu>
+            </div>
           </div>
 
           <div class="tab-grid exam-tab-grid">
@@ -61,6 +94,28 @@
                   hide-details
                 />
                 <v-text-field v-model.number="exam.enemyHp" type="number" :label="t('examSimulator.enemyHp')" min="1" density="compact" variant="outlined" hide-details />
+              </div>
+            </section>
+
+            <section v-if="availableSpecialChallenges.length" class="tool-panel special-challenge-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>{{ t('examSimulator.specialChallenges') }}</h2>
+                </div>
+                <div class="special-score-total">+{{ formatNumber(selectedSpecialChallengeScore) }}</div>
+              </div>
+              <div class="special-challenge-list">
+                <label
+                  v-for="challenge in availableSpecialChallenges"
+                  :key="challenge.id"
+                  class="special-challenge-item"
+                  :class="{ selected: selectedSpecialChallengeIds.includes(challenge.id) }"
+                >
+                  <input v-model="selectedSpecialChallengeIds" type="checkbox" :value="challenge.id" />
+                  <span class="special-rank">{{ specialChallengeRankLabel(challenge.rank) }}</span>
+                  <span class="special-label">{{ localizeExamLogText(challenge.label) }}</span>
+                  <span class="special-score">+{{ formatNumber(challenge.score) }}</span>
+                </label>
               </div>
             </section>
 
@@ -658,7 +713,7 @@ import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
 import { getPowerOption, processCharacterSelection } from '@/utils/characterSelection';
 import { applyBuddyGeneratedBuffOverrides, createBuddyGeneratedBuffs, getBuddyAtkRate, getBuddyStatusForCharacter, splitBuddyEffects } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
-import { examPresetDefinitions, type ExamPresetDefinition } from '@/utils/examPresets';
+import { examPresetDefinitions, type ExamPresetDefinition, type ExamSpecialChallengeDefinition, type ExamSpecialChallengeEffect } from '@/utils/examPresets';
 import { loadExamSimulatorDeckImportState } from '@/storage/simulatorStorage';
 import {
   loadSavedExamSimulatorSettings,
@@ -676,6 +731,9 @@ const { t, locale } = useI18n();
 
 const jpNameToEnName = Object.fromEntries(
   (charactersInfo as Array<{ name_ja: string; name_en: string }>).map((character) => [character.name_ja, character.name_en]),
+) as Record<string, string>;
+const charaDormMap = Object.fromEntries(
+  (charactersInfo as Array<{ name_ja: string; dorm?: string }>).map((character) => [character.name_ja, character.dorm || '']),
 ) as Record<string, string>;
 
 type ExamKind = 'BASIC' | 'DEFENCE' | 'ATTACK';
@@ -695,6 +753,7 @@ type EffectTarget = '自' | '相手' | '味方選択' | '相手選択' | '味方
 type EffectKind =
   | 'none'
   | 'atkUp'
+  | 'atkDown'
   | 'damageUp'
   | 'damageDown'
   | 'damageTakenDown'
@@ -894,6 +953,12 @@ interface TimedPlayerBuff {
   source?: string;
 }
 
+interface EnemyContinueHealState {
+  amount: number;
+  turns: number;
+  source?: string;
+}
+
 type PlayerImmunityKind = 'burn' | 'blind' | 'curse' | 'freeze';
 
 interface PlayerImmunityState {
@@ -916,6 +981,7 @@ interface SimulationStats {
   playerRemainHp: number;
   playerTotalHp: number;
   enemyRemainHp: number;
+  enemyMaxHp: number;
   finishTurn: number;
   duo: number;
   advantage: number;
@@ -935,6 +1001,8 @@ interface SimulationStats {
   healBlock: number;
   miss: number;
   fallback: number;
+  specialChallengeScore: number;
+  specialChallengeLabels: string[];
   log?: string[];
 }
 
@@ -948,10 +1016,13 @@ interface SimulationResultAggregate {
 }
 
 interface SimulationState {
+  playerAttackDowns: TargetedTimedRate[];
   playerDamageDowns: TargetedTimedRate[];
   playerEvasions: TargetedTimedRate[];
   enemyDamageReductions: TimedRate[];
+  enemyDamageNulls: TimedRate[];
   enemyEvasions: TimedRate[];
+  enemyCriticals: TimedRate[];
   enemyAttackDowns: TimedRate[];
   enemyDamageDowns: TimedRate[];
   enemyDamageTakenUps: TimedRate[];
@@ -971,6 +1042,7 @@ interface SimulationState {
   enemyAttackUps: TimedRate[];
   enemyDamageUps: TimedRate[];
   enemyGuts: TimedCount[];
+  enemyContinueHeals: EnemyContinueHealState[];
 }
 
 type BattleStep =
@@ -1070,6 +1142,7 @@ const difficultyOptions = [
 const rawEffectOptions: { title: string; value: EffectKind }[] = [
   { title: 'なし', value: 'none' },
   { title: 'ATKUP', value: 'atkUp' },
+  { title: 'ATKDOWN', value: 'atkDown' },
   { title: 'ダメージUP', value: 'damageUp' },
   { title: 'ダメージDOWN', value: 'damageDown' },
   { title: '被ダメDOWN', value: 'damageTakenDown' },
@@ -1087,13 +1160,38 @@ const effectOptions = computed(() => rawEffectOptions.map((option) => ({
   ...option,
   title: localizeGameText(option.title, locale.value),
 })));
-const examPresets = computed(() => [...examPresetDefinitions]
-  .sort((a, b) => b.title.localeCompare(a.title, 'ja'))
-  .map((preset) => ({
-    ...preset,
-    apply: () => applyExamPreset(preset),
-  })));
-const recentExamPresets = computed(() => examPresets.value.slice(0, 2));
+const sortedExamPresets = computed(() => [...examPresetDefinitions]
+  .sort((a, b) => b.title.localeCompare(a.title, 'ja')));
+const isUnifiedExamPreset = (preset: ExamPresetDefinition) => preset.title.includes('統一') || (preset.specialChallenges?.length ?? 0) > 0;
+const unifiedElementOrder: Record<ExamElement, number> = {
+  火: 0,
+  水: 1,
+  木: 2,
+  無: 3,
+  全: 4,
+};
+function unifiedPresetGroupKey(preset: ExamPresetDefinition) {
+  return preset.title.replace(new RegExp(`${preset.enemyElement}(?:ATK|DF|BS|BASIC|DEFENCE|ATTACK)?$`), '');
+}
+function compareUnifiedExamPresets(a: ExamPresetDefinition, b: ExamPresetDefinition) {
+  const groupCompare = unifiedPresetGroupKey(b).localeCompare(unifiedPresetGroupKey(a), 'ja', { numeric: true });
+  if (groupCompare !== 0) return groupCompare;
+  return (unifiedElementOrder[a.enemyElement] ?? 99) - (unifiedElementOrder[b.enemyElement] ?? 99)
+    || a.title.localeCompare(b.title, 'ja');
+}
+const createExamPresetListItem = (preset: ExamPresetDefinition) => ({
+  ...preset,
+  apply: () => applyExamPreset(preset),
+});
+const normalExamPresets = computed(() => sortedExamPresets.value
+  .filter((preset) => !isUnifiedExamPreset(preset))
+  .map(createExamPresetListItem));
+const unifiedExamPresets = computed(() => sortedExamPresets.value
+  .filter(isUnifiedExamPreset)
+  .sort(compareUnifiedExamPresets)
+  .map(createExamPresetListItem));
+const recentNormalExamPresets = computed(() => normalExamPresets.value.slice(0, 2));
+const recentUnifiedExamPresets = computed(() => unifiedExamPresets.value.slice(0, 5));
 const SIMULATION_GRAPH_UPDATE_INTERVAL_MS = 500;
 const scoreDistributionOptions = computed(() => {
   const percentageDataset = scoreDistributionData.value.datasets.find((dataset: any) => dataset.yAxisID === 'percentage');
@@ -1216,6 +1314,12 @@ function localizeExamLogText(text: string) {
   return localizeGameText(text, locale.value);
 }
 
+function specialChallengeRankLabel(rank: number) {
+  if (rank === 3) return '③';
+  if (rank === 2) return '②';
+  return '①';
+}
+
 const exam = ref<ExamDefinition>({
   kind: 'DEFENCE',
   enemyElement: '木',
@@ -1266,6 +1370,8 @@ const settingsSaveError = ref('');
 const savedExamSettings = ref<SavedExamSimulatorSettings[]>([]);
 const enemyConditionsTouched = ref(false);
 const runAttemptWarning = ref('');
+const activeExamPresetId = ref('');
+const selectedSpecialChallengeIds = ref<string[]>([]);
 
 const selectedCharacters = computed(() => deck.value.map((slot) => slot.character).filter((character): character is Character => !!character));
 const charaDict = computed(() => Object.fromEntries(selectedCharacters.value.map((character) => [character.chara, true])));
@@ -1351,6 +1457,13 @@ const planReferenceCards = computed<PlanReferenceCard[]>(() => deck.value.flatMa
   }];
 }));
 const editingEnemySlot = computed(() => enemySlots.value[editingEnemySlotIndex.value] ?? null);
+const activePreset = computed(() => examPresetDefinitions.find((preset) => preset.id === activeExamPresetId.value) ?? null);
+const availableSpecialChallenges = computed<ExamSpecialChallengeDefinition[]>(() => activePreset.value?.specialChallenges ?? []);
+const selectedSpecialChallenges = computed<ExamSpecialChallengeDefinition[]>(() => {
+  const selectedIds = new Set(selectedSpecialChallengeIds.value);
+  return availableSpecialChallenges.value.filter((challenge) => selectedIds.has(challenge.id));
+});
+const selectedSpecialChallengeScore = computed(() => selectedSpecialChallenges.value.reduce((sum, challenge) => sum + safeNumber(challenge.score), 0));
 
 interface ValidationIssue {
   tab: ActiveTab;
@@ -1829,6 +1942,8 @@ function createEnemySlotFromActions(name: string, actions: Partial<EnemyActionDe
 function applyExamPreset(preset: ExamPresetDefinition) {
   enemyConditionsTouched.value = true;
   runAttemptWarning.value = '';
+  activeExamPresetId.value = preset.id;
+  selectedSpecialChallengeIds.value = [];
   exam.value.kind = preset.kind;
   exam.value.enemyElement = preset.enemyElement;
   if (preset.difficulty !== undefined) exam.value.difficulty = preset.difficulty;
@@ -3194,10 +3309,13 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
   const enemyDeck = buildEnemyActionDeck(rng, turnLimit * 2);
   let handState = createHandCycle(rng);
   const state: SimulationState = {
+    playerAttackDowns: [],
     playerDamageDowns: [],
     playerEvasions: [],
     enemyDamageReductions: [],
+    enemyDamageNulls: [],
     enemyEvasions: [],
+    enemyCriticals: [],
     enemyAttackDowns: [],
     enemyDamageDowns: [],
     enemyDamageTakenUps: [],
@@ -3217,7 +3335,9 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     enemyAttackUps: [],
     enemyDamageUps: [],
     enemyGuts: [],
+    enemyContinueHeals: [],
   };
+  const initialEnemyHp = effectiveEnemyMaxHp();
   const stats: SimulationStats = {
     score: 0,
     retired: false,
@@ -3229,7 +3349,8 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     burnDamage: 0,
     playerRemainHp: totalDeckHp.value,
     playerTotalHp: totalDeckHp.value,
-    enemyRemainHp: safeNumber(exam.value.enemyHp),
+    enemyRemainHp: initialEnemyHp,
+    enemyMaxHp: initialEnemyHp,
     finishTurn: turnLimit,
     duo: 0,
     advantage: 0,
@@ -3249,14 +3370,17 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     healBlock: 0,
     miss: 0,
     fallback: 0,
+    specialChallengeScore: selectedSpecialChallengeScore.value,
+    specialChallengeLabels: selectedSpecialChallenges.value.map((challenge) => challenge.label),
     log: keepLog ? [] : undefined,
   };
 
   let playerHp = totalDeckHp.value;
-  let enemyHp = safeNumber(exam.value.enemyHp);
-  const enemyMaxHp = safeNumber(exam.value.enemyHp);
+  let enemyHp = initialEnemyHp;
+  const enemyMaxHp = initialEnemyHp;
   activateInitialBuddyEffects(state);
   pushLog(stats, `開始: 自分HP ${formatNumber(playerHp)} / 敵HP ${formatNumber(enemyHp)} / ${exam.value.kind}`);
+  activateInitialSpecialChallenges(state, stats);
 
   battleLoop:
   for (let turnIndex = 0; turnIndex < turnLimit; turnIndex += 1) {
@@ -3346,8 +3470,9 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
         const hitText = incoming.hitDamages.length > 1 ? ` [${incoming.hitDamages.map(formatNumber).join('+')}]` : '';
         const evasionText = incoming.evasionCount > 0 ? ` / 回避成功${incoming.evasionCount}回` : '';
         const blindText = incoming.blindMiss ? ' / 暗闇MISS1回' : '';
+        const criticalText = incoming.criticalCount > 0 ? ` / クリティカル${incoming.criticalCount}回` : '';
         const modifierText = describeEnemyDamageModifiers(incoming.atkRate, incoming.damageRate);
-        pushLog(stats, `${turnIndex + 1}T ${step.label} 相手 ${describeEnemyAction(step.enemy)} -> ${describeMagic(step.defendingMagicId)} 受け${incoming.defenderElement} 被${formatNumber(incoming.damage)}${hitText}${evasionText}${blindText}${modifierText}${playerGutsResult.used ? ' / ガッツ' : ''} / 逆算ATK${formatNumber(incoming.baseAtk)} / 等倍${formatNumber(incoming.equalDamage)} / 自HP ${formatNumber(playerHpBeforeEnemy)}→${formatNumber(playerHp)}`);
+        pushLog(stats, `${turnIndex + 1}T ${step.label} 相手 ${describeEnemyAction(step.enemy)} -> ${describeMagic(step.defendingMagicId)} 受け${incoming.defenderElement} 被${formatNumber(incoming.damage)}${hitText}${evasionText}${blindText}${criticalText}${modifierText}${playerGutsResult.used ? ' / ガッツ' : ''} / 逆算ATK${formatNumber(incoming.baseAtk)} / 等倍${formatNumber(incoming.equalDamage)} / 自HP ${formatNumber(playerHpBeforeEnemy)}→${formatNumber(playerHp)}`);
         if (playerHp <= 0) {
           stats.finishTurn = turnIndex + 1;
           retire(stats, `${turnIndex + 1}T ${step.label} 被ダメージで自HP0`);
@@ -3361,6 +3486,16 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
       playerHp -= burnDamage;
       stats.burnDamage += burnDamage;
       pushLog(stats, `${turnIndex + 1}T やけど: ${burnDamage}`);
+    }
+    const enemyContinueHeal = applyEnemyContinueHeal(state, enemyHp, enemyMaxHp);
+    if (enemyContinueHeal > 0) {
+      const beforeEnemyHeal = enemyHp;
+      enemyHp = Math.min(enemyMaxHp, enemyHp + enemyContinueHeal);
+      const actualEnemyHeal = Math.max(0, enemyHp - beforeEnemyHeal);
+      if (actualEnemyHeal > 0) {
+        stats.enemyHeal += actualEnemyHeal;
+        pushLog(stats, `${turnIndex + 1}T 相手継続回復: +${formatNumber(actualEnemyHeal)} / 敵HP ${formatNumber(beforeEnemyHeal)}→${formatNumber(enemyHp)}`);
+      }
     }
     const continueHeal = applyPlayerContinueHeal(state, playerHp);
     if (continueHeal.total > 0) {
@@ -3622,6 +3757,111 @@ function activateInitialBuddyEffects(state: SimulationState) {
       }
     });
   });
+}
+
+function effectiveEnemyMaxHp() {
+  return selectedSpecialChallenges.value.reduce((hp, challenge) => {
+    const hpEffect = challenge.effects.find((effect) => effect.kind === 'enemyMaxHp');
+    const value = safeNumber(hpEffect?.value);
+    return value > 0 ? value : hp;
+  }, safeNumber(exam.value.enemyHp));
+}
+
+function activateInitialSpecialChallenges(state: SimulationState, stats: SimulationStats) {
+  const challenges = selectedSpecialChallenges.value;
+  if (!challenges.length) return;
+  challenges.forEach((challenge) => {
+    challenge.effects.forEach((effect) => applySpecialChallengeEffect(effect, state));
+  });
+  pushLog(stats, `特別課題: ${challenges.map((challenge) => `${specialChallengeRankLabel(challenge.rank)}${challenge.label}+${formatNumber(challenge.score)}`).join(' / ')} / 加点 +${formatNumber(selectedSpecialChallengeScore.value)}`);
+}
+
+function applySpecialChallengeEffect(effect: ExamSpecialChallengeEffect, state: SimulationState) {
+  if (effect.kind === 'enemyMaxHp') return;
+  const duration = Math.max(1, Math.floor(safeNumber(effect.duration) || 1));
+  const value = safeNumber(effect.value);
+  switch (effect.kind) {
+    case 'enemyAttackUp':
+      state.enemyAttackUps.push({ rate: value || 32, turns: duration });
+      break;
+    case 'enemyDamageUp':
+      state.enemyDamageUps.push({ rate: value || 5, turns: duration, attributeOption: effect.attribute });
+      break;
+    case 'enemyDamageReduction':
+      state.enemyDamageReductions.push({ rate: value || 8.75, turns: duration, attributeOption: effect.attribute });
+      break;
+    case 'enemyDamageNull':
+      state.enemyDamageNulls.push({ rate: 100, turns: duration, attributeOption: effect.attribute });
+      break;
+    case 'enemyEvasion':
+      state.enemyEvasions.push({ rate: value || 14.8, turns: duration });
+      break;
+    case 'enemyCritical':
+      state.enemyCriticals.push({ rate: value || criticalRatePowerScale.小, turns: duration });
+      break;
+    case 'enemyContinueHeal':
+      state.enemyContinueHeals.push({ amount: ceilDamage(value), turns: duration, source: '特別課題' });
+      break;
+    case 'playerDamageDown':
+      specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
+        state.playerDamageDowns.push({ cardIndex, rate: value || 5, turns: duration, attributeOption: effect.attribute });
+      });
+      break;
+    case 'playerDamageTakenUp':
+      specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
+        state.playerDamageTakenUps.push({ cardIndex, rate: value || 8.75, turns: duration, attributeOption: effect.attribute });
+      });
+      break;
+    case 'playerBlind':
+      specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
+        if (!isPlayerImmune(state, cardIndex, 'blind')) {
+          state.playerBlinds.push({ cardIndex, rate: value || blindRatePowerScale.中, turns: duration });
+        }
+      });
+      break;
+    case 'playerBurn':
+      specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
+        if (!isPlayerImmune(state, cardIndex, 'burn')) {
+          state.burns.push({ cardIndex, rate: value || 16, turns: duration });
+        }
+      });
+      break;
+    case 'playerCurse':
+      specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
+        if (!isPlayerImmune(state, cardIndex, 'curse')) {
+          state.playerCurses.push({ cardIndex, rate: 100, turns: duration });
+        }
+      });
+      break;
+    case 'playerFreeze':
+      specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
+        if (!isPlayerImmune(state, cardIndex, 'freeze')) {
+          state.playerFreezes.push({ cardIndex, rate: 100, turns: duration });
+        }
+      });
+      break;
+    default:
+      break;
+  }
+}
+
+function specialChallengeTargetCardIndices(effect: ExamSpecialChallengeEffect) {
+  return deck.value
+    .map((slot, index) => ({ slot, index }))
+    .filter(({ slot }) => !!slot.character)
+    .filter(({ index }) => specialChallengeDormMatches(effect, index))
+    .map(({ index }) => index);
+}
+
+function specialChallengeDormMatches(effect: ExamSpecialChallengeEffect, deckIndex: number) {
+  if (!effect.dorm) return true;
+  const dorm = deckCharacterDorm(deckIndex);
+  return effect.dormMode === 'exclude' ? dorm !== effect.dorm : dorm === effect.dorm;
+}
+
+function deckCharacterDorm(deckIndex: number) {
+  const character = deck.value[deckIndex]?.character;
+  return character ? charaDormMap[character.chara] || '' : '';
 }
 
 function getRuntimeBuddyAdditionalEffects(runtime: any) {
@@ -4352,16 +4592,21 @@ function calculatePlayerDamage(
     ? 0
     : Math.min(1, sumRatesForCard(state.playerBlinds, parsed.deckIndex) / 100);
   const enemyReductionRate = sumDamageRatesForElementAndEnemy(state.enemyDamageReductions, magic.element, targetEnemySlotKey);
+  const enemyDamageNullActive = hasEnemyDamageNull(state, magic.element, targetEnemySlotKey);
   const enemyDamageTakenUpRate = sumDamageRatesForElementAndEnemy(state.enemyDamageTakenUps, magic.element, targetEnemySlotKey);
   const enemyEvasionRate = Math.min(1, sumRatesForEnemy(state.enemyEvasions, targetEnemySlotKey) / 100);
   const reductionRate = Math.min(100, sumDamageDownRatesForCard(state.playerDamageDowns, parsed.deckIndex, magic.element) + enemyReductionRate - enemyDamageTakenUpRate);
   const damageBase = calculatePlayerDamageBase(runtime, parsed.magicSlot, targetElement, reductionRate);
-  const baseDamage = damageBase.damage;
+  const attackDownRate = Math.min(100, sumDamageDownRatesForCard(state.playerAttackDowns, parsed.deckIndex, magic.element));
+  const baseDamage = enemyDamageNullActive ? 0 : damageBase.damage * Math.max(0, 1 - attackDownRate / 100);
+  if (enemyDamageNullActive) {
+    return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: false, criticalCount: 0, damageNull: true };
+  }
   if (blindRate > 0) {
     const blindRoll = rng();
     if (blindRoll < blindRate) {
       stats.miss += 1;
-      return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: true, criticalCount: 0 };
+      return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: true, criticalCount: 0, damageNull: false };
     }
   }
 
@@ -4386,14 +4631,15 @@ function calculatePlayerDamage(
     if (criticalActive && hitDamage > 0) criticalCount += 1;
     damage += hitDamage;
   }
-  return { damage, compatibility, hitCount, isDuo, evasionCount, blindMiss: false, criticalCount };
+  return { damage, compatibility, hitCount, isDuo, evasionCount, blindMiss: false, criticalCount, damageNull: false };
 }
 
-function describePlayerAttackSpecials(attack: { evasionCount?: number; blindMiss?: boolean; criticalCount?: number }) {
+function describePlayerAttackSpecials(attack: { evasionCount?: number; blindMiss?: boolean; criticalCount?: number; damageNull?: boolean }) {
   const parts: string[] = [];
   if (attack.blindMiss) parts.push('暗闇MISS1回');
   if (safeNumber(attack.evasionCount) > 0) parts.push(`回避成功${safeNumber(attack.evasionCount)}回`);
   if (safeNumber(attack.criticalCount) > 0) parts.push(`クリティカル発動${safeNumber(attack.criticalCount)}回`);
+  if (attack.damageNull) parts.push('ダメージ無効');
   return parts.length ? ` / ${parts.join(' / ')}` : '';
 }
 
@@ -4456,6 +4702,14 @@ function applyPlayerContinueHeal(state: SimulationState, currentHp: number): Con
   return { total, details };
 }
 
+function applyEnemyContinueHeal(state: SimulationState, enemyHp: number, enemyMaxHp: number) {
+  if (enemyHp <= 0 || enemyHp >= enemyMaxHp) return 0;
+  const total = state.enemyContinueHeals
+    .filter((entry) => entry.turns > 0)
+    .reduce((sum, entry) => sum + ceilDamage(entry.amount), 0);
+  return Math.min(total, enemyMaxHp - enemyHp);
+}
+
 function calculateEnemyDamage(
   enemyAction: RuntimeEnemyAction | undefined,
   magicId: string,
@@ -4475,6 +4729,7 @@ function calculateEnemyDamage(
       hitDamages: [] as number[],
       evasionCount: 0,
       blindMiss: false,
+      criticalCount: 0,
     };
   }
   const parsed = parseMagicId(magicId);
@@ -4495,7 +4750,9 @@ function calculateEnemyDamage(
   const hitCount = enemyPowerHitCount(enemyAction.power);
   const evasionRate = parsed ? Math.min(1, sumRatesForCard(state.playerEvasions, parsed.deckIndex) / 100) : 0;
   const blindRate = Math.min(1, sumRatesForEnemy(state.enemyBlinds, enemyAction.slotKey) / 100);
+  const criticalRate = Math.min(1, sumRatesForEnemy(state.enemyCriticals, enemyAction.slotKey) / 100);
   let evasionCount = 0;
+  let criticalCount = 0;
   const hitDamages: number[] = [];
   if (blindRate > 0) {
     const blindRoll = rng();
@@ -4512,6 +4769,7 @@ function calculateEnemyDamage(
         hitDamages: Array.from({ length: hitCount }, () => 0),
         evasionCount: 0,
         blindMiss: true,
+        criticalCount: 0,
       };
     }
   }
@@ -4526,8 +4784,11 @@ function calculateEnemyDamage(
       }
     }
     const random = nextDamageFactor(rng);
-    const raw = (equalDamage * elementMultiplier / hitCount) * random.factor;
+    const criticalActive = criticalRate > 0 && rollEffect(criticalRate * 100, rng);
+    const criticalMultiplier = criticalActive ? CRITICAL_DAMAGE_MULTIPLIER : 1;
+    const raw = (equalDamage * elementMultiplier * criticalMultiplier / hitCount) * random.factor;
     const hitDamage = ceilDamage(raw);
+    if (criticalActive && hitDamage > 0) criticalCount += 1;
     hitDamages.push(hitDamage);
   }
   return {
@@ -4541,6 +4802,7 @@ function calculateEnemyDamage(
     hitDamages,
     evasionCount,
     blindMiss: false,
+    criticalCount,
   };
 }
 
@@ -4625,6 +4887,11 @@ function applyEnemyAdditionalEffects(
   const targetCards = resolveEnemyPlayerTargets(action.effectTarget, cardIndex, paired?.deckIndex);
   const targetSlotKeys = resolveEnemySideTargetSlotKeys(action, pairedEnemy);
   switch (action.effectKind) {
+    case 'atkDown':
+      targetCards.forEach((targetCardIndex) => {
+        state.playerAttackDowns.push({ cardIndex: targetCardIndex, rate: value || 20, turns: duration, attributeOption: action.effectAttribute });
+      });
+      break;
     case 'damageDown':
       targetCards.forEach((targetCardIndex) => {
         state.playerDamageDowns.push({ cardIndex: targetCardIndex, rate: value || 5, turns: duration, attributeOption: action.effectAttribute });
@@ -4703,7 +4970,6 @@ function applyEnemyAdditionalEffects(
         }
       });
       break;
-    case 'atkUp':
     case 'damageUp':
     case 'heal':
     case 'guts':
@@ -4752,7 +5018,7 @@ function observedEnemyDamageBuffRate(action: EnemyActionDefinition) {
 }
 
 function defaultEnemyEffectTarget(effectKind: EffectKind): EffectTarget {
-  if (['damageDown', 'burn', 'blind', 'curse', 'freeze', 'buffRemoval'].includes(effectKind)) return '相手';
+  if (['atkDown', 'damageDown', 'burn', 'blind', 'curse', 'freeze', 'buffRemoval'].includes(effectKind)) return '相手';
   return '自';
 }
 
@@ -4952,6 +5218,7 @@ function isEnemyFrozen(state: SimulationState, enemySlotKey?: string) {
 
 function removePlayerNegativeEffects(state: SimulationState, targetCards: number[]) {
   const targetSet = new Set(targetCards);
+  state.playerAttackDowns = state.playerAttackDowns.filter((entry) => !targetSet.has(entry.cardIndex));
   state.playerDamageDowns = state.playerDamageDowns.filter((entry) => !targetSet.has(entry.cardIndex));
   state.playerDamageTakenUps = state.playerDamageTakenUps.filter((entry) => !targetSet.has(entry.cardIndex));
   state.playerBlinds = state.playerBlinds.filter((entry) => !targetSet.has(entry.cardIndex));
@@ -4989,8 +5256,11 @@ function removeEnemyPositiveEffects(state: SimulationState, enemySlotKeys?: Arra
     state.enemyAttackUps = [];
     state.enemyDamageUps = [];
     state.enemyEvasions = [];
+    state.enemyCriticals = [];
     state.enemyDamageReductions = [];
+    state.enemyDamageNulls = [];
     state.enemyGuts = [];
+    state.enemyContinueHeals = [];
     return;
   }
   const targetSet = enemySlotKeySet(enemySlotKeys);
@@ -4998,7 +5268,9 @@ function removeEnemyPositiveEffects(state: SimulationState, enemySlotKeys?: Arra
   state.enemyAttackUps = removeEnemySlotBuffsByTargets(state.enemyAttackUps, targetSet);
   state.enemyDamageUps = removeEnemySlotBuffsByTargets(state.enemyDamageUps, targetSet);
   state.enemyEvasions = removeEnemySlotBuffsByTargets(state.enemyEvasions, targetSet);
+  state.enemyCriticals = removeEnemySlotBuffsByTargets(state.enemyCriticals, targetSet);
   state.enemyDamageReductions = removeEnemySlotBuffsByTargets(state.enemyDamageReductions, targetSet);
+  state.enemyDamageNulls = removeEnemySlotBuffsByTargets(state.enemyDamageNulls, targetSet);
   state.enemyGuts = state.enemyGuts.filter((entry) => !entry.targetEnemySlotKey || !targetSet.has(entry.targetEnemySlotKey));
 }
 
@@ -5016,10 +5288,13 @@ function applyBurnDamage(state: SimulationState, currentHp: number) {
 }
 
 function tickTimedEffects(state: SimulationState) {
+  state.playerAttackDowns = tickRateList(state.playerAttackDowns);
   state.playerDamageDowns = tickRateList(state.playerDamageDowns);
   state.playerEvasions = tickRateList(state.playerEvasions);
   state.enemyDamageReductions = tickRateList(state.enemyDamageReductions);
+  state.enemyDamageNulls = tickRateList(state.enemyDamageNulls);
   state.enemyEvasions = tickRateList(state.enemyEvasions);
+  state.enemyCriticals = tickRateList(state.enemyCriticals);
   state.enemyAttackDowns = tickRateList(state.enemyAttackDowns);
   state.enemyDamageDowns = tickRateList(state.enemyDamageDowns);
   state.enemyDamageTakenUps = tickRateList(state.enemyDamageTakenUps);
@@ -5034,6 +5309,7 @@ function tickTimedEffects(state: SimulationState) {
   state.enemyAttackUps = tickRateList(state.enemyAttackUps);
   state.enemyDamageUps = tickRateList(state.enemyDamageUps);
   state.enemyGuts = state.enemyGuts.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0 && entry.count > 0);
+  state.enemyContinueHeals = state.enemyContinueHeals.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0 && entry.amount > 0);
   state.playerGuts = state.playerGuts.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0 && entry.count > 0);
   state.burns = state.burns.map((burn) => ({ ...burn, turns: burn.turns - 1 })).filter((burn) => burn.turns > 0);
   state.playerContinueHeals = state.playerContinueHeals.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0);
@@ -5107,13 +5383,13 @@ function calculateScore(stats: SimulationStats) {
     const moveNum = stats.advantage + stats.equal + stats.disadvantage;
     const turnIndex = clamp(Math.floor((moveNum - 1) / 2), 0, turns.length - 1);
     const base = stats.playerDamage - moveNum * 4.5 + stats.duo * 3000 + stats.advantage * 2000 + stats.equal * 500 - stats.disadvantage * 1000;
-    return Math.round(base * exam.value.difficulty * turns[turnIndex]);
+    return Math.round(base * exam.value.difficulty * turns[turnIndex] + stats.specialChallengeScore);
   }
   if (exam.value.kind === 'ATTACK') {
     const actionCount = stats.advantageCombo + stats.equalCombo + stats.disadvantageCombo + stats.advantageSingle + stats.equalSingle + stats.disadvantageSingle;
     const damageScore = Math.round(stats.playerDamage / 208);
-    const basicScore = 11036 + safeNumber(exam.value.enemyHp) * 0.080471;
-    const moveMinusScore = 641.2 + safeNumber(exam.value.enemyHp) * 0.002048;
+    const basicScore = 11036 + safeNumber(stats.enemyMaxHp) * 0.080471;
+    const moveMinusScore = 641.2 + safeNumber(stats.enemyMaxHp) * 0.002048;
     const base = basicScore
       - moveMinusScore * actionCount
       + damageScore
@@ -5125,7 +5401,7 @@ function calculateScore(stats: SimulationStats) {
       + stats.advantageSingle * 150
       + stats.equalSingle * 120
       + stats.disadvantageSingle * 90;
-    return Math.round(base * exam.value.difficulty);
+    return Math.round(base * exam.value.difficulty + stats.specialChallengeScore);
   }
   const turns = [0.8, 0.85, 0.9, 0.95, 1];
   const turnMultiplier = turns[clamp(stats.finishTurn - 1, 0, turns.length - 1)];
@@ -5136,7 +5412,7 @@ function calculateScore(stats: SimulationStats) {
     - stats.disadvantageDamaged / 1.5 * 0.05208
     + stats.evasion * 600
     + stats.debuff * 300;
-  return Math.round(base * exam.value.difficulty * turnMultiplier);
+  return Math.round(base * exam.value.difficulty * turnMultiplier + stats.specialChallengeScore);
 }
 
 function pushScoreBreakdownLog(stats: SimulationStats) {
@@ -5158,18 +5434,19 @@ function pushScoreBreakdownLog(stats: SimulationStats) {
       scoreComponent('有利', stats.advantage * 2000, `${stats.advantage}回`),
       scoreComponent('等倍', stats.equal * 500, `${stats.equal}回`),
       scoreComponent('不利', -stats.disadvantage * 1000, `${stats.disadvantage}回`),
+      scoreComponent('特別課題', stats.specialChallengeScore, `${stats.specialChallengeLabels.length}件`),
     ];
     const base = stats.playerDamage - moveNum * 4.5 + stats.duo * 3000 + stats.advantage * 2000 + stats.equal * 500 - stats.disadvantage * 1000;
     pushLog(stats, `スコア内訳: BASIC ${components.join(' / ')}`);
-    pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(base)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} × ターン補正 ${formatScoreNumber(turnMultiplier)} = ${formatNumber(stats.score)}`);
+    pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(base)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} × ターン補正 ${formatScoreNumber(turnMultiplier)} + 特別課題 ${formatNumber(stats.specialChallengeScore)} = ${formatNumber(stats.score)}`);
     return;
   }
 
   if (exam.value.kind === 'ATTACK') {
     const actionCount = stats.advantageCombo + stats.equalCombo + stats.disadvantageCombo + stats.advantageSingle + stats.equalSingle + stats.disadvantageSingle;
     const damageScore = Math.round(stats.playerDamage / 208);
-    const basicScore = 11036 + safeNumber(exam.value.enemyHp) * 0.080471;
-    const moveMinusScore = 641.2 + safeNumber(exam.value.enemyHp) * 0.002048;
+    const basicScore = 11036 + safeNumber(stats.enemyMaxHp) * 0.080471;
+    const moveMinusScore = 641.2 + safeNumber(stats.enemyMaxHp) * 0.002048;
     const base = basicScore
       - moveMinusScore * actionCount
       + damageScore
@@ -5193,9 +5470,10 @@ function pushScoreBreakdownLog(stats: SimulationStats) {
       scoreComponent('有利単発', stats.advantageSingle * 150, `${stats.advantageSingle}回`),
       scoreComponent('等倍単発', stats.equalSingle * 120, `${stats.equalSingle}回`),
       scoreComponent('不利単発', stats.disadvantageSingle * 90, `${stats.disadvantageSingle}回`),
+      scoreComponent('特別課題', stats.specialChallengeScore, `${stats.specialChallengeLabels.length}件`),
     ];
     pushLog(stats, `スコア内訳: ATTACK ${components.join(' / ')}`);
-    pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(base)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} = ${formatNumber(stats.score)}`);
+    pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(base)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} + 特別課題 ${formatNumber(stats.specialChallengeScore)} = ${formatNumber(stats.score)}`);
     return;
   }
 
@@ -5223,9 +5501,10 @@ function pushScoreBreakdownLog(stats: SimulationStats) {
     scoreComponent('不利被ダメ', disadvantageDamagedScore, `${formatNumber(stats.disadvantageDamaged)}`),
     scoreComponent('回避', evasionScore, `${stats.evasion}回`),
     scoreComponent('デバフ', debuffScore, `${stats.debuff}回`),
+    scoreComponent('特別課題', stats.specialChallengeScore, `${stats.specialChallengeLabels.length}件`),
   ];
   pushLog(stats, `スコア内訳: DEFENCE ${components.join(' / ')}`);
-  pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(base)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} × ターン補正 ${formatScoreNumber(turnMultiplier)} = ${formatNumber(stats.score)}`);
+  pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(base)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} × ターン補正 ${formatScoreNumber(turnMultiplier)} + 特別課題 ${formatNumber(stats.specialChallengeScore)} = ${formatNumber(stats.score)}`);
 }
 
 function scoreComponent(label: string, value: number, detail = '') {
@@ -5293,6 +5572,14 @@ function sumDamageRatesForElementAndEnemy(list: TimedRate[], element: ActionElem
     if (item.attributeOption && item.attributeOption !== element) return sum;
     return sum + safeNumber(item.rate);
   }, 0);
+}
+
+function hasEnemyDamageNull(state: SimulationState, element: ActionElement, enemySlotKey: string) {
+  return state.enemyDamageNulls.some((item) => (
+    item.turns > 0
+    && timedRateAppliesToEnemy(item, enemySlotKey)
+    && (!item.attributeOption || item.attributeOption === element)
+  ));
 }
 
 function enemySlotKeySet(enemySlotKeys: Array<string | undefined>) {
@@ -5513,10 +5800,13 @@ function describeEnemyEffectTarget(action: RuntimeEnemyAction, defendingMagicId:
 function describeEnemyEffect(action: RuntimeEnemyAction) {
   if (action.effectKind === 'none') return 'なし';
   const value = safeNumber(action.effectValue);
-  const valueText = value ? `${value}%` : '既定値';
+  const valueText = value
+    ? (action.effectKind === 'heal' ? formatNumber(value) : `${value}%`)
+    : '既定値';
   const labelMap: Record<EffectKind, string> = {
     none: 'なし',
     atkUp: 'ATKUP',
+    atkDown: 'ATKDOWN',
     damageUp: 'ダメージUP',
     damageDown: 'ダメージDOWN',
     damageTakenDown: '被ダメDOWN',
@@ -5654,15 +5944,39 @@ function formatRatePercent(value: number) {
 }
 
 .exam-preset-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
   padding: 10px 12px;
   border: 1px solid #d9e2ea;
   border-radius: 8px;
   background: #ffffff;
+}
+
+.preset-group {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #dbe5ed;
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.preset-group-unified {
+  background: #fffaf2;
+  border-color: #ead9bd;
+}
+
+.preset-group-label {
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 900;
+  color: #52616d;
 }
 
 .tab-grid,
@@ -5704,6 +6018,64 @@ function formatRatePercent(value: number) {
   font-size: 19px;
   font-weight: 800;
   line-height: 1.25;
+}
+
+.special-challenge-panel {
+  grid-column: 1 / -1;
+}
+
+.special-score-total {
+  color: #8b4a10;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.special-challenge-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 8px;
+}
+
+.special-challenge-item {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #dde6ed;
+  border-radius: 8px;
+  background: #fbfcfd;
+  cursor: pointer;
+}
+
+.special-challenge-item input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #b16a21;
+}
+
+.special-challenge-item.selected {
+  border-color: #d9a65d;
+  background: #fff7ec;
+}
+
+.special-rank {
+  color: #89530d;
+  font-weight: 900;
+}
+
+.special-label {
+  min-width: 0;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.special-score {
+  color: #9b4f0b;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .order-panel > .panel-heading {
@@ -7155,7 +7527,11 @@ button.combo-priority {
 
   .exam-preset-strip {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  .preset-group {
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .exam-tab-grid,
