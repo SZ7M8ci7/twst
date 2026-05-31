@@ -84,6 +84,56 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/06-1水DF',
+    title: '2026/06-1水DF',
+    kind: 'DEFENCE',
+    enemyElement: '水',
+    enemyHp: 100000,
+    enemies: [
+      {
+        name: 'カリム',
+        actions: [
+          { name: '相手選択呪い強単発', element: '水', power: '単発(強)', estimatedDamage: 4450, effectKind: 'curse', effectTarget: '相手選択', effectValue: 100, duration: 3 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 8050 },
+          { name: 'ダメUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 8700, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジャミル',
+        actions: [
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 8400, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 14400 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 19000, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/06-1火ATK',
+    title: '2026/06-1火ATK',
+    kind: 'ATTACK',
+    enemyElement: '火',
+    enemyHp: 220000,
+    enemies: [
+      {
+        name: 'トレイ',
+        actions: [
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'リリア',
+        actions: [
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '味方選択ATKUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '味方選択', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '第17回統一火ATK',
     title: '第17回統一火ATK',
     kind: 'ATTACK',
