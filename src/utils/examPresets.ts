@@ -12,6 +12,7 @@ export type ExamPresetEffectKind =
   | 'damageTakenDown'
   | 'burn'
   | 'heal'
+  | 'continueHeal'
   | 'blind'
   | 'evasion'
   | 'curse'
@@ -83,6 +84,73 @@ export interface ExamPresetDefinition {
 }
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
+  {
+    id: '2026/06-2木BS',
+    title: '2026/06-2木BS',
+    kind: 'BASIC',
+    enemyElement: '木',
+    enemyHp: 110000,
+    enemies: [
+      {
+        name: 'リドル',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'エース',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '継続回復強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'continueHeal', effectTarget: '自', effectValue: 5062, duration: 3 },
+        ],
+      },
+      {
+        name: 'デュース',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/06-2全DF',
+    title: '2026/06-2全DF',
+    kind: 'DEFENCE',
+    enemyElement: '全',
+    enemyHp: 95000,
+    enemies: [
+      {
+        name: 'ルーク',
+        actions: [
+          { name: '火ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 7300, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '火強2連', element: '火', power: '2連撃(強)', estimatedDamage: 12500 },
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 13750 },
+          { name: '無ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 18150, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ヴィル',
+        actions: [
+          { name: '水デバフ解除弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 8050, effectKind: 'debuffRemoval', effectTarget: '味方選択', effectValue: 0, duration: 1 },
+          { name: '水強2連', element: '水', power: '2連撃(強)', estimatedDamage: 10750 },
+          { name: '水ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 14200, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'レオナ',
+        actions: [
+          { name: '木相手選択やけど弱2連', element: '木', power: '2連撃(弱)', estimatedDamage: 8000, effectKind: 'burn', effectTarget: '相手選択', effectValue: 16, duration: 3 },
+          { name: '木強2連', element: '木', power: '2連撃(強)', estimatedDamage: 10650 },
+          { name: '木被ダメDOWN強2連', element: '木', power: '2連撃(強)', estimatedDamage: 10650, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+        ],
+      },
+    ],
+  },
   {
     id: '2026/06-1水DF',
     title: '2026/06-1水DF',

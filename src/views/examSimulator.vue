@@ -759,6 +759,7 @@ type EffectKind =
   | 'damageTakenDown'
   | 'burn'
   | 'heal'
+  | 'continueHeal'
   | 'blind'
   | 'evasion'
   | 'curse'
@@ -957,6 +958,7 @@ interface EnemyContinueHealState {
   amount: number;
   turns: number;
   source?: string;
+  targetEnemySlotKey?: string;
 }
 
 type PlayerImmunityKind = 'burn' | 'blind' | 'curse' | 'freeze';
@@ -1148,6 +1150,7 @@ const rawEffectOptions: { title: string; value: EffectKind }[] = [
   { title: '被ダメDOWN', value: 'damageTakenDown' },
   { title: 'やけど', value: 'burn' },
   { title: '回復', value: 'heal' },
+  { title: '継続回復', value: 'continueHeal' },
   { title: '暗闇', value: 'blind' },
   { title: '回避', value: 'evasion' },
   { title: '呪い', value: 'curse' },
@@ -4706,6 +4709,7 @@ function applyEnemyContinueHeal(state: SimulationState, enemyHp: number, enemyMa
   if (enemyHp <= 0 || enemyHp >= enemyMaxHp) return 0;
   const total = state.enemyContinueHeals
     .filter((entry) => entry.turns > 0)
+    .filter((entry) => !entry.targetEnemySlotKey || !isEnemyCursed(state, entry.targetEnemySlotKey))
     .reduce((sum, entry) => sum + ceilDamage(entry.amount), 0);
   return Math.min(total, enemyMaxHp - enemyHp);
 }
@@ -4843,6 +4847,22 @@ function applyEnemySelfEffects(
       }
       const capped = Math.min(ceilDamage(healAmount), enemyMaxHp - enemyHp);
       return capped;
+    }
+    case 'continueHeal': {
+      const healAmount = ceilDamage(value);
+      if (healAmount <= 0) {
+        return 0;
+      }
+      targetSlotKeys.forEach((targetEnemySlotKey) => {
+        if (isEnemyCursed(state, targetEnemySlotKey)) return;
+        state.enemyContinueHeals.push({
+          amount: healAmount,
+          turns: duration,
+          source: action.name,
+          targetEnemySlotKey,
+        });
+      });
+      break;
     }
     case 'guts':
       targetSlotKeys.forEach((targetEnemySlotKey) => {
@@ -5023,7 +5043,7 @@ function defaultEnemyEffectTarget(effectKind: EffectKind): EffectTarget {
 }
 
 function isEnemyFreezeBlockedEffectKind(effectKind: EffectKind) {
-  return ['atkUp', 'damageUp', 'damageTakenDown', 'evasion', 'guts'].includes(effectKind);
+  return ['atkUp', 'damageUp', 'damageTakenDown', 'evasion', 'guts', 'continueHeal'].includes(effectKind);
 }
 
 function isEnemySideTarget(target: EffectTarget) {
@@ -5272,6 +5292,7 @@ function removeEnemyPositiveEffects(state: SimulationState, enemySlotKeys?: Arra
   state.enemyDamageReductions = removeEnemySlotBuffsByTargets(state.enemyDamageReductions, targetSet);
   state.enemyDamageNulls = removeEnemySlotBuffsByTargets(state.enemyDamageNulls, targetSet);
   state.enemyGuts = state.enemyGuts.filter((entry) => !entry.targetEnemySlotKey || !targetSet.has(entry.targetEnemySlotKey));
+  state.enemyContinueHeals = state.enemyContinueHeals.filter((entry) => !entry.targetEnemySlotKey || !targetSet.has(entry.targetEnemySlotKey));
 }
 
 function applyBurnDamage(state: SimulationState, currentHp: number) {
@@ -5801,7 +5822,7 @@ function describeEnemyEffect(action: RuntimeEnemyAction) {
   if (action.effectKind === 'none') return 'なし';
   const value = safeNumber(action.effectValue);
   const valueText = value
-    ? (action.effectKind === 'heal' ? formatNumber(value) : `${value}%`)
+    ? (['heal', 'continueHeal'].includes(action.effectKind) ? formatNumber(value) : `${value}%`)
     : '既定値';
   const labelMap: Record<EffectKind, string> = {
     none: 'なし',
@@ -5812,6 +5833,7 @@ function describeEnemyEffect(action: RuntimeEnemyAction) {
     damageTakenDown: '被ダメDOWN',
     burn: 'やけど',
     heal: '回復',
+    continueHeal: '継続回復',
     blind: '暗闇',
     evasion: '回避',
     curse: '呪い',
