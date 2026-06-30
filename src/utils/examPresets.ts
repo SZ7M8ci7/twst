@@ -85,6 +85,80 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/07-1無ATK',
+    title: '2026/07-1無ATK',
+    kind: 'ATTACK',
+    enemyElement: '無',
+    enemyHp: 167000,
+    enemies: [
+      {
+        name: 'アズール',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジェイド',
+        actions: [
+          { name: '強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '回復強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'heal', effectTarget: '自', effectValue: 2382, duration: 1 },
+        ],
+      },
+      {
+        name: 'フロイド',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/07-1水BS',
+    title: '2026/07-1水BS',
+    kind: 'BASIC',
+    enemyElement: '水',
+    enemyHp: 115000,
+    enemies: [
+      {
+        name: 'リドル',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '相手選択バフ解除弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'buffRemoval', effectTarget: '相手選択', effectValue: 0, duration: 1 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'トレイ',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジェイド',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'リリア',
+        actions: [
+          { name: '強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/06-2木BS',
     title: '2026/06-2木BS',
     kind: 'BASIC',
