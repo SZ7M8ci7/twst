@@ -437,6 +437,7 @@ const buddyRateMap: { [key: string]: { hp: number; atk: number; heal: number; co
   '回復&継続回復(小)': { hp: 0, atk: 0, heal: 1.1, conHeal: 0.15 * 3 },
   '回復(中)': { hp: 0, atk: 0, heal: 1.7, conHeal: 0 },
   '回復&継続回復(中)': { hp: 0, atk: 0, heal: 1.7, conHeal: 0.25 * 3 },
+  '継続回復(極小)': { hp: 0, atk: 0, heal: 0, conHeal: 0.10 * 3 },
   '継続回復(小)': { hp: 0, atk: 0, heal: 0, conHeal: 0.15 * 3 },
   '継続回復(中)': { hp: 0, atk: 0, heal: 0, conHeal: 0.25 * 3 },
 };

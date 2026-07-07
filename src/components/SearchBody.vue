@@ -227,7 +227,7 @@ const buff = [
   'ダメUP(極大)','ダメUP(大)', 'ダメUP(中)', 'ダメUP(小)', 'ダメUP(極小)',
   '属性ダメUP(極大)', '属性ダメUP(大)', '属性ダメUP(中)', '属性ダメUP(小)', '属性ダメUP(極小)',
 ];
-const heal = ['回復&継続回復(中)','回復&継続回復(小)', '回復(中)', '回復(小)', '回復(極小)', '継続回復(中)', '継続回復(小)'];
+const heal = ['回復&継続回復(中)','回復&継続回復(小)', '回復(中)', '回復(小)', '回復(極小)', '継続回復(中)', '継続回復(小)', '継続回復(極小)'];
 const pow = ['単発(弱)', '単発(強)','連撃(弱)', '連撃(強)'];
 const buddyCharacterOptions = computed(() => buddyCharacter.map((value) => ({
   title: localizeCharacterName(value, locale.value),
