@@ -85,6 +85,64 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/07-2火DF',
+    title: '2026/07-2火DF',
+    kind: 'DEFENCE',
+    enemyElement: '火',
+    enemyHp: 98000,
+    enemies: [
+      {
+        name: 'マレウス',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 5400, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 9300 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 12250, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'エース',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 6450, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 11100 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 14600, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'セベク',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 9350, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強単発', element: '火', power: '単発(強)', estimatedDamage: 10800, effectKind: 'atkUp', effectTarget: '自', effectValue: 21.5, duration: 1 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 21150, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/07-2木ATK',
+    title: '2026/07-2木ATK',
+    kind: 'ATTACK',
+    enemyElement: '木',
+    enemyHp: 218000,
+    enemies: [
+      {
+        name: 'ラギー',
+        actions: [
+          { name: '強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '単体ATKDOWN強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'シルバー',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/07-1無ATK',
     title: '2026/07-1無ATK',
     kind: 'ATTACK',
