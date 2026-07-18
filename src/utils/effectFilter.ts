@@ -39,6 +39,9 @@ export function matchesSelectedEffect(etcRaw: string, effect: string): boolean {
   if (effect === PARTY_WIDE_TWO_TURN_BUFF) {
     return hasPartyWideTwoTurnBuff(etcRaw);
   }
+  if (effect === '呪い') {
+    return (etcRaw || '').includes('呪い(');
+  }
   return (etcRaw || '').includes(effect);
 }
 
