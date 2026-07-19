@@ -12,6 +12,7 @@ type WorkerRequest = {
   resetStop?: boolean;
   seedText: string;
   rootRange: { start: number; end: number };
+  pruneBenchmark?: { score: number; finishTurn: number };
 } | { id: number; method: 'warmup' }
   | { method: 'stop' };
 
@@ -68,6 +69,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         self.postMessage({ id: request.id, progress: { exploredNodes, completedPatterns, queuedBranches, provisionalBestScore } });
       },
       request.resetStop === true,
+      request.pruneBenchmark,
     );
     self.postMessage({ id: request.id, result });
   } catch (error) {

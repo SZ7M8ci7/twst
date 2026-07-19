@@ -997,6 +997,10 @@ interface AutoBestRootRange {
   start: number;
   end: number;
 }
+interface AutoBestPruneBenchmark {
+  score: number;
+  finishTurn: number;
+}
 interface AutoBestWorkerSnapshot {
   exam: ExamDefinition;
   enemySlots: EnemySlotDefinition[];
@@ -3662,6 +3666,7 @@ async function searchAutoBestSeedParallel(
   snapshot: AutoBestWorkerSnapshot,
   runToken: number,
   onProgress: (exploredNodes: number, completedPatterns: number, queuedBranches: number, provisionalBestScore: number) => void,
+  initialPruneBenchmark?: AutoBestPruneBenchmark,
 ) {
   const workers = await ensureAutoBestWorkerPool();
   const rootCount = 20;
@@ -3680,6 +3685,7 @@ async function searchAutoBestSeedParallel(
   });
   const results = new Array<AutoBestSeedSearchResult>(rootCount);
   let nextRootQueueIndex = 0;
+  let pruneBenchmark = initialPruneBenchmark ? { ...initialPruneBenchmark } : undefined;
   const runRoot = (
     client: AutoBestWorkerClient,
     rootIndex: number,
@@ -3706,6 +3712,7 @@ async function searchAutoBestSeedParallel(
       resetStop,
       seedText,
       rootRange: { start: rootIndex, end: rootIndex + 1 },
+      pruneBenchmark,
     });
   });
   const workerTasks = workers.map(async (client) => {
@@ -3720,6 +3727,16 @@ async function searchAutoBestSeedParallel(
       initialize = false;
       resetStop = false;
       results[rootIndex] = result;
+      if (
+        result.bestResult
+        && !result.bestResult.retired
+        && (!pruneBenchmark || result.bestResult.score > pruneBenchmark.score)
+      ) {
+        pruneBenchmark = {
+          score: result.bestResult.score,
+          finishTurn: result.bestResult.finishTurn,
+        };
+      }
       if (result.cancelled) break;
     }
   });
@@ -3776,6 +3793,7 @@ async function runAutoBestSimulation(count: number, resultGeneration: number) {
   let totalExploredNodes = 0;
   let totalCompletedPatterns = 0;
   let bestScore = Number.NEGATIVE_INFINITY;
+  let bestFinishTurn: number | undefined;
   let bestSeedText = '';
   let bestPlan: PlayerPair[] = [];
   let provisionalBestScore = 0;
@@ -3830,7 +3848,7 @@ async function runAutoBestSimulation(count: number, resultGeneration: number) {
       ) => {
         publishProgress(exploredNodes, completedPatterns, queuedBranches, currentBestScore);
         publishAggregate();
-      });
+      }, bestFinishTurn === undefined ? undefined : { score: bestScore, finishTurn: bestFinishTurn });
     } catch (error) {
       if (!stopRequested.value && isCurrentRun()) throw error;
       publishProgress(0, 0, 0, provisionalBestScore, true);
@@ -3875,6 +3893,7 @@ async function runAutoBestSimulation(count: number, resultGeneration: number) {
     }
     if (result.score > bestScore) {
       bestScore = result.score;
+      if (!result.retired) bestFinishTurn = result.finishTurn;
       bestSeedText = seedText;
       bestPlan = searchResult.bestPlan.map(([first, second]) => [first, second]);
     }
@@ -3906,6 +3925,7 @@ async function searchAutoBestSeed(
     provisionalBestScore: number,
   ) => void,
   rootRange?: AutoBestRootRange,
+  initialPruneBenchmark?: AutoBestPruneBenchmark,
 ): Promise<AutoBestSeedSearchResult> {
   const frames: Array<{
     checkpoint: AutoBestCheckpoint;
@@ -3926,6 +3946,8 @@ async function searchAutoBestSeed(
   let lastProgressAt = getSimulationClock();
   let cancelled = false;
   const branchRng = createRng(seedText);
+  const pruneLateAttackBranches = (simulationRuntimeCache?.examKind ?? exam.value.kind) === 'ATTACK';
+  let pruneBenchmark = initialPruneBenchmark ? { ...initialPruneBenchmark } : undefined;
 
   const queuedBranchCount = () => {
     let count = 0;
@@ -3935,6 +3957,14 @@ async function searchAutoBestSeed(
 
   const processResult = (result: SimulationStats, depth: number) => {
     if (result.pendingDecision) {
+      const decisionTurn = result.pendingDecision.turnIndex + 1;
+      if (
+        pruneLateAttackBranches
+        && pruneBenchmark
+        && decisionTurn >= pruneBenchmark.finishTurn + 2
+      ) {
+        return;
+      }
       let candidates = result.pendingDecision.candidates;
       if (depth === 0 && rootRange) {
         candidates = candidates.slice(rootRange.start, rootRange.end);
@@ -3948,6 +3978,12 @@ async function searchAutoBestSeed(
       return;
     }
     completedPatterns += 1;
+    if (
+      !result.retired
+      && (!pruneBenchmark || result.score > pruneBenchmark.score)
+    ) {
+      pruneBenchmark = { score: result.score, finishTurn: result.finishTurn };
+    }
     if (!bestResult || result.score > bestResult.score) {
       // Terminal results are not mutated after runOneSimulation returns. Keep
       // that object until the worker response is structured-cloned instead of
@@ -4014,6 +4050,7 @@ async function runAutoBestWorkerPartition(
   rootRange: AutoBestRootRange,
   onProgress: (exploredNodes: number, completedPatterns: number, queuedBranches: number, provisionalBestScore: number) => void = () => undefined,
   resetStop = false,
+  pruneBenchmark?: AutoBestPruneBenchmark,
 ) {
   if (snapshot) {
     exam.value = markRaw(snapshot.exam);
@@ -4035,7 +4072,7 @@ async function runAutoBestWorkerPartition(
       cancelled: true,
     } satisfies AutoBestSeedSearchResult;
   }
-  return await searchAutoBestSeed(seedText, onProgress, rootRange);
+  return await searchAutoBestSeed(seedText, onProgress, rootRange, pruneBenchmark);
 }
 
 function requestAutoBestWorkerStop() {
