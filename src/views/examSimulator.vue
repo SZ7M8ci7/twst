@@ -432,10 +432,53 @@
                 <h2>{{ t('examSimulator.simulationResult') }}</h2>
               </div>
               <div class="result-actions">
+                <v-btn-toggle v-model="simulationMode" class="simulation-mode-toggle" mandatory divided density="compact" variant="outlined" :disabled="isRunning">
+                  <v-btn value="normal" size="small" data-testid="simulation-mode-normal">{{ t('examSimulator.normalMode') }}</v-btn>
+                  <v-btn value="autoBest" size="small" data-testid="simulation-mode-auto-best">{{ t('examSimulator.autoBestMode') }}</v-btn>
+                </v-btn-toggle>
                 <v-text-field v-model.number="iterations" class="run-field" type="number" min="1" max="100000" :label="t('examSimulator.iterations')" density="compact" variant="outlined" hide-details />
                 <v-text-field v-model.number="seed" class="seed-field" type="number" label="seed" density="compact" variant="outlined" hide-details />
               <v-btn color="primary" data-testid="run-simulation" size="large" :loading="isRunning" :disabled="!!validationMessage || isRunning" prepend-icon="mdi-play" @click="runSimulation">{{ t('examSimulator.run') }}</v-btn>
-              <v-btn icon="mdi-refresh" variant="tonal" :aria-label="t('examSimulator.clear')" :disabled="!resultSummary || isRunning" @click="clearResults" />
+              <v-btn v-if="isRunning && simulationMode === 'autoBest'" color="error" data-testid="stop-simulation" size="large" prepend-icon="mdi-stop" @click="requestSimulationStop">{{ t('examSimulator.stop') }}</v-btn>
+              <v-btn icon="mdi-refresh" variant="tonal" :aria-label="t('examSimulator.clear')" :disabled="(!resultSummary && !autoBestProgress) || isRunning" @click="clearResults" />
+              </div>
+            </div>
+
+            <div v-if="simulationMode === 'autoBest' && autoBestProgress" class="auto-best-progress" data-testid="auto-best-progress">
+              <v-progress-linear v-if="isRunning" color="primary" indeterminate height="3" />
+              <div class="auto-best-progress-grid">
+                <div class="metric">
+                  <div class="metric-label">{{ t('examSimulator.completedIterations') }}</div>
+                  <div class="metric-value">{{ formatNumber(autoBestProgress.completedIterations) }} / {{ formatNumber(autoBestProgress.totalIterations) }}</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">{{ t('examSimulator.currentIteration') }}</div>
+                  <div class="metric-value">{{ formatNumber(autoBestProgress.currentIteration) }}</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">{{ t('examSimulator.exploredNodes') }}</div>
+                  <div class="metric-value">{{ formatNumber(autoBestProgress.exploredNodes) }}</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">{{ t('examSimulator.completedPatterns') }}</div>
+                  <div class="metric-value">{{ formatNumber(autoBestProgress.completedPatterns) }}</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">{{ t('examSimulator.queuedBranches') }}</div>
+                  <div class="metric-value">{{ formatNumber(autoBestProgress.queuedBranches) }}</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">{{ t('examSimulator.provisionalBestScore') }}</div>
+                  <div class="metric-value">{{ formatNumber(autoBestProgress.provisionalBestScore) }}</div>
+                </div>
+                <div class="metric">
+                  <div class="metric-label">{{ t('examSimulator.elapsedTime') }}</div>
+                  <div class="metric-value">{{ formatElapsedTime(autoBestProgress.elapsedMs) }}</div>
+                </div>
+                <div v-if="autoBestProgress.stopped" class="metric auto-best-stopped">
+                  <div class="metric-label">{{ t('examSimulator.status') }}</div>
+                  <div class="metric-value">{{ t('examSimulator.stopped') }}</div>
+                </div>
               </div>
             </div>
 
@@ -451,19 +494,19 @@
               <div v-if="scoreDistributionData.labels.length" class="chart-panel wide">
               <div class="chart-heading">{{ t('examSimulator.scoreDistribution') }}</div>
                 <div class="chart-body">
-                  <Bar :data="scoreDistributionChartData" :options="scoreDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
+                  <Bar :key="`score-${simulationResultGeneration}`" :data="scoreDistributionChartData" :options="scoreDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
                 </div>
               </div>
               <div v-if="retireReasonDistributionData.labels.length" class="chart-panel">
               <div class="chart-heading">{{ t('examSimulator.retireReason') }}</div>
                 <div class="chart-body compact">
-                  <Bar :data="retireReasonDistributionData" :options="retireReasonDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
+                  <Bar :key="`reason-${simulationResultGeneration}`" :data="retireReasonDistributionData" :options="retireReasonDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
                 </div>
               </div>
               <div v-if="retireTurnDistributionData.labels.length" class="chart-panel">
               <div class="chart-heading">{{ t('examSimulator.retireTurn') }}</div>
                 <div class="chart-body compact">
-                  <Bar :data="retireTurnDistributionData" :options="retireTurnDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
+                  <Bar :key="`turn-${simulationResultGeneration}`" :data="retireTurnDistributionData" :options="retireTurnDistributionOptions" :update-mode="isRunning ? 'none' : 'default'" />
                 </div>
               </div>
             </div>
@@ -581,7 +624,7 @@
                     <div class="log-arrow">→</div>
                     <div class="log-marker">
                       <img v-if="entry.targetIcon" class="log-avatar" :src="entry.targetIcon" alt="" />
-                      <div v-else class="log-combatant target-combatant">{{ localizeExamLogText(entry.targetLabel) }}</div>
+                      <div v-else class="log-combatant target-combatant">{{ localizeExamLogText(entry.targetLabel || '') }}</div>
                       <img v-if="entry.targetElement" class="log-element-icon" :src="elementIcon(entry.targetElement)" alt="" />
                     </div>
                   </template>
@@ -693,7 +736,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Bar } from 'vue-chartjs';
 import { Chart, registerables } from 'chart.js';
@@ -815,12 +858,6 @@ interface DeckSlot {
   imageUrl: string;
 }
 
-interface PlayerDamageBuffTotal {
-  atkBuffTotal: number;
-  dmgBuffTotal: number;
-  criticalChance: number;
-}
-
 interface MagicCard {
   id: string;
   deckIndex: number;
@@ -860,6 +897,131 @@ interface TurnPlan {
   combos: TurnCombo[];
   useElementCompatibilityPriority?: boolean;
 }
+
+type SimulationMode = 'normal' | 'autoBest';
+type PlayerPair = [string, string];
+interface ParsedMagicId {
+  deckIndex: number;
+  magicSlot: MagicSlot;
+}
+
+interface AutoBestDecision {
+  turnIndex: number;
+  candidates: PlayerPair[];
+  checkpoint: AutoBestCheckpoint;
+}
+
+interface SimulationRunOptions {
+  forcedPairs?: PlayerPair[];
+  forcedPairAtCheckpoint?: PlayerPair;
+  pauseAtUnforcedDecision?: boolean;
+  autoBestMode?: boolean;
+  checkpoint?: AutoBestCheckpoint;
+}
+
+type StatefulRng = (() => number) & {
+  getState: () => number;
+  setState: (state: number) => void;
+};
+
+interface SimulationRuntimeCache {
+  turnLimit: number;
+  totalDeckHp: number;
+  examKind: ExamKind;
+  difficulty: number;
+  specialChallengeScore: number;
+  specialChallengeLabels: string[];
+  runtimeCharacters: Map<number, any>;
+  runtimeBuffs: Map<number, any[]>;
+  automaticMagicBuffs: Map<string, ParsedBuff[]>;
+  automaticOpponentDebuffs: Map<string, ParsedBuff[]>;
+  buddyAtk: Map<number, number>;
+  magicsById: Map<string, MagicCard | undefined>;
+  parsedMagicIds: Map<string, ParsedMagicId | null>;
+  visiblePairs: Map<string, PlayerPair[]>;
+  duoActive: Map<string, boolean>;
+  enemyActionMeta: Map<string, { baseAtk: number; magicRatio: number; rengekiMultiplier: number; hitCount: number }>;
+  playerMagicMeta: Map<string, {
+    runtimeAtk: number;
+    buddyAtk: number;
+    magicAttribute: ActionElement;
+    adjustedPower: string;
+    level: number;
+    magicRatio: number;
+    attributeAdjust: number;
+    rengekiMultiplier: number;
+  }>;
+  playerEffectPlans: Map<string, Array<{ buff: ParsedBuff; duration: number; targets: number[] }>>;
+  continueHealPlans: Map<string, Array<{ rate: number; duration: number; targets: number[] }>>;
+  playerHealAmounts: Map<string, number>;
+  playerDamageResult: Record<string, any>;
+  enemyDamageResult: Record<string, any>;
+  emptyHitDamages: number[];
+  pendingResult: { pendingDecision?: AutoBestDecision };
+}
+
+interface AutoBestCheckpoint {
+  turnIndex: number;
+  enemyDeck: Array<RuntimeEnemyAction | undefined>;
+  handState: { visible: string[]; hidden: string[] };
+  state: SimulationState;
+  stats: SimulationStats;
+  playerHp: number;
+  enemyHp: number;
+  enemyMaxHp: number;
+  rngState: number;
+}
+
+interface AutoBestProgress {
+  completedIterations: number;
+  totalIterations: number;
+  currentIteration: number;
+  exploredNodes: number;
+  completedPatterns: number;
+  queuedBranches: number;
+  provisionalBestScore: number;
+  elapsedMs: number;
+  stopped: boolean;
+}
+
+interface AutoBestSeedSearchResult {
+  bestResult: SimulationStats | null;
+  bestPlan: PlayerPair[];
+  exploredNodes: number;
+  completedPatterns: number;
+  queuedBranches: number;
+  cancelled: boolean;
+}
+
+interface AutoBestRootRange {
+  start: number;
+  end: number;
+}
+interface AutoBestWorkerSnapshot {
+  exam: ExamDefinition;
+  enemySlots: EnemySlotDefinition[];
+  deck: DeckSlot[];
+  selectedSpecialChallengeIds: string[];
+}
+interface AutoBestWorkerProgress {
+  exploredNodes: number;
+  completedPatterns: number;
+  queuedBranches: number;
+  provisionalBestScore: number;
+}
+interface AutoBestWorkerClient {
+  worker: Worker;
+  ready: Promise<void>;
+  nextRequestId: number;
+  initializedRunToken: number;
+  requests: Map<number, {
+    resolve: (result: AutoBestSeedSearchResult) => void;
+    reject: (error: Error) => void;
+    onProgress: (progress: AutoBestWorkerProgress) => void;
+  }>;
+}
+
+
 
 interface ExamSettingsPayload {
   deck: Array<Record<string, any>>;
@@ -1005,6 +1167,7 @@ interface SimulationStats {
   fallback: number;
   specialChallengeScore: number;
   specialChallengeLabels: string[];
+  pendingDecision?: AutoBestDecision;
   log?: string[];
 }
 
@@ -1017,7 +1180,10 @@ interface SimulationResultAggregate {
   retireTurnFrequencies: Record<number, number>;
 }
 
+type SimulationStateArrayKey = Exclude<keyof SimulationState, '_ownedMask'>;
+
 interface SimulationState {
+  _ownedMask?: number;
   playerAttackDowns: TargetedTimedRate[];
   playerDamageDowns: TargetedTimedRate[];
   playerEvasions: TargetedTimedRate[];
@@ -1046,10 +1212,6 @@ interface SimulationState {
   enemyGuts: TimedCount[];
   enemyContinueHeals: EnemyContinueHealState[];
 }
-
-type BattleStep =
-  | { actor: 'player'; label: string; magicId: string; pairedMagicId: string; targetEnemy?: RuntimeEnemyAction; pairedEnemy?: RuntimeEnemyAction; duoActive: boolean }
-  | { actor: 'enemy'; label: string; enemy?: RuntimeEnemyAction; pairedEnemy?: RuntimeEnemyAction; defendingMagicId: string; pairedDefendingMagicId: string };
 
 const examKindOptions = [
   { title: 'BS', value: 'BASIC' },
@@ -1196,6 +1358,7 @@ const unifiedExamPresets = computed(() => sortedExamPresets.value
 const recentNormalExamPresets = computed(() => normalExamPresets.value.slice(0, 2));
 const recentUnifiedExamPresets = computed(() => unifiedExamPresets.value.slice(0, 5));
 const SIMULATION_GRAPH_UPDATE_INTERVAL_MS = 500;
+const AUTO_BEST_PROGRESS_UPDATE_INTERVAL_MS = 500;
 const scoreDistributionOptions = computed(() => {
   const percentageDataset = scoreDistributionData.value.datasets.find((dataset: any) => dataset.yAxisID === 'percentage');
   const values = (percentageDataset?.data ?? []) as number[];
@@ -1344,11 +1507,29 @@ const turnPlans = ref<TurnPlan[]>(Array.from({ length: 5 }, (_, index) => ({
   useElementCompatibilityPriority: false,
 })));
 const openedTurnPanels = ref<number[]>([0, 1, 2, 3, 4]);
-const iterations = ref(10000);
+const simulationMode = ref<SimulationMode>('normal');
+const normalIterations = ref(10000);
+const autoBestIterations = ref(1000);
+const iterations = computed<number>({
+  get: () => simulationMode.value === 'autoBest' ? autoBestIterations.value : normalIterations.value,
+  set: (value) => {
+    if (simulationMode.value === 'autoBest') autoBestIterations.value = value;
+    else normalIterations.value = value;
+  },
+});
 const seed = ref(-1);
 const isRunning = ref(false);
+const stopRequested = ref(false);
+const autoBestProgress = ref<AutoBestProgress | null>(null);
+let simulationRuntimeCache: SimulationRuntimeCache | null = null;
+let autoBestWorkerPool: AutoBestWorkerClient[] | null = null;
+let autoBestWorkerPoolPromise: Promise<AutoBestWorkerClient[]> | null = null;
+let autoBestRunToken = 0;
+let autoBestSnapshotKey = '';
+let autoBestRootWeights: number[] | null = null;
 const simulationAggregate = ref<SimulationResultAggregate | null>(null);
 const bestSimulationResult = ref<SimulationStats | null>(null);
+const simulationResultGeneration = ref(0);
 const imageCache = ref<Record<string, string>>({});
 const duoIconCache = ref<Record<string, string>>({});
 const characterDialogOpen = ref(false);
@@ -1645,6 +1826,23 @@ watch(() => exam.value.enemyElement, () => {
 
 watch(exam, markEnemyConditionsTouched, { deep: true });
 watch(enemySlots, markEnemyConditionsTouched, { deep: true });
+watch(
+  [exam, enemySlots, deck, turnPlans, selectedSpecialChallengeIds],
+  () => {
+    clearResults();
+    if (isRunning.value) requestSimulationStop();
+  },
+  { deep: true },
+);
+watch(simulationMode, (mode) => {
+  clearResults();
+  if (isRunning.value) requestSimulationStop();
+  if (mode === 'autoBest' && !autoBestWorkerPool) {
+    setTimeout(() => {
+      if (simulationMode.value === 'autoBest' && !autoBestWorkerPool) void ensureAutoBestWorkerPool().catch(() => undefined);
+    }, 0);
+  }
+});
 
 function markEnemyConditionsTouched() {
   enemyConditionsTouched.value = true;
@@ -1680,6 +1878,9 @@ watch(activeTab, (tab) => {
 onMounted(() => {
   savedExamSettings.value = loadSavedExamSimulatorSettings();
   void restoreDeckFromSimulatorImport();
+  window.setTimeout(() => {
+    void ensureAutoBestWorkerPool().catch(() => undefined);
+  }, 500);
 });
 
 function logTurnTitle(line: string) {
@@ -3058,7 +3259,12 @@ function normalizeSelectedMagicSlots(slot: DeckSlot) {
 }
 
 function magicById(magicId?: string) {
-  return magicId ? magicMap.value[magicId] : undefined;
+  if (!magicId) return undefined;
+  const cache = simulationRuntimeCache?.magicsById;
+  if (cache?.has(magicId)) return cache.get(magicId);
+  const magic = magicMap.value[magicId];
+  cache?.set(magicId, magic);
+  return magic;
 }
 
 function makeMagicId(deckIndex: number, magicSlot: MagicSlot) {
@@ -3078,13 +3284,16 @@ function parseInvalidMagicId(id: string) {
   };
 }
 
-function parseMagicId(id: string) {
+function parseMagicId(id: string): ParsedMagicId | null {
+  const cache = simulationRuntimeCache?.parsedMagicIds;
+  if (cache?.has(id)) return cache.get(id) ?? null;
   const match = id.match(/^(\d+)-M([123])$/);
-  if (!match) return null;
-  return {
+  const parsed = match ? {
     deckIndex: Number(match[1]),
     magicSlot: Number(match[2]) as MagicSlot,
-  };
+  } : null;
+  cache?.set(id, parsed);
+  return parsed;
 }
 
 function planReferenceEffectLines(deckIndex: number, magicSlot: MagicSlot) {
@@ -3129,6 +3338,12 @@ function deckCardTotalHp(index: number) {
 }
 
 function buildRuntimeCharacter(index: number, activeBuffs: ParsedBuff[] = []) {
+  const cached = simulationRuntimeCache?.runtimeCharacters.get(index);
+  if (cached) {
+    return activeBuffs.length
+      ? { ...cached, buffs: activeBuffs.map((buff) => ({ ...buff })) }
+      : cached;
+  }
   const slot = deck.value[index];
   if (!slot?.character) return null;
   const base = slot.character;
@@ -3171,11 +3386,22 @@ function buildRuntimeCharacter(index: number, activeBuffs: ParsedBuff[] = []) {
     magic2heal: slot.magicHeals[2],
     magic3heal: slot.magicHeals[3],
     buffs: activeBuffs.map((buff) => ({ ...buff })),
+    _examDeckIndex: index,
   };
+  if (simulationRuntimeCache && activeBuffs.length === 0) {
+    simulationRuntimeCache.runtimeCharacters.set(index, runtime);
+  }
   return runtime;
 }
 
 function buildRuntimeBuffs(runtime: any) {
+  const deckIndex = runtime?._examDeckIndex;
+  const canUseCache = simulationRuntimeCache
+    && typeof deckIndex === 'number'
+    && Number.isInteger(deckIndex)
+    && (!Array.isArray(runtime.buffs) || runtime.buffs.length === 0);
+  const cached = canUseCache ? simulationRuntimeCache?.runtimeBuffs.get(deckIndex) : undefined;
+  if (cached) return cached;
   const buffs: any[] = (Array.isArray(runtime.buffs) ? runtime.buffs.map((buff: any) => ({ ...buff })) : []);
   const parsedHealEffects = parseMagicBuffsFromEtc(runtime, { allowM3: true })
     .filter((buff) => buff.buffOption === '回復' || buff.buffOption === '継続回復')
@@ -3205,6 +3431,7 @@ function buildRuntimeBuffs(runtime: any) {
   parsedHealEffects
     .filter((buff) => !consumedParsedHealEffects.has(`${buff.magicOption}:${buff.buffOption}`))
     .forEach((buff) => buffs.push(buff));
+  if (canUseCache) simulationRuntimeCache?.runtimeBuffs.set(deckIndex, buffs);
   return buffs;
 }
 
@@ -3218,7 +3445,8 @@ async function waitForSimulationPaint() {
   await nextTick();
   await new Promise<void>((resolve) => {
     if (typeof window === 'undefined') {
-      resolve();
+      // Yield to the worker event loop so a queued stop message can be handled.
+      setTimeout(resolve, 0);
       return;
     }
     window.requestAnimationFrame(() => {
@@ -3240,14 +3468,64 @@ async function runSimulation() {
     return;
   }
   runAttemptWarning.value = '';
+  stopRequested.value = false;
   isRunning.value = true;
   activeTab.value = 'result';
   logDialogOpen.value = false;
-  simulationAggregate.value = null;
-  bestSimulationResult.value = null;
-  await waitForSimulationPaint();
+  clearResults();
+  const resultGeneration = simulationResultGeneration.value;
+  simulationRuntimeCache = createSimulationRuntimeCache();
+  if (simulationMode.value === 'autoBest') {
+    // Posting work to Web Workers yields the main thread, so the running state
+    // can paint without delaying every search by two animation frames.
+    await nextTick();
+  } else {
+    await waitForSimulationPaint();
+  }
   try {
     const count = Math.min(100000, Math.max(1, Math.floor(safeNumber(iterations.value) || 1)));
+    if (simulationMode.value === 'autoBest') {
+      await runAutoBestSimulation(count, resultGeneration);
+    } else {
+      await runNormalSimulation(count);
+    }
+  } finally {
+    simulationRuntimeCache = null;
+    isRunning.value = false;
+    stopRequested.value = false;
+  }
+}
+
+function createSimulationRuntimeCache(): SimulationRuntimeCache {
+  return {
+    turnLimit: maxTurnCount.value,
+    totalDeckHp: totalDeckHp.value,
+    examKind: exam.value.kind,
+    difficulty: exam.value.difficulty,
+    specialChallengeScore: selectedSpecialChallengeScore.value,
+    specialChallengeLabels: selectedSpecialChallenges.value.map((challenge) => challenge.label),
+    runtimeCharacters: new Map(),
+    runtimeBuffs: new Map(),
+    automaticMagicBuffs: new Map(),
+    automaticOpponentDebuffs: new Map(),
+    buddyAtk: new Map(),
+    magicsById: new Map(),
+    parsedMagicIds: new Map(),
+    visiblePairs: new Map(),
+    duoActive: new Map(),
+    enemyActionMeta: new Map(),
+    playerMagicMeta: new Map(),
+    playerEffectPlans: new Map(),
+    continueHealPlans: new Map(),
+    playerHealAmounts: new Map(),
+    playerDamageResult: {},
+    enemyDamageResult: {},
+    emptyHitDamages: [],
+    pendingResult: {},
+  };
+}
+
+async function runNormalSimulation(count: number) {
     const scoreFrequencies: Record<number, number> = {};
     const retireReasonFrequencies: Record<string, number> = {};
     const retireTurnFrequencies: Record<number, number> = {};
@@ -3297,21 +3575,505 @@ async function runSimulation() {
       bestSimulationResult.value = runOneSimulation(createRng(bestSeedText), true);
     }
     publishAggregate();
-  } finally {
-    isRunning.value = false;
+}
+
+function createAutoBestWorkerClient(): AutoBestWorkerClient {
+  let resolveReady!: () => void;
+  let rejectReady!: (error: Error) => void;
+  const ready = new Promise<void>((resolve, reject) => {
+    resolveReady = resolve;
+    rejectReady = reject;
+  });
+  void ready.catch(() => undefined);
+  const client: AutoBestWorkerClient = {
+    worker: new Worker(new URL('../workers/examAutoBest.worker.ts', import.meta.url), { type: 'module' }),
+    ready,
+    nextRequestId: 1,
+    initializedRunToken: -1,
+    requests: new Map(),
+  };
+  client.worker.onmessage = (event: MessageEvent<{ id: number; ready?: boolean; progress?: AutoBestWorkerProgress; result?: AutoBestSeedSearchResult; error?: string }>) => {
+    if (event.data.ready) {
+      resolveReady();
+      return;
+    }
+    if (event.data.id === 0 && event.data.error) {
+      rejectReady(new Error(event.data.error));
+      return;
+    }
+    const request = client.requests.get(event.data.id);
+    if (!request) return;
+    if (event.data.progress) {
+      request.onProgress(event.data.progress);
+      return;
+    }
+    client.requests.delete(event.data.id);
+    if (event.data.error) request.reject(new Error(event.data.error));
+    else if (event.data.result) request.resolve(event.data.result);
+    else request.reject(new Error('自動最善Workerから結果が返されませんでした。'));
+  };
+  client.worker.onerror = (event) => {
+    const workerError = (event as ErrorEvent).error;
+    const detail = [
+      event.message,
+      workerError instanceof Error ? `${workerError.name}: ${workerError.message}\n${workerError.stack ?? ''}` : String(workerError ?? ''),
+      event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : '',
+    ].filter(Boolean).join('\n');
+    const error = new Error(detail || '自動最善Workerでエラーが発生しました。');
+    rejectReady(error);
+    client.requests.forEach((request) => request.reject(error));
+    client.requests.clear();
+  };
+  client.worker.postMessage({ id: 0, method: 'warmup' });
+  return client;
+}
+
+async function ensureAutoBestWorkerPool() {
+  if (autoBestWorkerPoolPromise) return await autoBestWorkerPoolPromise;
+  const workerCount = Math.min(10, Math.max(1, typeof navigator === 'undefined' ? 8 : navigator.hardwareConcurrency || 8));
+  autoBestWorkerPool = [];
+  autoBestWorkerPoolPromise = (async () => {
+    for (let index = 0; index < workerCount; index += 1) {
+      const client = createAutoBestWorkerClient();
+      try {
+        await client.ready;
+        autoBestWorkerPool?.push(client);
+      } catch {
+        client.worker.terminate();
+      }
+      if (index + 1 < workerCount) await new Promise<void>((resolve) => window.setTimeout(resolve, 25));
+    }
+    const workers = autoBestWorkerPool ?? [];
+    if (workers.length === 0) throw new Error('自動最善Workerを起動できませんでした。');
+    return workers;
+  })();
+  try {
+    return await autoBestWorkerPoolPromise;
+  } catch (error) {
+    autoBestWorkerPool?.forEach((client) => client.worker.terminate());
+    autoBestWorkerPool = null;
+    autoBestWorkerPoolPromise = null;
+    throw error;
   }
 }
 
-function clearResults() {
-  simulationAggregate.value = null;
-  bestSimulationResult.value = null;
+async function searchAutoBestSeedParallel(
+  seedText: string,
+  snapshot: AutoBestWorkerSnapshot,
+  runToken: number,
+  onProgress: (exploredNodes: number, completedPatterns: number, queuedBranches: number, provisionalBestScore: number) => void,
+) {
+  const workers = await ensureAutoBestWorkerPool();
+  const rootCount = 20;
+  const rootQueue = Array.from({ length: rootCount }, (_, rootIndex) => rootIndex);
+  if (autoBestRootWeights?.length === rootCount) {
+    rootQueue.sort((left, right) => (autoBestRootWeights?.[right] ?? 0) - (autoBestRootWeights?.[left] ?? 0));
+  }
+  const progress = Array.from<unknown, AutoBestWorkerProgress>({ length: rootCount }, () => ({ exploredNodes: 1, completedPatterns: 0, queuedBranches: 0, provisionalBestScore: 0 }));
+  const rootDurations = new Array<number>(rootCount);
+  let lastProgressPublishedAt = getSimulationClock();
+  const aggregateProgress = () => ({
+    exploredNodes: 1 + progress.reduce((sum, value) => sum + Math.max(0, value.exploredNodes - 1), 0),
+    completedPatterns: progress.reduce((sum, value) => sum + value.completedPatterns, 0),
+    queuedBranches: progress.reduce((sum, value) => sum + value.queuedBranches, 0),
+    provisionalBestScore: progress.reduce((best, value) => Math.max(best, value.provisionalBestScore), 0),
+  });
+  const results = new Array<AutoBestSeedSearchResult>(rootCount);
+  let nextRootQueueIndex = 0;
+  const runRoot = (
+    client: AutoBestWorkerClient,
+    rootIndex: number,
+    initialize: boolean,
+    resetStop: boolean,
+  ) => new Promise<AutoBestSeedSearchResult>((resolve, reject) => {
+    const id = client.nextRequestId++;
+    client.requests.set(id, {
+      resolve,
+      reject,
+      onProgress: (item) => {
+        progress[rootIndex] = item;
+        const now = getSimulationClock();
+        if (now - lastProgressPublishedAt < 500) return;
+        lastProgressPublishedAt = now;
+        const aggregate = aggregateProgress();
+        onProgress(aggregate.exploredNodes, aggregate.completedPatterns, aggregate.queuedBranches, aggregate.provisionalBestScore);
+      },
+    });
+    client.worker.postMessage({
+      id,
+      method: 'runPartition',
+      ...(initialize ? { snapshot } : {}),
+      resetStop,
+      seedText,
+      rootRange: { start: rootIndex, end: rootIndex + 1 },
+    });
+  });
+  const workerTasks = workers.map(async (client) => {
+    let initialize = client.initializedRunToken !== runToken;
+    let resetStop = true;
+    while (nextRootQueueIndex < rootCount) {
+      const rootIndex = rootQueue[nextRootQueueIndex++];
+      const rootStartedAt = getSimulationClock();
+      const result = await runRoot(client, rootIndex, initialize, resetStop);
+      rootDurations[rootIndex] = getSimulationClock() - rootStartedAt;
+      if (initialize) client.initializedRunToken = runToken;
+      initialize = false;
+      resetStop = false;
+      results[rootIndex] = result;
+      if (result.cancelled) break;
+    }
+  });
+  await Promise.all(workerTasks);
+  if (results.every(Boolean)) autoBestRootWeights = rootDurations;
+  const finalProgress = aggregateProgress();
+  onProgress(
+    finalProgress.exploredNodes,
+    finalProgress.completedPatterns,
+    finalProgress.queuedBranches,
+    finalProgress.provisionalBestScore,
+  );
+  let bestResult: SimulationStats | null = null;
+  let bestPlan: PlayerPair[] = [];
+  const completedResults = results.filter((result): result is AutoBestSeedSearchResult => !!result);
+  for (const result of completedResults) {
+    if (result.bestResult && (!bestResult || result.bestResult.score > bestResult.score)) {
+      bestResult = result.bestResult;
+      bestPlan = result.bestPlan;
+    }
+  }
+  return {
+    bestResult,
+    bestPlan,
+    exploredNodes: 1 + completedResults.reduce((sum, result) => sum + Math.max(0, result.exploredNodes - 1), 0),
+    completedPatterns: completedResults.reduce((sum, result) => sum + result.completedPatterns, 0),
+    queuedBranches: completedResults.reduce((sum, result) => sum + result.queuedBranches, 0),
+    cancelled: completedResults.length < rootCount || completedResults.some((result) => result.cancelled),
+  } satisfies AutoBestSeedSearchResult;
 }
 
-function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats {
-  const turnLimit = maxTurnCount.value;
-  const enemyDeck = buildEnemyActionDeck(rng, turnLimit * 2);
-  let handState = createHandCycle(rng);
-  const state: SimulationState = {
+async function runAutoBestSimulation(count: number, resultGeneration: number) {
+  const snapshotJson = JSON.stringify({
+    exam: exam.value,
+    enemySlots: enemySlots.value,
+    deck: deck.value,
+    selectedSpecialChallengeIds: selectedSpecialChallengeIds.value,
+  });
+  if (snapshotJson !== autoBestSnapshotKey) {
+    autoBestSnapshotKey = snapshotJson;
+    autoBestRootWeights = null;
+  }
+  // Every execution gets a fresh snapshot generation. Worker-side runtime
+  // caches contain deck-derived values and must never survive into a later run.
+  const snapshot = JSON.parse(snapshotJson) as AutoBestWorkerSnapshot;
+  const runToken = ++autoBestRunToken;
+  const scoreFrequencies: Record<number, number> = {};
+  const retireReasonFrequencies: Record<string, number> = {};
+  const retireTurnFrequencies: Record<number, number> = {};
+  const startedAt = getSimulationClock();
+  let completed = 0;
+  let retiredCount = 0;
+  let positiveScoreCount = 0;
+  let totalExploredNodes = 0;
+  let totalCompletedPatterns = 0;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  let bestSeedText = '';
+  let bestPlan: PlayerPair[] = [];
+  let provisionalBestScore = 0;
+  let currentIteration = 1;
+  const isCurrentRun = () => simulationResultGeneration.value === resultGeneration;
+
+  const publishAggregate = () => {
+    if (!isCurrentRun()) return;
+    simulationAggregate.value = {
+      count: completed,
+      retiredCount,
+      positiveScoreCount,
+      scoreFrequencies: { ...scoreFrequencies },
+      retireReasonFrequencies: { ...retireReasonFrequencies },
+      retireTurnFrequencies: { ...retireTurnFrequencies },
+    };
+  };
+  const publishProgress = (
+    localExploredNodes = 0,
+    localCompletedPatterns = 0,
+    queuedBranches = 0,
+    localBestScore = provisionalBestScore,
+    stopped = false,
+  ) => {
+    if (!isCurrentRun()) return;
+    provisionalBestScore = Math.max(provisionalBestScore, localBestScore);
+    autoBestProgress.value = {
+      completedIterations: completed,
+      totalIterations: count,
+      currentIteration: Math.min(count, currentIteration),
+      exploredNodes: totalExploredNodes + localExploredNodes,
+      completedPatterns: totalCompletedPatterns + localCompletedPatterns,
+      queuedBranches,
+      provisionalBestScore,
+      elapsedMs: getSimulationClock() - startedAt,
+      stopped,
+    };
+  };
+
+  publishProgress();
+  for (let iteration = 0; iteration < count; iteration += 1) {
+    if (stopRequested.value || !isCurrentRun()) break;
+    currentIteration = iteration + 1;
+    const seedText = createIterationSeed(iteration);
+    let searchResult: AutoBestSeedSearchResult;
+    try {
+      searchResult = await searchAutoBestSeedParallel(seedText, snapshot, runToken, (
+        exploredNodes,
+        completedPatterns,
+        queuedBranches,
+        currentBestScore,
+      ) => {
+        publishProgress(exploredNodes, completedPatterns, queuedBranches, currentBestScore);
+        publishAggregate();
+      });
+    } catch (error) {
+      if (!stopRequested.value && isCurrentRun()) throw error;
+      publishProgress(0, 0, 0, provisionalBestScore, true);
+      break;
+    }
+    if (!isCurrentRun()) break;
+    if (searchResult.cancelled) {
+      publishProgress(
+        searchResult.exploredNodes,
+        searchResult.completedPatterns,
+        searchResult.queuedBranches,
+        searchResult.bestResult?.score ?? provisionalBestScore,
+        true,
+      );
+      break;
+    }
+
+    totalExploredNodes += searchResult.exploredNodes;
+    totalCompletedPatterns += searchResult.completedPatterns;
+    if (!searchResult.bestResult) continue;
+    // The score distribution and the detailed best log must come from the
+    // same full-plan execution. Replaying one winning plan per seed is tiny
+    // compared with the exhaustive DFS and prevents checkpoint/search state
+    // from producing a graph range that disagrees with the displayed log.
+    const result = runOneSimulation(createRng(seedText), false, {
+      forcedPairs: searchResult.bestPlan,
+      pauseAtUnforcedDecision: false,
+      autoBestMode: true,
+    });
+
+    completed += 1;
+    if (result.retired) {
+      retiredCount += 1;
+      const reason = retireReasonBucket(result.retireReason);
+      retireReasonFrequencies[reason] = (retireReasonFrequencies[reason] ?? 0) + 1;
+      const retireTurn = Math.min(maxTurnCount.value, Math.max(1, Math.floor(safeNumber(result.finishTurn) || 1)));
+      retireTurnFrequencies[retireTurn] = (retireTurnFrequencies[retireTurn] ?? 0) + 1;
+    }
+    if (result.score > 0) {
+      positiveScoreCount += 1;
+      scoreFrequencies[result.score] = (scoreFrequencies[result.score] ?? 0) + 1;
+    }
+    if (result.score > bestScore) {
+      bestScore = result.score;
+      bestSeedText = seedText;
+      bestPlan = searchResult.bestPlan.map(([first, second]) => [first, second]);
+    }
+    provisionalBestScore = Math.max(provisionalBestScore, result.score);
+    publishAggregate();
+    publishProgress(0, 0, 0, result.score);
+    if (iteration + 1 < count) await waitForSimulationPaint();
+  }
+
+  if (bestSeedText && isCurrentRun()) {
+    bestSimulationResult.value = runOneSimulation(createRng(bestSeedText), true, {
+      forcedPairs: bestPlan,
+      pauseAtUnforcedDecision: false,
+      autoBestMode: true,
+    });
+  }
+  publishAggregate();
+  if (isCurrentRun() && !autoBestProgress.value?.stopped) {
+    publishProgress(0, 0, 0, provisionalBestScore, stopRequested.value);
+  }
+}
+
+async function searchAutoBestSeed(
+  seedText: string,
+  onProgress: (
+    exploredNodes: number,
+    completedPatterns: number,
+    queuedBranches: number,
+    provisionalBestScore: number,
+  ) => void,
+  rootRange?: AutoBestRootRange,
+): Promise<AutoBestSeedSearchResult> {
+  const frames: Array<{
+    checkpoint: AutoBestCheckpoint;
+    candidates: PlayerPair[];
+    nextIndex: number;
+    depth: number;
+  }> = [];
+  const currentPath: PlayerPair[] = [];
+  const branchOptions: SimulationRunOptions = {
+    pauseAtUnforcedDecision: true,
+    autoBestMode: true,
+  };
+  let exploredNodes = 0;
+  let completedPatterns = 0;
+  let bestResult: SimulationStats | null = null;
+  let bestPlan: PlayerPair[] = [];
+  let bestScore = 0;
+  let lastProgressAt = getSimulationClock();
+  let cancelled = false;
+  const branchRng = createRng(seedText);
+
+  const queuedBranchCount = () => {
+    let count = 0;
+    for (const frame of frames) count += frame.candidates.length - frame.nextIndex;
+    return count;
+  };
+
+  const processResult = (result: SimulationStats, depth: number) => {
+    if (result.pendingDecision) {
+      let candidates = result.pendingDecision.candidates;
+      if (depth === 0 && rootRange) {
+        candidates = candidates.slice(rootRange.start, rootRange.end);
+      }
+      frames.push({
+        checkpoint: result.pendingDecision.checkpoint,
+        candidates,
+        nextIndex: 0,
+        depth,
+      });
+      return;
+    }
+    completedPatterns += 1;
+    if (!bestResult || result.score > bestResult.score) {
+      // Terminal results are not mutated after runOneSimulation returns. Keep
+      // that object until the worker response is structured-cloned instead of
+      // copying every field on each provisional-best update.
+      bestResult = result;
+      bestScore = result.score;
+      bestPlan = currentPath.slice(0, depth);
+    }
+  };
+
+  const initialResult = runOneSimulation(branchRng, false, branchOptions);
+  exploredNodes += 1;
+  processResult(initialResult, 0);
+
+  while (frames.length > 0) {
+    const frame = frames[frames.length - 1];
+    if (frame.nextIndex >= frame.candidates.length) {
+      frames.pop();
+      currentPath.length = frame.depth;
+      continue;
+    }
+    const pair = frame.candidates[frame.nextIndex++];
+    currentPath[frame.depth] = pair;
+    currentPath.length = frame.depth + 1;
+    branchRng.setState(frame.checkpoint.rngState);
+    branchOptions.checkpoint = frame.checkpoint;
+    branchOptions.forcedPairAtCheckpoint = pair;
+    const result = runOneSimulation(branchRng, false, branchOptions);
+    exploredNodes += 1;
+    processResult(result, frame.depth + 1);
+
+    // Reading the high-resolution clock at every DFS node is measurable at
+    // hundreds of thousands of nodes. Stop checks remain per-node; only the
+    // optional UI progress check is sampled.
+    if ((exploredNodes & 511) === 0) {
+      const now = getSimulationClock();
+      if (now - lastProgressAt >= AUTO_BEST_PROGRESS_UPDATE_INTERVAL_MS) {
+        onProgress(exploredNodes, completedPatterns, queuedBranchCount(), bestScore);
+        lastProgressAt = now;
+        await waitForSimulationPaint();
+        if (stopRequested.value) {
+          cancelled = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (bestResult && bestPlan.length > 0) {
+    bestResult = runOneSimulation(createRng(seedText), false, {
+      forcedPairs: bestPlan,
+      pauseAtUnforcedDecision: false,
+      autoBestMode: true,
+    });
+    bestScore = bestResult.score;
+  }
+  onProgress(exploredNodes, completedPatterns, 0, bestScore);
+  return { bestResult, bestPlan, exploredNodes, completedPatterns, queuedBranches: 0, cancelled };
+}
+
+async function runAutoBestWorkerPartition(
+  snapshot: AutoBestWorkerSnapshot | null,
+  seedText: string,
+  rootRange: AutoBestRootRange,
+  onProgress: (exploredNodes: number, completedPatterns: number, queuedBranches: number, provisionalBestScore: number) => void = () => undefined,
+  resetStop = false,
+) {
+  if (snapshot) {
+    exam.value = markRaw(snapshot.exam);
+    enemySlots.value = markRaw(snapshot.enemySlots);
+    deck.value = markRaw(snapshot.deck);
+    selectedSpecialChallengeIds.value = markRaw(snapshot.selectedSpecialChallengeIds);
+    simulationRuntimeCache = createSimulationRuntimeCache();
+  } else if (!simulationRuntimeCache) {
+    throw new Error('自動最善Workerが初期化されていません。');
+  }
+  if (resetStop) stopRequested.value = false;
+  if (stopRequested.value) {
+    return {
+      bestResult: null,
+      bestPlan: [],
+      exploredNodes: 0,
+      completedPatterns: 0,
+      queuedBranches: 0,
+      cancelled: true,
+    } satisfies AutoBestSeedSearchResult;
+  }
+  return await searchAutoBestSeed(seedText, onProgress, rootRange);
+}
+
+function requestAutoBestWorkerStop() {
+  stopRequested.value = true;
+}
+
+defineExpose({ runAutoBestWorkerPartition, requestAutoBestWorkerStop });
+
+function requestSimulationStop() {
+  stopRequested.value = true;
+  const cancellationError = new Error('自動最善探索を停止しました。');
+  if (autoBestWorkerPool) {
+    for (const client of autoBestWorkerPool) {
+      client.requests.forEach((request) => request.reject(cancellationError));
+      client.requests.clear();
+      client.worker.terminate();
+    }
+  }
+  autoBestWorkerPool = null;
+  autoBestWorkerPoolPromise = null;
+}
+
+function clearResults() {
+  simulationResultGeneration.value += 1;
+  simulationAggregate.value = null;
+  bestSimulationResult.value = null;
+  autoBestProgress.value = null;
+}
+
+function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: SimulationRunOptions = {}): SimulationStats {
+  const resumed = options.checkpoint;
+  const runtimeCache = simulationRuntimeCache;
+  const turnLimit = runtimeCache?.turnLimit ?? maxTurnCount.value;
+  const playerMaxHp = runtimeCache?.totalDeckHp ?? totalDeckHp.value;
+  const examKind = runtimeCache?.examKind ?? exam.value.kind;
+  const enemyDeck = resumed?.enemyDeck ?? buildEnemyActionDeck(rng, turnLimit * 2);
+  let handState = resumed ? resumed.handState : createHandCycle(rng);
+  const state: SimulationState = resumed ? cloneSimulationState(resumed.state) : {
     playerAttackDowns: [],
     playerDamageDowns: [],
     playerEvasions: [],
@@ -3340,8 +4102,8 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     enemyGuts: [],
     enemyContinueHeals: [],
   };
-  const initialEnemyHp = effectiveEnemyMaxHp();
-  const stats: SimulationStats = {
+  const initialEnemyHp = resumed?.enemyMaxHp ?? effectiveEnemyMaxHp();
+  const stats: SimulationStats = resumed ? cloneSimulationStats(resumed.stats, keepLog) : {
     score: 0,
     retired: false,
     retireReason: '',
@@ -3350,8 +4112,8 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     enemyHeal: 0,
     playerHeal: 0,
     burnDamage: 0,
-    playerRemainHp: totalDeckHp.value,
-    playerTotalHp: totalDeckHp.value,
+    playerRemainHp: playerMaxHp,
+    playerTotalHp: playerMaxHp,
     enemyRemainHp: initialEnemyHp,
     enemyMaxHp: initialEnemyHp,
     finishTurn: turnLimit,
@@ -3373,24 +4135,26 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     healBlock: 0,
     miss: 0,
     fallback: 0,
-    specialChallengeScore: selectedSpecialChallengeScore.value,
-    specialChallengeLabels: selectedSpecialChallenges.value.map((challenge) => challenge.label),
+    specialChallengeScore: runtimeCache?.specialChallengeScore ?? selectedSpecialChallengeScore.value,
+    specialChallengeLabels: runtimeCache?.specialChallengeLabels ?? selectedSpecialChallenges.value.map((challenge) => challenge.label),
     log: keepLog ? [] : undefined,
   };
 
-  let playerHp = totalDeckHp.value;
-  let enemyHp = initialEnemyHp;
-  const enemyMaxHp = initialEnemyHp;
-  activateInitialBuddyEffects(state);
-  pushLog(stats, `開始: 自分HP ${formatNumber(playerHp)} / 敵HP ${formatNumber(enemyHp)} / ${exam.value.kind}`);
-  activateInitialSpecialChallenges(state, stats);
+  let playerHp = resumed?.playerHp ?? playerMaxHp;
+  let enemyHp = resumed?.enemyHp ?? initialEnemyHp;
+  const enemyMaxHp = resumed?.enemyMaxHp ?? initialEnemyHp;
+  if (!resumed) {
+    activateInitialBuddyEffects(state);
+    if (stats.log) pushLog(stats, () => `開始: 自分HP ${formatNumber(playerHp)} / 敵HP ${formatNumber(enemyHp)} / ${exam.value.kind}`);
+    activateInitialSpecialChallenges(state, stats);
+  }
 
   battleLoop:
-  for (let turnIndex = 0; turnIndex < turnLimit; turnIndex += 1) {
+  for (let turnIndex = resumed?.turnIndex ?? 0; turnIndex < turnLimit; turnIndex += 1) {
     if (handState.visible.length < 2 && handState.hidden.length === 0) {
       if (turnIndex >= 5) {
         handState = createHandCycle(rng);
-        pushLog(stats, `${turnIndex + 1}T 手札再配布`);
+        if (stats.log) pushLog(stats, () => `${turnIndex + 1}T 手札再配布`);
       } else {
         stats.finishTurn = turnIndex + 1;
         retire(stats, `${turnIndex + 1}T 使用可能な手札が2枚未満`);
@@ -3399,86 +4163,144 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     }
     const firstEnemy = enemyDeck[turnIndex * 2];
     const secondEnemy = enemyDeck[turnIndex * 2 + 1];
-    const selected = choosePlayerPair(turnIndex, handState.visible, stats, enemyDeck);
+    const forcedPair = resumed && turnIndex === resumed.turnIndex
+      ? options.forcedPairAtCheckpoint
+      : options.forcedPairs?.[turnIndex];
+    let selected: PlayerPair | null = null;
+    if (forcedPair) {
+      // DFS branches only receive pairs generated from this exact checkpoint.
+      // Re-validating through the reactive magic map at every explored node is
+      // redundant; externally supplied full plans still take the guarded path.
+      selected = resumed && options.checkpoint && options.autoBestMode
+        ? forcedPair
+        : (isValidVisiblePlayerPair(forcedPair, handState.visible) ? forcedPair : null);
+    } else if (options.autoBestMode) {
+      const candidates = enumerateVisiblePlayerPairs(handState.visible);
+      if (options.pauseAtUnforcedDecision && candidates.length > 0) {
+        stats.finishTurn = turnIndex + 1;
+        const pendingDecision: AutoBestDecision = {
+          turnIndex,
+          candidates,
+          checkpoint: {
+            turnIndex,
+            enemyDeck,
+            handState,
+            state,
+            stats,
+            playerHp,
+            enemyHp,
+            enemyMaxHp,
+            rngState: rng.getState(),
+          },
+        };
+        const pendingResult = simulationRuntimeCache?.pendingResult;
+        if (pendingResult) {
+          pendingResult.pendingDecision = pendingDecision;
+          return pendingResult as SimulationStats;
+        }
+        return { pendingDecision } as SimulationStats;
+      }
+    } else {
+      selected = choosePlayerPair(turnIndex, handState.visible, stats, enemyDeck);
+    }
     if (!selected) {
       stats.finishTurn = turnIndex + 1;
-      retire(stats, `${turnIndex + 1}T 許容組み合わせなし`);
+      retire(stats, options.autoBestMode
+        ? `${turnIndex + 1}T 使用可能な行動組み合わせなし`
+        : `${turnIndex + 1}T 許容組み合わせなし`);
       break;
     }
-    consumeHand(handState, selected);
-    const steps = buildTurnSteps(turnIndex, selected, firstEnemy, secondEnemy);
+    handState = consumeHand(handState, selected);
+    const playerActsFirst = isPlayerFirstTurn(turnIndex);
 
-    for (const step of steps) {
-      if (step.actor === 'player') {
+    for (let phaseIndex = 0; phaseIndex < 4; phaseIndex += 1) {
+      const actionIndex = phaseIndex >> 1;
+      const isPlayerAction = (phaseIndex % 2 === 0) === playerActsFirst;
+      const magicId = selected[actionIndex];
+      const pairedMagicId = selected[1 - actionIndex];
+      const enemyAction = actionIndex === 0 ? firstEnemy : secondEnemy;
+      const pairedEnemyAction = actionIndex === 0 ? secondEnemy : firstEnemy;
+      const actionLabel = actionIndex === 0 ? '先手' : '後手';
+      if (isPlayerAction) {
         const playerHpBeforeHeal = playerHp;
-        activatePlayerMagicBuffs(step.magicId, step.pairedMagicId, state, stats, turnIndex + 1, step.label);
-        activatePlayerContinueHeal(step.magicId, step.pairedMagicId, state, stats);
-        activatePlayerOpponentDebuffs(step.magicId, step.targetEnemy, step.pairedEnemy, state, rng, stats, turnIndex + 1, step.label);
-        const heal = calculatePlayerHeal(step.magicId, state);
+        activatePlayerMagicBuffs(magicId, pairedMagicId, state, stats, turnIndex + 1, actionLabel);
+        activatePlayerContinueHeal(magicId, pairedMagicId, state, stats);
+        activatePlayerOpponentDebuffs(magicId, enemyAction, pairedEnemyAction, state, rng, stats, turnIndex + 1, actionLabel);
+        const heal = calculatePlayerHeal(magicId, state);
         if (heal > 0) {
-          playerHp = Math.min(totalDeckHp.value, playerHp + heal);
+          playerHp = Math.min(playerMaxHp, playerHp + heal);
           const actualHeal = Math.max(0, playerHp - playerHpBeforeHeal);
           if (actualHeal > 0) {
-            stats.playerHeal += actualHeal;
-            pushLog(stats, `${turnIndex + 1}T ${step.label} 自分回復 ${describeMagic(step.magicId)} ${formatNumber(playerHpBeforeHeal)}→${formatNumber(playerHp)} (+${formatNumber(actualHeal)})`);
+            if (examKind === 'DEFENCE' || stats.log) stats.playerHeal += actualHeal;
+            if (stats.log) pushLog(stats, () => `${turnIndex + 1}T ${actionLabel} 自分回復 ${describeMagic(magicId)} ${formatNumber(playerHpBeforeHeal)}→${formatNumber(playerHp)} (+${formatNumber(actualHeal)})`);
           }
         }
       } else {
-        const enemyEffectFrozen = !!step.enemy
-          && isEnemySideTarget(step.enemy.effectTarget)
-          && isEnemyFrozen(state, step.enemy.slotKey)
-          && isEnemyFreezeBlockedEffectKind(step.enemy.effectKind);
+        const enemyEffectFrozen = !!enemyAction
+          && isEnemySideTarget(enemyAction.effectTarget)
+          && isEnemyFrozen(state, enemyAction.slotKey)
+          && isEnemyFreezeBlockedEffectKind(enemyAction.effectKind);
         let appliedEnemyHeal = 0;
         if (!enemyEffectFrozen) {
-          appliedEnemyHeal = applyEnemySelfEffects(step.enemy, state, enemyHp, enemyMaxHp, stats, step.pairedEnemy);
+          appliedEnemyHeal = applyEnemySelfEffects(enemyAction, state, enemyHp, enemyMaxHp, stats, pairedEnemyAction);
           if (appliedEnemyHeal > 0) {
             enemyHp = Math.min(enemyMaxHp, enemyHp + appliedEnemyHeal);
-            stats.enemyHeal += appliedEnemyHeal;
+            if (stats.log) stats.enemyHeal += appliedEnemyHeal;
           }
-          applyEnemyAdditionalEffects(step.enemy, step.defendingMagicId, step.pairedDefendingMagicId, state, rng, stats, step.pairedEnemy);
+          applyEnemyAdditionalEffects(enemyAction, magicId, pairedMagicId, state, rng, stats, pairedEnemyAction);
         }
-        if (step.enemy?.effectKind && step.enemy.effectKind !== 'none') {
-          pushLog(stats, `${turnIndex + 1}T ${step.label} 相手効果 ${describeEnemyAction(step.enemy)}${describeEnemyEffectTarget(step.enemy, step.defendingMagicId, step.pairedDefendingMagicId)} / ${describeEnemyEffect(step.enemy)}${enemyEffectFrozen ? ' / 凍結無効化' : ''}${appliedEnemyHeal > 0 ? ` / 敵回復${formatNumber(appliedEnemyHeal)}` : ''}`);
+        if (enemyAction?.effectKind && enemyAction.effectKind !== 'none') {
+          if (stats.log) pushLog(stats, () => `${turnIndex + 1}T ${actionLabel} 相手効果 ${describeEnemyAction(enemyAction)}${describeEnemyEffectTarget(enemyAction, magicId, pairedMagicId)} / ${describeEnemyEffect(enemyAction)}${enemyEffectFrozen ? ' / 凍結無効化' : ''}${appliedEnemyHeal > 0 ? ` / 敵回復${formatNumber(appliedEnemyHeal)}` : ''}`);
         }
       }
     }
 
-    for (const step of steps) {
-      if (step.actor === 'player') {
+    for (let phaseIndex = 0; phaseIndex < 4; phaseIndex += 1) {
+      const actionIndex = phaseIndex >> 1;
+      const isPlayerAction = (phaseIndex % 2 === 0) === playerActsFirst;
+      const magicId = selected[actionIndex];
+      const pairedMagicId = selected[1 - actionIndex];
+      const enemyAction = actionIndex === 0 ? firstEnemy : secondEnemy;
+      const actionLabel = actionIndex === 0 ? '先手' : '後手';
+      if (isPlayerAction) {
         const enemyHpBeforePhase = enemyHp;
-        const targetElement = resolveTargetElement(step.targetEnemy);
-        const playerAttack = calculatePlayerDamage(step.magicId, targetElement, state, rng, stats, step.duoActive, step.targetEnemy);
+        const targetElement = resolveTargetElement(enemyAction);
+        const duoActive = isDuoActiveForPair(magicId, pairedMagicId);
+        const playerAttack = calculatePlayerDamage(magicId, targetElement, state, rng, stats, duoActive, enemyAction);
         enemyHp = Math.max(0, enemyHp - playerAttack.damage);
-        const gutsResult = applyEnemyGutsIfNeeded(state, enemyHp, stats, step.targetEnemy?.slotKey);
+        const gutsResult = applyEnemyGutsIfNeeded(state, enemyHp, stats, enemyAction?.slotKey);
         enemyHp = gutsResult.hp;
         stats.playerDamage += playerAttack.damage;
         incrementCompatibilityStats(stats, playerAttack.compatibility, playerAttack.hitCount);
-        if (playerAttack.isDuo) stats.duo += 1;
+        if (playerAttack.isDuo && (runtimeCache?.examKind ?? exam.value.kind) === 'BASIC') stats.duo += 1;
 
-        const playerSpecialText = describePlayerAttackSpecials(playerAttack);
-        pushLog(stats, `${turnIndex + 1}T ${step.label} 自分 ${describeMagic(step.magicId, step.duoActive)} -> ${describeEnemyTarget(step.targetEnemy)}:${targetElement} 与${formatNumber(playerAttack.damage)}${playerAttack.isDuo ? ' DUO' : ''}${playerSpecialText}${gutsResult.used ? ' / ガッツ' : ''} / 敵HP ${formatNumber(enemyHpBeforePhase)}→${formatNumber(enemyHp)}`);
+        if (stats.log) pushLog(stats, () => `${turnIndex + 1}T ${actionLabel} 自分 ${describeMagic(magicId, duoActive)} -> ${describeEnemyTarget(enemyAction)}:${targetElement} 与${formatNumber(playerAttack.damage)}${playerAttack.isDuo ? ' DUO' : ''}${describePlayerAttackSpecials(playerAttack)}${gutsResult.used ? ' / ガッツ' : ''} / 敵HP ${formatNumber(enemyHpBeforePhase)}→${formatNumber(enemyHp)}`);
         if (enemyHp <= 0) {
           stats.finishTurn = turnIndex + 1;
           break battleLoop;
         }
       } else {
         const playerHpBeforeEnemy = playerHp;
-        const incoming = calculateEnemyDamage(step.enemy, step.defendingMagicId, state, rng, stats);
+        const incoming = calculateEnemyDamage(enemyAction, magicId, state, rng, stats);
         playerHp = Math.max(0, playerHp - incoming.damage);
-        const playerGutsResult = applyPlayerGutsIfNeeded(state, playerHp, step.defendingMagicId);
+        const playerGutsResult = applyPlayerGutsIfNeeded(state, playerHp, magicId);
         playerHp = playerGutsResult.hp;
-        stats.enemyDamage += incoming.damage;
-        if (incoming.defenceCompatibility === 'advantage') stats.advantageDamaged += incoming.damage;
-        if (incoming.defenceCompatibility === 'disadvantage') stats.disadvantageDamaged += incoming.damage;
-        const hitText = incoming.hitDamages.length > 1 ? ` [${incoming.hitDamages.map(formatNumber).join('+')}]` : '';
-        const evasionText = incoming.evasionCount > 0 ? ` / 回避成功${incoming.evasionCount}回` : '';
-        const blindText = incoming.blindMiss ? ' / 暗闇MISS1回' : '';
-        const criticalText = incoming.criticalCount > 0 ? ` / クリティカル${incoming.criticalCount}回` : '';
-        const modifierText = describeEnemyDamageModifiers(incoming.atkRate, incoming.damageRate);
-        pushLog(stats, `${turnIndex + 1}T ${step.label} 相手 ${describeEnemyAction(step.enemy)} -> ${describeMagic(step.defendingMagicId)} 受け${incoming.defenderElement} 被${formatNumber(incoming.damage)}${hitText}${evasionText}${blindText}${criticalText}${modifierText}${playerGutsResult.used ? ' / ガッツ' : ''} / 逆算ATK${formatNumber(incoming.baseAtk)} / 等倍${formatNumber(incoming.equalDamage)} / 自HP ${formatNumber(playerHpBeforeEnemy)}→${formatNumber(playerHp)}`);
+        if (stats.log) stats.enemyDamage += incoming.damage;
+        if ((runtimeCache?.examKind ?? exam.value.kind) === 'DEFENCE') {
+          if (incoming.defenceCompatibility === 'advantage') stats.advantageDamaged += incoming.damage;
+          if (incoming.defenceCompatibility === 'disadvantage') stats.disadvantageDamaged += incoming.damage;
+        }
+        if (stats.log) pushLog(stats, () => {
+          const hitText = incoming.hitDamages.length > 1 ? ` [${incoming.hitDamages.map(formatNumber).join('+')}]` : '';
+          const evasionText = incoming.evasionCount > 0 ? ` / 回避成功${incoming.evasionCount}回` : '';
+          const blindText = incoming.blindMiss ? ' / 暗闇MISS1回' : '';
+          const criticalText = incoming.criticalCount > 0 ? ` / クリティカル${incoming.criticalCount}回` : '';
+          const modifierText = describeEnemyDamageModifiers(incoming.atkRate, incoming.damageRate);
+          return `${turnIndex + 1}T ${actionLabel} 相手 ${describeEnemyAction(enemyAction)} -> ${describeMagic(magicId)} 受け${incoming.defenderElement} 被${formatNumber(incoming.damage)}${hitText}${evasionText}${blindText}${criticalText}${modifierText}${playerGutsResult.used ? ' / ガッツ' : ''} / 逆算ATK${formatNumber(incoming.baseAtk)} / 等倍${formatNumber(incoming.equalDamage)} / 自HP ${formatNumber(playerHpBeforeEnemy)}→${formatNumber(playerHp)}`;
+        });
         if (playerHp <= 0) {
           stats.finishTurn = turnIndex + 1;
-          retire(stats, `${turnIndex + 1}T ${step.label} 被ダメージで自HP0`);
+          retire(stats, `${turnIndex + 1}T ${actionLabel} 被ダメージで自HP0`);
           break battleLoop;
         }
       }
@@ -3487,8 +4309,8 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
     const burnDamage = applyBurnDamage(state, playerHp);
     if (burnDamage > 0) {
       playerHp -= burnDamage;
-      stats.burnDamage += burnDamage;
-      pushLog(stats, `${turnIndex + 1}T やけど: ${burnDamage}`);
+      if (stats.log) stats.burnDamage += burnDamage;
+      if (stats.log) pushLog(stats, () => `${turnIndex + 1}T やけど: ${burnDamage}`);
     }
     const enemyContinueHeal = applyEnemyContinueHeal(state, enemyHp, enemyMaxHp);
     if (enemyContinueHeal > 0) {
@@ -3496,33 +4318,102 @@ function runOneSimulation(rng: () => number, keepLog: boolean): SimulationStats 
       enemyHp = Math.min(enemyMaxHp, enemyHp + enemyContinueHeal);
       const actualEnemyHeal = Math.max(0, enemyHp - beforeEnemyHeal);
       if (actualEnemyHeal > 0) {
-        stats.enemyHeal += actualEnemyHeal;
-        pushLog(stats, `${turnIndex + 1}T 相手継続回復: +${formatNumber(actualEnemyHeal)} / 敵HP ${formatNumber(beforeEnemyHeal)}→${formatNumber(enemyHp)}`);
+        if (stats.log) stats.enemyHeal += actualEnemyHeal;
+        if (stats.log) pushLog(stats, () => `${turnIndex + 1}T 相手継続回復: +${formatNumber(actualEnemyHeal)} / 敵HP ${formatNumber(beforeEnemyHeal)}→${formatNumber(enemyHp)}`);
       }
     }
-    const continueHeal = applyPlayerContinueHeal(state, playerHp);
+    const continueHeal = applyPlayerContinueHeal(state, playerHp, !!stats.log);
     if (continueHeal.total > 0) {
-      playerHp = Math.min(totalDeckHp.value, playerHp + continueHeal.total);
-      stats.playerHeal += continueHeal.total;
+      playerHp = Math.min(playerMaxHp, playerHp + continueHeal.total);
+      if (examKind === 'DEFENCE' || stats.log) stats.playerHeal += continueHeal.total;
       continueHeal.details
         .filter((detail) => detail.amount > 0)
         .forEach((detail) => {
-          const cappedText = detail.capped ? ` / 上限前${formatNumber(detail.potentialAmount)}` : '';
-          pushLog(stats, `${turnIndex + 1}T 継続回復 ${detail.source}: +${formatNumber(detail.amount)}${cappedText}`);
+          if (stats.log) pushLog(stats, () => {
+            const cappedText = detail.capped ? ` / 上限前${formatNumber(detail.potentialAmount)}` : '';
+            return `${turnIndex + 1}T 継続回復 ${detail.source}: +${formatNumber(detail.amount)}${cappedText}`;
+          });
         });
     }
     tickTimedEffects(state);
     stats.finishTurn = turnIndex + 1;
-    pushLog(stats, `${turnIndex + 1}T 終了: 自HP ${formatNumber(playerHp)} / 敵HP ${formatNumber(enemyHp)}`);
+    if (stats.log) pushLog(stats, () => `${turnIndex + 1}T 終了: 自HP ${formatNumber(playerHp)} / 敵HP ${formatNumber(enemyHp)}`);
     if (enemyHp <= 0) break;
   }
 
   stats.playerRemainHp = playerHp;
   stats.enemyRemainHp = enemyHp;
   stats.score = stats.retired ? 0 : calculateScore(stats);
-  pushLog(stats, `結果: スコア ${formatNumber(stats.score)}${stats.retired ? ` / リタイア ${stats.retireReason}` : ''}`);
+  if (stats.log) pushLog(stats, () => `結果: スコア ${formatNumber(stats.score)}${stats.retired ? ` / リタイア ${stats.retireReason}` : ''}`);
   pushScoreBreakdownLog(stats);
   return stats;
+}
+
+function cloneSimulationState(state: SimulationState): SimulationState {
+  return { ...state, _ownedMask: 0 };
+}
+
+const stateArrayOwnershipBits = Object.fromEntries([
+  'playerAttackDowns', 'playerDamageDowns', 'playerEvasions', 'enemyDamageReductions',
+  'enemyDamageNulls', 'enemyEvasions', 'enemyCriticals', 'enemyAttackDowns',
+  'enemyDamageDowns', 'enemyDamageTakenUps', 'enemyCurses', 'enemyBlinds',
+  'enemyFreezes', 'playerBlinds', 'playerCurses', 'playerFreezes', 'burns',
+  'playerDamageTakenDowns', 'playerDamageTakenUps', 'playerContinueHeals',
+  'playerImmunities', 'playerGuts', 'playerBuffs', 'enemyAttackUps', 'enemyDamageUps',
+  'enemyGuts', 'enemyContinueHeals',
+].map((key, index) => [key, 2 ** index])) as Record<SimulationStateArrayKey, number>;
+
+function appendState<K extends SimulationStateArrayKey>(
+  state: SimulationState,
+  key: K,
+  value: SimulationState[K][number],
+) {
+  const bit = stateArrayOwnershipBits[key];
+  const ownedMask = state._ownedMask ?? 0;
+  if ((ownedMask & bit) === 0) {
+    (state as any)[key] = [...state[key]];
+    state._ownedMask = ownedMask | bit;
+  }
+  (state[key] as Array<SimulationState[K][number]>).push(value);
+}
+
+function cloneSimulationStats(stats: SimulationStats, keepLog: boolean): SimulationStats {
+  return {
+    score: stats.score,
+    retired: stats.retired,
+    retireReason: stats.retireReason,
+    playerDamage: stats.playerDamage,
+    enemyDamage: stats.enemyDamage,
+    enemyHeal: stats.enemyHeal,
+    playerHeal: stats.playerHeal,
+    burnDamage: stats.burnDamage,
+    playerRemainHp: stats.playerRemainHp,
+    playerTotalHp: stats.playerTotalHp,
+    enemyRemainHp: stats.enemyRemainHp,
+    enemyMaxHp: stats.enemyMaxHp,
+    finishTurn: stats.finishTurn,
+    duo: stats.duo,
+    advantage: stats.advantage,
+    equal: stats.equal,
+    disadvantage: stats.disadvantage,
+    advantageCombo: stats.advantageCombo,
+    equalCombo: stats.equalCombo,
+    disadvantageCombo: stats.disadvantageCombo,
+    advantageSingle: stats.advantageSingle,
+    equalSingle: stats.equalSingle,
+    disadvantageSingle: stats.disadvantageSingle,
+    advantageDamaged: stats.advantageDamaged,
+    disadvantageDamaged: stats.disadvantageDamaged,
+    evasion: stats.evasion,
+    debuff: stats.debuff,
+    scoreBuff: stats.scoreBuff,
+    healBlock: stats.healBlock,
+    miss: stats.miss,
+    fallback: stats.fallback,
+    specialChallengeScore: stats.specialChallengeScore,
+    specialChallengeLabels: keepLog ? [...stats.specialChallengeLabels] : stats.specialChallengeLabels,
+    log: keepLog ? [...(stats.log ?? [])] : undefined,
+  };
 }
 
 function createHandCycle(rng: () => number) {
@@ -3533,11 +4424,35 @@ function createHandCycle(rng: () => number) {
   };
 }
 
+function enumerateVisiblePlayerPairs(visible: string[]): PlayerPair[] {
+  const cache = simulationRuntimeCache?.visiblePairs;
+  const cacheKey = visible.join('|');
+  const cached = cache?.get(cacheKey);
+  if (cached) return cached;
+  const selectable = visible.filter((magicId) => !!magicById(magicId));
+  const pairs: PlayerPair[] = [];
+  selectable.forEach((firstMagicId) => {
+    selectable.forEach((secondMagicId) => {
+      if (firstMagicId !== secondMagicId) pairs.push([firstMagicId, secondMagicId]);
+    });
+  });
+  cache?.set(cacheKey, pairs);
+  return pairs;
+}
+
+function isValidVisiblePlayerPair(pair: PlayerPair, visible: string[]) {
+  return pair[0] !== pair[1]
+    && !!magicMap.value[pair[0]]
+    && !!magicMap.value[pair[1]]
+    && visible.includes(pair[0])
+    && visible.includes(pair[1]);
+}
+
 function choosePlayerPair(
   turnIndex: number,
   visible: string[],
   stats: SimulationStats,
-  enemyDeck: RuntimeEnemyAction[],
+  enemyDeck: Array<RuntimeEnemyAction | undefined>,
 ): [string, string] | null {
   const combos = turnPlans.value[turnIndex]?.combos ?? [];
   const visibleSet = new Set(visible);
@@ -3558,7 +4473,7 @@ function choosePlayerPair(
     return [firstMatched.firstMagicId, firstMatched.secondMagicId];
   }
   stats.fallback += 1;
-  pushLog(stats, `${turnIndex + 1}T 許容外のみ: ${visible.map((magicId) => describeMagic(magicId)).join(' / ')}`);
+  if (stats.log) pushLog(stats, () => `${turnIndex + 1}T 許容外のみ: ${visible.map((magicId) => describeMagic(magicId)).join(' / ')}`);
   return null;
 }
 
@@ -3570,7 +4485,7 @@ function shouldUseAllElementSmartSelection(turnIndex: number) {
 function chooseAllElementSmartPair(
   turnIndex: number,
   matched: Array<{ combo: TurnCombo; priority: number }>,
-  enemyDeck: RuntimeEnemyAction[],
+  enemyDeck: Array<RuntimeEnemyAction | undefined>,
 ): [string, string] {
   let best: { selected: [string, string]; score: number; priority: number } | null = null;
   matched.forEach(({ combo, priority }) => {
@@ -3596,10 +4511,11 @@ function chooseAllElementSmartPair(
       best = candidate;
     }
   });
-  return best?.selected ?? [matched[0].combo.firstMagicId, matched[0].combo.secondMagicId];
+  const resolvedBest = best as { selected: [string, string] } | null;
+  return resolvedBest?.selected ?? [matched[0].combo.firstMagicId, matched[0].combo.secondMagicId];
 }
 
-function calculateAllElementPairScore(turnIndex: number, selected: [string, string], enemyDeck: RuntimeEnemyAction[]) {
+function calculateAllElementPairScore(turnIndex: number, selected: [string, string], enemyDeck: Array<RuntimeEnemyAction | undefined>) {
   const knownSlotIndex = knownEnemySlotIndexForTurn(turnIndex);
   const unknownSlotIndex = knownSlotIndex === 0 ? 1 : 0;
   const knownEnemy = enemyDeck[turnIndex * 2 + knownSlotIndex];
@@ -3615,7 +4531,7 @@ function knownEnemySlotIndexForTurn(turnIndex: number): 0 | 1 {
   return (turnIndex + 1) % 2 === 1 ? 0 : 1;
 }
 
-function unknownEnemyCandidatesForTurn(enemyDeck: RuntimeEnemyAction[], turnIndex: number) {
+function unknownEnemyCandidatesForTurn(enemyDeck: Array<RuntimeEnemyAction | undefined>, turnIndex: number) {
   const knownSlotIndex = knownEnemySlotIndexForTurn(turnIndex);
   const knownEnemyDeckIndex = turnIndex * 2 + knownSlotIndex;
   const blockStart = Math.floor(turnIndex / 5) * 10;
@@ -3624,7 +4540,7 @@ function unknownEnemyCandidatesForTurn(enemyDeck: RuntimeEnemyAction[], turnInde
   const visibleEnd = Math.min(enemyDeck.length, blockStart + 10, visibleStart + 5);
   return enemyDeck
     .slice(visibleStart, visibleEnd)
-    .filter((_enemy, offset) => visibleStart + offset !== knownEnemyDeckIndex);
+    .filter((enemy, offset): enemy is RuntimeEnemyAction => !!enemy && visibleStart + offset !== knownEnemyDeckIndex);
 }
 
 function advantageScoreAgainstEnemy(magicId: string, enemyAction: RuntimeEnemyAction | undefined) {
@@ -3634,41 +4550,21 @@ function advantageScoreAgainstEnemy(magicId: string, enemyAction: RuntimeEnemyAc
 }
 
 function consumeHand(handState: { visible: string[]; hidden: string[] }, selected: [string, string]) {
-  const selectedSet = new Set(selected);
-  handState.visible = handState.visible.filter((id) => !selectedSet.has(id));
-  while (handState.visible.length < 5 && handState.hidden.length > 0) {
-    const next = handState.hidden.shift();
-    if (next) handState.visible.push(next);
+  const nextVisible: string[] = [];
+  for (const id of handState.visible) {
+    if (id !== selected[0] && id !== selected[1]) nextVisible.push(id);
   }
+  const drawCount = Math.min(5 - nextVisible.length, handState.hidden.length);
+  for (let index = 0; index < drawCount; index += 1) nextVisible.push(handState.hidden[index]);
+  return {
+    visible: nextVisible,
+    hidden: drawCount > 0 ? handState.hidden.slice(drawCount) : handState.hidden,
+  };
 }
 
 function isPlayerFirstTurn(turnIndex: number) {
-  if (exam.value.kind === 'ATTACK' && turnIndex >= 5) return false;
+  if ((simulationRuntimeCache?.examKind ?? exam.value.kind) === 'ATTACK' && turnIndex >= 5) return false;
   return turnIndex % 2 === 0;
-}
-
-function buildTurnSteps(
-  turnIndex: number,
-  selected: [string, string],
-  firstEnemy: RuntimeEnemyAction | undefined,
-  secondEnemy: RuntimeEnemyAction | undefined,
-): BattleStep[] {
-  const duoFirst = isDuoActiveForPair(selected[0], selected[1]);
-  const duoSecond = isDuoActiveForPair(selected[1], selected[0]);
-  if (isPlayerFirstTurn(turnIndex)) {
-    return [
-      { actor: 'player', label: '先手', magicId: selected[0], pairedMagicId: selected[1], targetEnemy: firstEnemy, pairedEnemy: secondEnemy, duoActive: duoFirst },
-      { actor: 'enemy', label: '先手', enemy: firstEnemy, pairedEnemy: secondEnemy, defendingMagicId: selected[0], pairedDefendingMagicId: selected[1] },
-      { actor: 'player', label: '後手', magicId: selected[1], pairedMagicId: selected[0], targetEnemy: secondEnemy, pairedEnemy: firstEnemy, duoActive: duoSecond },
-      { actor: 'enemy', label: '後手', enemy: secondEnemy, pairedEnemy: firstEnemy, defendingMagicId: selected[1], pairedDefendingMagicId: selected[0] },
-    ];
-  }
-  return [
-    { actor: 'enemy', label: '先手', enemy: firstEnemy, pairedEnemy: secondEnemy, defendingMagicId: selected[0], pairedDefendingMagicId: selected[1] },
-    { actor: 'player', label: '先手', magicId: selected[0], pairedMagicId: selected[1], targetEnemy: firstEnemy, pairedEnemy: secondEnemy, duoActive: duoFirst },
-    { actor: 'enemy', label: '後手', enemy: secondEnemy, pairedEnemy: firstEnemy, defendingMagicId: selected[1], pairedDefendingMagicId: selected[0] },
-    { actor: 'player', label: '後手', magicId: selected[1], pairedMagicId: selected[0], targetEnemy: secondEnemy, pairedEnemy: firstEnemy, duoActive: duoSecond },
-  ];
 }
 
 function activateInitialBuddyEffects(state: SimulationState) {
@@ -3683,7 +4579,7 @@ function activateInitialBuddyEffects(state: SimulationState) {
         const key = `${deckIndex}:${buff.buddyIndex}:${buff.status}`;
         if (seenContinueHeals.has(key)) return;
         seenContinueHeals.add(key);
-        state.playerContinueHeals.push({
+        appendState(state, 'playerContinueHeals', {
           cardIndex: deckIndex,
           rate: buddyContinueHealRate,
           turns: buddyInitialEffectTurns,
@@ -3692,9 +4588,9 @@ function activateInitialBuddyEffects(state: SimulationState) {
         });
         return;
       }
-      state.playerBuffs.push({
+      appendState(state, 'playerBuffs', {
         targetDeckIndex: deckIndex,
-        buff: { ...buff },
+        buff,
         turns: buddyInitialEffectTurns,
         source: buff.status,
       });
@@ -3705,7 +4601,7 @@ function activateInitialBuddyEffects(state: SimulationState) {
       if (evasionMatch) {
         const rate = safeNumber(evasionRateByPower[evasionMatch[1]]) || 0;
         if (rate > 0) {
-          state.playerEvasions.push({
+          appendState(state, 'playerEvasions', {
             cardIndex: deckIndex,
             rate,
             turns: buddyInitialEffectTurns,
@@ -3720,7 +4616,7 @@ function activateInitialBuddyEffects(state: SimulationState) {
       if (damageTakenMatch) {
         const rate = buddyDamageTakenDownRate(damageTakenMatch[1], false);
         if (rate > 0) {
-          state.playerDamageTakenDowns.push({
+          appendState(state, 'playerDamageTakenDowns', {
             cardIndex: deckIndex,
             rate,
             turns: buddyInitialEffectTurns,
@@ -3736,7 +4632,7 @@ function activateInitialBuddyEffects(state: SimulationState) {
         const [, attribute, power] = attributeDamageTakenMatch as [string, ActionElement, string];
         const rate = buddyDamageTakenDownRate(power, true);
         if (rate > 0) {
-          state.playerDamageTakenDowns.push({
+          appendState(state, 'playerDamageTakenDowns', {
             cardIndex: deckIndex,
             rate,
             turns: buddyInitialEffectTurns,
@@ -3750,7 +4646,7 @@ function activateInitialBuddyEffects(state: SimulationState) {
 
       const immunityKind = buddyImmunityKinds[effect];
       if (immunityKind) {
-        state.playerImmunities.push({
+        appendState(state, 'playerImmunities', {
           cardIndex: deckIndex,
           kind: immunityKind,
           turns: buddyInitialEffectTurns,
@@ -3776,7 +4672,7 @@ function activateInitialSpecialChallenges(state: SimulationState, stats: Simulat
   challenges.forEach((challenge) => {
     challenge.effects.forEach((effect) => applySpecialChallengeEffect(effect, state));
   });
-  pushLog(stats, `特別課題: ${challenges.map((challenge) => `${specialChallengeRankLabel(challenge.rank)}${challenge.label}+${formatNumber(challenge.score)}`).join(' / ')} / 加点 +${formatNumber(selectedSpecialChallengeScore.value)}`);
+  if (stats.log) pushLog(stats, () => `特別課題: ${challenges.map((challenge) => `${specialChallengeRankLabel(challenge.rank)}${challenge.label}+${formatNumber(challenge.score)}`).join(' / ')} / 加点 +${formatNumber(selectedSpecialChallengeScore.value)}`);
 }
 
 function applySpecialChallengeEffect(effect: ExamSpecialChallengeEffect, state: SimulationState) {
@@ -3785,61 +4681,61 @@ function applySpecialChallengeEffect(effect: ExamSpecialChallengeEffect, state: 
   const value = safeNumber(effect.value);
   switch (effect.kind) {
     case 'enemyAttackUp':
-      state.enemyAttackUps.push({ rate: value || 32, turns: duration });
+      appendState(state, 'enemyAttackUps', { rate: value || 32, turns: duration });
       break;
     case 'enemyDamageUp':
-      state.enemyDamageUps.push({ rate: value || 5, turns: duration, attributeOption: effect.attribute });
+      appendState(state, 'enemyDamageUps', { rate: value || 5, turns: duration, attributeOption: effect.attribute });
       break;
     case 'enemyDamageReduction':
-      state.enemyDamageReductions.push({ rate: value || 8.75, turns: duration, attributeOption: effect.attribute });
+      appendState(state, 'enemyDamageReductions', { rate: value || 8.75, turns: duration, attributeOption: effect.attribute });
       break;
     case 'enemyDamageNull':
-      state.enemyDamageNulls.push({ rate: 100, turns: duration, attributeOption: effect.attribute });
+      appendState(state, 'enemyDamageNulls', { rate: 100, turns: duration, attributeOption: effect.attribute });
       break;
     case 'enemyEvasion':
-      state.enemyEvasions.push({ rate: value || 14.8, turns: duration });
+      appendState(state, 'enemyEvasions', { rate: value || 14.8, turns: duration });
       break;
     case 'enemyCritical':
-      state.enemyCriticals.push({ rate: value || criticalRatePowerScale.小, turns: duration });
+      appendState(state, 'enemyCriticals', { rate: value || criticalRatePowerScale.小, turns: duration });
       break;
     case 'enemyContinueHeal':
-      state.enemyContinueHeals.push({ amount: ceilDamage(value), turns: duration, source: '特別課題' });
+      appendState(state, 'enemyContinueHeals', { amount: ceilDamage(value), turns: duration, source: '特別課題' });
       break;
     case 'playerDamageDown':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
-        state.playerDamageDowns.push({ cardIndex, rate: value || 5, turns: duration, attributeOption: effect.attribute });
+        appendState(state, 'playerDamageDowns', { cardIndex, rate: value || 5, turns: duration, attributeOption: effect.attribute });
       });
       break;
     case 'playerDamageTakenUp':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
-        state.playerDamageTakenUps.push({ cardIndex, rate: value || 8.75, turns: duration, attributeOption: effect.attribute });
+        appendState(state, 'playerDamageTakenUps', { cardIndex, rate: value || 8.75, turns: duration, attributeOption: effect.attribute });
       });
       break;
     case 'playerBlind':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
         if (!isPlayerImmune(state, cardIndex, 'blind')) {
-          state.playerBlinds.push({ cardIndex, rate: value || blindRatePowerScale.中, turns: duration });
+          appendState(state, 'playerBlinds', { cardIndex, rate: value || blindRatePowerScale.中, turns: duration });
         }
       });
       break;
     case 'playerBurn':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
         if (!isPlayerImmune(state, cardIndex, 'burn')) {
-          state.burns.push({ cardIndex, rate: value || 16, turns: duration });
+          appendState(state, 'burns', { cardIndex, rate: value || 16, turns: duration });
         }
       });
       break;
     case 'playerCurse':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
         if (!isPlayerImmune(state, cardIndex, 'curse')) {
-          state.playerCurses.push({ cardIndex, rate: 100, turns: duration });
+          appendState(state, 'playerCurses', { cardIndex, rate: 100, turns: duration });
         }
       });
       break;
     case 'playerFreeze':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
         if (!isPlayerImmune(state, cardIndex, 'freeze')) {
-          state.playerFreezes.push({ cardIndex, rate: 100, turns: duration });
+          appendState(state, 'playerFreezes', { cardIndex, rate: 100, turns: duration });
         }
       });
       break;
@@ -3885,12 +4781,20 @@ function buddyDamageTakenDownRate(power: string, attributeSpecific: boolean) {
 }
 
 function isDuoActiveForPair(magicId: string, pairedMagicId: string) {
+  const cacheKey = `${magicId}|${pairedMagicId}`;
+  const cached = simulationRuntimeCache?.duoActive.get(cacheKey);
+  if (cached !== undefined) return cached;
   const parsed = parseMagicId(magicId);
   const paired = parseMagicId(pairedMagicId);
-  if (!parsed || !paired || parsed.magicSlot !== 2) return false;
+  if (!parsed || !paired || parsed.magicSlot !== 2) {
+    simulationRuntimeCache?.duoActive.set(cacheKey, false);
+    return false;
+  }
   const source = deck.value[parsed.deckIndex]?.character;
   const partner = deck.value[paired.deckIndex]?.character;
-  return !!source?.duo && !!partner && partner.chara === source.duo;
+  const active = !!source?.duo && !!partner && partner.chara === source.duo;
+  simulationRuntimeCache?.duoActive.set(cacheKey, active);
+  return active;
 }
 
 function activatePlayerMagicBuffs(
@@ -3903,63 +4807,60 @@ function activatePlayerMagicBuffs(
 ) {
   const parsed = parseMagicId(magicId);
   if (!parsed) return;
-  const effects = getAutomaticMagicBuffs(parsed.deckIndex, parsed.magicSlot);
-  if (!effects.length) return;
-  const paired = parseMagicId(pairedMagicId);
-  effects.forEach((buff) => {
+  const effectPlans = getPlayerEffectPlans(magicId, pairedMagicId, parsed);
+  if (!effectPlans.length) return;
+  effectPlans.forEach(({ buff, duration, targets }) => {
     if (isPlayerFrozen(state, parsed.deckIndex) && isFreezeBlockedPlayerSideEffect(buff)) {
-      pushLog(stats, `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} / ${describePlayerBuff(buff, parsedRateFromBuff(buff), Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 1)))} / 凍結無効化`);
+      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} / ${describePlayerBuff(buff, parsedRateFromBuff(buff), duration)} / 凍結無効化`);
       return;
     }
-    const targets = resolvePlayerBuffTargets(buff, parsed.deckIndex, paired?.deckIndex);
     let appliedForAttackScore = false;
     let appliedForDefenceScore = false;
     let appliedForEvasionScore = false;
     let applied = false;
     let effectText = '';
     targets.forEach((targetDeckIndex) => {
-      const duration = Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 1));
       if (buff.buffOption === 'デバフ解除') {
         removePlayerNegativeEffects(state, [targetDeckIndex]);
         applied = true;
-        effectText = describePlayerBuff(buff, 0, duration);
+        if (stats.log) effectText = describePlayerBuff(buff, 0, duration);
         return;
       }
       if (buff.buffOption === 'バフ解除') {
         removePlayerPositiveEffects(state, [targetDeckIndex]);
         applied = true;
-        effectText = describePlayerBuff(buff, 0, duration);
+        if (stats.log) effectText = describePlayerBuff(buff, 0, duration);
         return;
       }
       const immunityKind = playerImmunityKindFromBuff(buff);
       if (immunityKind) {
-        state.playerImmunities.push({
+        appendState(state, 'playerImmunities', {
           cardIndex: targetDeckIndex,
           kind: immunityKind,
           turns: duration,
           source: describeMagic(magicId),
         });
         applied = true;
-        effectText = describePlayerBuff(buff, 0, duration);
+        if (stats.log) effectText = describePlayerBuff(buff, 0, duration);
         return;
       }
       if (buff.buffOption === '回避') {
         const rate = evasionRateFromParsedBuff(buff);
         if (rate <= 0) return;
-        state.playerEvasions.push({
+        appendState(state, 'playerEvasions', {
           cardIndex: targetDeckIndex,
           rate,
           turns: duration,
         });
         appliedForEvasionScore = true;
         applied = true;
-        effectText = describePlayerBuff(buff, rate, duration);
+        if (stats.log) effectText = describePlayerBuff(buff, rate, duration);
         return;
       }
       if (isPlayerDamageTakenDownBuff(buff)) {
         const rate = playerDamageTakenDownRateFromParsedBuff(buff);
         if (rate <= 0) return;
-        state.playerDamageTakenDowns.push({
+        appendState(state, 'playerDamageTakenDowns', {
           cardIndex: targetDeckIndex,
           rate,
           turns: duration,
@@ -3967,55 +4868,71 @@ function activatePlayerMagicBuffs(
         });
         appliedForDefenceScore = true;
         applied = true;
-        effectText = describePlayerBuff(buff, rate, duration);
+        if (stats.log) effectText = describePlayerBuff(buff, rate, duration);
         return;
       }
       if (isPlayerDamageTakenUpBuff(buff)) {
         const rate = playerDamageTakenUpRateFromParsedBuff(buff);
         if (rate <= 0) return;
-        state.playerDamageTakenUps.push({
+        appendState(state, 'playerDamageTakenUps', {
           cardIndex: targetDeckIndex,
           rate,
           turns: duration,
           attributeOption: buff.buffOption === '属性被ダメージUP' ? buff.attributeOption : undefined,
         });
         applied = true;
-        effectText = describePlayerBuff(buff, rate, duration);
+        if (stats.log) effectText = describePlayerBuff(buff, rate, duration);
         return;
       }
       if (buff.buffOption === 'ガッツ') {
-        state.playerGuts.push({
+        appendState(state, 'playerGuts', {
           cardIndex: targetDeckIndex,
           count: normalizePlayerGutsCount(buff),
           turns: duration,
           source: describeMagic(magicId),
         });
         applied = true;
-        effectText = describePlayerBuff(buff, 0, duration);
+        if (stats.log) effectText = describePlayerBuff(buff, 0, duration);
         return;
       }
-      state.playerBuffs.push({
+      appendState(state, 'playerBuffs', {
         targetDeckIndex,
-        buff: { ...buff },
+        buff,
         turns: duration,
       });
       if (isAttackScoreBuff(buff)) appliedForAttackScore = true;
       applied = true;
-      effectText = describePlayerBuff(buff, parsedRateFromBuff(buff), duration);
+      if (stats.log) effectText = describePlayerBuff(buff, parsedRateFromBuff(buff), duration);
     });
     if (applied) {
-      pushLog(stats, `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerBuffTarget(buff, targets)} / ${effectText}`);
+      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerBuffTarget(buff, targets)} / ${effectText}`);
     }
-    if (appliedForAttackScore) {
+    const examKind = simulationRuntimeCache?.examKind ?? exam.value.kind;
+    if (appliedForAttackScore && examKind === 'ATTACK') {
       stats.scoreBuff += 1;
     }
-    if (appliedForEvasionScore) {
+    if (appliedForEvasionScore && examKind === 'DEFENCE') {
       stats.evasion += 1;
     }
-    if (appliedForDefenceScore) {
+    if (appliedForDefenceScore && examKind === 'DEFENCE') {
       stats.debuff += 1;
     }
   });
+}
+
+function getPlayerEffectPlans(magicId: string, pairedMagicId: string, parsed: ParsedMagicId) {
+  const cacheKey = `${magicId}|${pairedMagicId}`;
+  const cache = simulationRuntimeCache?.playerEffectPlans;
+  const cached = cache?.get(cacheKey);
+  if (cached) return cached;
+  const paired = parseMagicId(pairedMagicId);
+  const plans = getAutomaticMagicBuffs(parsed.deckIndex, parsed.magicSlot).map((buff) => ({
+    buff,
+    duration: Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 1)),
+    targets: resolvePlayerBuffTargets(buff, parsed.deckIndex, paired?.deckIndex),
+  }));
+  cache?.set(cacheKey, plans);
+  return plans;
 }
 
 function isAttackScoreBuff(buff: ParsedBuff) {
@@ -4057,6 +4974,9 @@ function playerImmunityKindFromBuff(buff: ParsedBuff): PlayerImmunityKind | null
 }
 
 function getAutomaticMagicBuffs(deckIndex: number, magicSlot: MagicSlot): ParsedBuff[] {
+  const cacheKey = `${deckIndex}-M${magicSlot}`;
+  const cached = simulationRuntimeCache?.automaticMagicBuffs.get(cacheKey);
+  if (cached) return cached;
   const slot = deck.value[deckIndex];
   if (!slot?.character) return [];
   const levelOption = safeNumber(slot.magicLevels[magicSlot]) || 10;
@@ -4064,7 +4984,7 @@ function getAutomaticMagicBuffs(deckIndex: number, magicSlot: MagicSlot): Parsed
   const source = customEffectText
     ? { etc: customEffectText.includes(`(M${magicSlot})`) ? customEffectText : `${customEffectText}(M${magicSlot})` }
     : { etc: slot.character.etc || '' };
-  return parseMagicBuffsFromEtc(source, { allowM3: true })
+  const parsed = parseMagicBuffsFromEtc(source, { allowM3: true })
     .filter((buff) => buff.magicOption === `M${magicSlot}`)
     .filter(isPlayerSideParsedTarget)
     .filter((buff) => [
@@ -4089,9 +5009,14 @@ function getAutomaticMagicBuffs(deckIndex: number, magicSlot: MagicSlot): Parsed
       'やけど無効',
     ].includes(buff.buffOption))
     .map((buff) => ({ ...buff, levelOption }));
+  simulationRuntimeCache?.automaticMagicBuffs.set(cacheKey, parsed);
+  return parsed;
 }
 
 function getAutomaticOpponentDebuffs(deckIndex: number, magicSlot: MagicSlot): ParsedBuff[] {
+  const cacheKey = `${deckIndex}-M${magicSlot}`;
+  const cached = simulationRuntimeCache?.automaticOpponentDebuffs.get(cacheKey);
+  if (cached) return cached;
   const slot = deck.value[deckIndex];
   if (!slot?.character) return [];
   const levelOption = safeNumber(slot.magicLevels[magicSlot]) || 10;
@@ -4099,7 +5024,7 @@ function getAutomaticOpponentDebuffs(deckIndex: number, magicSlot: MagicSlot): P
   const source = customEffectText
     ? { etc: customEffectText.includes(`(M${magicSlot})`) ? customEffectText : `${customEffectText}(M${magicSlot})` }
     : { etc: slot.character.etc || '' };
-  return parseMagicBuffsFromEtc(source, { allowM3: true })
+  const parsed = parseMagicBuffsFromEtc(source, { allowM3: true })
     .filter((buff) => buff.magicOption === `M${magicSlot}`)
     .filter(isOpponentSideParsedTarget)
     .filter((buff) => [
@@ -4122,6 +5047,8 @@ function getAutomaticOpponentDebuffs(deckIndex: number, magicSlot: MagicSlot): P
       'ガッツ',
     ].includes(buff.buffOption))
     .map((buff) => ({ ...buff, levelOption }));
+  simulationRuntimeCache?.automaticOpponentDebuffs.set(cacheKey, parsed);
+  return parsed;
 }
 
 function isPlayerSideParsedTarget(buff: ParsedBuff) {
@@ -4150,7 +5077,7 @@ function activatePlayerOpponentDebuffs(
     const duration = Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 1));
     const rate = parsedRateFromBuff(buff);
     if (isPlayerFrozen(state, parsed.deckIndex) && isFreezeBlockedPlayerSideEffect(buff)) {
-      pushLog(stats, `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerOpponentDebuffTarget(buff, targetEnemy, pairedEnemy)} / ${describePlayerOpponentDebuff(buff, rate, duration)} / 凍結無効化`);
+      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerOpponentDebuffTarget(buff, targetEnemy, pairedEnemy)} / ${describePlayerOpponentDebuff(buff, rate, duration)} / 凍結無効化`);
       return;
     }
     if (rate <= 0 && !['デバフ解除', 'バフ解除', 'ガッツ'].includes(buff.buffOption)) return;
@@ -4159,18 +5086,18 @@ function activatePlayerOpponentDebuffs(
     let appliedAny = false;
     targetEnemySlotKeys.forEach((targetEnemySlotKey) => {
       if (buff.buffOption === 'ATKDOWN') {
-        state.enemyAttackDowns.push({ rate, turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyAttackDowns', { rate, turns: duration, targetEnemySlotKey });
         appliedForDefenceScore = true;
         appliedAny = true;
         return;
       }
       if (buff.buffOption === 'ATKUP') {
-        state.enemyAttackUps.push({ rate, turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyAttackUps', { rate, turns: duration, targetEnemySlotKey });
         appliedAny = true;
         return;
       }
       if (buff.buffOption === 'ダメージUP' || buff.buffOption === '属性ダメUP') {
-        state.enemyDamageUps.push({
+        appendState(state, 'enemyDamageUps', {
           rate,
           turns: duration,
           attributeOption: buff.buffOption === '属性ダメUP' ? buff.attributeOption : undefined,
@@ -4180,7 +5107,7 @@ function activatePlayerOpponentDebuffs(
         return;
       }
       if (buff.buffOption === 'ダメージDOWN' || buff.buffOption === '属性ダメDOWN') {
-        state.enemyDamageDowns.push({
+        appendState(state, 'enemyDamageDowns', {
           rate,
           turns: duration,
           attributeOption: buff.buffOption === '属性ダメDOWN' ? buff.attributeOption : undefined,
@@ -4191,7 +5118,7 @@ function activatePlayerOpponentDebuffs(
         return;
       }
       if (isEnemyDamageTakenUpBuff(buff)) {
-        state.enemyDamageTakenUps.push({
+        appendState(state, 'enemyDamageTakenUps', {
           rate,
           turns: duration,
           attributeOption: buff.buffOption === '属性被ダメージUP' ? buff.attributeOption : undefined,
@@ -4201,7 +5128,7 @@ function activatePlayerOpponentDebuffs(
         return;
       }
       if (isEnemyDamageTakenDownBuff(buff)) {
-        state.enemyDamageReductions.push({
+        appendState(state, 'enemyDamageReductions', {
           rate,
           turns: duration,
           attributeOption: buff.buffOption === '属性被ダメージDOWN' ? buff.attributeOption : undefined,
@@ -4215,32 +5142,34 @@ function activatePlayerOpponentDebuffs(
         const roll = rng();
         const success = roll < Math.min(1, Math.max(0, curseRate) / 100);
         if (success) {
-          state.enemyCurses.push({ rate: 100, turns: duration, targetEnemySlotKey });
-          stats.healBlock = Math.max(stats.healBlock, 1);
+          appendState(state, 'enemyCurses', { rate: 100, turns: duration, targetEnemySlotKey });
+          if ((simulationRuntimeCache?.examKind ?? exam.value.kind) === 'ATTACK') {
+            stats.healBlock = Math.max(stats.healBlock, 1);
+          }
           appliedAny = true;
         }
         return;
       }
       if (buff.buffOption === '暗闇') {
-        state.enemyBlinds.push({ rate, turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyBlinds', { rate, turns: duration, targetEnemySlotKey });
         appliedAny = true;
         return;
       }
       if (buff.buffOption === '凍結') {
         const success = rollEffect(rate, rng);
         if (success) {
-          state.enemyFreezes.push({ rate: 100, turns: duration, targetEnemySlotKey });
+          appendState(state, 'enemyFreezes', { rate: 100, turns: duration, targetEnemySlotKey });
           appliedAny = true;
         }
         return;
       }
       if (buff.buffOption === '回避') {
-        state.enemyEvasions.push({ rate, turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyEvasions', { rate, turns: duration, targetEnemySlotKey });
         appliedAny = true;
         return;
       }
       if (buff.buffOption === 'ガッツ') {
-        state.enemyGuts.push({ count: normalizePlayerGutsCount(buff), turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyGuts', { count: normalizePlayerGutsCount(buff), turns: duration, targetEnemySlotKey });
         appliedAny = true;
         return;
       }
@@ -4254,9 +5183,9 @@ function activatePlayerOpponentDebuffs(
         appliedAny = true;
       }
     });
-    if (appliedForDefenceScore) stats.debuff += 1;
+    if (appliedForDefenceScore && (simulationRuntimeCache?.examKind ?? exam.value.kind) === 'DEFENCE') stats.debuff += 1;
     if (appliedAny) {
-      pushLog(stats, `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerOpponentDebuffTarget(buff, targetEnemy, pairedEnemy)} / ${describePlayerOpponentDebuff(buff, rate, duration)}`);
+      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerOpponentDebuffTarget(buff, targetEnemy, pairedEnemy)} / ${describePlayerOpponentDebuff(buff, rate, duration)}`);
     }
   });
 }
@@ -4391,98 +5320,6 @@ function resolvePlayerBuffTargets(buff: ParsedBuff, sourceDeckIndex: number, pai
   return [sourceDeckIndex];
 }
 
-function activeBuffsForMagic(state: SimulationState, deckIndex: number, magicSlot: MagicSlot): ParsedBuff[] {
-  const currentMagicOption = `M${magicSlot}` as ParsedBuff['magicOption'];
-  return state.playerBuffs
-    .filter((entry) => entry.targetDeckIndex === deckIndex && entry.turns > 0)
-    .filter((entry) => !entry.buff?.isBuddyGenerated || entry.buff.magicOption === currentMagicOption)
-    .map((entry) => ({
-      ...entry.buff,
-      magicOption: currentMagicOption,
-    }));
-}
-
-function calculatePlayerDamageBase(runtime: any, magicSlot: MagicSlot, targetElement: ActionElement, reductionRate: number) {
-  const components = calculatePlayerDamageComponents(runtime, magicSlot);
-  const reductionValue = reductionRate / 100;
-  const damageTermAfterReduction = Math.max(0, components.damageTerm - reductionValue);
-  const beforeReductionDamage = components.baseAtk
-    * components.damageTerm
-    * components.rengekiMultiplier
-    * playerAttributeMultiplier(components.magicAttribute, targetElement);
-  const damage = components.baseAtk
-    * damageTermAfterReduction
-    * components.rengekiMultiplier
-    * playerAttributeMultiplier(components.magicAttribute, targetElement);
-  return {
-    ...components,
-    reductionValue,
-    damageTermAfterReduction,
-    beforeReductionDamage,
-    damage,
-  };
-}
-
-function calculatePlayerDamageComponents(runtime: any, magicSlot: MagicSlot) {
-  const magicKey = `magic${magicSlot}`;
-  const magicAttribute = normalizeElement(runtime[`${magicKey}Attribute`]);
-  const power = runtime[`${magicKey}Power`] || '単発(弱)';
-  const adjustedPower = power === 'デュオ' ? 'デュオ魔法' : power;
-  const level = Math.min(10, Math.max(1, Math.floor(safeNumber(runtime[`${magicKey}Lv`]) || 1)));
-  const magicRatio = safeNumber(magicDict[`${adjustedPower}Lv${level}`]) || 1;
-  const attributeAdjust = magicAttribute === '無' ? 1.1 : 1;
-  const buffTotals = playerDamageBuffTotals(runtime, magicSlot, magicAttribute);
-  const buddyAtk = calculateRuntimeBuddyAtk(runtime);
-  const baseAtk = safeNumber(runtime.atk) + buffTotals.atkBuffTotal + buddyAtk;
-  const damageTerm = Math.max(0, magicRatio * attributeAdjust + buffTotals.dmgBuffTotal);
-  return {
-    magicAttribute,
-    adjustedPower,
-    level,
-    magicRatio,
-    attributeAdjust,
-    buddyAtk,
-    baseAtk,
-    atkBuffTotal: buffTotals.atkBuffTotal,
-    dmgBuffTotal: buffTotals.dmgBuffTotal,
-    criticalChance: buffTotals.criticalChance,
-    damageTerm,
-    rengekiMultiplier: playerRengekiMultiplier(adjustedPower),
-  };
-}
-
-function playerDamageBuffTotals(runtime: any, magicSlot: MagicSlot, magicAttribute: ActionElement) {
-  const magicOption = `M${magicSlot}`;
-  return getRuntimePlayerBuffs(runtime).reduce<PlayerDamageBuffTotal>((total, buff: any) => {
-    if (buff.magicOption !== magicOption) return total;
-    const buffType = buff.buffOption;
-    const powerType = buff.powerOption;
-    const level = Math.min(10, Math.max(1, Math.floor(safeNumber(buff.levelOption) || 10)));
-    if (buffType === 'ATKUP' || buffType === 'ATKDOWN') {
-      total.atkBuffTotal += safeNumber(atkbuffDict[`${buffType}(${powerType})${level}`]) * safeNumber(runtime.atk);
-      return total;
-    }
-    if (['ダメージUP', '属性ダメUP', 'ダメージDOWN', '属性ダメDOWN'].includes(buffType)) {
-      if ((buffType === '属性ダメUP' || buffType === '属性ダメDOWN') && buff.attributeOption && buff.attributeOption !== magicAttribute) {
-        return total;
-      }
-      const prefix = buffType === 'ダメージUP'
-        ? 'ダメUP'
-        : buffType === 'ダメージDOWN'
-          ? 'ダメDOWN'
-          : buffType === '属性ダメUP'
-            ? '属性ダメUP'
-            : '属性ダメDOWN';
-      total.dmgBuffTotal += safeNumber(dmgbuffDict[`${prefix}(${powerType})${level}`]);
-      return total;
-    }
-    if (buffType === 'クリティカル') {
-      total.criticalChance = Math.max(total.criticalChance, criticalChanceFromPower(powerType));
-    }
-    return total;
-  }, { atkBuffTotal: 0, dmgBuffTotal: 0, criticalChance: 0 });
-}
-
 function criticalChanceFromPower(powerType: string) {
   const normalizedPower = normalizeDisplayPower('クリティカル', powerType);
   if (normalizedPower in criticalRatePowerScale) return safeNumber(criticalRatePowerScale[normalizedPower]) / 100;
@@ -4493,10 +5330,6 @@ function criticalChanceFromPower(powerType: string) {
   const expectedMultiplier = safeNumber(criticalDict[`クリティカル(${powerType})`]);
   if (expectedMultiplier <= 1) return 0;
   return clamp((expectedMultiplier - 1) / (CRITICAL_DAMAGE_MULTIPLIER - 1), 0, 1);
-}
-
-function getRuntimePlayerBuffs(runtime: any): any[] {
-  return Array.isArray(runtime.buffs) ? runtime.buffs.map((buff: any) => ({ ...buff })) : [];
 }
 
 function getRuntimeBuddyGeneratedBuffs(runtime: any) {
@@ -4513,13 +5346,125 @@ function getRuntimeBuddyGeneratedBuffs(runtime: any) {
 }
 
 function calculateRuntimeBuddyAtk(runtime: any) {
+  const deckIndex = runtime?._examDeckIndex;
+  const canUseCache = simulationRuntimeCache
+    && typeof deckIndex === 'number'
+    && Number.isInteger(deckIndex);
+  const cached = canUseCache ? simulationRuntimeCache?.buddyAtk.get(deckIndex) : undefined;
+  if (cached !== undefined) return cached;
   const totsu = runtime?.totsu ?? (runtime?.isBonusSelected ? 4 : 0);
-  return [1, 2, 3].reduce((total, buddyIndex) => {
+  const total = [1, 2, 3].reduce((sum, buddyIndex) => {
     const buddyName = runtime?.[`buddy${buddyIndex}c`];
-    if (!buddyName || !(buddyName in charaDict.value)) return total;
+    if (!buddyName || !(buddyName in charaDict.value)) return sum;
     const status = getBuddyStatusForCharacter(runtime, buddyIndex, { totsu, isActive: true });
-    return total + safeNumber(runtime.atk) * getBuddyAtkRate(status, safeNumber(runtime[`buddy${buddyIndex}Lv`]) || 10);
+    return sum + safeNumber(runtime.atk) * getBuddyAtkRate(status, safeNumber(runtime[`buddy${buddyIndex}Lv`]) || 10);
   }, 0);
+  if (canUseCache) simulationRuntimeCache?.buddyAtk.set(deckIndex, total);
+  return total;
+}
+
+function calculatePlayerDamageBaseFromState(
+  state: SimulationState,
+  magicId: string,
+  deckIndex: number,
+  magicSlot: MagicSlot,
+  targetElement: ActionElement,
+  reductionRate: number,
+  duoActive: boolean,
+) {
+  const magicMeta = getPlayerMagicRuntimeMeta(magicId, deckIndex, magicSlot, duoActive);
+  if (!magicMeta) return null;
+  const {
+    runtimeAtk,
+    buddyAtk,
+    magicAttribute,
+    adjustedPower,
+    level,
+    magicRatio,
+    attributeAdjust,
+    rengekiMultiplier,
+  } = magicMeta;
+  const currentMagicOption = `M${magicSlot}`;
+  let atkBuffTotal = 0;
+  let dmgBuffTotal = 0;
+  let criticalChance = 0;
+
+  for (const entry of state.playerBuffs) {
+    if (entry.targetDeckIndex !== deckIndex || entry.turns <= 0) continue;
+    const buff = entry.buff;
+    if (buff?.isBuddyGenerated && buff.magicOption !== currentMagicOption) continue;
+    const buffType = buff?.buffOption;
+    const powerType = buff?.powerOption;
+    const buffLevel = Math.min(10, Math.max(1, Math.floor(safeNumber(buff?.levelOption) || 10)));
+    if (buffType === 'ATKUP' || buffType === 'ATKDOWN') {
+      atkBuffTotal += safeNumber(atkbuffDict[`${buffType}(${powerType})${buffLevel}`]) * runtimeAtk;
+      continue;
+    }
+    if (buffType === 'ダメージUP' || buffType === '属性ダメUP' || buffType === 'ダメージDOWN' || buffType === '属性ダメDOWN') {
+      if ((buffType === '属性ダメUP' || buffType === '属性ダメDOWN') && buff.attributeOption && buff.attributeOption !== magicAttribute) continue;
+      const prefix = buffType === 'ダメージUP'
+        ? 'ダメUP'
+        : buffType === 'ダメージDOWN'
+          ? 'ダメDOWN'
+          : buffType === '属性ダメUP'
+            ? '属性ダメUP'
+            : '属性ダメDOWN';
+      dmgBuffTotal += safeNumber(dmgbuffDict[`${prefix}(${powerType})${buffLevel}`]);
+      continue;
+    }
+    if (buffType === 'クリティカル') criticalChance = Math.max(criticalChance, criticalChanceFromPower(powerType));
+  }
+
+  const baseAtk = runtimeAtk + atkBuffTotal + buddyAtk;
+  const damageTerm = Math.max(0, magicRatio * attributeAdjust + dmgBuffTotal);
+  const reductionValue = reductionRate / 100;
+  const damageTermAfterReduction = Math.max(0, damageTerm - reductionValue);
+  const attributeMultiplier = playerAttributeMultiplier(magicAttribute, targetElement);
+  return {
+    magicAttribute,
+    adjustedPower,
+    level,
+    magicRatio,
+    attributeAdjust,
+    buddyAtk,
+    baseAtk,
+    atkBuffTotal,
+    dmgBuffTotal,
+    criticalChance,
+    damageTerm,
+    rengekiMultiplier,
+    reductionValue,
+    damageTermAfterReduction,
+    beforeReductionDamage: baseAtk * damageTerm * rengekiMultiplier * attributeMultiplier,
+    damage: baseAtk * damageTermAfterReduction * rengekiMultiplier * attributeMultiplier,
+  };
+}
+
+function getPlayerMagicRuntimeMeta(magicId: string, deckIndex: number, magicSlot: MagicSlot, duoActive: boolean) {
+  const cacheKey = `${magicId}:${duoActive && magicSlot === 2 ? 'duo' : 'normal'}`;
+  const cache = simulationRuntimeCache?.playerMagicMeta;
+  const cached = cache?.get(cacheKey);
+  if (cached) return cached;
+  const runtime = buildRuntimeCharacter(deckIndex);
+  if (!runtime) return null;
+  const magicKey = `magic${magicSlot}`;
+  const magicAttribute = normalizeElement(runtime[`${magicKey}Attribute`]);
+  const configuredPower = runtime[`${magicKey}Power`] || '単発(弱)';
+  const power = duoActive && magicSlot === 2 ? 'デュオ' : configuredPower;
+  const adjustedPower = power === 'デュオ' ? 'デュオ魔法' : power;
+  const level = Math.min(10, Math.max(1, Math.floor(safeNumber(runtime[`${magicKey}Lv`]) || 1)));
+  const meta = {
+    runtimeAtk: safeNumber(runtime.atk),
+    buddyAtk: calculateRuntimeBuddyAtk(runtime),
+    magicAttribute,
+    adjustedPower,
+    level,
+    magicRatio: safeNumber(magicDict[`${adjustedPower}Lv${level}`]) || 1,
+    attributeAdjust: magicAttribute === '無' ? 1.1 : 1,
+    rengekiMultiplier: playerRengekiMultiplier(adjustedPower),
+  };
+  cache?.set(cacheKey, meta);
+  return meta;
 }
 
 function playerRengekiMultiplier(power: string) {
@@ -4539,25 +5484,15 @@ function playerAttributeMultiplier(magicAttribute: ActionElement, targetElement:
 function activatePlayerContinueHeal(magicId: string, pairedMagicId: string, state: SimulationState, stats: SimulationStats) {
   const parsed = parseMagicId(magicId);
   if (!parsed) return;
-  const runtime = buildRuntimeCharacter(parsed.deckIndex);
-  if (!runtime) return;
-  const buffs = buildRuntimeBuffs(runtime).filter((buff) => (
-    buff.magicOption === `M${parsed.magicSlot}` && buff.buffOption === '継続回復'
-  ));
-  if (!buffs.length) return;
+  const plans = getContinueHealPlans(magicId, pairedMagicId, parsed);
+  if (!plans.length) return;
   if (isPlayerFrozen(state, parsed.deckIndex)) {
-    pushLog(stats, `${describeMagic(magicId)} 継続回復凍結`);
+    if (stats.log) pushLog(stats, () => `${describeMagic(magicId)} 継続回復凍結`);
     return;
   }
-  const paired = parseMagicId(pairedMagicId);
-  buffs.forEach((buff) => {
-    const level = Math.min(10, Math.max(1, Math.floor(safeNumber(buff.levelOption) || 10)));
-    const rate = safeNumber(healContinueDict[`継続回復(${buff.powerOption})${level}`]);
-    if (rate <= 0) return;
-    const duration = Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 3));
-    const targets = resolvePlayerBuffTargets(buff, parsed.deckIndex, paired?.deckIndex);
+  plans.forEach(({ rate, duration, targets }) => {
     targets.forEach((cardIndex) => {
-      state.playerContinueHeals.push({
+      appendState(state, 'playerContinueHeals', {
         cardIndex,
         rate,
         turns: duration,
@@ -4565,6 +5500,29 @@ function activatePlayerContinueHeal(magicId: string, pairedMagicId: string, stat
       });
     });
   });
+}
+
+function getContinueHealPlans(magicId: string, pairedMagicId: string, parsed: ParsedMagicId) {
+  const cacheKey = `${magicId}|${pairedMagicId}`;
+  const cache = simulationRuntimeCache?.continueHealPlans;
+  const cached = cache?.get(cacheKey);
+  if (cached) return cached;
+  const runtime = buildRuntimeCharacter(parsed.deckIndex);
+  if (!runtime) return [];
+  const paired = parseMagicId(pairedMagicId);
+  const plans = buildRuntimeBuffs(runtime)
+    .filter((buff) => buff.magicOption === `M${parsed.magicSlot}` && buff.buffOption === '継続回復')
+    .map((buff) => {
+      const level = Math.min(10, Math.max(1, Math.floor(safeNumber(buff.levelOption) || 10)));
+      return {
+        rate: safeNumber(healContinueDict[`継続回復(${buff.powerOption})${level}`]),
+        duration: Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 3)),
+        targets: resolvePlayerBuffTargets(buff, parsed.deckIndex, paired?.deckIndex),
+      };
+    })
+    .filter((plan) => plan.rate > 0);
+  cache?.set(cacheKey, plans);
+  return plans;
 }
 
 function calculatePlayerDamage(
@@ -4581,11 +5539,9 @@ function calculatePlayerDamage(
   if (!parsed || !magic) {
     return { damage: 0, compatibility: 'equal' as ScoreCompatibility, hitCount: 1, isDuo: false, evasionCount: 0, blindMiss: false, criticalCount: 0 };
   }
-  const runtime = buildRuntimeCharacter(parsed.deckIndex, activeBuffsForMagic(state, parsed.deckIndex, parsed.magicSlot));
-  if (!runtime) {
+  if (!buildRuntimeCharacter(parsed.deckIndex)) {
     return { damage: 0, compatibility: 'equal' as ScoreCompatibility, hitCount: 1, isDuo: false, evasionCount: 0, blindMiss: false, criticalCount: 0 };
   }
-  if (duoActive) runtime.magic2Power = 'デュオ';
   const compatibility = getCompatibility(magic.element, targetElement);
   const power = duoActive && parsed.magicSlot === 2 ? 'デュオ' : magic.power;
   const hitCount = magicHitCount(power);
@@ -4599,7 +5555,18 @@ function calculatePlayerDamage(
   const enemyDamageTakenUpRate = sumDamageRatesForElementAndEnemy(state.enemyDamageTakenUps, magic.element, targetEnemySlotKey);
   const enemyEvasionRate = Math.min(1, sumRatesForEnemy(state.enemyEvasions, targetEnemySlotKey) / 100);
   const reductionRate = Math.min(100, sumDamageDownRatesForCard(state.playerDamageDowns, parsed.deckIndex, magic.element) + enemyReductionRate - enemyDamageTakenUpRate);
-  const damageBase = calculatePlayerDamageBase(runtime, parsed.magicSlot, targetElement, reductionRate);
+  const damageBase = calculatePlayerDamageBaseFromState(
+    state,
+    magicId,
+    parsed.deckIndex,
+    parsed.magicSlot,
+    targetElement,
+    reductionRate,
+    duoActive,
+  );
+  if (!damageBase) {
+    return { damage: 0, compatibility: 'equal' as ScoreCompatibility, hitCount: 1, isDuo: false, evasionCount: 0, blindMiss: false, criticalCount: 0 };
+  }
   const attackDownRate = Math.min(100, sumDamageDownRatesForCard(state.playerAttackDowns, parsed.deckIndex, magic.element));
   const baseDamage = enemyDamageNullActive ? 0 : damageBase.damage * Math.max(0, 1 - attackDownRate / 100);
   if (enemyDamageNullActive) {
@@ -4608,7 +5575,7 @@ function calculatePlayerDamage(
   if (blindRate > 0) {
     const blindRoll = rng();
     if (blindRoll < blindRate) {
-      stats.miss += 1;
+      if (stats.log) stats.miss += 1;
       return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: true, criticalCount: 0, damageNull: false };
     }
   }
@@ -4628,11 +5595,23 @@ function calculatePlayerDamage(
     }
     const criticalActive = damageBase.criticalChance > 0 && rollEffect(damageBase.criticalChance * 100, rng);
     const criticalMultiplier = criticalActive ? CRITICAL_DAMAGE_MULTIPLIER : 1;
-    const random = nextDamageFactor(rng);
-    const raw = (baseDamage * criticalMultiplier / hitCount) * random.factor;
+    const randomFactor = nextDamageFactor(rng);
+    const raw = (baseDamage * criticalMultiplier / hitCount) * randomFactor;
     const hitDamage = ceilDamage(raw);
     if (criticalActive && hitDamage > 0) criticalCount += 1;
     damage += hitDamage;
+  }
+  const cachedResult = simulationRuntimeCache?.playerDamageResult;
+  if (cachedResult) {
+    cachedResult.damage = damage;
+    cachedResult.compatibility = compatibility;
+    cachedResult.hitCount = hitCount;
+    cachedResult.isDuo = isDuo;
+    cachedResult.evasionCount = evasionCount;
+    cachedResult.blindMiss = false;
+    cachedResult.criticalCount = criticalCount;
+    cachedResult.damageNull = false;
+    return cachedResult;
   }
   return { damage, compatibility, hitCount, isDuo, evasionCount, blindMiss: false, criticalCount, damageNull: false };
 }
@@ -4647,39 +5626,41 @@ function describePlayerAttackSpecials(attack: { evasionCount?: number; blindMiss
 }
 
 function calculatePlayerHeal(magicId: string, state: SimulationState) {
+  const amountCache = simulationRuntimeCache?.playerHealAmounts;
+  let amount = amountCache?.get(magicId);
   const parsed = parseMagicId(magicId);
   if (!parsed) {
     return 0;
   }
-  const runtime = buildRuntimeCharacter(parsed.deckIndex);
-  if (!runtime) {
-    return 0;
-  }
-  const buffs = buildRuntimeBuffs(runtime).filter((buff) => buff.magicOption === `M${parsed.magicSlot}`);
-  let heal = 0;
-  buffs.forEach((buff) => {
-    const level = Math.min(10, Math.max(1, Math.floor(safeNumber(buff.levelOption) || 10)));
-    if (buff.buffOption === '回復') {
-      const rate = safeNumber(healDict[`回復(${buff.powerOption})${level}`]);
-      const raw = rate * safeNumber(runtime.atk);
-      heal += raw;
+  if (amount === undefined) {
+    const runtime = buildRuntimeCharacter(parsed.deckIndex);
+    if (!runtime) {
+      return 0;
     }
-  });
-  const amount = ceilDamage(heal);
+    let heal = 0;
+    for (const buff of buildRuntimeBuffs(runtime)) {
+      if (buff.magicOption !== `M${parsed.magicSlot}` || buff.buffOption !== '回復') continue;
+      const level = Math.min(10, Math.max(1, Math.floor(safeNumber(buff.levelOption) || 10)));
+      heal += safeNumber(healDict[`回復(${buff.powerOption})${level}`]) * safeNumber(runtime.atk);
+    }
+    amount = ceilDamage(heal);
+    amountCache?.set(magicId, amount);
+  }
   if (amount > 0 && isPlayerCursed(state, parsed.deckIndex)) {
     return 0;
   }
   return amount;
 }
 
-function applyPlayerContinueHeal(state: SimulationState, currentHp: number): ContinueHealResult {
-  const activeHeals = state.playerContinueHeals.filter((entry) => entry.turns > 0);
-  if (!activeHeals.length) {
+function applyPlayerContinueHeal(state: SimulationState, currentHp: number, keepDetails = true): ContinueHealResult {
+  if (!state.playerContinueHeals.length) {
     return { total: 0, details: [] };
   }
   let remainingRecoverableHp = Math.max(0, totalDeckHp.value - currentHp);
+  let total = 0;
   const details: ContinueHealDetail[] = [];
-  for (const entry of activeHeals) {
+  for (const entry of state.playerContinueHeals) {
+    if (entry.turns <= 0) continue;
     const baseCardHp = deckCardHp(entry.cardIndex);
     const rawHeal = baseCardHp * entry.rate;
     const potentialAmount = ceilDamage(rawHeal);
@@ -4687,7 +5668,7 @@ function applyPlayerContinueHeal(state: SimulationState, currentHp: number): Con
       continue;
     }
     const amount = Math.min(potentialAmount, remainingRecoverableHp);
-    if (potentialAmount > 0) {
+    if (keepDetails && potentialAmount > 0) {
       details.push({
         cardIndex: entry.cardIndex,
         source: entry.source || describeDeckCard(entry.cardIndex),
@@ -4696,9 +5677,9 @@ function applyPlayerContinueHeal(state: SimulationState, currentHp: number): Con
         capped: amount < potentialAmount,
       });
     }
+    total += amount;
     remainingRecoverableHp = Math.max(0, remainingRecoverableHp - amount);
   }
-  const total = details.reduce((sum, detail) => sum + detail.amount, 0);
   if (total <= 0) {
     return { total: 0, details };
   }
@@ -4707,10 +5688,12 @@ function applyPlayerContinueHeal(state: SimulationState, currentHp: number): Con
 
 function applyEnemyContinueHeal(state: SimulationState, enemyHp: number, enemyMaxHp: number) {
   if (enemyHp <= 0 || enemyHp >= enemyMaxHp) return 0;
-  const total = state.enemyContinueHeals
-    .filter((entry) => entry.turns > 0)
-    .filter((entry) => !entry.targetEnemySlotKey || !isEnemyCursed(state, entry.targetEnemySlotKey))
-    .reduce((sum, entry) => sum + ceilDamage(entry.amount), 0);
+  let total = 0;
+  for (const entry of state.enemyContinueHeals) {
+    if (entry.turns <= 0) continue;
+    if (entry.targetEnemySlotKey && isEnemyCursed(state, entry.targetEnemySlotKey)) continue;
+    total += ceilDamage(entry.amount);
+  }
   return Math.min(total, enemyMaxHp - enemyHp);
 }
 
@@ -4737,11 +5720,12 @@ function calculateEnemyDamage(
     };
   }
   const parsed = parseMagicId(magicId);
-  const defenderElement = parsed ? normalizeElement(deck.value[parsed.deckIndex]?.character?.[`magic${parsed.magicSlot}atr` as keyof Character] as string) : '無';
+  const defenderElement = magicById(magicId)?.element ?? '無';
   const attackElement = effectiveEnemyActionElement(enemyAction);
   const defenceCompatibility = getCompatibility(defenderElement, attackElement);
   const elementMultiplier = defenceCompatibility === 'advantage' ? 0.5 : defenceCompatibility === 'disadvantage' ? 1.5 : 1;
-  const baseAtk = deriveEnemyBaseAtk(enemyAction);
+  const actionMeta = getEnemyActionRuntimeMeta(enemyAction);
+  const baseAtk = actionMeta.baseAtk;
   const atkRate = sumRatesForEnemy(state.enemyAttackUps, enemyAction.slotKey)
     - sumRatesForEnemy(state.enemyAttackDowns, enemyAction.slotKey);
   const damageTakenDownRate = parsed ? sumDamageTakenDownRatesForCard(state.playerDamageTakenDowns, parsed.deckIndex, attackElement) : 0;
@@ -4750,18 +5734,22 @@ function calculateEnemyDamage(
     - sumDamageRatesForElementAndEnemy(state.enemyDamageDowns, attackElement, enemyAction.slotKey)
     - damageTakenDownRate
     + damageTakenUpRate;
-  const equalDamage = calculateEnemyEqualDamage(enemyAction, baseAtk, atkRate, damageRate);
-  const hitCount = enemyPowerHitCount(enemyAction.power);
+  const equalDamage = Math.max(0, baseAtk)
+    * Math.max(0, 1 + atkRate / 100)
+    * Math.max(0, actionMeta.magicRatio + damageRate / 100)
+    * actionMeta.rengekiMultiplier;
+  const hitCount = actionMeta.hitCount;
   const evasionRate = parsed ? Math.min(1, sumRatesForCard(state.playerEvasions, parsed.deckIndex) / 100) : 0;
   const blindRate = Math.min(1, sumRatesForEnemy(state.enemyBlinds, enemyAction.slotKey) / 100);
   const criticalRate = Math.min(1, sumRatesForEnemy(state.enemyCriticals, enemyAction.slotKey) / 100);
   let evasionCount = 0;
   let criticalCount = 0;
-  const hitDamages: number[] = [];
+  let damage = 0;
+  const hitDamages: number[] | null = stats.log ? [] : null;
   if (blindRate > 0) {
     const blindRoll = rng();
     if (blindRoll < blindRate) {
-      stats.miss += 1;
+      if (stats.log) stats.miss += 1;
       return {
         damage: 0,
         defenceCompatibility,
@@ -4770,7 +5758,7 @@ function calculateEnemyDamage(
         equalDamage,
         atkRate,
         damageRate,
-        hitDamages: Array.from({ length: hitCount }, () => 0),
+        hitDamages: stats.log ? Array.from({ length: hitCount }, () => 0) : [],
         evasionCount: 0,
         blindMiss: true,
         criticalCount: 0,
@@ -4783,31 +5771,35 @@ function calculateEnemyDamage(
       const evaded = evasionRoll < evasionRate;
       if (evaded) {
         evasionCount += 1;
-        hitDamages.push(0);
+        hitDamages?.push(0);
         continue;
       }
     }
-    const random = nextDamageFactor(rng);
+    const randomFactor = nextDamageFactor(rng);
     const criticalActive = criticalRate > 0 && rollEffect(criticalRate * 100, rng);
     const criticalMultiplier = criticalActive ? CRITICAL_DAMAGE_MULTIPLIER : 1;
-    const raw = (equalDamage * elementMultiplier * criticalMultiplier / hitCount) * random.factor;
+    const raw = (equalDamage * elementMultiplier * criticalMultiplier / hitCount) * randomFactor;
     const hitDamage = ceilDamage(raw);
     if (criticalActive && hitDamage > 0) criticalCount += 1;
-    hitDamages.push(hitDamage);
+    hitDamages?.push(hitDamage);
+    damage += hitDamage;
   }
-  return {
-    damage: hitDamages.reduce((sum, value) => sum + value, 0),
-    defenceCompatibility,
-    defenderElement,
-    baseAtk,
-    equalDamage,
-    atkRate,
-    damageRate,
-    hitDamages,
-    evasionCount,
-    blindMiss: false,
-    criticalCount,
-  };
+  const cachedResult = simulationRuntimeCache?.enemyDamageResult;
+  if (cachedResult) {
+    cachedResult.damage = damage;
+    cachedResult.defenceCompatibility = defenceCompatibility;
+    cachedResult.defenderElement = defenderElement;
+    cachedResult.baseAtk = baseAtk;
+    cachedResult.equalDamage = equalDamage;
+    cachedResult.atkRate = atkRate;
+    cachedResult.damageRate = damageRate;
+    cachedResult.hitDamages = hitDamages ?? simulationRuntimeCache!.emptyHitDamages;
+    cachedResult.evasionCount = evasionCount;
+    cachedResult.blindMiss = false;
+    cachedResult.criticalCount = criticalCount;
+    return cachedResult;
+  }
+  return { damage, defenceCompatibility, defenderElement, baseAtk, equalDamage, atkRate, damageRate, hitDamages: hitDamages ?? [], evasionCount, blindMiss: false, criticalCount };
 }
 
 function applyEnemySelfEffects(
@@ -4828,12 +5820,12 @@ function applyEnemySelfEffects(
   switch (action.effectKind) {
     case 'atkUp':
       targetSlotKeys.forEach((targetEnemySlotKey) => {
-        state.enemyAttackUps.push({ rate: value || 20, turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyAttackUps', { rate: value || 20, turns: duration, targetEnemySlotKey });
       });
       break;
     case 'damageUp':
       targetSlotKeys.forEach((targetEnemySlotKey) => {
-        state.enemyDamageUps.push({ rate: value || 5, turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyDamageUps', { rate: value || 5, turns: duration, targetEnemySlotKey });
       });
       break;
     case 'heal': {
@@ -4855,7 +5847,7 @@ function applyEnemySelfEffects(
       }
       targetSlotKeys.forEach((targetEnemySlotKey) => {
         if (isEnemyCursed(state, targetEnemySlotKey)) return;
-        state.enemyContinueHeals.push({
+        appendState(state, 'enemyContinueHeals', {
           amount: healAmount,
           turns: duration,
           source: action.name,
@@ -4866,7 +5858,7 @@ function applyEnemySelfEffects(
     }
     case 'guts':
       targetSlotKeys.forEach((targetEnemySlotKey) => {
-        state.enemyGuts.push({ count: normalizeGutsCount(action), turns: duration, targetEnemySlotKey });
+        appendState(state, 'enemyGuts', { count: normalizeGutsCount(action), turns: duration, targetEnemySlotKey });
       });
       break;
     default:
@@ -4909,18 +5901,18 @@ function applyEnemyAdditionalEffects(
   switch (action.effectKind) {
     case 'atkDown':
       targetCards.forEach((targetCardIndex) => {
-        state.playerAttackDowns.push({ cardIndex: targetCardIndex, rate: value || 20, turns: duration, attributeOption: action.effectAttribute });
+        appendState(state, 'playerAttackDowns', { cardIndex: targetCardIndex, rate: value || 20, turns: duration, attributeOption: action.effectAttribute });
       });
       break;
     case 'damageDown':
       targetCards.forEach((targetCardIndex) => {
-        state.playerDamageDowns.push({ cardIndex: targetCardIndex, rate: value || 5, turns: duration, attributeOption: action.effectAttribute });
+        appendState(state, 'playerDamageDowns', { cardIndex: targetCardIndex, rate: value || 5, turns: duration, attributeOption: action.effectAttribute });
       });
       break;
     case 'damageTakenDown':
       if (isEnemySideTarget(action.effectTarget)) {
         targetSlotKeys.forEach((targetEnemySlotKey) => {
-          state.enemyDamageReductions.push({ rate: value || 22.5, turns: duration, targetEnemySlotKey });
+          appendState(state, 'enemyDamageReductions', { rate: value || 22.5, turns: duration, targetEnemySlotKey });
         });
       }
       break;
@@ -4929,13 +5921,13 @@ function applyEnemyAdditionalEffects(
         if (isPlayerImmune(state, targetCardIndex, 'blind')) {
           return;
         }
-        state.playerBlinds.push({ cardIndex: targetCardIndex, rate: value || 21.6, turns: duration });
+        appendState(state, 'playerBlinds', { cardIndex: targetCardIndex, rate: value || 21.6, turns: duration });
       });
       break;
     case 'evasion':
       if (isEnemySideTarget(action.effectTarget)) {
         targetSlotKeys.forEach((targetEnemySlotKey) => {
-          state.enemyEvasions.push({ rate: value || 14.8, turns: duration, targetEnemySlotKey });
+          appendState(state, 'enemyEvasions', { rate: value || 14.8, turns: duration, targetEnemySlotKey });
         });
       }
       break;
@@ -4944,7 +5936,7 @@ function applyEnemyAdditionalEffects(
         if (isPlayerImmune(state, targetCardIndex, 'burn')) {
           return;
         }
-        state.burns.push({ cardIndex: targetCardIndex, rate: value || 16, turns: duration });
+        appendState(state, 'burns', { cardIndex: targetCardIndex, rate: value || 16, turns: duration });
       });
       break;
     case 'debuffRemoval':
@@ -4974,7 +5966,7 @@ function applyEnemyAdditionalEffects(
         if (isPlayerImmune(state, targetCardIndex, 'curse')) {
           return;
         }
-        state.playerCurses.push({ cardIndex: targetCardIndex, rate: 100, turns: duration });
+        appendState(state, 'playerCurses', { cardIndex: targetCardIndex, rate: 100, turns: duration });
       });
       break;
     case 'freeze':
@@ -4986,7 +5978,7 @@ function applyEnemyAdditionalEffects(
         const roll = rng();
         const success = roll < Math.min(1, Math.max(0, rate) / 100);
         if (success) {
-          state.playerFreezes.push({ cardIndex: targetCardIndex, rate: 100, turns: duration });
+          appendState(state, 'playerFreezes', { cardIndex: targetCardIndex, rate: 100, turns: duration });
         }
       });
       break;
@@ -5044,6 +6036,20 @@ function defaultEnemyEffectTarget(effectKind: EffectKind): EffectTarget {
 
 function isEnemyFreezeBlockedEffectKind(effectKind: EffectKind) {
   return ['atkUp', 'damageUp', 'damageTakenDown', 'evasion', 'guts', 'continueHeal'].includes(effectKind);
+}
+
+function getEnemyActionRuntimeMeta(action: RuntimeEnemyAction) {
+  const cache = simulationRuntimeCache?.enemyActionMeta;
+  const cached = cache?.get(action.identity);
+  if (cached) return cached;
+  const meta = {
+    baseAtk: deriveEnemyBaseAtk(action),
+    magicRatio: enemyMagicRatio(action),
+    rengekiMultiplier: enemyRengekiMultiplier(action.power),
+    hitCount: enemyPowerHitCount(action.power),
+  };
+  cache?.set(action.identity, meta);
+  return meta;
 }
 
 function isEnemySideTarget(target: EffectTarget) {
@@ -5184,14 +6190,15 @@ function normalizePlayerGutsCount(buff: ParsedBuff) {
 
 function applyEnemyGutsIfNeeded(state: SimulationState, enemyHp: number, stats: SimulationStats, targetEnemySlotKey?: string) {
   if (enemyHp > 0) return { hp: enemyHp, used: false };
-  const guts = state.enemyGuts.find((entry) => entry.turns > 0
+  const gutsIndex = state.enemyGuts.findIndex((entry) => entry.turns > 0
     && entry.count > 0
     && timedRateAppliesToEnemy(entry, targetEnemySlotKey || ''));
-  if (!guts) {
+  if (gutsIndex < 0) {
     return { hp: enemyHp, used: false };
   }
-  guts.count -= 1;
-  state.enemyGuts = state.enemyGuts.filter((entry) => entry.turns > 0 && entry.count > 0);
+  state.enemyGuts = state.enemyGuts
+    .map((entry, index) => (index === gutsIndex ? { ...entry, count: entry.count - 1 } : entry))
+    .filter((entry) => entry.turns > 0 && entry.count > 0);
   return { hp: 1, used: true };
 }
 
@@ -5199,14 +6206,15 @@ function applyPlayerGutsIfNeeded(state: SimulationState, playerHp: number, defen
   if (playerHp > 0) return { hp: playerHp, used: false };
   const parsed = parseMagicId(defendingMagicId);
   if (!parsed) return { hp: playerHp, used: false };
-  const guts = state.playerGuts.find((entry) => entry.turns > 0
+  const gutsIndex = state.playerGuts.findIndex((entry) => entry.turns > 0
     && entry.count > 0
     && entry.cardIndex === parsed.deckIndex);
-  if (!guts) {
+  if (gutsIndex < 0) {
     return { hp: playerHp, used: false };
   }
-  guts.count -= 1;
-  state.playerGuts = state.playerGuts.filter((entry) => entry.turns > 0 && entry.count > 0);
+  state.playerGuts = state.playerGuts
+    .map((entry, index) => (index === gutsIndex ? { ...entry, count: entry.count - 1 } : entry))
+    .filter((entry) => entry.turns > 0 && entry.count > 0);
   return { hp: 1, used: true };
 }
 
@@ -5309,37 +6317,51 @@ function applyBurnDamage(state: SimulationState, currentHp: number) {
 }
 
 function tickTimedEffects(state: SimulationState) {
-  state.playerAttackDowns = tickRateList(state.playerAttackDowns);
-  state.playerDamageDowns = tickRateList(state.playerDamageDowns);
-  state.playerEvasions = tickRateList(state.playerEvasions);
-  state.enemyDamageReductions = tickRateList(state.enemyDamageReductions);
-  state.enemyDamageNulls = tickRateList(state.enemyDamageNulls);
-  state.enemyEvasions = tickRateList(state.enemyEvasions);
-  state.enemyCriticals = tickRateList(state.enemyCriticals);
-  state.enemyAttackDowns = tickRateList(state.enemyAttackDowns);
-  state.enemyDamageDowns = tickRateList(state.enemyDamageDowns);
-  state.enemyDamageTakenUps = tickRateList(state.enemyDamageTakenUps);
-  state.enemyCurses = tickRateList(state.enemyCurses);
-  state.enemyBlinds = tickRateList(state.enemyBlinds);
-  state.enemyFreezes = tickRateList(state.enemyFreezes);
-  state.playerBlinds = tickRateList(state.playerBlinds);
-  state.playerCurses = tickRateList(state.playerCurses);
-  state.playerFreezes = tickRateList(state.playerFreezes);
-  state.playerDamageTakenDowns = tickRateList(state.playerDamageTakenDowns);
-  state.playerDamageTakenUps = tickRateList(state.playerDamageTakenUps);
-  state.enemyAttackUps = tickRateList(state.enemyAttackUps);
-  state.enemyDamageUps = tickRateList(state.enemyDamageUps);
-  state.enemyGuts = state.enemyGuts.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0 && entry.count > 0);
-  state.enemyContinueHeals = state.enemyContinueHeals.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0 && entry.amount > 0);
-  state.playerGuts = state.playerGuts.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0 && entry.count > 0);
-  state.burns = state.burns.map((burn) => ({ ...burn, turns: burn.turns - 1 })).filter((burn) => burn.turns > 0);
-  state.playerContinueHeals = state.playerContinueHeals.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0);
-  state.playerImmunities = state.playerImmunities.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0);
-  state.playerBuffs = state.playerBuffs.map((entry) => ({ ...entry, turns: entry.turns - 1 })).filter((entry) => entry.turns > 0);
+  if (state.playerAttackDowns.length) state.playerAttackDowns = tickRateList(state.playerAttackDowns);
+  if (state.playerDamageDowns.length) state.playerDamageDowns = tickRateList(state.playerDamageDowns);
+  if (state.playerEvasions.length) state.playerEvasions = tickRateList(state.playerEvasions);
+  if (state.enemyDamageReductions.length) state.enemyDamageReductions = tickRateList(state.enemyDamageReductions);
+  if (state.enemyDamageNulls.length) state.enemyDamageNulls = tickRateList(state.enemyDamageNulls);
+  if (state.enemyEvasions.length) state.enemyEvasions = tickRateList(state.enemyEvasions);
+  if (state.enemyCriticals.length) state.enemyCriticals = tickRateList(state.enemyCriticals);
+  if (state.enemyAttackDowns.length) state.enemyAttackDowns = tickRateList(state.enemyAttackDowns);
+  if (state.enemyDamageDowns.length) state.enemyDamageDowns = tickRateList(state.enemyDamageDowns);
+  if (state.enemyDamageTakenUps.length) state.enemyDamageTakenUps = tickRateList(state.enemyDamageTakenUps);
+  if (state.enemyCurses.length) state.enemyCurses = tickRateList(state.enemyCurses);
+  if (state.enemyBlinds.length) state.enemyBlinds = tickRateList(state.enemyBlinds);
+  if (state.enemyFreezes.length) state.enemyFreezes = tickRateList(state.enemyFreezes);
+  if (state.playerBlinds.length) state.playerBlinds = tickRateList(state.playerBlinds);
+  if (state.playerCurses.length) state.playerCurses = tickRateList(state.playerCurses);
+  if (state.playerFreezes.length) state.playerFreezes = tickRateList(state.playerFreezes);
+  if (state.playerDamageTakenDowns.length) state.playerDamageTakenDowns = tickRateList(state.playerDamageTakenDowns);
+  if (state.playerDamageTakenUps.length) state.playerDamageTakenUps = tickRateList(state.playerDamageTakenUps);
+  if (state.enemyAttackUps.length) state.enemyAttackUps = tickRateList(state.enemyAttackUps);
+  if (state.enemyDamageUps.length) state.enemyDamageUps = tickRateList(state.enemyDamageUps);
+  if (state.enemyGuts.length) state.enemyGuts = tickConditionalList(state.enemyGuts, (entry) => entry.count > 0);
+  if (state.enemyContinueHeals.length) state.enemyContinueHeals = tickConditionalList(state.enemyContinueHeals, (entry) => entry.amount > 0);
+  if (state.playerGuts.length) state.playerGuts = tickConditionalList(state.playerGuts, (entry) => entry.count > 0);
+  if (state.burns.length) state.burns = tickConditionalList(state.burns);
+  if (state.playerContinueHeals.length) state.playerContinueHeals = tickConditionalList(state.playerContinueHeals);
+  if (state.playerImmunities.length) state.playerImmunities = tickConditionalList(state.playerImmunities);
+  if (state.playerBuffs.length) state.playerBuffs = tickConditionalList(state.playerBuffs);
+}
+
+function tickConditionalList<T extends { turns: number }>(list: T[], keep?: (entry: T) => boolean): T[] {
+  if (list.length === 0) return list;
+  const next: T[] = [];
+  for (const entry of list) {
+    if (entry.turns > 1 && (!keep || keep(entry))) next.push({ ...entry, turns: entry.turns - 1 });
+  }
+  return next;
 }
 
 function tickRateList<T extends TimedRate>(list: T[]): T[] {
-  return list.map((item) => ({ ...item, turns: item.turns - 1 })).filter((item) => item.turns > 0);
+  if (list.length === 0) return list;
+  const next: T[] = [];
+  for (const item of list) {
+    if (item.turns > 1) next.push({ ...item, turns: item.turns - 1 });
+  }
+  return next;
 }
 
 function buildEnemyActionDeck(rng: () => number, requiredActions: number) {
@@ -5399,14 +6421,17 @@ function countIdentities(actions: RuntimeEnemyAction[]) {
 }
 
 function calculateScore(stats: SimulationStats) {
-  if (exam.value.kind === 'BASIC') {
+  const runtimeCache = simulationRuntimeCache;
+  const examKind = runtimeCache?.examKind ?? exam.value.kind;
+  const difficulty = runtimeCache?.difficulty ?? exam.value.difficulty;
+  if (examKind === 'BASIC') {
     const turns = [0.144, 0.138, 0.132, 0.126, 0.12];
     const moveNum = stats.advantage + stats.equal + stats.disadvantage;
     const turnIndex = clamp(Math.floor((moveNum - 1) / 2), 0, turns.length - 1);
     const base = stats.playerDamage - moveNum * 4.5 + stats.duo * 3000 + stats.advantage * 2000 + stats.equal * 500 - stats.disadvantage * 1000;
-    return Math.round(base * exam.value.difficulty * turns[turnIndex] + stats.specialChallengeScore);
+    return Math.round(base * difficulty * turns[turnIndex] + stats.specialChallengeScore);
   }
-  if (exam.value.kind === 'ATTACK') {
+  if (examKind === 'ATTACK') {
     const actionCount = stats.advantageCombo + stats.equalCombo + stats.disadvantageCombo + stats.advantageSingle + stats.equalSingle + stats.disadvantageSingle;
     const damageScore = Math.round(stats.playerDamage / 208);
     const basicScore = 11036 + safeNumber(stats.enemyMaxHp) * 0.080471;
@@ -5422,7 +6447,7 @@ function calculateScore(stats: SimulationStats) {
       + stats.advantageSingle * 150
       + stats.equalSingle * 120
       + stats.disadvantageSingle * 90;
-    return Math.round(base * exam.value.difficulty + stats.specialChallengeScore);
+    return Math.round(base * difficulty + stats.specialChallengeScore);
   }
   const turns = [0.8, 0.85, 0.9, 0.95, 1];
   const turnMultiplier = turns[clamp(stats.finishTurn - 1, 0, turns.length - 1)];
@@ -5433,7 +6458,7 @@ function calculateScore(stats: SimulationStats) {
     - stats.disadvantageDamaged / 1.5 * 0.05208
     + stats.evasion * 600
     + stats.debuff * 300;
-  return Math.round(base * exam.value.difficulty * turnMultiplier + stats.specialChallengeScore);
+  return Math.round(base * difficulty * turnMultiplier + stats.specialChallengeScore);
 }
 
 function pushScoreBreakdownLog(stats: SimulationStats) {
@@ -5545,9 +6570,14 @@ function formatScoreNumber(value: number) {
 }
 
 function incrementCompatibilityStats(stats: SimulationStats, compatibility: ScoreCompatibility, hitCount: number) {
-  if (compatibility === 'advantage') stats.advantage += 1;
-  if (compatibility === 'equal') stats.equal += 1;
-  if (compatibility === 'disadvantage') stats.disadvantage += 1;
+  const examKind = simulationRuntimeCache?.examKind ?? exam.value.kind;
+  if (examKind === 'BASIC') {
+    if (compatibility === 'advantage') stats.advantage += 1;
+    if (compatibility === 'equal') stats.equal += 1;
+    if (compatibility === 'disadvantage') stats.disadvantage += 1;
+    return;
+  }
+  if (examKind !== 'ATTACK') return;
   const isCombo = hitCount > 1;
   if (compatibility === 'advantage' && isCombo) stats.advantageCombo += 1;
   if (compatibility === 'equal' && isCombo) stats.equalCombo += 1;
@@ -5582,17 +6612,21 @@ function magicHitCount(power: string) {
 }
 
 function sumRatesForEnemy(list: TimedRate[], enemySlotKey: string) {
-  return list.reduce((sum, item) => (
-    timedRateAppliesToEnemy(item, enemySlotKey) ? sum + safeNumber(item.rate) : sum
-  ), 0);
+  let total = 0;
+  for (const item of list) {
+    if (timedRateAppliesToEnemy(item, enemySlotKey)) total += item.rate;
+  }
+  return total;
 }
 
 function sumDamageRatesForElementAndEnemy(list: TimedRate[], element: ActionElement, enemySlotKey: string) {
-  return list.reduce((sum, item) => {
-    if (!timedRateAppliesToEnemy(item, enemySlotKey)) return sum;
-    if (item.attributeOption && item.attributeOption !== element) return sum;
-    return sum + safeNumber(item.rate);
-  }, 0);
+  let total = 0;
+  for (const item of list) {
+    if (!timedRateAppliesToEnemy(item, enemySlotKey)) continue;
+    if (item.attributeOption && item.attributeOption !== element) continue;
+    total += item.rate;
+  }
+  return total;
 }
 
 function hasEnemyDamageNull(state: SimulationState, element: ActionElement, enemySlotKey: string) {
@@ -5622,30 +6656,36 @@ function removeEnemySlotBuffsByTargets<T extends TimedRate>(list: T[], targetSet
 }
 
 function sumRatesForCard(list: TargetedTimedRate[], cardIndex: number) {
-  return list.reduce((sum, item) => (
-    item.cardIndex === cardIndex ? sum + safeNumber(item.rate) : sum
-  ), 0);
+  let total = 0;
+  for (const item of list) {
+    if (item.cardIndex === cardIndex) total += item.rate;
+  }
+  return total;
 }
 
 function sumDamageDownRatesForCard(list: TargetedTimedRate[], cardIndex: number, attackerElement: ActionElement) {
-  return list.reduce((sum, item) => {
-    if (item.cardIndex !== cardIndex) return sum;
-    if (item.attributeOption && item.attributeOption !== attackerElement) return sum;
-    return sum + safeNumber(item.rate);
-  }, 0);
+  let total = 0;
+  for (const item of list) {
+    if (item.cardIndex !== cardIndex) continue;
+    if (item.attributeOption && item.attributeOption !== attackerElement) continue;
+    total += item.rate;
+  }
+  return total;
 }
 
 function sumDamageTakenDownRatesForCard(list: TargetedTimedRate[], cardIndex: number, attackElement: ActionElement) {
-  return list.reduce((sum, item) => {
-    if (item.cardIndex !== cardIndex) return sum;
-    if (item.attributeOption && item.attributeOption !== attackElement) return sum;
-    return sum + safeNumber(item.rate);
-  }, 0);
+  let total = 0;
+  for (const item of list) {
+    if (item.cardIndex !== cardIndex) continue;
+    if (item.attributeOption && item.attributeOption !== attackElement) continue;
+    total += item.rate;
+  }
+  return total;
 }
 
 function nextDamageFactor(rng: () => number) {
   const roll = rng();
-  return { roll, factor: 0.95 + roll * 0.1 };
+  return 0.95 + roll * 0.1;
 }
 
 function ceilDamage(value: number) {
@@ -5728,15 +6768,20 @@ function hashSeed(input: string) {
   };
 }
 
-function createRng(seedText: string) {
-  let seedValue = hashSeed(seedText)();
-  return () => {
+function createRng(seedText: string, restoredState?: number): StatefulRng {
+  let seedValue = restoredState ?? hashSeed(seedText)();
+  const rng = (() => {
     seedValue += 0x6D2B79F5;
     let value = seedValue;
     value = Math.imul(value ^ (value >>> 15), value | 1);
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  }) as StatefulRng;
+  rng.getState = () => seedValue;
+  rng.setState = (state: number) => {
+    seedValue = state;
   };
+  return rng;
 }
 
 function createIterationSeed(iteration: number) {
@@ -5750,15 +6795,24 @@ function formatNumber(value: number) {
   return Math.round(value).toLocaleString('ja-JP');
 }
 
-function pushLog(stats: SimulationStats, line: string) {
+function formatElapsedTime(value: number) {
+  const totalSeconds = Math.max(0, Math.floor(value / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function pushLog(stats: SimulationStats, line: string | (() => string)) {
   if (!stats.log) return;
-  stats.log.push(line);
+  stats.log.push(typeof line === 'function' ? line() : line);
 }
 
 function retire(stats: SimulationStats, reason: string) {
   stats.retired = true;
   stats.retireReason = reason;
-  pushLog(stats, `リタイア: ${reason}`);
+  if (stats.log) pushLog(stats, () => `リタイア: ${reason}`);
 }
 
 function retireReasonBucket(reason: string) {
@@ -7159,6 +8213,41 @@ button.combo-priority {
 
 .result-panel {
   min-height: 520px;
+}
+
+.simulation-mode-toggle {
+  flex: 0 0 auto;
+}
+
+.auto-best-progress {
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid #cbdce9;
+  border-radius: 8px;
+  background: #f6fafc;
+}
+
+.auto-best-progress-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 6px;
+  padding: 8px;
+}
+
+.auto-best-progress .metric {
+  min-height: 52px;
+  padding: 7px 9px;
+  background: #ffffff;
+}
+
+.auto-best-progress .metric-value {
+  font-size: 17px;
+}
+
+.auto-best-stopped {
+  border-color: #efb3ac;
+  color: #a9281b;
+  background: #fff7f6 !important;
 }
 
 .metrics-grid {

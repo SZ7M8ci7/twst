@@ -6,12 +6,14 @@ import ViteFonts from 'unplugin-fonts/vite'
 // Utilities
 import { defineConfig } from 'vite'
 import { fileURLToPath, URL } from 'node:url'
+import { examAutoBestWorkerHostPlugin } from './build/examAutoBestWorkerHostPlugin.mts'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: (process.env.NODE_ENV === 'production')
   ? './' : './',
   plugins: [
+    examAutoBestWorkerHostPlugin(),
     vue({
       template: { transformAssetUrls }
     }),
@@ -29,6 +31,10 @@ export default defineConfig({
     }),
   ],
   define: { 'process.env': {} },
+  worker: {
+    format: 'es',
+    plugins: () => [examAutoBestWorkerHostPlugin()],
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))

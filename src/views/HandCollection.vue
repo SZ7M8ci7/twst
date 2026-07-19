@@ -226,6 +226,14 @@
                   <v-icon>mdi-content-copy</v-icon>
                   <span class="ml-2">{{ $t('handCollection.copy') }}</span>
                 </v-btn>
+                <v-btn color="primary" @click="downloadBackupFile" class="action-btn" size="small">
+                  <v-icon>mdi-download</v-icon>
+                  <span class="ml-2">{{ $t('handCollection.downloadJson') }}</span>
+                </v-btn>
+                <v-btn color="primary" @click="openBackupFilePicker" class="action-btn" size="small">
+                  <v-icon>mdi-upload</v-icon>
+                  <span class="ml-2">{{ $t('handCollection.loadJson') }}</span>
+                </v-btn>
                 <v-btn color="primary" @click="importFromText" class="action-btn" size="small">
                   <v-icon>mdi-database-import</v-icon>
                   <span class="ml-2">{{ $t('handCollection.import') }}</span>
@@ -243,6 +251,13 @@
                 class="mt-4"
                 :label="$t('handCollection.dataFormat')"
               ></v-textarea>
+              <input
+                ref="backupFileInput"
+                type="file"
+                accept="application/json,.json"
+                class="backup-file-input"
+                @change="handleBackupFileSelected"
+              />
             </v-card-text>
           </v-card>
         </v-dialog>
@@ -283,6 +298,7 @@ import { useI18n } from 'vue-i18n';
 import { getInputMaxLevel } from '@/constants/levels';
 import { clampTotsuCount, deriveTotsuCount } from '@/utils/totsu';
 import { localizeCostumeName } from '@/utils/localizedDisplay';
+import { requestPersistentStorage } from '@/storage/persistentStorage';
 
 // Stores and i18n
 const { t, locale } = useI18n();
@@ -315,6 +331,7 @@ const savedState = ref<string>('');
 // データ管理用
 const dataModal = ref(false);
 const dataText = ref('');
+const backupFileInput = ref<HTMLInputElement | null>(null);
 const snackbar = ref({
   show: false,
   text: '',
@@ -491,6 +508,9 @@ async function saveHandCollection() {
     
     // 手持ちコレクションを保存
     handCollectionStore.saveHandCollectionManually();
+
+    // 永続ストレージ要求の拒否や未対応は、通常の保存結果へ影響させない。
+    void requestPersistentStorage();
     
     // 未保存フラグをリセット
     hasUnsavedChanges.value = false;
@@ -557,13 +577,9 @@ function handleFilterApplied() {
 }
 
 // データ管理機能
-function openDataModal() {
-  dataModal.value = true;
-  const cards = filteredCharacters.value.reduce((result, char) => {
-    const handCard = getHandCard(char.name);
-    if (handCard.level <= 0) {
-      return result;
-    }
+function createBackupJson(): string {
+  const cards = characters.value.reduce((result, char) => {
+    const handCard = getReadOnlyHandCard(char.name);
     result[char.name] = {
       chara: char.chara,
       costume: char.costume,
@@ -575,10 +591,16 @@ function openDataModal() {
     return result;
   }, {} as Record<string, { chara: string; costume: string; rare: string; isOwned: boolean; level: number; totsu: number }>);
 
-  dataText.value = JSON.stringify({
-    format: 'twst-hand-collection-v2',
+  return JSON.stringify({
+    format: 'twst-hand-collection-v3',
+    exportedAt: new Date().toISOString(),
     cards,
   }, null, 2);
+}
+
+function openDataModal() {
+  dataModal.value = true;
+  dataText.value = createBackupJson();
 }
 
 function closeDataModal() {
@@ -601,6 +623,46 @@ function copyToClipboard() {
       console.error('クリップボードへのコピーに失敗しました:', err);
       showSnackbar(t('handCollection.copyError'), 'error');
     });
+}
+
+function downloadBackupFile() {
+  try {
+    const json = createBackupJson();
+    dataText.value = json;
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    anchor.href = url;
+    anchor.download = `twst-hand-collection-${date}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showSnackbar(t('handCollection.downloadSuccess'));
+  } catch (error) {
+    console.error('JSONファイルの保存に失敗しました:', error);
+    showSnackbar(t('handCollection.downloadError'), 'error');
+  }
+}
+
+function openBackupFilePicker() {
+  backupFileInput.value?.click();
+}
+
+async function handleBackupFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+
+  try {
+    dataText.value = await file.text();
+    importFromText();
+  } catch (error) {
+    console.error('JSONファイルの読み込みに失敗しました:', error);
+    showSnackbar(t('handCollection.fileReadError'), 'error');
+  }
 }
 
 function importFromText() {
@@ -668,6 +730,10 @@ function importFromText() {
           importedCount++;
         }
       });
+    }
+
+    if (importedCount === 0) {
+      throw new Error('No importable hand collection data found');
     }
 
     markAsUnsaved();
@@ -1070,6 +1136,10 @@ onUnmounted(() => {
   flex: 1;
   min-width: 120px;
   max-width: 200px;
+}
+
+.backup-file-input {
+  display: none;
 }
 
 @media (max-width: 600px) {
