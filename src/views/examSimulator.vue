@@ -436,10 +436,10 @@
                   <v-btn value="normal" size="small" data-testid="simulation-mode-normal">{{ t('examSimulator.normalMode') }}</v-btn>
                   <v-btn value="autoBest" size="small" data-testid="simulation-mode-auto-best">{{ t('examSimulator.autoBestMode') }}</v-btn>
                 </v-btn-toggle>
-                <v-text-field v-model.number="iterations" class="run-field" type="number" min="1" max="100000" :label="t('examSimulator.iterations')" density="compact" variant="outlined" hide-details />
+                <v-text-field v-model.number="iterations" class="run-field" type="number" min="1" :label="t('examSimulator.iterations')" density="compact" variant="outlined" hide-details />
                 <v-text-field v-model.number="seed" class="seed-field" type="number" label="seed" density="compact" variant="outlined" hide-details />
               <v-btn color="primary" data-testid="run-simulation" size="large" :loading="isRunning" :disabled="!!validationMessage || isRunning" prepend-icon="mdi-play" @click="runSimulation">{{ t('examSimulator.run') }}</v-btn>
-              <v-btn v-if="isRunning && simulationMode === 'autoBest'" color="error" data-testid="stop-simulation" size="large" prepend-icon="mdi-stop" @click="requestSimulationStop">{{ t('examSimulator.stop') }}</v-btn>
+              <v-btn v-if="isRunning" color="error" data-testid="stop-simulation" size="large" prepend-icon="mdi-stop" @click="requestSimulationStop">{{ t('examSimulator.stop') }}</v-btn>
               <v-btn icon="mdi-refresh" variant="tonal" :aria-label="t('examSimulator.clear')" :disabled="(!resultSummary && !autoBestProgress) || isRunning" @click="clearResults" />
               </div>
             </div>
@@ -3487,7 +3487,7 @@ async function runSimulation() {
     await waitForSimulationPaint();
   }
   try {
-    const count = Math.min(100000, Math.max(1, Math.floor(safeNumber(iterations.value) || 1)));
+    const count = Math.max(1, Math.floor(safeNumber(iterations.value) || 1));
     if (simulationMode.value === 'autoBest') {
       await runAutoBestSimulation(count, resultGeneration);
     } else {
@@ -3550,6 +3550,7 @@ async function runNormalSimulation(count: number) {
       };
     };
     for (let i = 0; i < count; i += 1) {
+      if (stopRequested.value) break;
       const seedText = createIterationSeed(i);
       const result = runOneSimulation(createRng(seedText), false);
       completed += 1;
