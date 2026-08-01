@@ -85,6 +85,80 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/08-1全BS',
+    title: '2026/08-1全BS',
+    kind: 'BASIC',
+    enemyElement: '全',
+    enemyHp: 110000,
+    enemies: [
+      {
+        name: 'シルバー',
+        actions: [
+          { name: '火強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '火単体ダメDOWN強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageDown', effectTarget: '相手', effectValue: 5, duration: 1 },
+          { name: '火被ダメDOWN強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジャミル',
+        actions: [
+          { name: '水強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '水ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '水ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'マレウス',
+        actions: [
+          { name: '木強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '木ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '木ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'リドル',
+        actions: [
+          { name: '無強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無単体ATKDOWN強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/08-1無DF',
+    title: '2026/08-1無DF',
+    kind: 'DEFENCE',
+    enemyElement: '無',
+    enemyHp: 92000,
+    enemies: [
+      {
+        name: 'エース',
+        actions: [
+          { name: '相手選択呪い強単発', element: '無', power: '単発(強)', estimatedDamage: 4200, effectKind: 'curse', effectTarget: '相手選択', effectValue: 100, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 7550 },
+          { name: 'ダメUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 8150, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
+        ],
+      },
+      {
+        name: 'オルト',
+        actions: [
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 5000, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 8550 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 11300, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'イデア',
+        actions: [
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 5200, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 8850 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 11700, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/07-2火DF',
     title: '2026/07-2火DF',
     kind: 'DEFENCE',
