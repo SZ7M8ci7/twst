@@ -1,28 +1,66 @@
 <template>
   <div class="modal-background" ref="modalContainer" :class="{ embedded: embedded }">
-    <!-- Card Attributesセクション -->
-    <div class="feature-select-all-container">
-      <v-btn small @click="toggleSelectAll('cardAttributes')">
-        {{ isGroupFullySelected('cardAttributes') ? t('filterModal.release') : t('filterModal.select') }}
-      </v-btn>
-      <div class="feature-items">
-        <div class="feature-item" v-for="(rare, index) in rareOptions" :key="`rare-${index}`">
-          <v-checkbox v-model="selectedRare" :value="rare" :label="rare" hide-details />
+    <!-- カード属性セクション -->
+    <div class="card-attribute-groups">
+      <section class="attribute-group attribute-group--rarity">
+        <div class="attribute-group-header">
+          <div class="attribute-group-title">
+            <v-icon size="18">mdi-diamond-stone</v-icon>
+            <span>{{ t('filterModal.rarity') }}</span>
+          </div>
+          <v-btn class="attribute-group-action" size="small" variant="text" @click="toggleSelectAll('rarity')">
+            {{ isGroupFullySelected('rarity') ? t('filterModal.release') : t('filterModal.select') }}
+          </v-btn>
         </div>
-        <div class="feature-item" v-for="(type, index) in typeOptions" :key="`type-${index}`">
-          <v-checkbox v-model="selectedType" :value="type.value" :label="type.name" hide-details />
+        <div class="feature-items attribute-items">
+          <div class="feature-item" v-for="(rare, index) in rareOptions" :key="`rare-${index}`">
+            <v-checkbox v-model="selectedRare" :value="rare" :label="rare" hide-details density="compact" />
+          </div>
         </div>
-        <div class="feature-item" v-for="(attr, index) in attrOptions" :key="`attr-${index}`">
-          <v-checkbox v-model="selectedAttr" :value="attr.value" :label="attr.name" hide-details />
+      </section>
+      <section class="attribute-group attribute-group--type">
+        <div class="attribute-group-header">
+          <div class="attribute-group-title">
+            <v-icon size="18">mdi-shape-outline</v-icon>
+            <span>{{ t('filterModal.cardType') }}</span>
+          </div>
+          <v-btn class="attribute-group-action" size="small" variant="text" @click="toggleSelectAll('cardType')">
+            {{ isGroupFullySelected('cardType') ? t('filterModal.release') : t('filterModal.select') }}
+          </v-btn>
         </div>
-      </div>
+        <div class="feature-items attribute-items">
+          <div class="feature-item" v-for="(type, index) in typeOptions" :key="`type-${index}`">
+            <v-checkbox v-model="selectedType" :value="type.value" :label="type.name" hide-details density="compact" />
+          </div>
+        </div>
+      </section>
+      <section class="attribute-group attribute-group--attribute">
+        <div class="attribute-group-header">
+          <div class="attribute-group-title">
+            <v-icon size="18">mdi-flare</v-icon>
+            <span>{{ t('filterModal.magicAttribute') }}</span>
+          </div>
+          <v-btn class="attribute-group-action" size="small" variant="text" @click="toggleSelectAll('magicAttribute')">
+            {{ isGroupFullySelected('magicAttribute') ? t('filterModal.release') : t('filterModal.select') }}
+          </v-btn>
+        </div>
+        <div class="feature-items attribute-items">
+          <div class="feature-item" v-for="(attr, index) in attrOptions" :key="`attr-${index}`">
+            <v-checkbox v-model="selectedAttr" :value="attr.value" :label="attr.name" hide-details density="compact" />
+          </div>
+        </div>
+      </section>
     </div>
     <hr class="rare-divider" />
     <!-- キャラクタリスト -->
      <div class="display-block">
       <!-- キャラクター全体の全選択・解除ボタン -->
-      <div class="character-global-select-container">
-        <v-btn small @click="toggleSelectAllCharacters">
+      <div class="section-heading-row character-global-select-container">
+        <div class="section-title">
+          <v-icon size="18">mdi-account-group-outline</v-icon>
+          <span>{{ t('filterModal.characters') }}</span>
+        </div>
+        <v-btn class="filter-section-action" size="small" variant="text" @click="toggleSelectAllCharacters">
           {{ areAllCharactersSelected() ? t('filterModal.release') : t('filterModal.select') }}
         </v-btn>
       </div>
@@ -36,7 +74,7 @@
             class="character-list"
           >
             <div class="character-select-all-container">
-              <v-btn small @click="toggleSelectAll(groupName)">
+              <v-btn class="filter-section-action character-group-action" size="small" variant="text" @click="toggleSelectAll(groupName)">
                 {{ isGroupFullySelected(groupName) ? t('filterModal.release') : t('filterModal.select') }}
               </v-btn>
               <div class="character-items">
@@ -58,14 +96,38 @@
       </div>
     </div>
     <hr class="rare-divider" />
+    <div class="costume-search-container filter-section-surface">
+      <div class="section-title costume-search-label">
+        <v-icon size="20">mdi-hanger</v-icon>
+        <span>{{ t('filterModal.costumeName') }}</span>
+      </div>
+      <v-text-field
+        v-model="costumeSearch"
+        :placeholder="t('filterModal.costumeSearchPlaceholder')"
+        :aria-label="t('filterModal.costumeSearch')"
+        prepend-inner-icon="mdi-magnify"
+        clearable
+        hide-details
+        density="compact"
+        variant="outlined"
+        class="costume-search-input"
+      />
+    </div>
+    <hr class="rare-divider" />
     <!-- Status Effectsセクション -->
-    <div class="feature-select-all-container">
-      <v-btn small @click="toggleSelectAll('statusEffects')">
-        {{ isGroupFullySelected('statusEffects') ? t('filterModal.release') : t('filterModal.select') }}
-      </v-btn>
-      <div class="feature-items">
+    <div class="status-effects-section filter-section-surface">
+      <div class="section-heading-row">
+        <div class="section-title">
+          <v-icon size="18">mdi-auto-fix</v-icon>
+          <span>{{ t('filterModal.statusEffects') }}</span>
+        </div>
+        <v-btn class="filter-section-action" size="small" variant="text" @click="toggleSelectAll('statusEffects')">
+          {{ isGroupFullySelected('statusEffects') ? t('filterModal.release') : t('filterModal.select') }}
+        </v-btn>
+      </div>
+      <div class="feature-items status-effect-items">
         <div v-for="effect in localEffects" :key="effect.name" class="feature-item">
-          <v-checkbox v-model="selectedEffects" :value="effect.value" :label="effect.name" hide-details />
+          <v-checkbox v-model="selectedEffects" :value="effect.value" :label="effect.name" hide-details density="compact" />
         </div>
       </div>
     </div>
@@ -95,19 +157,21 @@ import { loadImageUrls } from '@/utils/characterAssets';
 import defaultImg from '@/assets/img/default.webp';
 import { defaultSelectedEffectValues, effects } from '@/store/searchResult';
 import { matchesAnySelectedEffect } from '@/utils/effectFilter';
+import { localizeCostumeName } from '@/utils/localizedDisplay';
 
 const { t } = useI18n();
 
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const filterdStore = useFilterdStore();
-const { tempSelectedCharacters, tempSelectedRare, tempSelectedType, tempSelectedAttr, tempSelectedEffects ,isFirst } = storeToRefs(filterdStore);
+const { tempSelectedCharacters, tempSelectedRare, tempSelectedType, tempSelectedAttr, tempSelectedEffects, tempCostumeSearch, isFirst } = storeToRefs(filterdStore);
 
 const selectedCharacters = ref<string[]>([]);
 const selectedRare = ref<string[]>([]);
 const selectedType = ref<string[]>([]);
 const selectedAttr = ref<string[]>([]);
 const selectedEffects = ref<string[]>([]);
+const costumeSearch = ref('');
 const emit = defineEmits(['close', 'filter-applied']);
 const displayBlockWidth = ref(0);
 const imgUrlDictionary: Ref<Record<string, string>> = ref({});
@@ -215,6 +279,7 @@ onMounted(async () => {
     if (tempSelectedEffects.value.length > 0) {
       selectedEffects.value = [...tempSelectedEffects.value];
     }
+    costumeSearch.value = tempCostumeSearch.value;
   }
   isFirst.value = false;
 
@@ -229,13 +294,14 @@ onMounted(async () => {
   
   // 埋め込みモードの場合はリアルタイム更新のためのwatcherを設定
   if (props.embedded) {
-    watch([selectedCharacters, selectedRare, selectedType, selectedAttr, selectedEffects], () => {
+    watch([selectedCharacters, selectedRare, selectedType, selectedAttr, selectedEffects, costumeSearch], () => {
       // 選択状態を一時保存エリアに更新
       tempSelectedCharacters.value = [...selectedCharacters.value];
       tempSelectedRare.value = [...selectedRare.value];
       tempSelectedType.value = [...selectedType.value];
       tempSelectedAttr.value = [...selectedAttr.value];
       tempSelectedEffects.value = [...selectedEffects.value];
+      tempCostumeSearch.value = costumeSearch.value || '';
       
       // ユーザーがフィルターを変更したことを記録
       filterdStore.markFilterAsModified();
@@ -259,6 +325,7 @@ function applyFilter() {
   tempSelectedType.value = [...selectedType.value];
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
+  tempCostumeSearch.value = costumeSearch.value || '';
 
   // ユーザーがフィルターを変更したことを記録
   filterdStore.markFilterAsModified();
@@ -282,6 +349,7 @@ function resetFilter() {
   selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
   selectedAttr.value = ['火', '水', '木', '無'];
   selectedEffects.value = [...defaultSelectedEffectValues];
+  costumeSearch.value = '';
 
   // 一時保存エリアも更新
   tempSelectedCharacters.value = [...selectedCharacters.value];
@@ -289,6 +357,7 @@ function resetFilter() {
   tempSelectedType.value = [...selectedType.value];
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
+  tempCostumeSearch.value = '';
 
   // ストアの状態をリセットしlocalStorageからも削除
   filterdStore.resetFilterState();
@@ -322,6 +391,8 @@ const getCharacterItemStyle = (characterName: string) => {
 
 // フィルタリング処理を分離
 function updateCharacterVisibility() {
+  const normalizedCostumeSearch = normalizeSearchText(costumeSearch.value);
+
   characters.value.forEach(character => {
     // レア度チェック
     if (!selectedRareSet.value.has(character.rare)) {
@@ -338,6 +409,17 @@ function updateCharacterVisibility() {
     if (!selectedTypeSet.value.has(character.attr)) {
       character.visible = false;
       return
+    }
+    // 衣装名チェック（日本語の元データと現在の表示言語の名前を対象に部分一致）
+    if (normalizedCostumeSearch) {
+      const costumeNames = [
+        character.costume,
+        localizeCostumeName(character, 'en'),
+      ];
+      if (!costumeNames.some(name => normalizeSearchText(name).includes(normalizedCostumeSearch))) {
+        character.visible = false;
+        return;
+      }
     }
     // 属性チェック
     if ((!selectedAttrSet.value.has(character.magic1atr))
@@ -385,23 +467,12 @@ function toggleSelectAll(groupName: string) {
       // すべてのエフェクトを選択
       selectedEffects.value = localEffects.value.map(effect => effect.value);
     }
-  } else if (groupName === 'cardAttributes') {
-    // カード属性の全選択/解除を処理
-    const allRaresSelected = ['SSR', 'SR', 'R'].every(rare => selectedRareSet.value.has(rare));
-    const allTypesSelected = ['バランス', 'ディフェンス', 'アタック'].every(type => selectedTypeSet.value.has(type));
-    const allAttrsSelected = ['火', '水', '木', '無'].every(attr => selectedAttrSet.value.has(attr));
-
-    if (allRaresSelected && allTypesSelected && allAttrsSelected) {
-      // すべて選択されている場合は解除
-      selectedRare.value = [];
-      selectedType.value = [];
-      selectedAttr.value = [];
-    } else {
-      // すべてのカード属性を選択
-      selectedRare.value = ['SSR', 'SR', 'R'];
-      selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
-      selectedAttr.value = ['火', '水', '木', '無'];
-    }
+  } else if (groupName === 'rarity') {
+    selectedRare.value = isGroupFullySelected('rarity') ? [] : [...rareOptions];
+  } else if (groupName === 'cardType') {
+    selectedType.value = isGroupFullySelected('cardType') ? [] : typeOptions.value.map(type => type.value);
+  } else if (groupName === 'magicAttribute') {
+    selectedAttr.value = isGroupFullySelected('magicAttribute') ? [] : attrOptions.value.map(attr => attr.value);
   } else {
     // キャラクターグループの全選択/解除を処理
     const group: Character[] = filteredCharacterGroups.value[groupName] || [];
@@ -417,16 +488,22 @@ function toggleSelectAll(groupName: string) {
 }
 
 function isGroupFullySelected(groupName: string): boolean {
-  if (groupName === 'cardAttributes') {
-    return rareOptions.every(rare => selectedRareSet.value.has(rare)) &&
-           typeOptions.value.every(type => selectedTypeSet.value.has(type.value)) &&
-          attrOptions.value.every(attr => selectedAttrSet.value.has(attr.value));
+  if (groupName === 'rarity') {
+    return rareOptions.every(rare => selectedRareSet.value.has(rare));
+  } else if (groupName === 'cardType') {
+    return typeOptions.value.every(type => selectedTypeSet.value.has(type.value));
+  } else if (groupName === 'magicAttribute') {
+    return attrOptions.value.every(attr => selectedAttrSet.value.has(attr.value));
   } else if (groupName === 'statusEffects') {
     return localEffects.value.every(effect => selectedEffectsSet.value.has(effect.value));
   }
 
   const group = filteredCharacterGroups.value[groupName] || [];
   return group.every(character => selectedCharactersSet.value.has(character.name_en));
+}
+
+function normalizeSearchText(value: unknown): string {
+  return String(value ?? '').normalize('NFKC').trim().toLocaleLowerCase();
 }
 
 // キャラクター選択の切り替え処理
@@ -673,6 +750,196 @@ function areAllCharactersSelected(): boolean {
   border-top: 1px solid #e0e0e0;
   padding: 10px 0 0;
   z-index: 2;
+}
+
+.card-attribute-groups {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.attribute-group {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  padding: 4px 7px 3px;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.attribute-group-header {
+  display: flex;
+  min-height: 25px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding-left: 2px;
+  color: #3f3f46;
+  font-weight: 600;
+}
+
+.attribute-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.attribute-group-title .v-icon {
+  color: #62666d;
+}
+
+.attribute-group-action,
+.filter-section-action {
+  min-width: 42px !important;
+  height: 23px !important;
+  padding: 0 5px !important;
+  border-radius: 5px;
+  color: #52525b;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  background: #f4f4f5;
+}
+
+.section-heading-row {
+  display: flex;
+  min-height: 25px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #3f3f46;
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.section-title .v-icon {
+  color: #62666d;
+}
+
+.filter-section-surface {
+  box-sizing: border-box;
+  border: 1px solid #e4e4e7;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.character-global-select-container {
+  margin-bottom: 2px;
+  padding: 0 2px;
+}
+
+.character-group-action {
+  flex: 0 0 auto;
+}
+
+.attribute-items {
+  display: grid;
+  align-items: center;
+  align-content: center;
+  gap: 0 2px;
+}
+
+.attribute-group--rarity .attribute-items {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.attribute-group--type .attribute-items {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.attribute-group--attribute .attribute-items {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.attribute-items :deep(.v-selection-control) {
+  min-height: 28px;
+}
+
+.attribute-items :deep(.v-label) {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.attribute-items :deep(.v-selection-control__wrapper) {
+  transform: scale(0.88);
+}
+
+.costume-search-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 520px;
+  margin: 10px 0;
+  padding: 10px 12px;
+}
+
+.costume-search-label {
+  display: inline-flex;
+  flex: 0 0 96px;
+  align-items: center;
+  gap: 7px;
+  color: #444;
+  white-space: nowrap;
+}
+
+.costume-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.costume-search-input :deep(.v-field) {
+  background: #fff;
+}
+
+.modal-background.embedded .costume-search-container {
+  margin: 6px 0;
+  padding: 7px 9px;
+}
+
+.status-effects-section {
+  margin: 8px 0 3px;
+  padding: 5px 9px;
+}
+
+.status-effect-items {
+  gap: 0 4px;
+}
+
+.status-effect-items :deep(.v-selection-control) {
+  min-height: 30px;
+}
+
+.status-effect-items :deep(.v-label) {
+  font-size: 0.84rem;
+}
+
+@media (max-width: 600px) {
+  .card-attribute-groups {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .costume-search-container {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .costume-search-label {
+    flex-basis: auto;
+  }
 }
 
 .button, .apply-button {

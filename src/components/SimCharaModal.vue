@@ -1514,6 +1514,7 @@ const initializeModalFilter = () => {
     filterdStore.tempSelectedType = ['バランス', 'ディフェンス', 'アタック'];
     filterdStore.tempSelectedAttr = ['火', '水', '木', '無'];
     filterdStore.tempSelectedEffects = [...defaultSelectedEffectValues];
+    filterdStore.tempCostumeSearch = '';
     
     // 初回表示フラグをfalseに設定（ただし、保存はしない）
     filterdStore.isFirst = false;
@@ -1526,6 +1527,10 @@ const initializeModalFilter = () => {
   const selectedCharactersSet = new Set(filterdStore.tempSelectedCharacters);
   const selectedEffectsSet = new Set(filterdStore.tempSelectedEffects);
   const allEffectsSelected = defaultSelectedEffectValues.every(effect => selectedEffectsSet.has(effect));
+  const normalizedCostumeSearch = String(filterdStore.tempCostumeSearch || '')
+    .normalize('NFKC')
+    .trim()
+    .toLocaleLowerCase();
   
   // 変更が必要なもののみ更新
   const updatesNeeded = [];
@@ -1542,10 +1547,14 @@ const initializeModalFilter = () => {
       if (characterInfo && selectedCharactersSet.has(characterInfo.name_en)) {
         // タイプチェック
         if (selectedTypeSet.has(character.attr)) {
+          const costumeMatches = !normalizedCostumeSearch || [
+            character.costume,
+            localizeCostumeName(character, 'en'),
+          ].some(name => String(name ?? '').normalize('NFKC').toLocaleLowerCase().includes(normalizedCostumeSearch));
           // 属性チェック
-          if (selectedAttrSet.has(character.magic1atr) ||
+          if (costumeMatches && (selectedAttrSet.has(character.magic1atr) ||
               selectedAttrSet.has(character.magic2atr) ||
-              selectedAttrSet.has(character.magic3atr)) {
+              selectedAttrSet.has(character.magic3atr))) {
           
           // 効果チェック
           if (allEffectsSelected) {

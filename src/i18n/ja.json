@@ -262,6 +262,14 @@
     "text13": "Editボタンは一時的にキャラのステータスを変更したい場合に使用します。変更後に探索を開始するとその値で計算しますが、画面更新すると元の値に戻ります。"
   },
   "filterModal": {
+    "costumeSearch": "衣装名検索",
+    "costumeName": "衣装名",
+    "costumeSearchPlaceholder": "衣装名で絞り込み",
+    "rarity": "レア度",
+    "cardType": "タイプ",
+    "magicAttribute": "属性",
+    "characters": "キャラクター",
+    "statusEffects": "効果",
     "select": "選択",
     "release": "解除",
     "cancel": "キャンセル",

@@ -262,6 +262,14 @@
     "text13": "The Edit button is used when you want to temporarily change a character's stats. After making changes, the calculations will use the new values when starting an exploration, but the original values will be restored upon refreshing the screen."
   },
   "filterModal": {
+    "costumeSearch": "Costume Search",
+    "costumeName": "Costume",
+    "costumeSearchPlaceholder": "Filter by costume name",
+    "rarity": "Rarity",
+    "cardType": "Type",
+    "magicAttribute": "Element",
+    "characters": "Characters",
+    "statusEffects": "Effects",
     "select": "Select",
     "release": "Cancel",
     "cancel": "Cancel",

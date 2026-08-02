@@ -9,6 +9,7 @@ interface FilterState {
   selectedType: string[];
   selectedAttr: string[];
   selectedEffects: string[];
+  costumeSearch: string;
 }
 
 // ソート状態の型定義
@@ -65,6 +66,7 @@ export const useFilterdStore = defineStore('filterd', () => {
   const tempSelectedType = ref<string[]>(savedState?.selectedType || []);
   const tempSelectedAttr = ref<string[]>(savedState?.selectedAttr || []);
   const tempSelectedEffects = ref<string[]>(savedState?.selectedEffects || []);
+  const tempCostumeSearch = ref<string>(savedState?.costumeSearch || '');
   const isFirst = ref(!savedState); // 保存された状態がない場合は初回
   
   // ソート設定
@@ -79,6 +81,7 @@ export const useFilterdStore = defineStore('filterd', () => {
       selectedType: tempSelectedType.value,
       selectedAttr: tempSelectedAttr.value,
       selectedEffects: tempSelectedEffects.value,
+      costumeSearch: tempCostumeSearch.value,
     };
     saveFilterState(state);
   }
@@ -99,6 +102,7 @@ export const useFilterdStore = defineStore('filterd', () => {
     tempSelectedType.value = [];
     tempSelectedAttr.value = [];
     tempSelectedEffects.value = [];
+    tempCostumeSearch.value = '';
     isFirst.value = true;
     
     // セッション状態もリセット
@@ -123,6 +127,7 @@ export const useFilterdStore = defineStore('filterd', () => {
     tempSelectedType,
     tempSelectedAttr,
     tempSelectedEffects,
+    tempCostumeSearch,
     sortBy,
     sortOrder,
     saveCurrentState,
