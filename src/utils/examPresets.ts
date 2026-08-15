@@ -85,6 +85,64 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/08-2水ATK',
+    title: '2026/08-2水ATK',
+    kind: 'ATTACK',
+    enemyElement: '水',
+    enemyHp: 210000,
+    enemies: [
+      {
+        name: 'イデア',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'エペル',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ヴィル',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
+          { name: '相手選択凍結強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'freeze', effectTarget: '相手選択', effectValue: 100, duration: 3 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/08-2火BS',
+    title: '2026/08-2火BS',
+    kind: 'BASIC',
+    enemyElement: '火',
+    enemyHp: 111000,
+    enemies: [
+      {
+        name: 'オルト',
+        actions: [
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '味方選択ATKUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '味方選択', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'カリム',
+        actions: [
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/08-1全BS',
     title: '2026/08-1全BS',
     kind: 'BASIC',
