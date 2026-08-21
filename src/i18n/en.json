@@ -269,7 +269,8 @@
     "cardType": "Type",
     "magicAttribute": "Element",
     "characters": "Characters",
-    "statusEffects": "Effects",
+    "statusEffects": "Magic Effects",
+    "buddyBonusEffects": "2-uncap Buddy Bonus Effects",
     "select": "Select",
     "release": "Cancel",
     "cancel": "Cancel",
@@ -312,6 +313,7 @@
     "flora": "Flora",
     "cosmic": "Cosmic",
     "power_boost": "power boost",
+    "hp_boost": "HP boost",
     "damage_boost": "damage boost",
     "critical": "critical",
     "element_boost": "element boost",
@@ -328,7 +330,9 @@
     "nullifies_freeze": "nullifies freeze",
     "debuff_removal": "debuff removal",
     "curse": "curse",
-    "partywide_2turn_buff": "party-wide 2T"
+    "partywide_2turn_buff": "party-wide 2T",
+    "element_resistence": "elemental damage resistance",
+    "nullifies_burn": "nullifies burn"
   },
   "settingModal": {
     "sortSettings": "Sort settings",

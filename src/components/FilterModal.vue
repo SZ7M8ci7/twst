@@ -131,6 +131,23 @@
         </div>
       </div>
     </div>
+    <!-- 2凸バディボーナス効果セクション -->
+    <div class="status-effects-section filter-section-surface">
+      <div class="section-heading-row">
+        <div class="section-title">
+          <v-icon size="18">mdi-account-multiple-plus-outline</v-icon>
+          <span>{{ t('filterModal.buddyBonusEffects') }}</span>
+        </div>
+        <v-btn class="filter-section-action" size="small" variant="text" @click="toggleSelectAll('buddyBonusEffects')">
+          {{ isGroupFullySelected('buddyBonusEffects') ? t('filterModal.release') : t('filterModal.select') }}
+        </v-btn>
+      </div>
+      <div class="feature-items status-effect-items">
+        <div v-for="effect in localBuddyBonusEffects" :key="effect.value" class="feature-item">
+          <v-checkbox v-model="selectedBuddyBonusEffects" :value="effect.value" :label="effect.name" hide-details density="compact" />
+        </div>
+      </div>
+    </div>
     <!-- ボタンのコンテナ -->
     <div class="button-container" v-if="!embedded">
       <v-btn class="button" @click="$emit('close')">{{ $t('filterModal.cancel') }}</v-btn>
@@ -155,8 +172,13 @@ import { useI18n } from 'vue-i18n';
 import characterData from '@/assets/characters_info.json';
 import { loadImageUrls } from '@/utils/characterAssets';
 import defaultImg from '@/assets/img/default.webp';
-import { defaultSelectedEffectValues, effects } from '@/store/searchResult';
-import { matchesAnySelectedEffect } from '@/utils/effectFilter';
+import {
+  buddyBonusEffects,
+  defaultSelectedBuddyBonusEffectValues,
+  defaultSelectedEffectValues,
+  effects,
+} from '@/store/searchResult';
+import { matchesAnySelectedBuddyBonusEffect, matchesAnySelectedEffect } from '@/utils/effectFilter';
 import { localizeCostumeName } from '@/utils/localizedDisplay';
 
 const { t } = useI18n();
@@ -164,13 +186,23 @@ const { t } = useI18n();
 const characterStore = useCharacterStore();
 const { characters } = storeToRefs(characterStore);
 const filterdStore = useFilterdStore();
-const { tempSelectedCharacters, tempSelectedRare, tempSelectedType, tempSelectedAttr, tempSelectedEffects, tempCostumeSearch, isFirst } = storeToRefs(filterdStore);
+const {
+  tempSelectedCharacters,
+  tempSelectedRare,
+  tempSelectedType,
+  tempSelectedAttr,
+  tempSelectedEffects,
+  tempSelectedBuddyBonusEffects,
+  tempCostumeSearch,
+  isFirst,
+} = storeToRefs(filterdStore);
 
 const selectedCharacters = ref<string[]>([]);
 const selectedRare = ref<string[]>([]);
 const selectedType = ref<string[]>([]);
 const selectedAttr = ref<string[]>([]);
 const selectedEffects = ref<string[]>([]);
+const selectedBuddyBonusEffects = ref<string[]>([]);
 const costumeSearch = ref('');
 const emit = defineEmits(['close', 'filter-applied']);
 const displayBlockWidth = ref(0);
@@ -207,6 +239,11 @@ const attrOptions = computed(() => [
 const localEffects = computed(() => effects.map(effect => ({
   name: t(`filterModal.${effect.name}`),
   value: effect.value
+})));
+
+const localBuddyBonusEffects = computed(() => buddyBonusEffects.map(effect => ({
+  name: t(`filterModal.${effect.name}`),
+  value: effect.value,
 })));
 
 interface Character {
@@ -263,6 +300,7 @@ onMounted(async () => {
     selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
     selectedAttr.value = ['火', '水', '木', '無'];
     selectedEffects.value = [...defaultSelectedEffectValues];
+    selectedBuddyBonusEffects.value = [...defaultSelectedBuddyBonusEffectValues];
   } else {
     if (tempSelectedCharacters.value.length > 0) {
       selectedCharacters.value = [...tempSelectedCharacters.value];
@@ -279,6 +317,7 @@ onMounted(async () => {
     if (tempSelectedEffects.value.length > 0) {
       selectedEffects.value = [...tempSelectedEffects.value];
     }
+    selectedBuddyBonusEffects.value = [...tempSelectedBuddyBonusEffects.value];
     costumeSearch.value = tempCostumeSearch.value;
   }
   isFirst.value = false;
@@ -294,13 +333,14 @@ onMounted(async () => {
   
   // 埋め込みモードの場合はリアルタイム更新のためのwatcherを設定
   if (props.embedded) {
-    watch([selectedCharacters, selectedRare, selectedType, selectedAttr, selectedEffects, costumeSearch], () => {
+    watch([selectedCharacters, selectedRare, selectedType, selectedAttr, selectedEffects, selectedBuddyBonusEffects, costumeSearch], () => {
       // 選択状態を一時保存エリアに更新
       tempSelectedCharacters.value = [...selectedCharacters.value];
       tempSelectedRare.value = [...selectedRare.value];
       tempSelectedType.value = [...selectedType.value];
       tempSelectedAttr.value = [...selectedAttr.value];
       tempSelectedEffects.value = [...selectedEffects.value];
+      tempSelectedBuddyBonusEffects.value = [...selectedBuddyBonusEffects.value];
       tempCostumeSearch.value = costumeSearch.value || '';
       
       // ユーザーがフィルターを変更したことを記録
@@ -325,6 +365,7 @@ function applyFilter() {
   tempSelectedType.value = [...selectedType.value];
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
+  tempSelectedBuddyBonusEffects.value = [...selectedBuddyBonusEffects.value];
   tempCostumeSearch.value = costumeSearch.value || '';
 
   // ユーザーがフィルターを変更したことを記録
@@ -349,6 +390,7 @@ function resetFilter() {
   selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
   selectedAttr.value = ['火', '水', '木', '無'];
   selectedEffects.value = [...defaultSelectedEffectValues];
+  selectedBuddyBonusEffects.value = [...defaultSelectedBuddyBonusEffectValues];
   costumeSearch.value = '';
 
   // 一時保存エリアも更新
@@ -357,6 +399,7 @@ function resetFilter() {
   tempSelectedType.value = [...selectedType.value];
   tempSelectedAttr.value = [...selectedAttr.value];
   tempSelectedEffects.value = [...selectedEffects.value];
+  tempSelectedBuddyBonusEffects.value = [...selectedBuddyBonusEffects.value];
   tempCostumeSearch.value = '';
 
   // ストアの状態をリセットしlocalStorageからも削除
@@ -373,6 +416,10 @@ const selectedTypeSet = computed(() => new Set(selectedType.value));
 const selectedAttrSet = computed(() => new Set(selectedAttr.value));
 const selectedEffectsSet = computed(() => new Set(selectedEffects.value));
 const allEffectsSelected = computed(() => localEffects.value.every(effect => selectedEffectsSet.value.has(effect.value)));
+const selectedBuddyBonusEffectsSet = computed(() => new Set(selectedBuddyBonusEffects.value));
+const allBuddyBonusEffectsSelected = computed(() =>
+  localBuddyBonusEffects.value.every(effect => selectedBuddyBonusEffectsSet.value.has(effect.value))
+);
 
 // 全キャラクター配列 - computed property化（画像があるもののみ）
 const allCharacterNames = computed(() => 
@@ -447,6 +494,15 @@ function updateCharacterVisibility() {
         character.visible = true;
       }
     }
+
+    // 2凸時のバディボーナス効果チェック（魔法効果とは独立したAND条件）
+    if (allBuddyBonusEffectsSelected.value) {
+      return;
+    }
+    if (selectedBuddyBonusEffects.value.length === 0 ||
+        !matchesAnySelectedBuddyBonusEffect(character, selectedBuddyBonusEffects.value)) {
+      character.visible = false;
+    }
   });
 }
 
@@ -467,6 +523,10 @@ function toggleSelectAll(groupName: string) {
       // すべてのエフェクトを選択
       selectedEffects.value = localEffects.value.map(effect => effect.value);
     }
+  } else if (groupName === 'buddyBonusEffects') {
+    selectedBuddyBonusEffects.value = isGroupFullySelected('buddyBonusEffects')
+      ? []
+      : localBuddyBonusEffects.value.map(effect => effect.value);
   } else if (groupName === 'rarity') {
     selectedRare.value = isGroupFullySelected('rarity') ? [] : [...rareOptions];
   } else if (groupName === 'cardType') {
@@ -496,6 +556,8 @@ function isGroupFullySelected(groupName: string): boolean {
     return attrOptions.value.every(attr => selectedAttrSet.value.has(attr.value));
   } else if (groupName === 'statusEffects') {
     return localEffects.value.every(effect => selectedEffectsSet.value.has(effect.value));
+  } else if (groupName === 'buddyBonusEffects') {
+    return localBuddyBonusEffects.value.every(effect => selectedBuddyBonusEffectsSet.value.has(effect.value));
   }
 
   const group = filteredCharacterGroups.value[groupName] || [];

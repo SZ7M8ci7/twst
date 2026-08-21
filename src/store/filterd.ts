@@ -9,6 +9,7 @@ interface FilterState {
   selectedType: string[];
   selectedAttr: string[];
   selectedEffects: string[];
+  selectedBuddyBonusEffects: string[];
   costumeSearch: string;
 }
 
@@ -66,6 +67,7 @@ export const useFilterdStore = defineStore('filterd', () => {
   const tempSelectedType = ref<string[]>(savedState?.selectedType || []);
   const tempSelectedAttr = ref<string[]>(savedState?.selectedAttr || []);
   const tempSelectedEffects = ref<string[]>(savedState?.selectedEffects || []);
+  const tempSelectedBuddyBonusEffects = ref<string[]>(savedState?.selectedBuddyBonusEffects || []);
   const tempCostumeSearch = ref<string>(savedState?.costumeSearch || '');
   const isFirst = ref(!savedState); // 保存された状態がない場合は初回
   
@@ -81,6 +83,7 @@ export const useFilterdStore = defineStore('filterd', () => {
       selectedType: tempSelectedType.value,
       selectedAttr: tempSelectedAttr.value,
       selectedEffects: tempSelectedEffects.value,
+      selectedBuddyBonusEffects: tempSelectedBuddyBonusEffects.value,
       costumeSearch: tempCostumeSearch.value,
     };
     saveFilterState(state);
@@ -102,6 +105,7 @@ export const useFilterdStore = defineStore('filterd', () => {
     tempSelectedType.value = [];
     tempSelectedAttr.value = [];
     tempSelectedEffects.value = [];
+    tempSelectedBuddyBonusEffects.value = [];
     tempCostumeSearch.value = '';
     isFirst.value = true;
     
@@ -127,6 +131,7 @@ export const useFilterdStore = defineStore('filterd', () => {
     tempSelectedType,
     tempSelectedAttr,
     tempSelectedEffects,
+    tempSelectedBuddyBonusEffects,
     tempCostumeSearch,
     sortBy,
     sortOrder,

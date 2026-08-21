@@ -180,8 +180,8 @@ import charactersInfo from '@/assets/characters_info.json';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getDamageValueFromDetails, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
 import { normalizeLegacyDeckBuffs, parseMagicBuffsFromEtc } from '@/utils/buffParser';
-import { matchesSelectedEffect } from '@/utils/effectFilter';
-import { defaultSelectedEffectValues } from '@/store/searchResult';
+import { matchesAnySelectedBuddyBonusEffect, matchesSelectedEffect } from '@/utils/effectFilter';
+import { defaultSelectedBuddyBonusEffectValues, defaultSelectedEffectValues } from '@/store/searchResult';
 import {
   localizeCharacterName,
   localizeGameText,
@@ -1514,6 +1514,7 @@ const initializeModalFilter = () => {
     filterdStore.tempSelectedType = ['バランス', 'ディフェンス', 'アタック'];
     filterdStore.tempSelectedAttr = ['火', '水', '木', '無'];
     filterdStore.tempSelectedEffects = [...defaultSelectedEffectValues];
+    filterdStore.tempSelectedBuddyBonusEffects = [...defaultSelectedBuddyBonusEffectValues];
     filterdStore.tempCostumeSearch = '';
     
     // 初回表示フラグをfalseに設定（ただし、保存はしない）
@@ -1527,6 +1528,10 @@ const initializeModalFilter = () => {
   const selectedCharactersSet = new Set(filterdStore.tempSelectedCharacters);
   const selectedEffectsSet = new Set(filterdStore.tempSelectedEffects);
   const allEffectsSelected = defaultSelectedEffectValues.every(effect => selectedEffectsSet.has(effect));
+  const selectedBuddyBonusEffectsSet = new Set(filterdStore.tempSelectedBuddyBonusEffects);
+  const allBuddyBonusEffectsSelected = defaultSelectedBuddyBonusEffectValues.every(
+    effect => selectedBuddyBonusEffectsSet.has(effect)
+  );
   const normalizedCostumeSearch = String(filterdStore.tempCostumeSearch || '')
     .normalize('NFKC')
     .trim()
@@ -1566,6 +1571,11 @@ const initializeModalFilter = () => {
                 break;
               }
             }
+          }
+
+          if (shouldBeVisible && !allBuddyBonusEffectsSelected) {
+            shouldBeVisible = filterdStore.tempSelectedBuddyBonusEffects.length > 0 &&
+              matchesAnySelectedBuddyBonusEffect(character, filterdStore.tempSelectedBuddyBonusEffects);
           }
           }
         }

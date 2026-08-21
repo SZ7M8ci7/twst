@@ -27,6 +27,25 @@ export const effects = [
 
 export const defaultSelectedEffectValues = effects.map(effect => effect.value);
 
+// 2凸時に発動するバディボーナスで絞り込むための効果一覧
+export const buddyBonusEffects = [
+  { name: 'hp_boost', value: 'HPUP' },
+  { name: 'power_boost', value: 'ATKUP' },
+  { name: 'damage_boost', value: 'ダメージUP' },
+  { name: 'critical', value: 'クリティカル' },
+  { name: 'element_boost', value: '属性ダメージUP' },
+  { name: 'evasion', value: '回避' },
+  { name: 'element_resistence', value: '属性被ダメージDOWN' },
+  { name: 'resistence', value: '被ダメージDOWN' },
+  { name: 'hp_regen', value: 'HP継続回復' },
+  { name: 'nullifies_blind', value: '暗闇無効' },
+  { name: 'nullifies_curse', value: '呪い無効' },
+  { name: 'nullifies_freeze', value: '凍結無効' },
+  { name: 'nullifies_burn', value: 'やけど無効' },
+];
+
+export const defaultSelectedBuddyBonusEffectValues = buddyBonusEffects.map(effect => effect.value);
+
 // types/searchSettingsTypes.ts
 export interface result {
   totalHP: number;

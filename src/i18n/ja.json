@@ -269,7 +269,8 @@
     "cardType": "タイプ",
     "magicAttribute": "属性",
     "characters": "キャラクター",
-    "statusEffects": "効果",
+    "statusEffects": "魔法効果",
+    "buddyBonusEffects": "2凸バディボーナス効果",
     "select": "選択",
     "release": "解除",
     "cancel": "キャンセル",
@@ -312,6 +313,7 @@
     "flora": "木",
     "cosmic": "無",
     "power_boost": "ATKUP",
+    "hp_boost": "HPUP",
     "damage_boost": "ダメージUP",
     "critical": "クリティカル",
     "element_boost": "属性ダメージUP",
@@ -328,7 +330,9 @@
     "nullifies_freeze": "凍結無効",
     "debuff_removal": "デバフ解除",
     "curse": "呪い",
-    "partywide_2turn_buff": "味方全体2T"
+    "partywide_2turn_buff": "味方全体2T",
+    "element_resistence": "属性被ダメージDOWN",
+    "nullifies_burn": "やけど無効"
   },
   "settingModal": {
     "sortSettings": "ソート設定",

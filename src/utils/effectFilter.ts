@@ -53,3 +53,37 @@ export function matchesAnySelectedEffect(etcRaw: string, effects: string[]): boo
   }
   return false;
 }
+
+export function matchesSelectedBuddyBonusEffect(buddyStatus: string, effect: string): boolean {
+  if (effect === 'HPUP') {
+    return buddyStatus.includes('HPUP') || buddyStatus.includes('HP&ATKUP');
+  }
+  if (effect === '被ダメージDOWN') {
+    return buddyStatus.split('&').some(status => status.startsWith('被ダメージDOWN'));
+  }
+  return buddyStatus.includes(effect);
+}
+
+export function matchesAnySelectedBuddyBonusEffect(
+  character: {
+    rare?: string;
+    buddy1s_totsu?: string;
+    buddy2s_totsu?: string;
+    buddy3s_totsu?: string;
+  },
+  effects: string[],
+): boolean {
+  if (character.rare !== 'SSR') {
+    return false;
+  }
+
+  const buddyStatuses = [
+    character.buddy1s_totsu || '',
+    character.buddy2s_totsu || '',
+    character.buddy3s_totsu || '',
+  ];
+
+  return effects.some(effect =>
+    buddyStatuses.some(status => matchesSelectedBuddyBonusEffect(status, effect))
+  );
+}
