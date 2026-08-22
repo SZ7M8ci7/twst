@@ -5478,7 +5478,9 @@ function calculatePlayerDamageBaseFromState(
       dmgBuffTotal += safeNumber(dmgbuffDict[`${prefix}(${powerType})${buffLevel}`]);
       continue;
     }
-    if (buffType === 'クリティカル') criticalChance = Math.max(criticalChance, criticalChanceFromPower(powerType));
+    if (buffType === 'クリティカル') {
+      criticalChance = Math.min(1, criticalChance + criticalChanceFromPower(powerType));
+    }
   }
 
   const baseAtk = runtimeAtk + atkBuffTotal + buddyAtk;
