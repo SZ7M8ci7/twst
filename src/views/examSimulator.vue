@@ -757,6 +757,7 @@ import { getPowerOption, processCharacterSelection } from '@/utils/characterSele
 import { applyBuddyGeneratedBuffOverrides, createBuddyGeneratedBuffs, getBuddyAtkRate, getBuddyStatusForCharacter, splitBuddyEffects } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
 import { examPresetDefinitions, type ExamPresetDefinition, type ExamSpecialChallengeDefinition, type ExamSpecialChallengeEffect } from '@/utils/examPresets';
+import { buildConstrainedEnemyActionDeck } from '@/utils/enemyActionDeck';
 import { loadExamSimulatorDeckImportState } from '@/storage/simulatorStorage';
 import {
   loadSavedExamSimulatorSettings,
@@ -831,6 +832,8 @@ interface EnemyActionDefinition {
   effectAttribute?: ActionElement;
   effectValue: number;
   duration: number;
+  fixedOrder?: number;
+  preferFirstDuplicate?: boolean;
 }
 
 interface EnemySlotDefinition {
@@ -1006,6 +1009,7 @@ interface AutoBestWorkerSnapshot {
   enemySlots: EnemySlotDefinition[];
   deck: DeckSlot[];
   selectedSpecialChallengeIds: string[];
+  activeExamPresetId: string;
 }
 interface AutoBestWorkerProgress {
   exploredNodes: number;
@@ -2124,6 +2128,8 @@ function createEnemyAction(partial: Partial<EnemyActionDefinition> = {}): EnemyA
     effectAttribute: partial.effectAttribute,
     effectValue: partial.effectValue ?? 0,
     duration: partial.duration ?? 1,
+    fixedOrder: partial.fixedOrder,
+    preferFirstDuplicate: partial.preferFirstDuplicate,
   };
 }
 
@@ -3799,6 +3805,7 @@ async function runAutoBestSimulation(count: number, resultGeneration: number) {
     enemySlots: enemySlots.value,
     deck: deck.value,
     selectedSpecialChallengeIds: selectedSpecialChallengeIds.value,
+    activeExamPresetId: activeExamPresetId.value,
   });
   if (snapshotJson !== autoBestSnapshotKey) {
     autoBestSnapshotKey = snapshotJson;
@@ -4082,6 +4089,7 @@ async function runAutoBestWorkerPartition(
     enemySlots.value = markRaw(snapshot.enemySlots);
     deck.value = markRaw(snapshot.deck);
     selectedSpecialChallengeIds.value = markRaw(snapshot.selectedSpecialChallengeIds);
+    activeExamPresetId.value = snapshot.activeExamPresetId;
     simulationRuntimeCache = createSimulationRuntimeCache();
   } else if (!simulationRuntimeCache) {
     throw new Error('自動最善Workerが初期化されていません。');
@@ -4762,6 +4770,11 @@ function applySpecialChallengeEffect(effect: ExamSpecialChallengeEffect, state: 
       break;
     case 'enemyContinueHeal':
       appendState(state, 'enemyContinueHeals', { amount: ceilDamage(value), turns: duration, source: '特別課題' });
+      break;
+    case 'playerAttackDown':
+      specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
+        appendState(state, 'playerAttackDowns', { cardIndex, rate: value || 20, turns: duration, attributeOption: effect.attribute });
+      });
       break;
     case 'playerDamageDown':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
@@ -6446,6 +6459,9 @@ function buildEnemyActionDeck(rng: () => number, requiredActions: number) {
 }
 
 function buildFiveTurnEnemyDeck(perSlot: RuntimeEnemyAction[][], allActions: RuntimeEnemyAction[], rng: () => number) {
+  const constrainedDeck = buildConstrainedEnemyActionDeck(allActions, rng);
+  if (constrainedDeck) return constrainedDeck;
+
   let selected: RuntimeEnemyAction[] = [];
   if (perSlot.length === 3 && allActions.length === 9) {
     selected = [...allActions, pickRandom(allActions, rng)];

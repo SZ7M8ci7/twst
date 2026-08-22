@@ -32,6 +32,8 @@ export interface ExamPresetEnemyAction {
   effectAttribute?: ExamPresetActionElement;
   effectValue?: number;
   duration?: number;
+  fixedOrder?: number;
+  preferFirstDuplicate?: boolean;
 }
 
 export interface ExamPresetEnemy {
@@ -48,6 +50,7 @@ export type ExamSpecialChallengeEffectKind =
   | 'enemyEvasion'
   | 'enemyCritical'
   | 'enemyContinueHeal'
+  | 'playerAttackDown'
   | 'playerDamageDown'
   | 'playerDamageTakenUp'
   | 'playerBlind'
@@ -463,6 +466,234 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
           { name: '味方選択ATKUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '味方選択', effectValue: 32, duration: 1 },
         ],
       },
+    ],
+  },
+  {
+    id: '第18回統一火DF',
+    title: '第18回統一火DF',
+    kind: 'DEFENCE',
+    enemyElement: '火',
+    enemyHp: 96000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'ヴィル',
+        actions: [
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 16162, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 12244 },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 7108, effectKind: 'damageUp', effectTarget: '自', effectValue: 4.5, duration: 3 },
+        ],
+      },
+      {
+        name: 'ルーク',
+        actions: [
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 12560, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 9515 },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 5524, effectKind: 'damageUp', effectTarget: '自', effectValue: 4.5, duration: 3 },
+        ],
+      },
+      {
+        name: 'エペル',
+        actions: [
+          { name: '味方選択ATKUP強単発', element: '火', power: '単発(強)', estimatedDamage: 11558, effectKind: 'atkUp', effectTarget: '味方選択', effectValue: 30.5, duration: 1 },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 9211, effectKind: 'damageUp', effectTarget: '自', effectValue: 4, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 15943 },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'player-curse-5t', rank: 3, label: '味方が呪い(5T)', score: 9000, effects: [{ kind: 'playerCurse', duration: 5 }] },
+      { id: 'enemy-atk-up-3t-35', rank: 2, label: '相手がATKUP(3T/35%)', score: 4000, effects: [{ kind: 'enemyAttackUp', value: 35, duration: 3 }] },
+      { id: 'enemy-damage-reduction-3t-10_5', rank: 2, label: '相手が被ダメDOWN(3T/10.5%)', score: 2500, effects: [{ kind: 'enemyDamageReduction', value: 10.5, duration: 3 }] },
+      { id: 'enemy-evasion-2t-7_4', rank: 1, label: '相手が回避(2T/7.4%)', score: 500, effects: [{ kind: 'enemyEvasion', value: 7.4, duration: 2 }] },
+      { id: 'player-damage-taken-up-2t-4_3', rank: 1, label: '味方が被ダメUP(2T/4.3%)', score: 500, effects: [{ kind: 'playerDamageTakenUp', value: 4.3, duration: 2 }] },
+      { id: 'enemy-continue-heal-2t-4799', rank: 1, label: '相手がHP継続回復(2T/4799×2)', score: 500, effects: [{ kind: 'enemyContinueHeal', value: 4799, duration: 2 }] },
+    ],
+  },
+  {
+    id: '第18回統一水ATK',
+    title: '第18回統一水ATK',
+    kind: 'ATTACK',
+    enemyElement: '水',
+    enemyHp: 208000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'イデア',
+        actions: [
+          { name: '相手選択バフ解除強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'buffRemoval', effectTarget: '相手選択', duration: 1, fixedOrder: 6 },
+          { name: '相手選択バフ解除弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'buffRemoval', effectTarget: '相手選択', duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'オルト',
+        actions: [
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1, preferFirstDuplicate: true },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, preferFirstDuplicate: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3, preferFirstDuplicate: true },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'player-freeze-10t', rank: 3, label: '味方が凍結(10T)', score: 8500, effects: [{ kind: 'playerFreeze', duration: 10 }] },
+      { id: 'enemy-atk-up-5t-32', rank: 2, label: '相手がATKUP(5T/32%)', score: 3000, effects: [{ kind: 'enemyAttackUp', value: 32, duration: 5 }] },
+      { id: 'player-burn-5t-5', rank: 2, label: '味方がやけど(5T/5%)', score: 3500, effects: [{ kind: 'playerBurn', value: 5, duration: 5 }] },
+      { id: 'player-damage-down-2t-4_5', rank: 1, label: '味方がダメDOWN(2T/4.5%)', score: 400, effects: [{ kind: 'playerDamageDown', value: 4.5, duration: 2 }] },
+      { id: 'enemy-hp-up-239199', rank: 1, label: '相手がHPUP(239199)', score: 300, effects: [{ kind: 'enemyMaxHp', value: 239199 }] },
+      { id: 'player-damage-taken-up-2t-8_75', rank: 1, label: '味方が被ダメUP(2T/8.75%)', score: 300, effects: [{ kind: 'playerDamageTakenUp', value: 8.75, duration: 2 }] },
+    ],
+  },
+  {
+    id: '第18回統一木BS',
+    title: '第18回統一木BS',
+    kind: 'BASIC',
+    enemyElement: '木',
+    enemyHp: 115000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'アズール',
+        actions: [
+          { name: 'ATKDOWN強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+        ],
+      },
+      {
+        name: 'ジェイド',
+        actions: [
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'フロイド',
+        actions: [
+          { name: 'ダメUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
+          { name: '相手選択ATKDOWN強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手選択', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'enemy-atk-up-5t-32', rank: 3, label: '相手がATKUP(5T/32%)', score: 8500, effects: [{ kind: 'enemyAttackUp', value: 32, duration: 5 }] },
+      { id: 'enemy-damage-reduction-3t-10', rank: 2, label: '相手が被ダメDOWN(3T/10%)', score: 3000, effects: [{ kind: 'enemyDamageReduction', value: 10, duration: 3 }] },
+      { id: 'enemy-fire-damage-reduction-3t-13_8', rank: 2, label: '相手が火属性被ダメDOWN(3T/13.8%)', score: 3500, effects: [{ kind: 'enemyDamageReduction', value: 13.8, duration: 3, attribute: '火' }] },
+      { id: 'player-blind-2t-10_8', rank: 1, label: '味方が暗闇(2T/10.8%)', score: 500, effects: [{ kind: 'playerBlind', value: 10.8, duration: 2 }] },
+      { id: 'player-atk-down-2t-20', rank: 1, label: '味方がATKDOWN(2T/20%)', score: 800, effects: [{ kind: 'playerAttackDown', value: 20, duration: 2 }] },
+      { id: 'enemy-critical-2t-9_55', rank: 1, label: '相手がクリティカル(2T/9.55%)', score: 500, effects: [{ kind: 'enemyCritical', value: 9.55, duration: 2 }] },
+    ],
+  },
+  {
+    id: '第18回統一無ATK',
+    title: '第18回統一無ATK',
+    kind: 'ATTACK',
+    enemyElement: '無',
+    enemyHp: 170000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'マレウス',
+        actions: [
+          { name: 'ATKUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 21.5, duration: 1 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+        ],
+      },
+      {
+        name: 'リリア',
+        actions: [
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ATKUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 21.5, duration: 1 },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+        ],
+      },
+      {
+        name: 'シルバー',
+        actions: [
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+        ],
+      },
+      {
+        name: 'セベク',
+        actions: [
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'non-diasomnia-damage-down-10t-20_5', rank: 3, label: 'ディアソ以外にダメDOWN(10T/20.5%)', score: 8500, effects: [{ kind: 'playerDamageDown', value: 20.5, duration: 10, dorm: 'ディアソムニア', dormMode: 'exclude' }] },
+      { id: 'enemy-critical-5t-9_55', rank: 2, label: '相手がクリティカル(5T/9.55%)', score: 3000, effects: [{ kind: 'enemyCritical', value: 9.55, duration: 5 }] },
+      { id: 'enemy-cosmic-damage-up-5t-5', rank: 2, label: '相手が無属性ダメUP(5T/5%)', score: 3000, effects: [{ kind: 'enemyDamageUp', value: 5, duration: 5, attribute: '無' }] },
+      { id: 'enemy-fire-damage-null-2t', rank: 1, label: '相手が火属性ダメ無効(2T)', score: 500, effects: [{ kind: 'enemyDamageNull', duration: 2, attribute: '火' }] },
+      { id: 'enemy-water-damage-null-2t', rank: 1, label: '相手が水属性ダメ無効(2T)', score: 500, effects: [{ kind: 'enemyDamageNull', duration: 2, attribute: '水' }] },
+      { id: 'enemy-flora-damage-null-2t', rank: 1, label: '相手が木属性ダメ無効(2T)', score: 500, effects: [{ kind: 'enemyDamageNull', duration: 2, attribute: '木' }] },
+    ],
+  },
+  {
+    id: '第18回統一全BS',
+    title: '第18回統一全BS',
+    kind: 'BASIC',
+    enemyElement: '全',
+    enemyHp: 117000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'リドル',
+        actions: [
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無ダメUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
+          { name: '無相手選択凍結強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'freeze', effectTarget: '相手選択', effectValue: 100, duration: 3 },
+        ],
+      },
+      {
+        name: 'トレイ',
+        actions: [
+          { name: '火強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '火ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '火ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ケイト',
+        actions: [
+          { name: '水ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '水強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '水相手選択バフ解除弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'buffRemoval', effectTarget: '相手選択', duration: 1 },
+        ],
+      },
+      {
+        name: 'エース',
+        actions: [
+          { name: '木強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '木ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '木ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+        ],
+      },
+      {
+        name: 'デュース',
+        actions: [
+          { name: '火強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '火ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '無ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'enemy-critical-5t-9_55', rank: 3, label: '相手がクリティカル(5T/9.55%)', score: 8000, effects: [{ kind: 'enemyCritical', value: 9.55, duration: 5 }] },
+      { id: 'player-blind-3t-10_8', rank: 2, label: '味方が暗闇(3T/10.8%)', score: 4000, effects: [{ kind: 'playerBlind', value: 10.8, duration: 3 }] },
+      { id: 'non-heartslabyul-atk-down-3t-30', rank: 2, label: 'ハーツ以外にATKDOWN(3T/30%)', score: 4000, effects: [{ kind: 'playerAttackDown', value: 30, duration: 3, dorm: 'ハーツラビュル', dormMode: 'exclude' }] },
+      { id: 'player-damage-taken-up-2t-8_75', rank: 1, label: '味方が被ダメUP(2T/8.75%)', score: 300, effects: [{ kind: 'playerDamageTakenUp', value: 8.75, duration: 2 }] },
+      { id: 'enemy-atk-up-2t-32', rank: 1, label: '相手がATKUP(2T/32%)', score: 400, effects: [{ kind: 'enemyAttackUp', value: 32, duration: 2 }] },
+      { id: 'enemy-cosmic-damage-null-2t', rank: 1, label: '相手が無属性ダメ無効(2T)', score: 500, effects: [{ kind: 'enemyDamageNull', duration: 2, attribute: '無' }] },
     ],
   },
   {
