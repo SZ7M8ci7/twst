@@ -4788,30 +4788,22 @@ function applySpecialChallengeEffect(effect: ExamSpecialChallengeEffect, state: 
       break;
     case 'playerBlind':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
-        if (!isPlayerImmune(state, cardIndex, 'blind')) {
-          appendState(state, 'playerBlinds', { cardIndex, rate: value || blindRatePowerScale.中, turns: duration });
-        }
+        appendState(state, 'playerBlinds', { cardIndex, rate: value || blindRatePowerScale.中, turns: duration });
       });
       break;
     case 'playerBurn':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
-        if (!isPlayerImmune(state, cardIndex, 'burn')) {
-          appendState(state, 'burns', { cardIndex, rate: value || 16, turns: duration });
-        }
+        appendState(state, 'burns', { cardIndex, rate: value || 16, turns: duration });
       });
       break;
     case 'playerCurse':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
-        if (!isPlayerImmune(state, cardIndex, 'curse')) {
-          appendState(state, 'playerCurses', { cardIndex, rate: 100, turns: duration });
-        }
+        appendState(state, 'playerCurses', { cardIndex, rate: 100, turns: duration });
       });
       break;
     case 'playerFreeze':
       specialChallengeTargetCardIndices(effect).forEach((cardIndex) => {
-        if (!isPlayerImmune(state, cardIndex, 'freeze')) {
-          appendState(state, 'playerFreezes', { cardIndex, rate: 100, turns: duration });
-        }
+        appendState(state, 'playerFreezes', { cardIndex, rate: 100, turns: duration });
       });
       break;
     default:
@@ -5035,7 +5027,6 @@ function isFreezeBlockedPlayerSideEffect(buff: ParsedBuff) {
     'ガッツ',
     '暗闇無効',
     '呪い無効',
-    '凍結無効',
     'やけど無効',
   ].includes(buff.buffOption);
 }
@@ -5993,9 +5984,6 @@ function applyEnemyAdditionalEffects(
       break;
     case 'blind':
       targetCards.forEach((targetCardIndex) => {
-        if (isPlayerImmune(state, targetCardIndex, 'blind')) {
-          return;
-        }
         appendState(state, 'playerBlinds', { cardIndex: targetCardIndex, rate: value || 21.6, turns: duration });
       });
       break;
@@ -6008,9 +5996,6 @@ function applyEnemyAdditionalEffects(
       break;
     case 'burn':
       targetCards.forEach((targetCardIndex) => {
-        if (isPlayerImmune(state, targetCardIndex, 'burn')) {
-          return;
-        }
         appendState(state, 'burns', { cardIndex: targetCardIndex, rate: value || 16, turns: duration });
       });
       break;
@@ -6038,17 +6023,11 @@ function applyEnemyAdditionalEffects(
       break;
     case 'curse':
       targetCards.forEach((targetCardIndex) => {
-        if (isPlayerImmune(state, targetCardIndex, 'curse')) {
-          return;
-        }
         appendState(state, 'playerCurses', { cardIndex: targetCardIndex, rate: 100, turns: duration });
       });
       break;
     case 'freeze':
       targetCards.forEach((targetCardIndex) => {
-        if (isPlayerImmune(state, targetCardIndex, 'freeze')) {
-          return;
-        }
         const rate = value || 100;
         const roll = rng();
         const success = roll < Math.min(1, Math.max(0, rate) / 100);
