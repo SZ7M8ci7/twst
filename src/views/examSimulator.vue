@@ -2364,7 +2364,7 @@ async function restoreDeckFromSimulatorImport() {
 
   const characterStore = useCharacterStore();
   deck.value = await Promise.all(Array.from({ length: 5 }, (_, index) => (
-    createDeckSlotFromSimulatorCharacter(importState.deckCharacters[index], characterStore)
+    createDeckSlotFromBaseCharacter(importState.deckCharacters[index], characterStore)
   )));
   syncAllDeckLevelInputs();
   editingDeckDetailCharacter.value = null;
@@ -2374,6 +2374,30 @@ async function restoreDeckFromSimulatorImport() {
   resetDefaultCombos();
   normalizeTurnCombosForAvailableMagic();
   clearResults();
+}
+
+async function createDeckSlotFromBaseCharacter(
+  importedCharacter: any,
+  characterStore: ReturnType<typeof useCharacterStore>,
+): Promise<DeckSlot> {
+  if (!importedCharacter?.id && !importedCharacter?.name) return createEmptyDeckSlot();
+
+  // 受信側でも引き継ぎ値を信用せず、カード原本をキーから引き直す。
+  // これにより旧形式の保存済み引き継ぎデータに能力値や編集済みバフが
+  // 含まれていても、試験シミュレータへ混入しない。
+  const original = (
+    importedCharacter.id
+      ? characterStore.characters.find((candidate: Character) => candidate.id === importedCharacter.id)
+      : undefined
+  ) ?? (
+    importedCharacter.name
+      ? characterStore.characters.find((candidate: Character) => candidate.name === importedCharacter.name)
+      : undefined
+  );
+  if (!original) return createEmptyDeckSlot();
+
+  const baseCharacter = await processCharacterSelection({ ...original }, undefined, true) as Character;
+  return createDeckSlotFromSimulatorCharacter(baseCharacter, characterStore);
 }
 
 async function createDeckSlotFromSimulatorCharacter(
