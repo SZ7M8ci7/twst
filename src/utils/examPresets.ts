@@ -521,28 +521,28 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
       {
         name: 'イデア',
         actions: [
-          { name: '相手選択バフ解除強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'buffRemoval', effectTarget: '相手選択', duration: 1, fixedOrder: 6 },
-          { name: '相手選択バフ解除弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'buffRemoval', effectTarget: '相手選択', duration: 1 },
-          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
-          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '相手選択バフ解除強単発', element: '水', power: '単発(強)', estimatedDamage: 3683, effectKind: 'buffRemoval', effectTarget: '相手選択', duration: 1, fixedOrder: 6 },
+          { name: '相手選択バフ解除弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 4972, effectKind: 'buffRemoval', effectTarget: '相手選択', duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 6629 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 8850, effectKind: 'atkUp', effectTarget: '自', effectValue: 33.5, duration: 1 },
         ],
       },
       {
         name: 'オルト',
         actions: [
-          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1, preferFirstDuplicate: true },
-          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, preferFirstDuplicate: true },
-          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3, preferFirstDuplicate: true },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7313, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1, preferFirstDuplicate: true },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 5540, preferFirstDuplicate: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 3244, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.4, duration: 3, preferFirstDuplicate: true },
         ],
       },
     ],
     specialChallenges: [
       { id: 'player-freeze-10t', rank: 3, label: '味方が凍結(10T)', score: 8500, effects: [{ kind: 'playerFreeze', duration: 10 }] },
-      { id: 'enemy-atk-up-5t-32', rank: 2, label: '相手がATKUP(5T/32%)', score: 3000, effects: [{ kind: 'enemyAttackUp', value: 32, duration: 5 }] },
+      { id: 'enemy-atk-up-5t-40', rank: 2, label: '相手がATKUP(5T/40%)', score: 3000, effects: [{ kind: 'enemyAttackUp', value: 40, duration: 5 }] },
       { id: 'player-burn-5t-5', rank: 2, label: '味方がやけど(5T/5%)', score: 3500, effects: [{ kind: 'playerBurn', value: 5, duration: 5 }] },
       { id: 'player-damage-down-2t-4_5', rank: 1, label: '味方がダメDOWN(2T/4.5%)', score: 400, effects: [{ kind: 'playerDamageDown', value: 4.5, duration: 2 }] },
       { id: 'enemy-hp-up-239199', rank: 1, label: '相手がHPUP(239199)', score: 300, effects: [{ kind: 'enemyMaxHp', value: 239199 }] },
-      { id: 'player-damage-taken-up-2t-8_75', rank: 1, label: '味方が被ダメUP(2T/8.75%)', score: 300, effects: [{ kind: 'playerDamageTakenUp', value: 8.75, duration: 2 }] },
+      { id: 'player-damage-taken-up-2t-4', rank: 1, label: '味方が被ダメUP(2T/4%)', score: 300, effects: [{ kind: 'playerDamageTakenUp', value: 4, duration: 2 }] },
     ],
   },
   {
