@@ -4877,16 +4877,22 @@ function activatePlayerMagicBuffs(
   const effectPlans = getPlayerEffectPlans(magicId, pairedMagicId, parsed);
   if (!effectPlans.length) return;
   effectPlans.forEach(({ buff, duration, targets }) => {
-    if (isPlayerFrozen(state, parsed.deckIndex) && isFreezeBlockedPlayerSideEffect(buff)) {
-      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} / ${describePlayerBuff(buff, parsedRateFromBuff(buff), duration)} / 凍結無効化`);
-      return;
+    const freezeBlockedTargets = isFreezeBlockedPlayerSideEffect(buff)
+      ? targets.filter((targetDeckIndex) => isPlayerFrozen(state, targetDeckIndex))
+      : [];
+    const activeTargets = freezeBlockedTargets.length
+      ? targets.filter((targetDeckIndex) => !freezeBlockedTargets.includes(targetDeckIndex))
+      : targets;
+    if (stats.log && freezeBlockedTargets.length) {
+      pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${freezeBlockedTargets.map(describeDeckTarget).join(' / ')} / ${describePlayerBuff(buff, parsedRateFromBuff(buff), duration)} / 凍結無効化`);
     }
+    if (!activeTargets.length) return;
     let appliedForAttackScore = false;
     let appliedForDefenceScore = false;
     let appliedForEvasionScore = false;
     let applied = false;
     let effectText = '';
-    targets.forEach((targetDeckIndex) => {
+    activeTargets.forEach((targetDeckIndex) => {
       if (buff.buffOption === 'デバフ解除') {
         removePlayerNegativeEffects(state, [targetDeckIndex]);
         applied = true;
@@ -4972,7 +4978,7 @@ function activatePlayerMagicBuffs(
       if (stats.log) effectText = describePlayerBuff(buff, parsedRateFromBuff(buff), duration);
     });
     if (applied) {
-      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerBuffTarget(buff, targets)} / ${effectText}`);
+      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerBuffTarget(buff, activeTargets)} / ${effectText}`);
     }
     const examKind = simulationRuntimeCache?.examKind ?? exam.value.kind;
     if (appliedForAttackScore && examKind === 'ATTACK') {
@@ -5554,19 +5560,21 @@ function activatePlayerContinueHeal(magicId: string, pairedMagicId: string, stat
   if (!parsed) return;
   const plans = getContinueHealPlans(magicId, pairedMagicId, parsed);
   if (!plans.length) return;
-  if (isPlayerFrozen(state, parsed.deckIndex)) {
-    if (stats.log) pushLog(stats, () => `${describeMagic(magicId)} 継続回復凍結`);
-    return;
-  }
   plans.forEach(({ rate, duration, targets }) => {
-    targets.forEach((cardIndex) => {
-      appendState(state, 'playerContinueHeals', {
-        cardIndex,
-        rate,
-        turns: duration,
-        source: describeMagic(magicId),
+    const freezeBlockedTargets = targets.filter((cardIndex) => isPlayerFrozen(state, cardIndex));
+    if (stats.log && freezeBlockedTargets.length) {
+      pushLog(stats, () => `${describeMagic(magicId)} -> ${freezeBlockedTargets.map(describeDeckTarget).join(' / ')} 継続回復凍結`);
+    }
+    targets
+      .filter((cardIndex) => !freezeBlockedTargets.includes(cardIndex))
+      .forEach((cardIndex) => {
+        appendState(state, 'playerContinueHeals', {
+          cardIndex,
+          rate,
+          turns: duration,
+          source: describeMagic(magicId),
+        });
       });
-    });
   });
 }
 
