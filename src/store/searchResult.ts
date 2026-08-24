@@ -1,7 +1,8 @@
 
 import { defineStore } from 'pinia';
 
-export const PARTY_WIDE_TWO_TURN_BUFF = '味方全体2T';
+export const PARTY_WIDE_EFFECT = '味方全体';
+export const OPPONENT_WIDE_EFFECT = '相手全体';
 
 // Status effects array
 export const effects = [
@@ -9,7 +10,8 @@ export const effects = [
   { name: 'damage_boost', value: 'ダメージUP' },
   { name: 'critical', value: 'クリティカル' },
   { name: 'element_boost', value: '属性ダメージUP' },
-  { name: 'partywide_2turn_buff', value: PARTY_WIDE_TWO_TURN_BUFF },
+  { name: 'partywide_effect', value: PARTY_WIDE_EFFECT },
+  { name: 'opponentwide_effect', value: OPPONENT_WIDE_EFFECT },
   { name: 'damage_vulnerability', value: '被ダメージUP' },
   { name: 'power_cut', value: 'ATKDOWN' },
   { name: 'damage_cut', value: 'ダメージDOWN' },

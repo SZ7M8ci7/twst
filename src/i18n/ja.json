@@ -330,7 +330,8 @@
     "nullifies_freeze": "凍結無効",
     "debuff_removal": "デバフ解除",
     "curse": "呪い",
-    "partywide_2turn_buff": "味方全体2T",
+    "partywide_effect": "味方全体",
+    "opponentwide_effect": "相手全体",
     "element_resistence": "属性被ダメージDOWN",
     "nullifies_burn": "やけど無効"
   },
