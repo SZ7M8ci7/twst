@@ -149,6 +149,9 @@
                 <h2>{{ t('examSimulator.deckSetup') }}</h2>
               </div>
               <div class="deck-save-actions">
+                <v-btn color="primary" variant="outlined" size="small" prepend-icon="mdi-cards-outline" @click="openDeckSimulatorFromDeck">
+                  {{ t('examSimulator.openDeckSimulator') }}
+                </v-btn>
                 <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-content-save-outline" @click="openSaveExamSettingsDialog">
                   {{ t('simulator.deck') }}
                 </v-btn>
@@ -432,6 +435,16 @@
                 <h2>{{ t('examSimulator.simulationResult') }}</h2>
               </div>
               <div class="result-actions">
+                <v-btn
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  prepend-icon="mdi-cards-outline"
+                  :disabled="isRunning || !bestResult"
+                  @click="openDeckSimulatorFromResult"
+                >
+                  {{ t('examSimulator.openDeckSimulator') }}
+                </v-btn>
                 <v-btn-toggle v-model="simulationMode" class="simulation-mode-toggle" mandatory divided density="compact" variant="outlined" :disabled="isRunning">
                   <v-btn value="normal" size="small" data-testid="simulation-mode-normal">{{ t('examSimulator.normalMode') }}</v-btn>
                   <v-btn value="autoBest" size="small" data-testid="simulation-mode-auto-best">{{ t('examSimulator.autoBestMode') }}</v-btn>
@@ -522,6 +535,9 @@
         </section>
       </div>
 
+      <v-alert v-if="transferMessage" class="transfer-message" :type="transferMessageType" variant="tonal" density="compact" closable @click:close="transferMessage = ''">
+        {{ transferMessage }}
+      </v-alert>
       <v-alert v-if="visibleValidationMessage" class="validation-bar" type="warning" variant="tonal" density="compact">
         {{ visibleValidationMessage }}
       </v-alert>
@@ -738,6 +754,7 @@
 <script setup lang="ts">
 import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { Bar } from 'vue-chartjs';
 import { Chart, registerables } from 'chart.js';
 import defaultImg from '@/assets/img/default.webp';
@@ -758,7 +775,7 @@ import { applyBuddyGeneratedBuffOverrides, createBuddyGeneratedBuffs, getBuddyAt
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
 import { examPresetDefinitions, type ExamPresetDefinition, type ExamSpecialChallengeDefinition, type ExamSpecialChallengeEffect } from '@/utils/examPresets';
 import { buildConstrainedEnemyActionDeck } from '@/utils/enemyActionDeck';
-import { loadExamSimulatorDeckImportState } from '@/storage/simulatorStorage';
+import { loadExamSimulatorDeckImportState, saveDeckSimulatorImportState } from '@/storage/simulatorStorage';
 import {
   loadSavedExamSimulatorSettings,
   saveSavedExamSimulatorSettings,
@@ -772,6 +789,7 @@ import {
 
 Chart.register(...registerables);
 const { t, locale } = useI18n();
+const router = useRouter();
 
 const jpNameToEnName = Object.fromEntries(
   (charactersInfo as Array<{ name_ja: string; name_en: string }>).map((character) => [character.name_ja, character.name_en]),
@@ -1102,6 +1120,10 @@ interface ContinueHealState {
   turns: number;
   source?: string;
   isBuddyGenerated?: boolean;
+  sourceDeckIndex?: number;
+  sourceMagicSlot?: MagicSlot;
+  powerOption?: string;
+  levelOption?: number;
 }
 
 interface ContinueHealDetail {
@@ -1110,6 +1132,11 @@ interface ContinueHealDetail {
   amount: number;
   potentialAmount: number;
   capped: boolean;
+  sourceDeckIndex?: number;
+  sourceMagicSlot?: MagicSlot;
+  powerOption?: string;
+  levelOption?: number;
+  isBuddyGenerated?: boolean;
 }
 
 interface ContinueHealResult {
@@ -1175,8 +1202,31 @@ interface SimulationStats {
   fallback: number;
   specialChallengeScore: number;
   specialChallengeLabels: string[];
+  playerAttackSnapshots?: PlayerAttackTransferSnapshot[];
+  playerHealSnapshots?: PlayerHealTransferSnapshot[];
   pendingDecision?: AutoBestDecision;
   log?: string[];
+}
+
+interface PlayerAttackTransferSnapshot {
+  deckIndex: number;
+  magicSlot: MagicSlot;
+  duoActive: boolean;
+  hitCount: number;
+  criticalCount: number;
+  atkBuffRate: number;
+  attackDownRate: number;
+  damageBuffRate: number;
+  damageReductionRate: number;
+}
+
+interface PlayerHealTransferSnapshot {
+  deckIndex: number;
+  magicSlot: MagicSlot;
+  buffOption: '回復' | '継続回復';
+  powerOption: string;
+  levelOption: number;
+  isBuddyGenerated?: boolean;
 }
 
 interface SimulationResultAggregate {
@@ -1559,6 +1609,8 @@ const logDialogOpen = ref(false);
 const settingsSaveDialogOpen = ref(false);
 const settingsSetName = ref('');
 const settingsSaveError = ref('');
+const transferMessage = ref('');
+const transferMessageType = ref<'success' | 'error' | 'warning'>('error');
 const savedExamSettings = ref<SavedExamSimulatorSettings[]>([]);
 const enemyConditionsTouched = ref(false);
 const runAttemptWarning = ref('');
@@ -2380,6 +2432,191 @@ async function restoreDeckFromSimulatorImport() {
   resetDefaultCombos();
   normalizeTurnCombosForAvailableMagic();
   clearResults();
+}
+
+function createTransferId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function criticalPowerOption(criticalCount: number, hitCount: number) {
+  if (criticalCount <= 0 || hitCount <= 0) return '0';
+  if (criticalCount >= hitCount) return '1/1';
+  if (hitCount === 2) return '1/2';
+  return criticalCount >= 2 ? '2/3' : '1/3';
+}
+
+function resultRateBuff(
+  magicSlot: MagicSlot,
+  buffOption: string,
+  rate: number,
+  isManuallyAdded: boolean,
+) {
+  return {
+    magicOption: `M${magicSlot}`,
+    buffOption,
+    powerOption: '中',
+    levelOption: 10,
+    rateOverride: rate,
+    isManuallyAdded,
+    isResultSnapshot: true,
+  };
+}
+
+function portableDeckCharacter(slot: DeckSlot, selectedMagicSlots = slot.selectedMagicSlots) {
+  if (!slot.character) return {};
+  const selected = new Set(selectedMagicSlots);
+  return {
+    id: slot.character.id,
+    name: slot.character.name,
+    chara: slot.character.chara,
+    level: slot.level,
+    totsu: slot.totsu,
+    hp: slot.customHp,
+    atk: slot.customAtk,
+    originalMaxHP: slot.maxHp,
+    originalMaxATK: slot.maxAtk,
+    magic1Lv: slot.magicLevels[1],
+    magic2Lv: slot.magicLevels[2],
+    magic3Lv: slot.magicLevels[3],
+    buddy1Lv: slot.buddyLevels[1],
+    buddy2Lv: slot.buddyLevels[2],
+    buddy3Lv: slot.buddyLevels[3],
+    isM1Selected: selected.has(1),
+    isM2Selected: selected.has(2),
+    isM3Selected: selected.has(3),
+  };
+}
+
+function buildDeckTabTransferCharacters() {
+  return deck.value.map((slot) => portableDeckCharacter(slot));
+}
+
+function buildResultTransferCharacters(result: SimulationStats) {
+  const snapshots = result.playerAttackSnapshots ?? [];
+  const healSnapshots = result.playerHealSnapshots ?? [];
+  const snapshotsByDeck = new Map<number, PlayerAttackTransferSnapshot[]>();
+  const healSnapshotsByDeck = new Map<number, PlayerHealTransferSnapshot[]>();
+  snapshots.forEach((snapshot) => {
+    const entries = snapshotsByDeck.get(snapshot.deckIndex) ?? [];
+    entries.push(snapshot);
+    snapshotsByDeck.set(snapshot.deckIndex, entries);
+  });
+  healSnapshots.forEach((snapshot) => {
+    const entries = healSnapshotsByDeck.get(snapshot.deckIndex) ?? [];
+    entries.push(snapshot);
+    healSnapshotsByDeck.set(snapshot.deckIndex, entries);
+  });
+
+  return deck.value.map((slot, deckIndex) => {
+    if (!slot.character) return {};
+    const attackSnapshots = snapshotsByDeck.get(deckIndex) ?? [];
+    const activatedHeals = healSnapshotsByDeck.get(deckIndex) ?? [];
+    const usedMagicSlots = Array.from(new Set(attackSnapshots.map((snapshot) => snapshot.magicSlot)));
+    const damageBuffs = attackSnapshots.flatMap((snapshot) => {
+      const rows: any[] = [];
+      // 味方の魔法・バディによって実際に発動したバフは、手動追加（赤色）扱いにしない。
+      if (Math.abs(snapshot.atkBuffRate) > 0.0001) rows.push(resultRateBuff(snapshot.magicSlot, 'ATKUP', snapshot.atkBuffRate, false));
+      if (Math.abs(snapshot.attackDownRate) > 0.0001) rows.push(resultRateBuff(snapshot.magicSlot, 'ATKDOWN', -snapshot.attackDownRate, true));
+      if (Math.abs(snapshot.damageBuffRate) > 0.0001) rows.push(resultRateBuff(snapshot.magicSlot, 'ダメージUP', snapshot.damageBuffRate, false));
+      if (Math.abs(snapshot.damageReductionRate) > 0.0001) {
+        rows.push(resultRateBuff(
+          snapshot.magicSlot,
+          snapshot.damageReductionRate > 0 ? 'ダメージDOWN' : 'ダメージUP',
+          -snapshot.damageReductionRate,
+          true,
+        ));
+      }
+      if (snapshot.criticalCount > 0) {
+        rows.push({
+          magicOption: `M${snapshot.magicSlot}`,
+          buffOption: 'クリティカル',
+          powerOption: criticalPowerOption(snapshot.criticalCount, snapshot.hitCount),
+          levelOption: 10,
+          isManuallyAdded: false,
+          isResultSnapshot: true,
+        });
+      }
+      return rows;
+    });
+    const healBuffs = activatedHeals.map((snapshot) => ({
+      magicOption: `M${snapshot.magicSlot}`,
+      buffOption: snapshot.buffOption,
+      powerOption: snapshot.powerOption,
+      levelOption: snapshot.levelOption,
+      isManuallyAdded: false,
+      isResultSnapshot: true,
+      isBuddyGenerated: snapshot.isBuddyGenerated,
+    }));
+    const seenBuffs = new Set<string>();
+    const buffs = [...damageBuffs, ...healBuffs].filter((buff) => {
+      const key = `${buff.magicOption}:${buff.buffOption}:${buff.powerOption}:${buff.levelOption}:${buff.rateOverride ?? ''}:${buff.isBuddyGenerated ?? false}`;
+      if (seenBuffs.has(key)) return false;
+      seenBuffs.add(key);
+      return true;
+    });
+    const transferred = portableDeckCharacter(slot, usedMagicSlots);
+    return {
+      ...transferred,
+      magic1Attribute: slot.magicAttributes[1],
+      magic2Attribute: slot.magicAttributes[2],
+      magic3Attribute: slot.magicAttributes[3],
+      magic1Power: slot.magicPowers[1],
+      magic2Power: attackSnapshots.some((snapshot) => snapshot.magicSlot === 2 && snapshot.duoActive)
+        ? 'デュオ'
+        : slot.magicPowers[2],
+      magic3Power: slot.magicPowers[3],
+      magic1heal: slot.magicHeals[1],
+      magic2heal: slot.magicHeals[2],
+      magic3heal: slot.magicHeals[3],
+      magic1etc: slot.magicEffects[1],
+      magic2etc: slot.magicEffects[2],
+      magic3etc: slot.magicEffects[3],
+      buffs,
+      suppressBuddyGeneratedBuffs: true,
+      resultSnapshot: true,
+    };
+  });
+}
+
+function openDeckSimulator(mode: 'deck' | 'result') {
+  const result = bestResult.value;
+  if (mode === 'result' && (!result || isRunning.value)) return;
+  transferMessage.value = '';
+  const transferId = createTransferId();
+  try {
+    saveDeckSimulatorImportState({
+      id: transferId,
+      mode,
+      deckCharacters: mode === 'result' && result
+        ? buildResultTransferCharacters(result)
+        : buildDeckTabTransferCharacters(),
+      selectedAttribute: examTargetAttribute.value,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    transferMessageType.value = 'error';
+    const isQuotaExceeded = error instanceof DOMException && (
+      error.name === 'QuotaExceededError'
+      || error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+      || error.code === 22
+      || error.code === 1014
+    );
+    transferMessage.value = isQuotaExceeded
+      ? t('examSimulator.transferStorageFull')
+      : t('examSimulator.transferSaveFailed');
+    return;
+  }
+  const url = router.resolve({ name: 'sim', query: { importExamDeck: transferId } }).href;
+  window.open(url, '_blank');
+}
+
+function openDeckSimulatorFromDeck() {
+  openDeckSimulator('deck');
+}
+
+function openDeckSimulatorFromResult() {
+  openDeckSimulator('result');
 }
 
 async function createDeckSlotFromBaseCharacter(
@@ -4207,6 +4444,8 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
     fallback: 0,
     specialChallengeScore: runtimeCache?.specialChallengeScore ?? selectedSpecialChallengeScore.value,
     specialChallengeLabels: runtimeCache?.specialChallengeLabels ?? selectedSpecialChallenges.value.map((challenge) => challenge.label),
+    playerAttackSnapshots: keepLog ? [] : undefined,
+    playerHealSnapshots: keepLog ? [] : undefined,
     log: keepLog ? [] : undefined,
   };
 
@@ -4298,6 +4537,7 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
         activatePlayerOpponentDebuffs(magicId, enemyAction, pairedEnemyAction, state, rng, stats, turnIndex + 1, actionLabel);
         const heal = calculatePlayerHeal(magicId, state);
         if (heal > 0) {
+          recordActivatedInstantHeals(magicId, stats);
           playerHp = Math.min(playerMaxHp, playerHp + heal);
           const actualHeal = Math.max(0, playerHp - playerHpBeforeHeal);
           if (actualHeal > 0) {
@@ -4337,6 +4577,9 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
         const targetElement = resolveTargetElement(enemyAction);
         const duoActive = isDuoActiveForPair(magicId, pairedMagicId);
         const playerAttack = calculatePlayerDamage(magicId, targetElement, state, rng, stats, duoActive, enemyAction);
+        if (stats.playerAttackSnapshots && playerAttack.transferSnapshot) {
+          stats.playerAttackSnapshots.push(playerAttack.transferSnapshot);
+        }
         enemyHp = Math.max(0, enemyHp - playerAttack.damage);
         const gutsResult = applyEnemyGutsIfNeeded(state, enemyHp, stats, enemyAction?.slotKey);
         enemyHp = gutsResult.hp;
@@ -4393,6 +4636,7 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
       }
     }
     const continueHeal = applyPlayerContinueHeal(state, playerHp, !!stats.log);
+    recordActivatedContinueHeals(continueHeal.details, stats);
     if (continueHeal.total > 0) {
       playerHp = Math.min(playerMaxHp, playerHp + continueHeal.total);
       if (examKind === 'DEFENCE' || stats.log) stats.playerHeal += continueHeal.total;
@@ -4482,6 +4726,8 @@ function cloneSimulationStats(stats: SimulationStats, keepLog: boolean): Simulat
     fallback: stats.fallback,
     specialChallengeScore: stats.specialChallengeScore,
     specialChallengeLabels: keepLog ? [...stats.specialChallengeLabels] : stats.specialChallengeLabels,
+    playerAttackSnapshots: keepLog ? [...(stats.playerAttackSnapshots ?? [])] : undefined,
+    playerHealSnapshots: keepLog ? [...(stats.playerHealSnapshots ?? [])] : undefined,
     log: keepLog ? [...(stats.log ?? [])] : undefined,
   };
 }
@@ -4649,12 +4895,17 @@ function activateInitialBuddyEffects(state: SimulationState) {
         const key = `${deckIndex}:${buff.buddyIndex}:${buff.status}`;
         if (seenContinueHeals.has(key)) return;
         seenContinueHeals.add(key);
+        const sourceMagicSlot = Number(String(buff.magicOption || '').replace('M', '')) as MagicSlot;
         appendState(state, 'playerContinueHeals', {
           cardIndex: deckIndex,
           rate: buddyContinueHealRate,
           turns: buddyInitialEffectTurns,
           source: `${describeDeckCard(deckIndex)} ${buff.status}`,
           isBuddyGenerated: true,
+          sourceDeckIndex: deckIndex,
+          sourceMagicSlot: [1, 2, 3].includes(sourceMagicSlot) ? sourceMagicSlot : 1,
+          powerOption: buff.powerOption || '極小',
+          levelOption: safeNumber(buff.levelOption) || 10,
         });
         return;
       }
@@ -5495,6 +5746,7 @@ function calculatePlayerDamageBaseFromState(
   const damageTermAfterReduction = Math.max(0, damageTerm - reductionValue);
   const attributeMultiplier = playerAttributeMultiplier(magicAttribute, targetElement);
   return {
+    runtimeAtk,
     magicAttribute,
     adjustedPower,
     level,
@@ -5560,7 +5812,7 @@ function activatePlayerContinueHeal(magicId: string, pairedMagicId: string, stat
   if (!parsed) return;
   const plans = getContinueHealPlans(magicId, pairedMagicId, parsed);
   if (!plans.length) return;
-  plans.forEach(({ rate, duration, targets }) => {
+  plans.forEach(({ rate, duration, targets, powerOption, levelOption }) => {
     const freezeBlockedTargets = targets.filter((cardIndex) => isPlayerFrozen(state, cardIndex));
     if (stats.log && freezeBlockedTargets.length) {
       pushLog(stats, () => `${describeMagic(magicId)} -> ${freezeBlockedTargets.map(describeDeckTarget).join(' / ')} 継続回復凍結`);
@@ -5573,6 +5825,10 @@ function activatePlayerContinueHeal(magicId: string, pairedMagicId: string, stat
           rate,
           turns: duration,
           source: describeMagic(magicId),
+          sourceDeckIndex: parsed.deckIndex,
+          sourceMagicSlot: parsed.magicSlot,
+          powerOption,
+          levelOption,
         });
       });
   });
@@ -5594,6 +5850,8 @@ function getContinueHealPlans(magicId: string, pairedMagicId: string, parsed: Pa
         rate: safeNumber(healContinueDict[`継続回復(${buff.powerOption})${level}`]),
         duration: Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 3)),
         targets: resolvePlayerBuffTargets(buff, parsed.deckIndex, paired?.deckIndex),
+        powerOption: buff.powerOption,
+        levelOption: level,
       };
     })
     .filter((plan) => plan.rate > 0);
@@ -5645,14 +5903,25 @@ function calculatePlayerDamage(
   }
   const attackDownRate = Math.min(100, sumDamageDownRatesForCard(state.playerAttackDowns, parsed.deckIndex, magic.element));
   const baseDamage = enemyDamageNullActive ? 0 : damageBase.damage * Math.max(0, 1 - attackDownRate / 100);
+  const transferSnapshot: PlayerAttackTransferSnapshot = {
+    deckIndex: parsed.deckIndex,
+    magicSlot: parsed.magicSlot,
+    duoActive: isDuo,
+    hitCount,
+    criticalCount: 0,
+    atkBuffRate: damageBase.runtimeAtk > 0 ? (damageBase.atkBuffTotal / damageBase.runtimeAtk) * 100 : 0,
+    attackDownRate,
+    damageBuffRate: damageBase.dmgBuffTotal * 100,
+    damageReductionRate: reductionRate,
+  };
   if (enemyDamageNullActive) {
-    return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: false, criticalCount: 0, damageNull: true };
+    return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: false, criticalCount: 0, damageNull: true, transferSnapshot };
   }
   if (blindRate > 0) {
     const blindRoll = rng();
     if (blindRoll < blindRate) {
       if (stats.log) stats.miss += 1;
-      return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: true, criticalCount: 0, damageNull: false };
+      return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: true, criticalCount: 0, damageNull: false, transferSnapshot };
     }
   }
 
@@ -5678,6 +5947,7 @@ function calculatePlayerDamage(
     damage += hitDamage;
   }
   const cachedResult = simulationRuntimeCache?.playerDamageResult;
+  transferSnapshot.criticalCount = criticalCount;
   if (cachedResult) {
     cachedResult.damage = damage;
     cachedResult.compatibility = compatibility;
@@ -5687,9 +5957,10 @@ function calculatePlayerDamage(
     cachedResult.blindMiss = false;
     cachedResult.criticalCount = criticalCount;
     cachedResult.damageNull = false;
+    cachedResult.transferSnapshot = transferSnapshot;
     return cachedResult;
   }
-  return { damage, compatibility, hitCount, isDuo, evasionCount, blindMiss: false, criticalCount, damageNull: false };
+  return { damage, compatibility, hitCount, isDuo, evasionCount, blindMiss: false, criticalCount, damageNull: false, transferSnapshot };
 }
 
 function describePlayerAttackSpecials(attack: { evasionCount?: number; blindMiss?: boolean; criticalCount?: number; damageNull?: boolean }) {
@@ -5699,6 +5970,51 @@ function describePlayerAttackSpecials(attack: { evasionCount?: number; blindMiss
   if (safeNumber(attack.criticalCount) > 0) parts.push(`クリティカル発動${safeNumber(attack.criticalCount)}回`);
   if (attack.damageNull) parts.push('ダメージ無効');
   return parts.length ? ` / ${parts.join(' / ')}` : '';
+}
+
+function addPlayerHealSnapshot(stats: SimulationStats, snapshot: PlayerHealTransferSnapshot) {
+  if (!stats.playerHealSnapshots) return;
+  const duplicate = stats.playerHealSnapshots.some((existing) => (
+    existing.deckIndex === snapshot.deckIndex
+    && existing.magicSlot === snapshot.magicSlot
+    && existing.buffOption === snapshot.buffOption
+    && existing.powerOption === snapshot.powerOption
+    && existing.levelOption === snapshot.levelOption
+    && !!existing.isBuddyGenerated === !!snapshot.isBuddyGenerated
+  ));
+  if (!duplicate) stats.playerHealSnapshots.push(snapshot);
+}
+
+function recordActivatedInstantHeals(magicId: string, stats: SimulationStats) {
+  const parsed = parseMagicId(magicId);
+  if (!parsed) return;
+  const runtime = buildRuntimeCharacter(parsed.deckIndex);
+  if (!runtime) return;
+  buildRuntimeBuffs(runtime)
+    .filter((buff) => buff.magicOption === `M${parsed.magicSlot}` && buff.buffOption === '回復')
+    .forEach((buff) => {
+      addPlayerHealSnapshot(stats, {
+        deckIndex: parsed.deckIndex,
+        magicSlot: parsed.magicSlot,
+        buffOption: '回復',
+        powerOption: buff.powerOption,
+        levelOption: Math.min(10, Math.max(1, Math.floor(safeNumber(buff.levelOption) || 10))),
+      });
+    });
+}
+
+function recordActivatedContinueHeals(details: ContinueHealDetail[], stats: SimulationStats) {
+  details.forEach((detail) => {
+    if (detail.sourceDeckIndex === undefined || !detail.sourceMagicSlot || !detail.powerOption) return;
+    addPlayerHealSnapshot(stats, {
+      deckIndex: detail.sourceDeckIndex,
+      magicSlot: detail.sourceMagicSlot,
+      buffOption: '継続回復',
+      powerOption: detail.powerOption,
+      levelOption: Math.min(10, Math.max(1, Math.floor(safeNumber(detail.levelOption) || 10))),
+      isBuddyGenerated: detail.isBuddyGenerated,
+    });
+  });
 }
 
 function calculatePlayerHeal(magicId: string, state: SimulationState) {
@@ -5751,6 +6067,11 @@ function applyPlayerContinueHeal(state: SimulationState, currentHp: number, keep
         amount,
         potentialAmount,
         capped: amount < potentialAmount,
+        sourceDeckIndex: entry.sourceDeckIndex,
+        sourceMagicSlot: entry.sourceMagicSlot,
+        powerOption: entry.powerOption,
+        levelOption: entry.levelOption,
+        isBuddyGenerated: entry.isBuddyGenerated,
       });
     }
     total += amount;
@@ -8877,9 +9198,53 @@ button.combo-priority {
     padding: 3px 8px;
   }
 
-  .header-actions > *,
+  .header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .header-actions > * {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .deck-save-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .deck-save-actions :deep(.v-btn) {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .result-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    width: 100%;
+  }
+
   .result-actions > * {
-    flex: 1 1 120px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .result-actions > :first-child,
+  .result-actions > .simulation-mode-toggle {
+    grid-column: 1 / -1;
+  }
+
+  .result-actions :deep(.v-btn) {
+    min-width: 0;
+  }
+
+  .result-actions > :first-child :deep(.v-btn__content) {
+    white-space: normal;
+    text-align: center;
   }
 
   .run-field,

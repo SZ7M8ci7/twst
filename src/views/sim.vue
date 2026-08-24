@@ -1,6 +1,9 @@
 <template>
   <v-container>
     <SimHeader v-model="selectedAttribute" @update:filter="selectedAttribute = $event" />
+    <v-alert v-if="importMessage" class="mb-3" :type="importMessageType" variant="tonal" density="compact" closable @click:close="importMessage = ''">
+      {{ importMessage }}
+    </v-alert>
     
     <v-row>
       <!-- メインコンテンツエリア -->
@@ -111,13 +114,15 @@ import CalcATK from '@/views/calcATK.vue';
 import BuddyInfo from '@/components/BuddyInfo.vue';
 import CharacterEtc from '@/components/CharacterEtc.vue';
 import { useSimulatorStore } from '@/store/simulatorStore';
-import { loadSimulatorWindowState } from '@/storage/simulatorStorage';
+import { loadDeckSimulatorImportState, loadSimulatorWindowState } from '@/storage/simulatorStorage';
 import { processCharacterSelection } from '@/utils/characterSelection';
 import { applyLegacyTargetAttributeToCharacter } from '@/utils/simulatorAttributes';
 
 const isLargeScreen = ref(window.innerWidth >= 768);
 const selectedAttribute = ref('対全');
 const carouselModel = ref(0);
+const importMessage = ref('');
+const importMessageType = ref<'error'>('error');
 const simulatorStore = useSimulatorStore();
 const { t } = useI18n();
 
@@ -157,6 +162,12 @@ function handleResize() {
 // 状態を復元する関数
 async function restoreState() {
   const urlParams = new URLSearchParams(window.location.search);
+
+  const examImportId = urlParams.get('importExamDeck');
+  if (examImportId) {
+    await restoreFromExamSimulator(examImportId);
+    return;
+  }
   
   // 既存の状態復元
   if (urlParams.get('restoreState') === 'true') {
@@ -203,6 +214,90 @@ async function restoreState() {
     return;
   }
 
+}
+
+async function restoreFromExamSimulator(importId: string) {
+  const importState = loadDeckSimulatorImportState(importId);
+  if (!importState || importState.id !== importId || !Array.isArray(importState.deckCharacters)) {
+    importMessageType.value = 'error';
+    importMessage.value = t('simulator.examImportFailed');
+    return;
+  }
+
+  try {
+    const { useCharacterStore } = await import('@/store/characters');
+    const characterStore = useCharacterStore();
+    const restoredCharacters = await Promise.all(Array.from({ length: 5 }, async (_, index) => {
+      const transferred = importState.deckCharacters[index];
+      if (!transferred?.id && !transferred?.name) return null;
+      const original = (transferred.id
+        ? characterStore.characters.find((candidate: any) => candidate.id === transferred.id)
+        : undefined)
+        ?? characterStore.characters.find((candidate: any) => candidate.name === transferred.name);
+      if (!original) return null;
+
+      const level = Number(transferred.level) || undefined;
+      const processed = await processCharacterSelection({ ...original }, level, true) as any;
+      const restored = {
+        ...processed,
+        level: transferred.level ?? processed.level,
+        totsu: transferred.totsu ?? processed.totsu,
+        hp: transferred.hp ?? processed.hp,
+        atk: transferred.atk ?? processed.atk,
+        originalMaxHP: transferred.originalMaxHP ?? processed.originalMaxHP,
+        originalMaxATK: transferred.originalMaxATK ?? processed.originalMaxATK,
+        max_hp: transferred.originalMaxHP ?? processed.max_hp,
+        max_atk: transferred.originalMaxATK ?? processed.max_atk,
+        magic1Lv: transferred.magic1Lv ?? processed.magic1Lv,
+        magic2Lv: transferred.magic2Lv ?? processed.magic2Lv,
+        magic3Lv: transferred.magic3Lv ?? processed.magic3Lv,
+        buddy1Lv: transferred.buddy1Lv ?? processed.buddy1Lv,
+        buddy2Lv: transferred.buddy2Lv ?? processed.buddy2Lv,
+        buddy3Lv: transferred.buddy3Lv ?? processed.buddy3Lv,
+        isM1Selected: !!transferred.isM1Selected,
+        isM2Selected: !!transferred.isM2Selected,
+        isM3Selected: !!transferred.isM3Selected,
+      };
+      if (importState.mode === 'result') {
+        Object.assign(restored, {
+          magic1Attribute: transferred.magic1Attribute ?? processed.magic1Attribute,
+          magic2Attribute: transferred.magic2Attribute ?? processed.magic2Attribute,
+          magic3Attribute: transferred.magic3Attribute ?? processed.magic3Attribute,
+          magic1Power: transferred.magic1Power ?? processed.magic1Power,
+          magic2Power: transferred.magic2Power ?? processed.magic2Power,
+          magic3Power: transferred.magic3Power ?? processed.magic3Power,
+          magic1heal: transferred.magic1heal ?? processed.magic1heal,
+          magic2heal: transferred.magic2heal ?? processed.magic2heal,
+          magic3heal: transferred.magic3heal ?? processed.magic3heal,
+          magic1etc: transferred.magic1etc ?? processed.magic1etc,
+          magic2etc: transferred.magic2etc ?? processed.magic2etc,
+          magic3etc: transferred.magic3etc ?? processed.magic3etc,
+          buffs: Array.isArray(transferred.buffs) ? transferred.buffs : [],
+          suppressBuddyGeneratedBuffs: !!transferred.suppressBuddyGeneratedBuffs,
+          resultSnapshot: true,
+        });
+      }
+      return restored;
+    }));
+
+    if (importState.mode === 'deck') {
+      const characterNames = new Set(restoredCharacters.filter(Boolean).map((character: any) => character.chara));
+      restoredCharacters.forEach((character: any) => {
+        if (!character?.duo) return;
+        character.magic2Power = characterNames.has(character.duo)
+          ? 'デュオ'
+          : (character.magic2pow || '連撃(強)');
+      });
+    }
+
+    simulatorStore.replaceDeckCharacters(restoredCharacters, importState.selectedAttribute);
+    selectedAttribute.value = importState.selectedAttribute || '対全';
+    await nextTick();
+  } catch (error) {
+    console.error('試験シミュレータからの復元に失敗しました:', error);
+    importMessageType.value = 'error';
+    importMessage.value = t('simulator.examImportFailed');
+  }
 }
 
 // デッキ探索結果からキャラクターを復元する関数

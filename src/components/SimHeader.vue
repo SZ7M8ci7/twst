@@ -35,6 +35,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { useSimulatorStore } from '@/store/simulatorStore';
 import { saveExamSimulatorDeckImportState, saveSimulatorWindowState } from '@/storage/simulatorStorage';
 import SavedDeckModal from '@/components/SavedDeckModal.vue';
@@ -52,6 +53,7 @@ const optionValues = ['対全', '対火', '対水', '対木', '対無'];
 const options = computed(() => localizeOptionItems(optionValues, locale.value));
 const selectedOption = ref(props.modelValue);
 const simulatorStore = useSimulatorStore();
+const router = useRouter();
 const showSavedDeckModal = ref(false);
 
 // 外部からの値の変更を監視
@@ -165,8 +167,11 @@ const openInExamSimulator = () => {
     createdAt: new Date().toISOString()
   });
 
-  const baseUrl = window.location.origin;
-  window.open(`${baseUrl}/twst/exam-simulator?importDeck=${encodeURIComponent(transferId)}`, '_blank');
+  const url = router.resolve({
+    name: 'examSimulator',
+    query: { importDeck: transferId },
+  }).href;
+  window.open(url, '_blank');
 };
 
 const openSavedDeckModal = () => {
@@ -293,13 +298,22 @@ const closeSavedDeckModal = () => {
   .sim-header {
     align-items: stretch;
     gap: 8px;
-    flex-wrap: wrap;
+    flex-direction: column;
   }
 
   .button-group-horizontal {
-    flex: 1 1 auto;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .button-group-horizontal .button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .button-group-horizontal .button:last-child {
+    grid-column: 1 / -1;
   }
 
   .target-select-input {

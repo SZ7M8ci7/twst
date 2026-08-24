@@ -414,6 +414,7 @@ const getBuddyGeneratedBuffOverrides = (character) => {
 const displayBuddyGeneratedBuffs = computed(() => {
   const character = currentCharacter.value;
   if (!character) return [];
+  if (character.suppressBuddyGeneratedBuffs) return [];
 
   const forceTotsu = isTotsuBuddyEnhanced(character?.rare, character?.totsu ?? 0);
   const overrides = getBuddyGeneratedBuffOverrides(character);

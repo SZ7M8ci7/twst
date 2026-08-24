@@ -34,6 +34,9 @@ export type ParsedBuff = {
   durationTurns?: number; // 効果ターン（例: 自/3T -> 3）
   isSelf?: boolean; // 自対象か
   targetType?: 'self' | 'allySelected' | 'allyAll' | 'opponent' | 'opponentSelected' | 'opponentAll';
+  rateOverride?: number;
+  isManuallyAdded?: boolean;
+  isResultSnapshot?: boolean;
 };
 
 // パワー文字列抽出（characterSelection.tsの実装と同等の挙動）

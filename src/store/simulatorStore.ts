@@ -576,6 +576,20 @@ export const useSimulatorStore = defineStore('simulator', () => {
     }
   }
 
+  function replaceDeckCharacters(characters: any[], attribute: string) {
+    for (let index = 0; index < deckCharacters.length; index += 1) {
+      const target = deckCharacters[index] as Record<string, any>;
+      Object.keys(target).forEach((key) => delete target[key]);
+      Object.assign(target, createDefaultCharacter(), characters[index] ?? {});
+    }
+    selectedAttribute.value = attribute || '対全';
+    characterStats.value = deckCharacters.map((character) => calculateCharacterStats(character, charaDict.value));
+    isInitialized.value = true;
+    isDeckStatsReady.value = true;
+    saveAutoDeck(deckCharacters, selectedAttribute.value);
+    recalculateStats();
+  }
+
 
 
   return {
@@ -586,6 +600,7 @@ export const useSimulatorStore = defineStore('simulator', () => {
     updateLevel,
     calculateBaseStats,
     selectCharacter,
+    replaceDeckCharacters,
     recalculateStats,
     charaDict,
     deckDuoStatuses,

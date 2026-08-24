@@ -456,7 +456,7 @@ export function calculateCharacterStats(character: any, charaDict: { [key: strin
 
 function getActiveBuddyGeneratedBuffs(character: any, charaDict: { [key: string]: boolean }) {
   const overrides = character?.buddyGeneratedBuffOverrides;
-  return [1, 2, 3].flatMap((buddyIndex) => {
+  const generated = [1, 2, 3].flatMap((buddyIndex) => {
     const buddyName = character?.[`buddy${buddyIndex}c`];
     const isActive = !!(buddyName && charaDict && buddyName in charaDict);
     const generatedBuffs = createBuddyGeneratedBuffs(character, buddyIndex, {
@@ -465,6 +465,9 @@ function getActiveBuddyGeneratedBuffs(character: any, charaDict: { [key: string]
     });
     return applyBuddyGeneratedBuffOverrides(generatedBuffs, overrides);
   });
+  return character?.suppressBuddyGeneratedBuffs
+    ? generated.filter((buff) => buff.buffOption === '継続回復')
+    : generated;
 }
 
 function calculateBuddyGeneratedContinueHeal(character: any, charaDict: { [key: string]: boolean }) {
@@ -691,8 +694,13 @@ function calculateBuffs(character: any, magicKey: string, charaDict: { [key: str
       const buffType = legacyBuff.buffOption;
       const powerType = legacyBuff.powerOption;
       const level = legacyBuff.levelOption || 10;
+      const rateOverride = Number(legacyBuff.rateOverride);
       
       if (buffType === 'ATKUP' || buffType === 'ATKDOWN') {
+        if (Number.isFinite(rateOverride)) {
+          atkBuffTotal += (rateOverride / 100) * character.atk;
+          continue;
+        }
         const buffKey = `${buffType}(${powerType})${level}`;
         if (buffKey in atkbuffDict) {
           atkBuffTotal += Number(atkbuffDict[buffKey]) * character.atk;
@@ -706,6 +714,10 @@ function calculateBuffs(character: any, magicKey: string, charaDict: { [key: str
           legacyBuff.attributeOption &&
           legacyBuff.attributeOption !== magicAttribute
         ) {
+          continue;
+        }
+        if (Number.isFinite(rateOverride)) {
+          dmgBuffTotal += rateOverride / 100;
           continue;
         }
         let prefix = '';

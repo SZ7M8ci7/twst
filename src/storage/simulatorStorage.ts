@@ -3,6 +3,7 @@ import { readVersionedStorage, writeVersionedStorage } from '@/storage/versioned
 const STORAGE_VERSION = 1;
 const SIMULATOR_STATE_KEY = 'twstSimulatorState';
 const EXAM_SIMULATOR_IMPORT_KEY = 'twstExamSimulatorImport';
+const DECK_SIMULATOR_IMPORT_KEY = 'twstDeckSimulatorImport';
 const SAVED_DECKS_KEY = 'twst_saved_decks';
 const AUTO_SAVE_KEY = 'twst_autosave_deck';
 
@@ -19,8 +20,22 @@ export interface ExamSimulatorDeckImportState {
   createdAt: string;
 }
 
+export type DeckSimulatorImportMode = 'deck' | 'result';
+
+export interface DeckSimulatorImportState {
+  id: string;
+  mode: DeckSimulatorImportMode;
+  deckCharacters: any[];
+  selectedAttribute: string;
+  createdAt: string;
+}
+
 interface ExamSimulatorDeckImportStore {
   imports: Record<string, ExamSimulatorDeckImportState>;
+}
+
+interface DeckSimulatorImportStore {
+  imports: Record<string, DeckSimulatorImportState>;
 }
 
 export function loadSimulatorWindowState() {
@@ -63,6 +78,28 @@ export function saveExamSimulatorDeckImportState(state: ExamSimulatorDeckImportS
       .map((entry) => [entry.id, entry])
   );
   writeVersionedStorage(EXAM_SIMULATOR_IMPORT_KEY, STORAGE_VERSION, { imports: limitedImports });
+}
+
+function readDeckSimulatorImportStore(): DeckSimulatorImportStore {
+  const stored = readVersionedStorage<DeckSimulatorImportStore>(DECK_SIMULATOR_IMPORT_KEY, STORAGE_VERSION);
+  if (!stored?.imports || typeof stored.imports !== 'object') return { imports: {} };
+  return stored;
+}
+
+export function loadDeckSimulatorImportState(id: string) {
+  return readDeckSimulatorImportStore().imports[id] ?? null;
+}
+
+export function saveDeckSimulatorImportState(state: DeckSimulatorImportState) {
+  const store = readDeckSimulatorImportStore();
+  const imports = { ...store.imports, [state.id]: state };
+  const limitedImports = Object.fromEntries(
+    Object.values(imports)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, 12)
+      .map((entry) => [entry.id, entry])
+  );
+  writeVersionedStorage(DECK_SIMULATOR_IMPORT_KEY, STORAGE_VERSION, { imports: limitedImports });
 }
 
 export function loadStoredSavedDecks<T>() {

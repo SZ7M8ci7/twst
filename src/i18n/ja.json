@@ -673,7 +673,8 @@
     "duoPartnerInactive": "DUO: {name} (無効)",
     "duoPartnerShortActive": "デュオ相手: {name} (有効)",
     "duoPartnerShortInactive": "デュオ相手: {name} (無効)",
-    "duoPartnerShortUnavailable": "デュオ相手: {name} (相手あり・デュオ数不足)"
+    "duoPartnerShortUnavailable": "デュオ相手: {name} (相手あり・デュオ数不足)",
+    "examImportFailed": "試験シミュレータの編成を復元できませんでした。"
   },
   "examSimulator": {
     "tabs": {
@@ -696,6 +697,9 @@
     "enemy": "敵",
     "actionCount": "{count}行動",
     "deckSetup": "デッキ編成",
+    "openDeckSimulator": "デッキシミュレータで開く",
+    "transferStorageFull": "ブラウザの保存容量が不足しているため、編成を引き継げませんでした。",
+    "transferSaveFailed": "デッキシミュレータ用の編成を保存できませんでした。",
     "priority": "許容優先度",
     "elementCompatibilityPriority": "属性相性優先",
     "elementCompatibilityPriorityTitle": "全属性試験で公開敵属性と残り候補から有利確率を計算して選択",

@@ -673,7 +673,8 @@
     "duoPartnerInactive": "DUO: {name} (Inactive)",
     "duoPartnerShortActive": "Duo partner: {name} (Active)",
     "duoPartnerShortInactive": "Duo partner: {name} (Inactive)",
-    "duoPartnerShortUnavailable": "Duo partner: {name} (partner present, not enough Duos)"
+    "duoPartnerShortUnavailable": "Duo partner: {name} (partner present, not enough Duos)",
+    "examImportFailed": "Could not restore the deck from the Exam Simulator."
   },
   "examSimulator": {
     "tabs": {
@@ -696,6 +697,9 @@
     "enemy": "Enemy",
     "actionCount": "{count} actions",
     "deckSetup": "Deck Setup",
+    "openDeckSimulator": "Open in Deck Simulator",
+    "transferStorageFull": "The deck could not be transferred because browser storage is full.",
+    "transferSaveFailed": "The deck could not be saved for the Deck Simulator.",
     "priority": "Priority",
     "elementCompatibilityPriority": "Prioritize Element Matchup",
     "elementCompatibilityPriorityTitle": "For Omni exams, choose by advantage probability from revealed enemy elements and remaining candidates.",
