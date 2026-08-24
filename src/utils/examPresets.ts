@@ -556,35 +556,35 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
       {
         name: 'アズール',
         actions: [
-          { name: 'ATKDOWN強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手', effectValue: 32, duration: 1 },
-          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
-          { name: '強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKDOWN強2連', element: '木', power: '2連撃(強)', estimatedDamage: 7353, effectKind: 'atkDown', effectTarget: '相手', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 7353 },
+          { name: '強単発', element: '木', power: '単発(強)', estimatedDamage: 4085 },
         ],
       },
       {
         name: 'ジェイド',
         actions: [
-          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
-          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
-          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 4523, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.4, duration: 3 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 7724 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 10195, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
         ],
       },
       {
         name: 'フロイド',
         actions: [
-          { name: 'ダメUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
-          { name: '相手選択ATKDOWN強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手選択', effectValue: 32, duration: 1 },
-          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 7835, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
+          { name: '相手選択ATKDOWN強単発', element: '木', power: '単発(強)', estimatedDamage: 7268, effectKind: 'atkDown', effectTarget: '相手選択', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 4038 },
         ],
       },
     ],
     specialChallenges: [
-      { id: 'enemy-atk-up-5t-32', rank: 3, label: '相手がATKUP(5T/32%)', score: 8500, effects: [{ kind: 'enemyAttackUp', value: 32, duration: 5 }] },
+      { id: 'enemy-atk-up-5t-61', rank: 3, label: '相手がATKUP(5T/61%)', score: 8500, effects: [{ kind: 'enemyAttackUp', value: 61, duration: 5 }] },
       { id: 'enemy-damage-reduction-3t-10', rank: 2, label: '相手が被ダメDOWN(3T/10%)', score: 3000, effects: [{ kind: 'enemyDamageReduction', value: 10, duration: 3 }] },
       { id: 'enemy-fire-damage-reduction-3t-13_8', rank: 2, label: '相手が火属性被ダメDOWN(3T/13.8%)', score: 3500, effects: [{ kind: 'enemyDamageReduction', value: 13.8, duration: 3, attribute: '火' }] },
-      { id: 'player-blind-2t-10_8', rank: 1, label: '味方が暗闇(2T/10.8%)', score: 500, effects: [{ kind: 'playerBlind', value: 10.8, duration: 2 }] },
+      { id: 'player-blind-2t-7', rank: 1, label: '味方が暗闇(2T/7%)', score: 500, effects: [{ kind: 'playerBlind', value: 7, duration: 2 }] },
       { id: 'player-atk-down-2t-20', rank: 1, label: '味方がATKDOWN(2T/20%)', score: 800, effects: [{ kind: 'playerAttackDown', value: 20, duration: 2 }] },
-      { id: 'enemy-critical-2t-9_55', rank: 1, label: '相手がクリティカル(2T/9.55%)', score: 500, effects: [{ kind: 'enemyCritical', value: 9.55, duration: 2 }] },
+      { id: 'enemy-critical-2t-10', rank: 1, label: '相手がクリティカル(2T/10%)', score: 500, effects: [{ kind: 'enemyCritical', value: 10, duration: 2 }] },
     ],
   },
   {
