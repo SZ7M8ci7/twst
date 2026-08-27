@@ -4560,7 +4560,7 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
           applyEnemyAdditionalEffects(enemyAction, magicId, pairedMagicId, state, rng, stats, pairedEnemyAction);
         }
         if (enemyAction?.effectKind && enemyAction.effectKind !== 'none') {
-          if (stats.log) pushLog(stats, () => `${turnIndex + 1}T ${actionLabel} 相手効果 ${describeEnemyAction(enemyAction)}${describeEnemyEffectTarget(enemyAction, magicId, pairedMagicId)} / ${describeEnemyEffect(enemyAction)}${enemyEffectFrozen ? ' / 凍結無効化' : ''}${appliedEnemyHeal > 0 ? ` / 敵回復${formatNumber(appliedEnemyHeal)}` : ''}`);
+          if (stats.log) pushLog(stats, () => `${turnIndex + 1}T ${actionLabel} 相手効果 ${describeEnemyAction(enemyAction)}${describeEnemyEffectTarget(enemyAction, magicId, pairedMagicId)} / ${describeEnemyEffect(enemyAction)}${enemyEffectFrozen ? ' / 凍結により無効' : ''}${appliedEnemyHeal > 0 ? ` / 敵回復${formatNumber(appliedEnemyHeal)}` : ''}`);
         }
       }
     }
@@ -5135,7 +5135,7 @@ function activatePlayerMagicBuffs(
       ? targets.filter((targetDeckIndex) => !freezeBlockedTargets.includes(targetDeckIndex))
       : targets;
     if (stats.log && freezeBlockedTargets.length) {
-      pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${freezeBlockedTargets.map(describeDeckTarget).join(' / ')} / ${describePlayerBuff(buff, parsedRateFromBuff(buff), duration)} / 凍結無効化`);
+      pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${freezeBlockedTargets.map(describeDeckTarget).join(' / ')} / ${describePlayerBuff(buff, parsedRateFromBuff(buff), duration)} / 凍結により無効`);
     }
     if (!activeTargets.length) return;
     let appliedForAttackScore = false;
@@ -5400,7 +5400,7 @@ function activatePlayerOpponentDebuffs(
     const duration = Math.max(1, Math.floor(safeNumber(buff.durationTurns) || 1));
     const rate = parsedRateFromBuff(buff);
     if (isPlayerFrozen(state, parsed.deckIndex) && isFreezeBlockedPlayerSideEffect(buff)) {
-      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerOpponentDebuffTarget(buff, targetEnemy, pairedEnemy)} / ${describePlayerOpponentDebuff(buff, rate, duration)} / 凍結無効化`);
+      if (stats.log) pushLog(stats, () => `${turnNumber}T ${timingLabel} 自分効果 ${describeMagic(magicId)} -> ${describePlayerOpponentDebuffTarget(buff, targetEnemy, pairedEnemy)} / ${describePlayerOpponentDebuff(buff, rate, duration)} / 凍結により無効`);
       return;
     }
     if (rate <= 0 && !['デバフ解除', 'バフ解除', 'ガッツ'].includes(buff.buffOption)) return;
