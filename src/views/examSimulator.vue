@@ -2424,6 +2424,7 @@ async function restoreDeckFromSimulatorImport() {
   deck.value = await Promise.all(Array.from({ length: 5 }, (_, index) => (
     createDeckSlotFromBaseCharacter(importState.deckCharacters[index], characterStore)
   )));
+  deck.value.forEach((_slot, index) => recalculateDeckStats(index));
   syncAllDeckLevelInputs();
   editingDeckDetailCharacter.value = null;
   characterDialogOpen.value = false;
@@ -2625,9 +2626,8 @@ async function createDeckSlotFromBaseCharacter(
 ): Promise<DeckSlot> {
   if (!importedCharacter?.id && !importedCharacter?.name) return createEmptyDeckSlot();
 
-  // 受信側でも引き継ぎ値を信用せず、カード原本をキーから引き直す。
-  // これにより旧形式の保存済み引き継ぎデータに能力値や編集済みバフが
-  // 含まれていても、試験シミュレータへ混入しない。
+  // カード原本を基に、育成状態と使用マジックだけを上書きする。
+  // 旧形式のデータに含まれる手動編集済みの能力値やバフは取り込まない。
   const original = (
     importedCharacter.id
       ? characterStore.characters.find((candidate: Character) => candidate.id === importedCharacter.id)
@@ -2640,7 +2640,17 @@ async function createDeckSlotFromBaseCharacter(
   if (!original) return createEmptyDeckSlot();
 
   const baseCharacter = await processCharacterSelection({ ...original }, undefined, true) as Character;
-  return createDeckSlotFromSimulatorCharacter(baseCharacter, characterStore);
+  return createDeckSlotFromSimulatorCharacter({
+    ...baseCharacter,
+    level: importedCharacter.level ?? baseCharacter.level,
+    totsu: importedCharacter.totsu ?? baseCharacter.totsu,
+    isM1Selected: importedCharacter.isM1Selected ?? baseCharacter.isM1Selected,
+    isM2Selected: importedCharacter.isM2Selected ?? baseCharacter.isM2Selected,
+    isM3Selected: importedCharacter.isM3Selected ?? baseCharacter.isM3Selected,
+    magic1Lv: importedCharacter.magic1Lv ?? baseCharacter.magic1Lv,
+    magic2Lv: importedCharacter.magic2Lv ?? baseCharacter.magic2Lv,
+    magic3Lv: importedCharacter.magic3Lv ?? baseCharacter.magic3Lv,
+  }, characterStore);
 }
 
 async function createDeckSlotFromSimulatorCharacter(

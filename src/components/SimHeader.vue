@@ -120,11 +120,19 @@ const createDeckSnapshot = () => simulatorStore.deckCharacters.map(char => ({
     magic2pow: char.magic2pow
   }));
 
-// 試験シミュレータにはカードを特定するための原本キーだけを渡す。
-// デッキシミュレータ上で編集された能力値・魔法・バフ・バディ効果は渡さない。
+// カードの育成状態と使用マジックを引き継ぐ。
+// 手動編集された能力値・バフ・バディ効果は渡さない。
 const createExamDeckImportSnapshot = () => simulatorStore.deckCharacters.map(char => ({
   id: char.id,
   name: char.name,
+  level: char.level,
+  totsu: char.totsu,
+  isM1Selected: char.isM1Selected,
+  isM2Selected: char.isM2Selected,
+  isM3Selected: char.isM3Selected,
+  magic1Lv: char.magic1Lv,
+  magic2Lv: char.magic2Lv,
+  magic3Lv: char.magic3Lv,
 }));
 
 const saveState = () => {
