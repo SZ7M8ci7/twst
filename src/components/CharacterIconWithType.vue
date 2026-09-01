@@ -11,7 +11,7 @@
 import { computed, type StyleValue } from 'vue';
 import defaultImg from '@/assets/img/default.webp';
 import { useI18n } from 'vue-i18n';
-import { isEnglishLocale } from '@/utils/localizedDisplay';
+import { isEnglishLocale, localizeGameText } from '@/utils/localizedDisplay';
 
 const props = defineProps<{
   imgSrc?: string;      // 既存:直接画像URLを指定する場合
@@ -57,7 +57,7 @@ const englishCardTypeLabels: Record<string, string> = {
 
 const displayCardType = computed(() => {
   const cardType = props.cardType || '';
-  if (!isEnglishLocale(locale.value)) return cardType;
+  if (!isEnglishLocale(locale.value)) return localizeGameText(cardType, locale.value);
   return englishCardTypeLabels[cardType] ?? cardType;
 });
 

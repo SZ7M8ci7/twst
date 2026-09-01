@@ -179,7 +179,7 @@ import {
   effects,
 } from '@/store/searchResult';
 import { matchesAnySelectedBuddyBonusEffect, matchesAnySelectedEffect } from '@/utils/effectFilter';
-import { localizeCostumeName } from '@/utils/localizedDisplay';
+import { matchesCostumeSearch } from '@/utils/localizedDisplay';
 
 const { t } = useI18n();
 
@@ -457,13 +457,9 @@ function updateCharacterVisibility() {
       character.visible = false;
       return
     }
-    // 衣装名チェック（日本語の元データと現在の表示言語の名前を対象に部分一致）
+    // 衣装名チェック（対応する全言語を対象に部分一致。切替後も検索を維持）
     if (normalizedCostumeSearch) {
-      const costumeNames = [
-        character.costume,
-        localizeCostumeName(character, 'en'),
-      ];
-      if (!costumeNames.some(name => normalizeSearchText(name).includes(normalizedCostumeSearch))) {
+      if (!matchesCostumeSearch(character, normalizedCostumeSearch)) {
         character.visible = false;
         return;
       }

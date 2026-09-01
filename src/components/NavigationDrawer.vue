@@ -2,9 +2,11 @@
   <div class="toolbar-items">
     <v-app-bar-nav-icon @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
     <div class="language-links">
-      <a href="#" :class="{ 'text-muted': $i18n.locale !== 'ja' }" @click="changeLanguage('ja')">JA</a>
+      <button type="button" lang="ja" aria-label="日本語" :aria-pressed="locale === 'ja'" :class="{ 'text-muted': locale !== 'ja' }" @click="changeLanguage('ja')">JA</button>
       <span>/</span>
-      <a href="#" :class="{ 'text-muted': $i18n.locale !== 'en' }" @click="changeLanguage('en')">EN</a>
+      <button type="button" lang="en" aria-label="English" :aria-pressed="locale === 'en'" :class="{ 'text-muted': locale !== 'en' }" @click="changeLanguage('en')">EN</button>
+      <span>/</span>
+      <button type="button" lang="zh-CN" aria-label="中文（简体）" :aria-pressed="locale === 'zh-CN'" :class="{ 'text-muted': locale !== 'zh-CN' }" @click="changeLanguage('zh-CN')">中文</button>
     </div>
   </div>
   <v-navigation-drawer
@@ -98,11 +100,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useI18n } from 'vue-i18n';
+import { useLocale } from 'vuetify';
+import { normalizeLocale, saveLocale, type SupportedLocale } from '@/i18n/locales';
 const drawer = ref(false);
 
 const { locale } = useI18n();
+const { current: vuetifyLocale } = useLocale();
+watch(locale, (value) => {
+  const language = normalizeLocale(value) ?? 'ja';
+  vuetifyLocale.value = language;
+  document.documentElement.lang = language;
+  saveLocale(language);
+}, { immediate: true });
 
 type NavItem = {
   routeName: string;
@@ -171,7 +182,7 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-function changeLanguage(lang: string) {
+function changeLanguage(lang: SupportedLocale) {
   locale.value = lang;
 }
 
@@ -198,8 +209,18 @@ a {
   align-items: center;
 }
 
-.language-links a {
+.language-links button {
   margin: 0 4px;
+  cursor: pointer;
+}
+
+.language-links button[aria-pressed="true"] {
+  font-weight: 700;
+}
+
+.language-links button:focus-visible {
+  outline: 2px solid #1565c0;
+  outline-offset: 3px;
 }
 
 .language-links .text-muted {

@@ -185,6 +185,7 @@ import { defaultSelectedBuddyBonusEffectValues, defaultSelectedEffectValues } fr
 import {
   localizeCharacterName,
   localizeGameText,
+  matchesCostumeSearch,
 } from '@/utils/localizedDisplay';
 
 // characterDataの高速検索用Mapを事前に作成
@@ -1552,10 +1553,7 @@ const initializeModalFilter = () => {
       if (characterInfo && selectedCharactersSet.has(characterInfo.name_en)) {
         // タイプチェック
         if (selectedTypeSet.has(character.attr)) {
-          const costumeMatches = !normalizedCostumeSearch || [
-            character.costume,
-            localizeCostumeName(character, 'en'),
-          ].some(name => String(name ?? '').normalize('NFKC').toLocaleLowerCase().includes(normalizedCostumeSearch));
+          const costumeMatches = matchesCostumeSearch(character, normalizedCostumeSearch);
           // 属性チェック
           if (costumeMatches && (selectedAttrSet.has(character.magic1atr) ||
               selectedAttrSet.has(character.magic2atr) ||

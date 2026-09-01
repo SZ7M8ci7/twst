@@ -1,4 +1,6 @@
 import charactersInfo from '@/assets/characters_info.json';
+import chineseGameText from '@/i18n/zh-CN-game.json';
+import { normalizeLocale, supportedLocales } from '@/i18n/locales';
 
 type CharacterInfo = {
   name_ja: string;
@@ -26,6 +28,27 @@ const englishCharacterNameByJa = new Map<string, string>(
 
 const japaneseCharacterNames = Array.from(englishCharacterNameByJa.keys())
   .sort((a, b) => b.length - a.length);
+
+// Community references and the policy for provisional costume names:
+// docs/chinese-localization.md. Keep the calculation/source data in Japanese.
+const chineseCharacterNameByJa = new Map(englishCharacterNameByJa);
+chineseCharacterNameByJa.set('トレイン', 'Trein');
+
+const chineseCostumes: Record<string, string> = chineseGameText.costumes;
+const chineseTerms: Record<string, string> = {
+  ...chineseGameText.terms,
+  ...chineseGameText.dorms,
+  ...Object.fromEntries(chineseCharacterNameByJa),
+};
+// Replace once, longest match first: translated names must never be translated again.
+const chineseTermPattern = new RegExp(Object.keys(chineseTerms)
+  .sort((a, b) => b.length - a.length)
+  .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  .join('|'), 'g');
+
+export function isChineseLocale(locale: unknown): boolean {
+  return normalizeLocale(locale) === 'zh-CN';
+}
 
 const costumeKeyOverrides: Record<string, string> = {
   birth: 'Birthday Boy',
@@ -223,11 +246,18 @@ export function isEnglishLocale(locale: unknown): boolean {
 
 export function localizeCharacterName(value: unknown, locale: unknown): string {
   const text = toDisplayString(value);
+  if (isChineseLocale(locale)) return chineseCharacterNameByJa.get(text) ?? text;
   if (!isEnglishLocale(locale)) return text;
   return englishCharacterNameByJa.get(text) ?? text;
 }
 
 export function localizeCostumeName(card: CardLike | string, locale: unknown): string {
+  if (isChineseLocale(locale)) {
+    const costume = typeof card === 'string' ? card : toDisplayString(card.costume);
+    // Do not infer birthday series from internal birthN IDs (they are not uniform).
+    // Preserve unknown names rather than inventing a Chinese proper noun.
+    return chineseCostumes[costume] ?? costume;
+  }
   if (!isEnglishLocale(locale)) {
     return typeof card === 'string' ? card : toDisplayString(card.costume);
   }
@@ -251,6 +281,12 @@ export function localizeCardTitle(card: CardLike, locale: unknown): string {
 
 export function localizeGameText(value: unknown, locale: unknown): string {
   const text = toDisplayString(value);
+  if (isChineseLocale(locale)) {
+    if (chineseTerms[text] !== undefined) return chineseTerms[text];
+    return text.replace(chineseTermPattern, (term) => chineseTerms[term])
+      .replace(/第(\d+)回/g, '第$1届')
+      .replace(/(\d+)回/g, '$1次');
+  }
   if (!isEnglishLocale(locale)) return text;
   if (exactTextMap[text] !== undefined) return exactTextMap[text];
 
@@ -279,11 +315,21 @@ export function localizeNumberUnit(
   unitJa: string,
   locale: unknown
 ): string {
+  if (isChineseLocale(locale)) {
+    const units: Record<string, string> = { 回: '次', 行動: '次行动', 秒: '秒' };
+    return `${value}${units[unitJa] ?? unitJa}`;
+  }
   if (!isEnglishLocale(locale)) return `${value}${unitJa}`;
   if (unitJa === '回') return `${value} times`;
   if (unitJa === '行動') return `${value} actions`;
   if (unitJa === '秒') return `${value} sec`;
   return `${value}`;
+}
+
+export function matchesCostumeSearch(card: CardLike, query: unknown): boolean {
+  const normalize = (value: unknown) => toDisplayString(value).normalize('NFKC').trim().toLowerCase();
+  const search = normalize(query);
+  return !search || supportedLocales.some((locale) => normalize(localizeCostumeName(card, locale)).includes(search));
 }
 
 function getCostumeKey(cardName: string): string {

@@ -15,13 +15,17 @@ import { registerPlugins } from '@/plugins'
 import { createI18n } from 'vue-i18n'
 import ja from "@/i18n/ja.json";
 import en from "@/i18n/en.json";
+import zhCN from '@/i18n/zh-CN.json';
+import { getSavedLocale } from '@/i18n/locales';
 
 const i18n = createI18n({
     legacy: false,
-    locale: "ja",
+    locale: getSavedLocale(),
+    fallbackLocale: 'ja',
     messages: {
       ja: ja,
       en: en,
+      'zh-CN': zhCN,
     },
   });
 

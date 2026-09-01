@@ -11,8 +11,10 @@ import 'vuetify/styles'
 // Composables
 import { createVuetify } from 'vuetify'
 import { VDataTable } from 'vuetify/components'
+import { ja, en, zhHans } from 'vuetify/locale'
 // https://vuetifyjs.com/en/introduction/why-vuetify/#feature-guides
 export default createVuetify({
+  locale: { locale: 'ja', fallback: 'en', messages: { ja, en, 'zh-CN': zhHans } },
   components: {
     VDataTable,
  },
