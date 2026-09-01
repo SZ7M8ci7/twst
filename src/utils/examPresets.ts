@@ -88,6 +88,81 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/09-1木DF',
+    title: '2026/09-1木DF',
+    kind: 'DEFENCE',
+    enemyElement: '木',
+    enemyHp: 95000,
+    enemies: [
+      {
+        name: 'レオナ',
+        actions: [
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 6300, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.5, duration: 3 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 10750 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 14250, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジャック',
+        actions: [
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 8900, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.5, duration: 1 },
+          { name: '味方選択ATKUP強単発', element: '木', power: '単発(強)', estimatedDamage: 11150, effectKind: 'atkUp', effectTarget: '味方選択', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 15200 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/09-1全ATK',
+    title: '2026/09-1全ATK',
+    kind: 'ATTACK',
+    enemyElement: '全',
+    enemyHp: 209000,
+    enemies: [
+      {
+        name: 'ジェイド',
+        actions: [
+          { name: '火ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '火強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '火ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'フロイド',
+        actions: [
+          { name: '水ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '水強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '水ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'リドル',
+        actions: [
+          { name: '水強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '水強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無ATKDOWN強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'アズール',
+        actions: [
+          { name: '木強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '木ダメDOWN強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageDown', effectTarget: '相手', effectValue: 5, duration: 1 },
+          { name: '木被ダメDOWN強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+        ],
+      },
+      {
+        name: 'トレイ',
+        actions: [
+          { name: '無ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/08-2水ATK',
     title: '2026/08-2水ATK',
     kind: 'ATTACK',
