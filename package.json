@@ -7,8 +7,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint . --fix --ignore-path .gitignore",
-    "deploy": "cd dist && copy index.html 404.html && cd .. && gh-pages -d dist",
-    "deploy-github": "cd dist && cp index.html 404.html && cd .. && gh-pages -d dist"
+    "deploy": "cd dist && copy index.html 404.html && cd .. && gh-pages -d dist --nojekyll",
+    "deploy-github": "cd dist && cp index.html 404.html && cd .. && gh-pages -d dist --nojekyll"
   },
   "dependencies": {
     "@mdi/font": "7.0.96",
