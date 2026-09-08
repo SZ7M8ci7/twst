@@ -919,8 +919,6 @@
     "highestScore": "最高スコア {score}",
     "percentile95": "95パーセンタイル {score}",
     "openSimulator": "詳細シミュレーション",
-    "importedPolicy": "通常モードは探索時の実行ルールを使います。",
-    "manualPolicy": "手動の手順設定に切り替える",
     "simple": {
       "supportMax": "サポートは全カードを最大育成で比較（SSR Lv120）。魔法・バディは自前もLv10として探索します。",
       "normalTraining": "通常試験は自前5枚で探索します。魔法・バディはLv10として計算します。",

@@ -919,8 +919,6 @@
     "highestScore": "最高分 {score}",
     "percentile95": "第95百分位数 {score}",
     "openSimulator": "详细模拟",
-    "importedPolicy": "普通模式使用搜索时的行动规则。",
-    "manualPolicy": "切换为手动回合设置",
     "simple": {
       "supportMax": "辅助比较所有卡牌的满培养状态（SSR Lv120）。己方与辅助的魔法、伙伴等级均按Lv10计算。",
       "normalTraining": "普通考试使用5张自有卡牌。魔法及伙伴等级均按Lv10计算。",

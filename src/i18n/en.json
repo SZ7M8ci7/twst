@@ -919,8 +919,6 @@
     "highestScore": "Highest score {score}",
     "percentile95": "95th percentile {score}",
     "openSimulator": "Detailed simulation",
-    "importedPolicy": "Normal mode uses the evaluated search policy.",
-    "manualPolicy": "Switch to manual turn plans",
     "simple": {
       "supportMax": "All support cards are compared at maximum training (SSR Lv120). Own and support magic and buddy levels are assumed to be 10.",
       "normalTraining": "Normal exams use five owned cards. Magic and buddy levels are assumed to be 10.",

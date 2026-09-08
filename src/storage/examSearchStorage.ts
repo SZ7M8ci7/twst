@@ -19,7 +19,7 @@ export function loadExamSearch(): SearchInput | null {
     return input;
   } catch { return null; }
 }
-export function saveSearchTransfer(input: SearchInput, candidate: Candidate): string {
+export function saveSearchTransfer(input: SearchInput, candidate: Candidate, best?: { seed: string; score: number }): string {
   const id = `resource-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const now = Date.now();
   const entries: Array<{ key: string; createdAt: number }> = [];
@@ -33,10 +33,10 @@ export function saveSearchTransfer(input: SearchInput, candidate: Candidate): st
     } catch { localStorage.removeItem(key); }
   }
   entries.sort((a, b) => b.createdAt - a.createdAt).slice(MAX_TRANSFERS - 1).forEach(entry => localStorage.removeItem(entry.key));
-  localStorage.setItem(transferStorageKey(id), JSON.stringify({ id, input, candidate, createdAt: now }));
+  localStorage.setItem(transferStorageKey(id), JSON.stringify({ id, input, candidate, best, createdAt: now }));
   return id;
 }
-export function loadSearchTransfer(id: string): { input: SearchInput; candidate: Candidate } | null {
+export function loadSearchTransfer(id: string): { input: SearchInput; candidate: Candidate; best?: { seed: string; score: number } } | null {
   try {
     const key = transferStorageKey(id);
     const value = JSON.parse(localStorage.getItem(key) ?? 'null');

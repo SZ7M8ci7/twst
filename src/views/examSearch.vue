@@ -458,7 +458,7 @@ function preview(result: SearchResult) {
 }
 function openSimulator(result: SearchResult) {
   try {
-    const id = saveSearchTransfer(clone(evaluatedInput.value!), clone(result.candidate));
+    const id = saveSearchTransfer(clone(evaluatedInput.value!), clone(result.candidate), result.validationBest ? clone(result.validationBest) : undefined);
     const url = router.resolve({ name: 'examSimulator', query: { resourceSearch: id } }).href;
     window.open(url, '_blank', 'noopener,noreferrer');
   } catch { error.value = t('examSearch.saveFailed'); }
