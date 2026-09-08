@@ -83,6 +83,11 @@ const routes = [
     component: () => import('@/views/calcBASIC.vue'),
   },
   {
+    path: '/twst/exam-search',
+    name: 'examSearch',
+    redirect: (to: any) => ({ name: 'examSimulator', query: { ...to.query, tab: 'search' } }),
+  },
+  {
     path: '/twst/exam-simulator',
     name: 'examSimulator',
     component: () => import('@/views/examSimulator.vue'),

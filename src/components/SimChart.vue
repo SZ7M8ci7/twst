@@ -222,7 +222,7 @@ function createChart() {
           callbacks: {
             label: function(context) {
               const label = context.dataset.label || '';
-              const value = Math.ceil(context.parsed.y);
+              const value = Math.ceil(context.parsed.y ?? 0);
               return `${label}: ${value}`;
             },
             title: function() {
@@ -231,7 +231,7 @@ function createChart() {
             afterBody: function(context) {
               const totalHP = context.reduce((sum, item) => {
                 if (item.dataset.label === 'HP' || item.dataset.label === `${t('simulator.buddy')} HP` || item.dataset.label === t('simulator.heal')) {
-                  return sum + Math.ceil(item.parsed.y);
+                  return sum + Math.ceil(item.parsed.y ?? 0);
                 }
                 return sum;
               }, 0);

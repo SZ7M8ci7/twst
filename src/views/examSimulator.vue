@@ -1,148 +1,135 @@
 <template>
   <v-container class="exam-simulator" data-testid="exam-simulator" fluid>
     <div class="exam-shell">
-      <v-tabs v-model="activeTab" class="main-tabs" color="primary" fixed-tabs :mobile-breakpoint="Infinity">
-        <v-tab value="exam" prepend-icon="mdi-file-document-edit-outline">{{ t('examSimulator.tabs.exam') }}</v-tab>
+      <v-alert v-if="resourcePreviewPolicy && activeTab !== 'search'" type="info" variant="tonal" class="mb-3">
+        {{ t('examSearch.importedPolicy') }} {{ t(`examSearch.policy.${resourcePreviewPolicy}`) }}
+        <v-btn variant="text" @click="resourcePreviewPolicy = null">{{ t('examSearch.manualPolicy') }}</v-btn>
+      </v-alert>
+      <section class="common-exam-conditions">
+        <div class="exam-preset-strip">
+          <div class="preset-group">
+            <span class="preset-group-label">{{ t('examSimulator.normalPresets') }}</span>
+            <div class="preset-actions">
+              <v-btn
+                v-for="preset in recentNormalExamPresets"
+                :key="preset.id"
+                color="primary"
+                variant="tonal"
+                size="small"
+                :disabled="commonConditionsBusy"
+                @click="preset.apply"
+              >
+                {{ displayPresetTitle(preset.title) }}
+              </v-btn>
+            </div>
+            <v-menu location="bottom end" max-height="420">
+              <template #activator="{ props }">
+                <v-btn v-bind="props" color="primary" variant="outlined" size="small" :disabled="commonConditionsBusy" :aria-label="`${t('examSimulator.normalPresets')}: ${t('examSimulator.pastPresets')}`">
+                  {{ t('examSimulator.pastPresets') }}
+                </v-btn>
+              </template>
+              <v-list class="preset-menu-list" density="compact" nav role="menu">
+                <v-list-item
+                  v-for="preset in normalExamPresets"
+                  role="menuitem"
+                  :key="preset.id"
+                  :title="displayPresetTitle(preset.title)"
+                    :disabled="commonConditionsBusy"
+                  @click="preset.apply"
+                />
+              </v-list>
+            </v-menu>
+          </div>
+          <div class="preset-group preset-group-unified">
+            <span class="preset-group-label">{{ t('examSimulator.unifiedPresets') }}</span>
+            <div class="preset-actions">
+              <v-btn
+                v-for="preset in recentUnifiedExamPresets"
+                :key="preset.id"
+                color="primary"
+                variant="tonal"
+                size="small"
+                :disabled="commonConditionsBusy"
+                @click="preset.apply"
+              >
+                {{ displayPresetTitle(preset.title) }}
+              </v-btn>
+            </div>
+            <v-menu location="bottom end" max-height="420">
+              <template #activator="{ props }">
+                <v-btn v-bind="props" color="primary" variant="outlined" size="small" :disabled="commonConditionsBusy" :aria-label="`${t('examSimulator.unifiedPresets')}: ${t('examSimulator.pastPresets')}`">
+                  {{ t('examSimulator.pastPresets') }}
+                </v-btn>
+              </template>
+              <v-list class="preset-menu-list" density="compact" nav role="menu">
+                <v-list-item
+                  v-for="preset in unifiedExamPresets"
+                  role="menuitem"
+                  :key="preset.id"
+                  :title="displayPresetTitle(preset.title)"
+                    :disabled="commonConditionsBusy"
+                  @click="preset.apply"
+                />
+              </v-list>
+            </v-menu>
+          </div>
+        </div>
+
+        <div class="selected-exam-summary" data-testid="selected-exam-summary">
+          <div>
+            <span class="muted">{{ t('examSimulator.examConditions') }}</span>
+            <strong>{{ activePreset ? displayPresetTitle(activePreset.title) : t('examSimulator.customExam') }}</strong>
+          </div>
+          <v-btn data-testid="exam-details-open" color="primary" variant="outlined" :disabled="commonConditionsBusy" @click="enemyConditionsDialogOpen = true">
+            {{ t('examSimulator.examDetails') }}
+          </v-btn>
+        </div>
+
+        <section v-if="availableSpecialChallenges.length" class="common-special-challenges" aria-label="special challenges">
+          <div class="panel-heading">
+            <h2>{{ t('examSimulator.specialChallenges') }}</h2>
+            <div class="special-score-total">+{{ formatNumber(selectedSpecialChallengeScore) }}</div>
+          </div>
+          <div class="special-challenge-list">
+            <label
+              v-for="challenge in availableSpecialChallenges"
+              :key="challenge.id"
+              class="special-challenge-item"
+              :class="{ selected: selectedSpecialChallengeIds.includes(challenge.id) }"
+            >
+              <input
+                type="checkbox"
+                :checked="selectedSpecialChallengeIds.includes(challenge.id)"
+                :disabled="commonConditionsBusy"
+                @change="setSharedChallenge(challenge.id, ($event.target as HTMLInputElement).checked)"
+              />
+              <span class="special-rank">{{ specialChallengeRankLabel(challenge.rank) }}</span>
+              <span class="special-label">{{ localizeExamLogText(challenge.label) }}</span>
+              <span class="special-score">+{{ formatNumber(challenge.score) }}</span>
+            </label>
+          </div>
+        </section>
+      </section>
+
+      <v-tabs v-model="activeFlow" class="main-tabs flow-tabs" color="primary" fixed-tabs :mobile-breakpoint="Infinity">
+        <v-tab value="search" prepend-icon="mdi-magnify">{{ t('examSimulator.tabs.search') }}</v-tab>
+        <v-tab value="simulate" prepend-icon="mdi-file-document-edit-outline">{{ t('examSimulator.flow.simulate') }}</v-tab>
+      </v-tabs>
+      <v-tabs v-if="activeFlow === 'simulate'" v-model="manualTab" class="manual-tabs" color="primary" density="comfortable" fixed-tabs :mobile-breakpoint="Infinity">
         <v-tab value="deck" prepend-icon="mdi-cards-outline">{{ t('examSimulator.tabs.deck') }}</v-tab>
         <v-tab value="plan" prepend-icon="mdi-call-split">{{ t('examSimulator.tabs.plan') }}</v-tab>
         <v-tab value="result" prepend-icon="mdi-chart-bar">{{ t('examSimulator.tabs.result') }}</v-tab>
       </v-tabs>
 
       <div class="tab-window">
-        <section v-show="activeTab === 'exam'">
-          <div class="exam-preset-strip">
-            <div class="preset-group">
-              <span class="preset-group-label">{{ t('examSimulator.normalPresets') }}</span>
-              <div class="preset-actions">
-                <v-btn
-                  v-for="preset in recentNormalExamPresets"
-                  :key="preset.id"
-                  color="primary"
-                  variant="tonal"
-                  size="small"
-                  @click="preset.apply"
-                >
-                  {{ displayPresetTitle(preset.title) }}
-                </v-btn>
-              </div>
-              <v-menu location="bottom end" max-height="420">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" color="primary" variant="outlined" size="small">
-                    {{ t('examSimulator.pastPresets') }}
-                  </v-btn>
-                </template>
-                <v-list class="preset-menu-list" density="compact" nav>
-                  <v-list-item
-                    v-for="preset in normalExamPresets"
-                    :key="preset.id"
-                    :title="displayPresetTitle(preset.title)"
-                    @click="preset.apply"
-                  />
-                </v-list>
-              </v-menu>
-            </div>
-            <div class="preset-group preset-group-unified">
-              <span class="preset-group-label">{{ t('examSimulator.unifiedPresets') }}</span>
-              <div class="preset-actions">
-                <v-btn
-                  v-for="preset in recentUnifiedExamPresets"
-                  :key="preset.id"
-                  color="primary"
-                  variant="tonal"
-                  size="small"
-                  @click="preset.apply"
-                >
-                  {{ displayPresetTitle(preset.title) }}
-                </v-btn>
-              </div>
-              <v-menu location="bottom end" max-height="420">
-                <template #activator="{ props }">
-                  <v-btn v-bind="props" color="primary" variant="outlined" size="small">
-                    {{ t('examSimulator.pastPresets') }}
-                  </v-btn>
-                </template>
-                <v-list class="preset-menu-list" density="compact" nav>
-                  <v-list-item
-                    v-for="preset in unifiedExamPresets"
-                    :key="preset.id"
-                    :title="displayPresetTitle(preset.title)"
-                    @click="preset.apply"
-                  />
-                </v-list>
-              </v-menu>
-            </div>
-          </div>
-
-          <div class="tab-grid exam-tab-grid">
-            <section class="tool-panel">
-              <div class="panel-heading">
-                <div>
-                  <h2>{{ t('examSimulator.examConditions') }}</h2>
-                </div>
-              </div>
-              <div class="form-grid exam-grid">
-                <v-select v-model="exam.kind" class="exam-kind-select" :items="examKindOptions" :label="t('examSimulator.kind')" density="compact" variant="outlined" hide-details />
-                <v-select v-model="exam.enemyElement" :items="elementOptionItems" item-title="title" item-value="value" :label="t('examSimulator.enemyElement')" density="compact" variant="outlined" hide-details />
-                <v-select
-                  v-model="exam.difficulty"
-                  :items="difficultyOptions"
-                  item-title="title"
-                  item-value="value"
-                  :label="t('examSimulator.difficulty')"
-                  density="compact"
-                  variant="outlined"
-                  hide-details
-                />
-                <v-text-field v-model.number="exam.enemyHp" type="number" :label="t('examSimulator.enemyHp')" min="1" density="compact" variant="outlined" hide-details />
-              </div>
-            </section>
-
-            <section v-if="availableSpecialChallenges.length" class="tool-panel special-challenge-panel">
-              <div class="panel-heading">
-                <div>
-                  <h2>{{ t('examSimulator.specialChallenges') }}</h2>
-                </div>
-                <div class="special-score-total">+{{ formatNumber(selectedSpecialChallengeScore) }}</div>
-              </div>
-              <div class="special-challenge-list">
-                <label
-                  v-for="challenge in availableSpecialChallenges"
-                  :key="challenge.id"
-                  class="special-challenge-item"
-                  :class="{ selected: selectedSpecialChallengeIds.includes(challenge.id) }"
-                >
-                  <input v-model="selectedSpecialChallengeIds" type="checkbox" :value="challenge.id" />
-                  <span class="special-rank">{{ specialChallengeRankLabel(challenge.rank) }}</span>
-                  <span class="special-label">{{ localizeExamLogText(challenge.label) }}</span>
-                  <span class="special-score">+{{ formatNumber(challenge.score) }}</span>
-                </label>
-              </div>
-            </section>
-
-            <section class="tool-panel">
-              <div class="panel-heading">
-                <div>
-                  <h2>{{ t('examSimulator.enemyActions') }}</h2>
-                </div>
-                <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" @click="addEnemySlot">{{ t('examSimulator.addEnemy') }}</v-btn>
-              </div>
-              <div class="enemy-card-list">
-                <article v-for="(slot, slotIndex) in enemySlots" :key="slot.id" class="enemy-summary-card">
-                  <div>
-                    <div class="summary-title">{{ displayEnemySlotName(slot.name, slotIndex) }}</div>
-                    <div class="summary-sub">{{ t('examSimulator.actionCount', { count: slot.actions.length }) }}</div>
-                  </div>
-                  <div class="enemy-actions">
-                    <v-btn size="small" variant="tonal" prepend-icon="mdi-pencil" @click="openEnemyDialog(slotIndex)">{{ t('common.edit') }}</v-btn>
-                    <v-btn size="small" variant="text" color="error" icon="mdi-delete" @click="removeEnemySlot(slotIndex)" />
-                  </div>
-                </article>
-              </div>
-            </section>
-          </div>
+        <section v-if="searchMounted && conditionsReady" v-show="activeFlow === 'search'" class="search-tab">
+          <ExamSearchPanel
+            ref="searchPanelRef"
+            embedded
+            :conditions="conditionsReady ? sharedConditions : undefined"
+          />
         </section>
-
-        <section v-show="activeTab === 'deck'">
+        <section v-show="activeFlow === 'simulate' && manualTab === 'deck'">
           <section class="tool-panel">
             <div class="panel-heading">
               <div>
@@ -218,7 +205,7 @@
           </section>
         </section>
 
-        <section v-show="activeTab === 'plan'">
+        <section v-show="activeFlow === 'simulate' && manualTab === 'plan'">
           <div class="plan-layout">
             <section class="tool-panel order-panel">
               <div class="panel-heading">
@@ -428,7 +415,7 @@
           </div>
         </section>
 
-        <section v-show="activeTab === 'result'">
+        <section v-show="activeFlow === 'simulate' && manualTab === 'result'">
           <section class="tool-panel result-panel">
             <div class="panel-heading">
               <div>
@@ -543,11 +530,54 @@
       </v-alert>
     </div>
 
+    <v-dialog v-model="enemyConditionsDialogOpen" max-width="1320" data-testid="exam-details-dialog">
+      <v-card class="modal-card">
+        <v-card-title class="modal-title">
+          <span>{{ t('examSimulator.examDetails') }}</span>
+          <v-btn icon="mdi-close" variant="text" :aria-label="t('common.close')" :disabled="commonConditionsBusy" @click="enemyConditionsDialogOpen = false" />
+        </v-card-title>
+        <v-card-text>
+          <section class="tool-panel detail-panel">
+            <div class="panel-heading"><h2>{{ t('examSimulator.examConditions') }}</h2></div>
+            <div class="form-grid exam-grid">
+              <v-select v-model="exam.kind" class="exam-kind-select" :items="examKindOptions" :label="t('examSimulator.kind')" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details />
+              <v-select v-model="exam.enemyElement" :items="elementOptionItems" item-title="title" item-value="value" :label="t('examSimulator.enemyElement')" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details />
+              <v-select v-model="exam.difficulty" :items="difficultyOptions" item-title="title" item-value="value" :label="t('examSimulator.difficulty')" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details />
+              <v-text-field v-model.number="exam.enemyHp" type="number" :label="t('examSimulator.enemyHp')" min="1" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details />
+            </div>
+          </section>
+
+          <section class="tool-panel detail-panel">
+            <div class="panel-heading">
+              <h2>{{ t('examSimulator.enemyActions') }}</h2>
+              <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" :disabled="commonConditionsBusy" @click="addEnemySlot">{{ t('examSimulator.addEnemy') }}</v-btn>
+            </div>
+            <div class="enemy-card-list">
+              <article v-for="(slot, slotIndex) in enemySlots" :key="slot.id" class="enemy-summary-card">
+                <div>
+                  <div class="summary-title">{{ displayEnemySlotName(slot.name, slotIndex) }}</div>
+                  <div class="summary-sub">{{ t('examSimulator.actionCount', { count: slot.actions.length }) }}</div>
+                </div>
+                <div class="enemy-actions">
+                  <v-btn size="small" variant="tonal" prepend-icon="mdi-pencil" :disabled="commonConditionsBusy" @click="openEnemyDialog(slotIndex)">{{ t('common.edit') }}</v-btn>
+                  <v-btn size="small" variant="text" color="error" icon="mdi-delete" :disabled="commonConditionsBusy" @click="removeEnemySlot(slotIndex)" />
+                </div>
+              </article>
+            </div>
+          </section>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn data-testid="exam-details-close" color="primary" variant="tonal" @click="enemyConditionsDialogOpen = false">{{ t('common.close') }}</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="enemyDialogOpen" max-width="1320">
       <v-card class="modal-card" v-if="editingEnemySlot">
         <v-card-title class="modal-title">
           <span>{{ t('examSimulator.enemyActionTitle', { name: displayEnemySlotName(editingEnemySlot.name, editingEnemySlotIndex) }) }}</span>
-          <v-btn icon="mdi-close" variant="text" @click="enemyDialogOpen = false" />
+          <v-btn icon="mdi-close" variant="text" :disabled="commonConditionsBusy" @click="enemyDialogOpen = false" />
         </v-card-title>
         <v-card-text>
           <div class="enemy-toolbar">
@@ -555,12 +585,13 @@
               :model-value="displayEnemySlotName(editingEnemySlot.name, editingEnemySlotIndex)"
               class="enemy-name-field"
               :label="t('examSimulator.enemyName')"
+              :disabled="commonConditionsBusy"
               density="compact"
               variant="outlined"
               hide-details
               @update:model-value="updateEditingEnemySlotName"
             />
-            <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" @click="addEnemyAction(editingEnemySlotIndex)">{{ t('examSimulator.addAction') }}</v-btn>
+            <v-btn color="primary" variant="tonal" size="small" prepend-icon="mdi-plus" :disabled="commonConditionsBusy" @click="addEnemyAction(editingEnemySlotIndex)">{{ t('examSimulator.addAction') }}</v-btn>
           </div>
 
           <div class="table-scroll">
@@ -586,21 +617,22 @@
                       :items="actionElementOptionItems"
                       item-title="title"
                       item-value="value"
+                      :disabled="commonConditionsBusy"
                       density="compact"
                       variant="outlined"
                       hide-details
                     />
                     <div v-else class="fixed-attribute">{{ localizeGameText(exam.enemyElement, locale) }}</div>
                   </td>
-                  <td class="power-cell"><v-select v-model="action.power" :items="enemyMagicPowerOptionItems" item-title="title" item-value="value" density="compact" variant="outlined" hide-details @update:model-value="syncEnemyPower(action)" /></td>
-                  <td class="damage-cell"><v-text-field v-model.number="action.estimatedDamage" type="number" min="0" density="compact" variant="outlined" hide-details /></td>
+                  <td class="power-cell"><v-select v-model="action.power" :items="enemyMagicPowerOptionItems" item-title="title" item-value="value" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details @update:model-value="syncEnemyPower(action)" /></td>
+                  <td class="damage-cell"><v-text-field v-model.number="action.estimatedDamage" type="number" min="0" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details /></td>
                   <td class="effect-cell">
-                    <v-select v-model="action.effectKind" :items="effectOptions" item-title="title" item-value="value" density="compact" variant="outlined" hide-details @update:model-value="syncEnemyEffectTarget(action)" />
+                    <v-select v-model="action.effectKind" :items="effectOptions" item-title="title" item-value="value" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details @update:model-value="syncEnemyEffectTarget(action)" />
                   </td>
-                  <td class="value-cell"><v-text-field v-model.number="action.effectValue" type="number" density="compact" variant="outlined" hide-details /></td>
-                  <td class="turn-cell"><v-select v-model.number="action.duration" :items="durationOptions" density="compact" variant="outlined" hide-details /></td>
-                  <td class="range-cell"><v-select v-model="action.effectTarget" :items="effectTargetOptionItems" item-title="title" item-value="value" density="compact" variant="outlined" hide-details /></td>
-                  <td class="delete-cell"><v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="removeEnemyAction(editingEnemySlotIndex, actionIndex)" /></td>
+                  <td class="value-cell"><v-text-field v-model.number="action.effectValue" type="number" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details /></td>
+                  <td class="turn-cell"><v-select v-model.number="action.duration" :items="durationOptions" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details /></td>
+                  <td class="range-cell"><v-select v-model="action.effectTarget" :items="effectTargetOptionItems" item-title="title" item-value="value" :disabled="commonConditionsBusy" density="compact" variant="outlined" hide-details /></td>
+                  <td class="delete-cell"><v-btn icon="mdi-delete" size="small" variant="text" color="error" :disabled="commonConditionsBusy" @click="removeEnemyAction(editingEnemySlotIndex, actionIndex)" /></td>
                 </tr>
               </tbody>
             </v-table>
@@ -620,50 +652,13 @@
           <v-btn icon="mdi-close" variant="text" @click="logDialogOpen = false" />
         </v-card-title>
         <v-card-text>
-          <div class="log-body" data-testid="best-log-body">
-            <section v-for="group in groupedBestLog" :key="group.title" class="log-turn-group">
-              <div class="log-turn-title">{{ localizeExamLogText(group.title) }}</div>
-              <div
-                v-for="(entry, index) in group.entries"
-                :key="`${group.title}-${index}-${entry.line}`"
-                class="battle-log-row"
-                :class="[entry.side, { emphasized: entry.emphasized }]"
-              >
-                <template v-if="entry.side === 'enemy'">
-                  <div class="log-marker">
-                    <div class="log-combatant enemy-combatant">{{ entry.label ? localizeExamLogText(entry.label) : t('examSimulator.enemy') }}</div>
-                    <img v-if="entry.sourceElement" class="log-element-icon" :src="elementIcon(entry.sourceElement)" alt="" />
-                  </div>
-                  <div class="log-arrow">→</div>
-                  <div class="log-bubble">{{ localizeExamLogText(entry.displayLine) }}</div>
-                  <template v-if="entry.targetIcon || entry.targetLabel">
-                    <div class="log-arrow">→</div>
-                    <div class="log-marker">
-                      <img v-if="entry.targetIcon" class="log-avatar" :src="entry.targetIcon" alt="" />
-                      <div v-else class="log-combatant target-combatant">{{ localizeExamLogText(entry.targetLabel || '') }}</div>
-                      <img v-if="entry.targetElement" class="log-element-icon" :src="elementIcon(entry.targetElement)" alt="" />
-                    </div>
-                  </template>
-                </template>
-                <template v-else-if="entry.side === 'player'">
-                  <template v-if="entry.targetLabel">
-                    <div class="log-marker">
-                      <div class="log-combatant target-combatant">{{ localizeExamLogText(entry.targetLabel) }}</div>
-                      <img v-if="entry.targetElement" class="log-element-icon" :src="elementIcon(entry.targetElement)" alt="" />
-                    </div>
-                    <div class="log-arrow">←</div>
-                  </template>
-                  <div class="log-bubble">{{ localizeExamLogText(entry.displayLine) }}</div>
-                  <div class="log-arrow">←</div>
-                  <div class="log-marker">
-                    <img class="log-avatar" :src="entry.icon || defaultImg" alt="" />
-                    <img v-if="entry.sourceElement" class="log-element-icon" :src="elementIcon(entry.sourceElement)" alt="" />
-                  </div>
-                </template>
-                <div v-else class="log-system-line">{{ localizeExamLogText(entry.displayLine) }}</div>
-              </div>
-            </section>
-          </div>
+          <ExamBattleLog
+            :groups="groupedBestLog"
+            :default-img="defaultImg"
+            :enemy-label="t('examSimulator.enemy')"
+            :localize="localizeExamLogText"
+            :element-icon="elementIcon"
+          />
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -752,7 +747,9 @@
 </template>
 
 <script setup lang="ts">
+import { yieldToHost } from '@/utils/yieldToHost';
 import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
+import ExamSearchPanel from '@/components/ExamSearchPanelLoader.vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { Bar } from 'vue-chartjs';
@@ -766,15 +763,22 @@ import charactersInfo from '@/assets/characters_info.json';
 import { useCharacterStore, type Character } from '@/store/characters';
 import SimCharaModal from '@/components/SimCharaModal.vue';
 import SimCharaDetailModal from '@/components/SimCharaDetailModal.vue';
+import ExamBattleLog from '@/components/ExamBattleLog.vue';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { atkbuffDict, calculateCharacterStats, criticalDict, dmgbuffDict, healContinueDict, healDict, magicDict, recalculateATK, recalculateHP } from '@/utils/calculations';
+import { criticalRatePowerScale, criticalTailMultiplier, criticalProposal } from '@/utils/criticalRates';
+import { evasionRateByPower } from '@/utils/evasionRates';
 import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
 import { getPowerOption, processCharacterSelection } from '@/utils/characterSelection';
 import { applyBuddyGeneratedBuffOverrides, createBuddyGeneratedBuffs, getBuddyAtkRate, getBuddyStatusForCharacter, splitBuddyEffects } from '@/utils/buddyEffects';
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } from '@/utils/totsu';
 import { examPresetDefinitions, type ExamPresetDefinition, type ExamSpecialChallengeDefinition, type ExamSpecialChallengeEffect } from '@/utils/examPresets';
 import { buildConstrainedEnemyActionDeck } from '@/utils/enemyActionDeck';
+import { chooseObservedPair, chooseFlexiblePlanPair, remainingContinuousHealing, createPairSpend, type BattleObservation, type FlexiblePlanStep } from '@/domain/examSearch/policy';
+import type { SearchInput, Candidate, PolicyKind } from '@/domain/examSearch/types';
+import { loadSearchTransfer, loadExamSearch } from '@/storage/examSearchStorage';
+import { snapshotExamConditions, type SharedExamConditions } from '@/utils/sharedExamConditions';
 import { loadExamSimulatorDeckImportState, saveDeckSimulatorImportState } from '@/storage/simulatorStorage';
 import {
   loadSavedExamSimulatorSettings,
@@ -786,10 +790,13 @@ import {
   localizeGameText,
   localizeOptionItems,
 } from '@/utils/localizedDisplay';
+import { groupExamBattleLog, type BattleLogGroup } from '@/utils/examBattleLog';
+
 
 Chart.register(...registerables);
 const { t, locale } = useI18n();
 const router = useRouter();
+const resourcePreviewPolicy = ref<PolicyKind | null>(null);
 
 const jpNameToEnName = Object.fromEntries(
   (charactersInfo as Array<{ name_ja: string; name_en: string }>).map((character) => [character.name_ja, character.name_en]),
@@ -808,7 +815,9 @@ type ExamCharacter = Character & {
   magic3etc?: string;
 };
 type ComboSlotKey = 'firstMagicId' | 'secondMagicId';
-type ActiveTab = 'exam' | 'deck' | 'plan' | 'result';
+type ActiveTab = 'exam' | 'deck' | 'plan' | 'result' | 'search';
+type SimulatorFlow = 'search' | 'simulate';
+type ManualTab = 'deck' | 'plan' | 'result';
 type ScoreCompatibility = 'advantage' | 'equal' | 'disadvantage';
 type EnemyMagicPower = '単発(弱)' | '単発(強)' | '2連撃(弱)' | '2連撃(強)' | '3連撃(弱)' | '3連撃(強)';
 type EffectTarget = '自' | '相手' | '味方選択' | '相手選択' | '味方全体' | '相手全体';
@@ -933,6 +942,8 @@ interface AutoBestDecision {
 }
 
 interface SimulationRunOptions {
+  resourcePolicy?: PolicyKind;
+  recordPairs?: PlayerPair[];
   forcedPairs?: PlayerPair[];
   forcedPairAtCheckpoint?: PlayerPair;
   pauseAtUnforcedDecision?: boolean;
@@ -960,6 +971,7 @@ interface SimulationRuntimeCache {
   magicsById: Map<string, MagicCard | undefined>;
   parsedMagicIds: Map<string, ParsedMagicId | null>;
   visiblePairs: Map<string, PlayerPair[]>;
+  enemyActionPools: RuntimeEnemyAction[][];
   duoActive: Map<string, boolean>;
   enemyActionMeta: Map<string, { baseAtk: number; magicRatio: number; rengekiMultiplier: number; hitCount: number }>;
   playerMagicMeta: Map<string, {
@@ -973,7 +985,7 @@ interface SimulationRuntimeCache {
     rengekiMultiplier: number;
   }>;
   playerEffectPlans: Map<string, Array<{ buff: ParsedBuff; duration: number; targets: number[] }>>;
-  continueHealPlans: Map<string, Array<{ rate: number; duration: number; targets: number[] }>>;
+  continueHealPlans: Map<string, Array<{ rate: number; duration: number; targets: number[]; powerOption: string; levelOption: number }>>;
   playerHealAmounts: Map<string, number>;
   playerDamageResult: Record<string, any>;
   enemyDamageResult: Record<string, any>;
@@ -1028,6 +1040,7 @@ interface AutoBestWorkerSnapshot {
   deck: DeckSlot[];
   selectedSpecialChallengeIds: string[];
   activeExamPresetId: string;
+  presetMetadata?: ExamPresetDefinition | null;
 }
 interface AutoBestWorkerProgress {
   exploredNodes: number;
@@ -1054,24 +1067,6 @@ interface ExamSettingsPayload {
   turnPlans: TurnPlan[];
   useElementCompatibilityPriority?: boolean;
   useAllElementSmartSelection?: boolean;
-}
-
-interface BattleLogEntry {
-  line: string;
-  displayLine: string;
-  side: 'enemy' | 'player' | 'system';
-  emphasized?: boolean;
-  icon?: string;
-  targetIcon?: string;
-  sourceElement?: ActionElement;
-  targetElement?: ActionElement;
-  label?: string;
-  targetLabel?: string;
-}
-
-interface BattleLogGroup {
-  title: string;
-  entries: BattleLogEntry[];
 }
 
 interface RuntimeEnemyAction extends EnemyActionDefinition {
@@ -1290,13 +1285,6 @@ const totsuOptions = [0, 1, 2, 3, 4].map((value) => ({
   title: value.toString(),
   value,
 }));
-const evasionRateByPower: Record<string, number> = {
-  極小: 9.2,
-  小: 14.8,
-  中: 23.7,
-  大: 38.0,
-  極大: 61.0,
-};
 const blindRateByPower: Record<string, number> = {
   中: 21.6,
 };
@@ -1337,13 +1325,6 @@ const freezeRatePowerScale: Record<string, number> = {
   小: 33.4,
   中: 44.6,
   大: 66.9,
-  極大: 100,
-};
-const criticalRatePowerScale: Record<string, number> = {
-  極小: 10,
-  小: 19.1,
-  中: 33.3,
-  大: 50,
   極大: 100,
 };
 const CRITICAL_DAMAGE_MULTIPLIER = 1.25;
@@ -1538,10 +1519,37 @@ function localizeExamLogText(text: string) {
   return localizeGameText(text, locale.value);
 }
 
+function elementIcon(element: ActionElement) {
+  if (element === '火') return fireIcon;
+  if (element === '水') return waterIcon;
+  if (element === '木') return floraIcon;
+  return cosmicIcon;
+}
+
+function referenceMagicElementClass(element: ActionElement) {
+  return {
+    'reference-magic-label--fire': element === '火',
+    'reference-magic-label--water': element === '水',
+    'reference-magic-label--flora': element === '木',
+    'reference-magic-label--cosmic': element === '無',
+  };
+}
+
+function isSelectionLogLine(line: string) {
+  return /^\d+T\s+選択\s/.test(line);
+}
+
+function playerLogIcon(line: string) {
+  const slot = deck.value.find((item) => {
+    const character = item.character;
+    if (!character) return false;
+    return line.includes(`${character.chara}/${character.costume}`);
+  });
+  return slot?.imageUrl || '';
+}
+
 function specialChallengeRankLabel(rank: number) {
-  if (rank === 3) return '③';
-  if (rank === 2) return '②';
-  return '①';
+  return '★'.repeat(Math.max(0, Math.floor(rank)));
 }
 
 const exam = ref<ExamDefinition>({
@@ -1598,12 +1606,30 @@ const editingDeckDetailCharacter = ref<any | null>(null);
 const draggingMagicId = ref('');
 const draggingCombo = ref<{ turnIndex: number; comboIndex: number } | null>(null);
 const dragOverComboIndex = ref<number | null>(null);
-const activeTab = ref<ActiveTab>('exam');
+const initialTab = router.currentRoute.value.query.tab === 'search' ? 'search' : 'exam';
+const activeTab = ref<ActiveTab>(initialTab);
+const lastManualTab = ref<ManualTab>('deck');
+const activeFlow = computed<SimulatorFlow>({
+  get: () => activeTab.value === 'search' ? 'search' : 'simulate',
+  set: (flow) => {
+    if (flow === 'search') activeTab.value = 'search';
+    else if (activeTab.value === 'search') activeTab.value = lastManualTab.value;
+  },
+});
+const manualTab = computed<ManualTab>({
+  get: () => activeTab.value === 'plan' ? 'plan' : activeTab.value === 'result' ? 'result' : lastManualTab.value,
+  set: (tab) => { lastManualTab.value = tab; activeTab.value = tab; },
+});
+const searchMounted = ref(initialTab === 'search');
+const searchPanelRef = ref<{ busy?: boolean } | null>(null);
+const searchBusy = computed(() => searchPanelRef.value?.busy === true);
+const commonConditionsBusy = computed(() => searchBusy.value || isRunning.value);
 const activeTurnIndex = ref(0);
 const activeComboIndex = ref(0);
 const activeComboSlot = ref<ComboSlotKey>('firstMagicId');
 const magicPickerOpen = ref(false);
 const enemyDialogOpen = ref(false);
+const enemyConditionsDialogOpen = ref(false);
 const editingEnemySlotIndex = ref(0);
 const logDialogOpen = ref(false);
 const settingsSaveDialogOpen = ref(false);
@@ -1615,7 +1641,21 @@ const savedExamSettings = ref<SavedExamSimulatorSettings[]>([]);
 const enemyConditionsTouched = ref(false);
 const runAttemptWarning = ref('');
 const activeExamPresetId = ref('');
+const appliedExamPreset = ref<ExamPresetDefinition | null>(null);
 const selectedSpecialChallengeIds = ref<string[]>([]);
+const sharedChallengeLocks = ref<SharedExamConditions['challengeLocks']>({});
+const sharedMaxRemoved = ref<1 | 2>(1);
+const conditionsReady = ref(false);
+const sharedConditions = computed(() => snapshotExamConditions(
+  activePreset.value,
+  exam.value, enemySlots.value,
+  Object.fromEntries((activePreset.value?.specialChallenges ?? []).map(challenge => [
+    challenge.id, selectedSpecialChallengeIds.value.includes(challenge.id) ? 'on' : 'off',
+  ])), sharedMaxRemoved.value,
+));
+const searchPreset = computed(() => activeExamPresetId.value
+  ? examPresetDefinitions.find(preset => preset.id === activeExamPresetId.value) ?? null
+  : null);
 
 const selectedCharacters = computed(() => deck.value.map((slot) => slot.character).filter((character): character is Character => !!character));
 const charaDict = computed(() => Object.fromEntries(selectedCharacters.value.map((character) => [character.chara, true])));
@@ -1701,8 +1741,22 @@ const planReferenceCards = computed<PlanReferenceCard[]>(() => deck.value.flatMa
   }];
 }));
 const editingEnemySlot = computed(() => enemySlots.value[editingEnemySlotIndex.value] ?? null);
-const activePreset = computed(() => examPresetDefinitions.find((preset) => preset.id === activeExamPresetId.value) ?? null);
+const activePreset = computed(() => appliedExamPreset.value?.id === activeExamPresetId.value
+  ? appliedExamPreset.value
+  : examPresetDefinitions.find((preset) => preset.id === activeExamPresetId.value) ?? null);
 const availableSpecialChallenges = computed<ExamSpecialChallengeDefinition[]>(() => activePreset.value?.specialChallenges ?? []);
+watch(selectedSpecialChallengeIds, ids => {
+  const selected = new Set(ids);
+  sharedChallengeLocks.value = Object.fromEntries(availableSpecialChallenges.value.map(challenge => [
+    challenge.id, selected.has(challenge.id) ? 'on' : 'off',
+  ]));
+}, { deep: true, flush: 'sync' });
+function setSharedChallenge(id: string, checked: boolean) {
+  sharedChallengeLocks.value = { ...sharedChallengeLocks.value, [id]: checked ? 'on' : 'off' };
+  selectedSpecialChallengeIds.value = checked
+    ? [...new Set([...selectedSpecialChallengeIds.value, id])]
+    : selectedSpecialChallengeIds.value.filter(value => value !== id);
+}
 const selectedSpecialChallenges = computed<ExamSpecialChallengeDefinition[]>(() => {
   const selectedIds = new Set(selectedSpecialChallengeIds.value);
   return availableSpecialChallenges.value.filter((challenge) => selectedIds.has(challenge.id));
@@ -1855,26 +1909,9 @@ const bestLogTitle = computed(() => {
     : '';
   return `${t('examSimulator.bestScoreLogWithScore', { score: formatNumber(bestResult.value.score) })}${suffix}`;
 });
-const groupedBestLog = computed<BattleLogGroup[]>(() => {
-  const groups: BattleLogGroup[] = [];
-  bestLog.value.forEach((line) => {
-    if (!shouldShowBestLogLine(line)) return;
-    const title = logTurnTitle(line);
-    let group = groups[groups.length - 1];
-    if (!group || group.title !== title) {
-      group = { title, entries: [] };
-      groups.push(group);
-    }
-    group.entries.push(buildBattleLogEntry(line));
-  });
-  return groups;
-});
-
-function shouldShowBestLogLine(line: string) {
-  return !line.includes('自分手札')
-    && !line.includes('相手予定')
-    && !isSelectionLogLine(line);
-}
+const groupedBestLog = computed<BattleLogGroup[]>(() => groupExamBattleLog(bestLog.value, {
+  playerIcon: playerLogIcon,
+}));
 
 watch(maxTurnCount, (turnCount) => {
   syncTurnPlans(turnCount);
@@ -1932,238 +1969,54 @@ watch(activeTurnIndex, () => {
 });
 
 watch(activeTab, (tab) => {
+  if (tab === 'search') searchMounted.value = true;
+  if (tab === 'deck' || tab === 'plan' || tab === 'result') lastManualTab.value = tab;
   if (tab !== 'plan') cancelMagicPicker();
 });
+watch(activeFlow, (flow) => {
+  const tab = flow === 'search' ? 'search' : undefined;
+  if (router.currentRoute.value.query.tab !== tab) {
+    void router.replace({ query: { ...router.currentRoute.value.query, tab } });
+  }
+});
+watch(() => router.currentRoute.value.query.tab, (tab) => {
+  const flow = tab === 'search' ? 'search' : 'simulate';
+  if (activeFlow.value !== flow) activeFlow.value = flow;
+});
+
+function restoreInitialExamDeck() {
+  const transferId = router.currentRoute.value.query.resourceSearch;
+  const resourceTransfer = typeof transferId === 'string' ? loadSearchTransfer(transferId) : null;
+  if (resourceTransfer) {
+    void prepareResourceCandidate(resourceTransfer.input, resourceTransfer.candidate).then(async () => {
+      await Promise.all(deck.value.map(async slot => {
+        if (slot.character) slot.imageUrl = await ensureImageUrl(slot.character);
+      }));
+      syncAllDeckLevelInputs();
+      resourcePreviewPolicy.value = resourceTransfer.candidate.policy;
+      if (router.currentRoute.value.query.tab !== 'search') activeTab.value = 'deck';
+    });
+  } else void restoreDeckFromSimulatorImport();
+}
 
 onMounted(() => {
   savedExamSettings.value = loadSavedExamSimulatorSettings();
-  void restoreDeckFromSimulatorImport();
-  window.setTimeout(() => {
-    void ensureAutoBestWorkerPool().catch(() => undefined);
-  }, 500);
+  if (router.currentRoute.value.query.tab === 'search' && !router.currentRoute.value.query.resourceSearch) {
+    const savedSearch = loadExamSearch();
+    if (savedSearch?.preset?.enemies?.length) {
+      applyExamPreset(savedSearch.preset);
+      sharedChallengeLocks.value = { ...savedSearch.challengeLocks };
+      sharedMaxRemoved.value = savedSearch.maxRemoved;
+      selectedSpecialChallengeIds.value = (savedSearch.preset.specialChallenges ?? [])
+        .filter(challenge => savedSearch.challengeLocks[challenge.id] !== 'off').map(challenge => challenge.id);
+      // The page exposes exact on/off selections; legacy automatic selections start checked.
+      sharedChallengeLocks.value = Object.fromEntries((savedSearch.preset.specialChallenges ?? [])
+        .map(challenge => [challenge.id, savedSearch.challengeLocks[challenge.id] === 'off' ? 'off' : 'on']));
+    }
+  }
+  conditionsReady.value = true;
+  restoreInitialExamDeck();
 });
-
-function logTurnTitle(line: string) {
-  if (line.startsWith('開始')) return '開始';
-  const turnMatch = line.match(/^(\d+)T/);
-  if (turnMatch) return `${turnMatch[1]}T`;
-  if (line.startsWith('結果')) return '結果';
-  if (line.startsWith('スコア内訳')) return 'スコア';
-  if (line.startsWith('リタイア')) return 'リタイア';
-  return 'その他';
-}
-
-function buildBattleLogEntry(line: string): BattleLogEntry {
-  const displayLine = formatBattleLogLine(line);
-  const emphasized = isHighlightedLogLine(line);
-  if (isSystemLogLine(line)) {
-    return { line, displayLine, side: 'system', emphasized };
-  }
-  if (line.includes('相手効果') || line.includes(' 相手 ')) {
-    const label = enemyLogLabel(displayLine);
-    return {
-      line,
-      displayLine: stripEnemyLogLabel(displayLine),
-      side: 'enemy',
-      emphasized,
-      label,
-      targetIcon: enemyLogTargetIcon(line),
-      targetLabel: enemyLogTargetLabel(line, label),
-      sourceElement: enemyLogSourceElement(line),
-      targetElement: enemyLogTargetElement(line),
-    };
-  }
-  if (line.includes(' 自分 ') || line.includes('自分効果') || line.includes('自分回復') || line.includes('継続回復')) {
-    return {
-      line,
-      displayLine,
-      side: 'player',
-      emphasized,
-      icon: playerLogIcon(line),
-      targetLabel: playerLogTargetLabel(line),
-      sourceElement: playerLogSourceElement(line),
-      targetElement: playerLogTargetElement(line),
-    };
-  }
-  return { line, displayLine, side: 'system' };
-}
-
-function isHighlightedLogLine(line: string) {
-  if (line.startsWith('スコア内訳')) return false;
-  return line.includes('回避')
-    || line.includes('クリティカル')
-    || line.includes('暗闇');
-}
-
-function formatBattleLogLine(line: string) {
-  let text = line.replace(/^\d+T\s+/, '');
-  text = text.replace(/^(先手|後手)\s+/, '');
-  text = text.replace(/^相手効果\s+/, '');
-  text = text.replace(/^自分効果\s+/, '効果 ');
-  text = text.replace(/^自分回復\s+/, '回復 ');
-  text = text.replace(/^自分\s+/, '');
-  text = text.replace(/^相手\s+/, '');
-  text = stripPlayerCardNames(text);
-  text = stripInlineEnemyLabels(text);
-  text = stripInlineElementTexts(text);
-  text = stripArrowTargetLabels(text);
-  text = stripInlineElementTexts(text);
-  text = stripLogCalculationDetails(text);
-  if (!isSelectionLogLine(line)) text = stripInlineTargetMagic(text);
-  text = text.replace(/\s*->\s*/g, ' / ');
-  text = text.replace(/\s+\/\s+\/\s+/g, ' / ');
-  return text.trim();
-}
-
-function enemyLogLabel(displayLine: string) {
-  const match = displayLine.match(/^([^:：\s/]+)[:：]/);
-  return match?.[1] || '敵';
-}
-
-function stripEnemyLogLabel(displayLine: string) {
-  return displayLine.replace(/^[^:：\s/]+[:：]\s*/, '');
-}
-
-function stripPlayerCardNames(text: string) {
-  return text.replace(/[^/\s]+\/[^\s]+\s+(M[123]\()/g, '$1');
-}
-
-function stripInlineElementTexts(text: string) {
-  return text
-    .replace(/(M[123]\()([火水木無]),\s*/g, '$1')
-    .replace(/(\S+\()([火水木無]),\s*/g, '$1')
-    .replace(/\s*受け[火水木無]\s*/g, ' ')
-    .replace(/->\s*[火水木無]\s*\/\s*/g, '-> ')
-    .replace(/->\s*[火水木無]\s+(与[\d,]+)/g, '-> $1')
-    .replace(/\s\/\s[火水木無]\s+(与[\d,]+)/g, ' / $1');
-}
-
-function stripLogCalculationDetails(text: string) {
-  return text
-    .replace(/,\s*等倍[\d,]+/g, '')
-    .replace(/,\s*ATK[\d,]+/g, '')
-    .replace(/\s+ATK[\d,]+/g, '')
-    .replace(/\s*\/\s*逆算ATK[\d,]+/g, '')
-    .replace(/\s*\/\s*等倍[\d,]+/g, '')
-    .replace(/\s*\/\s*ATK[\d,]+/g, '')
-    .replace(/\s*\[[\d,+]+\]/g, '')
-    .replace(/\s+受け\s+(被[\d,]+)/g, ' $1')
-    .replace(/\s+受け(?=\s|\/|$)/g, '');
-}
-
-function stripInlineEnemyLabels(text: string) {
-  return text.replace(/(先手|後手)\s+([^:：\s/]+)[:：]\s*/g, '$1 ');
-}
-
-function stripArrowTargetLabels(text: string) {
-  return text
-    .replace(/->\s*相手全体\s*\/\s*/g, '-> ')
-    .replace(/->\s*([^:：\s/]+)[:：]\s*/g, '-> ');
-}
-
-function stripInlineTargetMagic(text: string) {
-  return text.replace(/->\s*M[123]\((?:[^()]|\([^()]*\))*\)\s*/g, '-> ');
-}
-
-function enemyLogTargetIcon(line: string) {
-  const targetText = line.split('->')[1] || '';
-  return playerLogIcon(targetText);
-}
-
-function enemyLogSourceElement(line: string): ActionElement | undefined {
-  return extractActionElement(line);
-}
-
-function enemyLogTargetElement(line: string): ActionElement | undefined {
-  const targetText = line.split('->')[1] || '';
-  return extractMagicElement(targetText) || extractReceivingElement(targetText);
-}
-
-function enemyLogTargetLabel(line: string, sourceLabel: string) {
-  const targetText = line.split('->')[1] || '';
-  const match = targetText.match(/^\s*([^:：\s/]+)[:：]/);
-  const targetLabel = match?.[1] || '';
-  if (!targetLabel || targetLabel === sourceLabel) return '';
-  return targetLabel;
-}
-
-function playerLogTargetLabel(line: string) {
-  if ((!line.includes(' 自分 ') && !line.includes('自分効果')) || line.includes('自分回復')) return '';
-  const match = line.match(/\s->\s*([^:：\s/]+)(?:[:：]|\s*\/)/);
-  return match?.[1] || '敵';
-}
-
-function playerLogSourceElement(line: string): ActionElement | undefined {
-  return extractMagicElement(line);
-}
-
-function playerLogTargetElement(line: string): ActionElement | undefined {
-  if ((!line.includes(' 自分 ') && !line.includes('自分効果')) || line.includes('自分回復')) return undefined;
-  const targetText = line.split('->')[1] || '';
-  return extractTargetLabelElement(targetText) || extractReceivingElement(targetText);
-}
-
-function extractMagicElement(text: string): ActionElement | undefined {
-  return normalizeActionElement(text.match(/M[123]\(([火水木無]),/)?.[1]);
-}
-
-function extractActionElement(text: string): ActionElement | undefined {
-  return normalizeActionElement(text.match(/[^:：\s/]+[:：][^(]*\(([火水木無]),/)?.[1]);
-}
-
-function extractTargetLabelElement(text: string): ActionElement | undefined {
-  return normalizeActionElement(text.match(/^\s*[^:：\s/]+[:：]\s*([火水木無])/)?.[1]);
-}
-
-function extractReceivingElement(text: string): ActionElement | undefined {
-  return normalizeActionElement(text.match(/受け([火水木無])/)?.[1]);
-}
-
-function normalizeActionElement(value?: string): ActionElement | undefined {
-  return ['火', '水', '木', '無'].includes(value || '') ? value as ActionElement : undefined;
-}
-
-function elementIcon(element: ActionElement) {
-  if (element === '火') return fireIcon;
-  if (element === '水') return waterIcon;
-  if (element === '木') return floraIcon;
-  return cosmicIcon;
-}
-
-function referenceMagicElementClass(element: ActionElement) {
-  return {
-    'reference-magic-label--fire': element === '火',
-    'reference-magic-label--water': element === '水',
-    'reference-magic-label--flora': element === '木',
-    'reference-magic-label--cosmic': element === '無',
-  };
-}
-
-function isSystemLogLine(line: string) {
-  return line.startsWith('開始')
-    || line.startsWith('結果')
-    || line.startsWith('リタイア')
-    || line.includes('自分手札')
-    || line.includes('相手予定')
-    || isSelectionLogLine(line)
-    || line.includes('終了:')
-    || line.includes('手札再配布')
-    || line.includes('許容組み合わせなし')
-    || line.includes('やけど:');
-}
-
-function isSelectionLogLine(line: string) {
-  return /^\d+T\s+選択\s/.test(line);
-}
-
-function playerLogIcon(line: string) {
-  const slot = deck.value.find((item) => {
-    const character = item.character;
-    if (!character) return false;
-    return line.includes(`${character.chara}/${character.costume}`);
-  });
-  return slot?.imageUrl || '';
-}
 
 function createEnemyAction(partial: Partial<EnemyActionDefinition> = {}): EnemyActionDefinition {
   const power = normalizeEnemyMagicPower(partial.power, partial.hitCount, partial.name);
@@ -2205,11 +2058,21 @@ function createEnemySlotFromActions(name: string, actions: Partial<EnemyActionDe
   };
 }
 
+function handleSearchPreset(preset: ExamPresetDefinition) {
+  if (searchBusy.value) return;
+  if (activeExamPresetId.value === preset.id) return;
+  applyExamPreset(preset);
+}
+
 function applyExamPreset(preset: ExamPresetDefinition) {
+  if (commonConditionsBusy.value) return;
+  appliedExamPreset.value = clonePlain(preset);
+  sharedChallengeLocks.value = Object.fromEntries((preset.specialChallenges ?? []).map(challenge => [challenge.id, 'on'])) as SharedExamConditions['challengeLocks'];
+  resourcePreviewPolicy.value = null;
   enemyConditionsTouched.value = true;
   runAttemptWarning.value = '';
   activeExamPresetId.value = preset.id;
-  selectedSpecialChallengeIds.value = [];
+  selectedSpecialChallengeIds.value = (preset.specialChallenges ?? []).map(challenge => challenge.id);
   exam.value.kind = preset.kind;
   exam.value.enemyElement = preset.enemyElement;
   if (preset.difficulty !== undefined) exam.value.difficulty = preset.difficulty;
@@ -2639,7 +2502,7 @@ async function createDeckSlotFromBaseCharacter(
   );
   if (!original) return createEmptyDeckSlot();
 
-  const baseCharacter = await processCharacterSelection({ ...original }, undefined, true) as Character;
+  const baseCharacter = await processCharacterSelection({ ...original }, undefined, true) as Character & Record<string, any>;
   return createDeckSlotFromSimulatorCharacter({
     ...baseCharacter,
     level: importedCharacter.level ?? baseCharacter.level,
@@ -3724,12 +3587,8 @@ function getMagicPower(deckIndex: number, magicSlot: MagicSlot) {
 
 async function waitForSimulationPaint() {
   await nextTick();
+  if(typeof window==='undefined'){await yieldToHost();return;}
   await new Promise<void>((resolve) => {
-    if (typeof window === 'undefined') {
-      // Yield to the worker event loop so a queued stop message can be handled.
-      setTimeout(resolve, 0);
-      return;
-    }
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => resolve());
     });
@@ -3793,6 +3652,7 @@ function createSimulationRuntimeCache(): SimulationRuntimeCache {
     magicsById: new Map(),
     parsedMagicIds: new Map(),
     visiblePairs: new Map(),
+    enemyActionPools: createEnemyActionPools(),
     duoActive: new Map(),
     enemyActionMeta: new Map(),
     playerMagicMeta: new Map(),
@@ -4053,6 +3913,7 @@ async function runAutoBestSimulation(count: number, resultGeneration: number) {
     deck: deck.value,
     selectedSpecialChallengeIds: selectedSpecialChallengeIds.value,
     activeExamPresetId: activeExamPresetId.value,
+    presetMetadata: activePreset.value,
   });
   if (snapshotJson !== autoBestSnapshotKey) {
     autoBestSnapshotKey = snapshotJson;
@@ -4205,6 +4066,8 @@ async function searchAutoBestSeed(
   ) => void,
   rootRange?: AutoBestRootRange,
   initialPruneBenchmark?: AutoBestPruneBenchmark,
+  trainingPolicy?: PolicyKind,
+  trainingDeadline?: number,
 ): Promise<AutoBestSeedSearchResult> {
   const frames: Array<{
     checkpoint: AutoBestCheckpoint;
@@ -4225,6 +4088,8 @@ async function searchAutoBestSeed(
   let lastProgressAt = getSimulationClock();
   let cancelled = false;
   const branchRng = createRng(seedText);
+  const rootSlice=trainingDeadline===undefined?Infinity:Math.max(1,(trainingDeadline-getSimulationClock())/4);
+  let rootDeadline=Infinity;
   const pruneLateAttackBranches = (simulationRuntimeCache?.examKind ?? exam.value.kind) === 'ATTACK';
   let pruneBenchmark = initialPruneBenchmark ? { ...initialPruneBenchmark } : undefined;
 
@@ -4245,6 +4110,24 @@ async function searchAutoBestSeed(
         return;
       }
       let candidates = result.pendingDecision.candidates;
+      if (trainingPolicy && depth < 3) {
+        // Spend the short offline search on promising first moves. The ordering
+        // sees only the same public observation as the playable policy.
+        const checkpoint = result.pendingDecision.checkpoint;
+        const used = new Set(currentPath.slice(0, depth).flat());
+        const scorePolicy=trainingPolicy==='effects-score'||trainingPolicy==='effects-duo';
+        const observation = observeResourceBattle(checkpoint.turnIndex, checkpoint.handState.visible,
+          checkpoint.state, checkpoint.playerHp, checkpoint.enemyHp,
+          checkpoint.enemyDeck[checkpoint.turnIndex * 2 + knownEnemySlotIndexForTurn(checkpoint.turnIndex)],
+          checkpoint.stats, trainingPolicy.startsWith('effects'), handMagicIds.value.filter(id => !used.has(id)), scorePolicy, trainingPolicy==='effects-public'||trainingPolicy==='effects-tail'||scorePolicy&&exam.value.kind!=='DEFENCE', trainingPolicy==='effects-tail'||scorePolicy&&exam.value.kind!=='DEFENCE',trainingPolicy==='effects-duo');
+        const ordered: PlayerPair[] = [];
+        while (observation.pairs.length) {
+          const pair = chooseObservedPair(observation, trainingPolicy)!;
+          ordered.push(pair);
+          observation.pairs = observation.pairs.filter(p => p.ids !== pair);
+        }
+        candidates = ordered;
+      }
       if (depth === 0 && rootRange) {
         candidates = candidates.slice(rootRange.start, rootRange.end);
       }
@@ -4278,6 +4161,13 @@ async function searchAutoBestSeed(
   processResult(initialResult, 0);
 
   while (frames.length > 0) {
+    if(trainingDeadline!==undefined) {
+      const now=getSimulationClock();
+      if(now>=trainingDeadline){cancelled=true;break;}
+      // A short training DFS must try more than one opening. Preserve the
+      // root checkpoint and the best completed plan when moving to the next.
+      if(frames.length>1&&now>=rootDeadline){frames.length=1;currentPath.length=0;}
+    }
     const frame = frames[frames.length - 1];
     if (frame.nextIndex >= frame.candidates.length) {
       frames.pop();
@@ -4285,6 +4175,7 @@ async function searchAutoBestSeed(
       continue;
     }
     const pair = frame.candidates[frame.nextIndex++];
+    if(trainingDeadline!==undefined&&frame.depth===0)rootDeadline=getSimulationClock()+rootSlice;
     currentPath[frame.depth] = pair;
     currentPath.length = frame.depth + 1;
     branchRng.setState(frame.checkpoint.rngState);
@@ -4297,9 +4188,9 @@ async function searchAutoBestSeed(
     // Reading the high-resolution clock at every DFS node is measurable at
     // hundreds of thousands of nodes. Stop checks remain per-node; only the
     // optional UI progress check is sampled.
-    if ((exploredNodes & 511) === 0) {
+    if ((exploredNodes & (trainingDeadline===undefined?511:63)) === 0) {
       const now = getSimulationClock();
-      if (now - lastProgressAt >= AUTO_BEST_PROGRESS_UPDATE_INTERVAL_MS) {
+      if (now - lastProgressAt >= (trainingDeadline===undefined?AUTO_BEST_PROGRESS_UPDATE_INTERVAL_MS:32)) {
         onProgress(exploredNodes, completedPatterns, queuedBranchCount(), bestScore);
         lastProgressAt = now;
         await waitForSimulationPaint();
@@ -4333,6 +4224,7 @@ async function runAutoBestWorkerPartition(
 ) {
   if (snapshot) {
     exam.value = markRaw(snapshot.exam);
+    appliedExamPreset.value = snapshot.presetMetadata ?? null;
     enemySlots.value = markRaw(snapshot.enemySlots);
     deck.value = markRaw(snapshot.deck);
     selectedSpecialChallengeIds.value = markRaw(snapshot.selectedSpecialChallengeIds);
@@ -4359,7 +4251,358 @@ function requestAutoBestWorkerStop() {
   stopRequested.value = true;
 }
 
-defineExpose({ runAutoBestWorkerPartition, requestAutoBestWorkerStop });
+// Compatibility adapter: search and the interactive simulator execute the SAME
+// battle state machine and score formula. No duplicate implementation of combat.
+let resourcePreferredPlan: PlayerPair[] = [];
+let resourcePreferredPlanMode: 'turn' | 'priority' | 'flexible' = 'turn';
+let resourceFlexibleSteps: FlexiblePlanStep[] = [];
+let resourceTrainingPolicy: PolicyKind = 'effects';
+let resourceCriticalScoutCard:number|undefined;
+let resourceCriticalScoutMagic:MagicSlot|undefined;
+let resourceImportanceWeight:number|undefined;
+let resourceIdealHandTraining=false;
+let resourceCriticalScoutHits=0;
+let resourceCriticalScoutTargets:number[]=[];
+let resourcePerAttemptProbability = 0.0017;
+let resourcePublicEnemyActions: RuntimeEnemyAction[] = [];
+let resourcePairRuntime:SimulationRuntimeCache|null|undefined;
+let resourcePairSpend:ReturnType<typeof createPairSpend>|undefined;
+let resourceInitialRuntime:SimulationRuntimeCache|null|undefined;
+let resourceInitialState:SimulationState|undefined;
+let resourceInitialStats:SimulationStats|undefined;
+async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
+  resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
+  resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
+  resourcePreferredPlanMode = candidate.preferredPlanMode ?? 'turn';
+  resourceTrainingPolicy = candidate.policy ?? 'effects';
+  simulationRuntimeCache = null;
+  resourceInitialRuntime=undefined;resourceInitialState=undefined;resourceInitialStats=undefined;
+  applyExamPreset(input.preset);
+  exam.value.difficulty = input.preset.difficulty ?? 1.5;
+  selectedSpecialChallengeIds.value = [...candidate.challengeIds];
+  const store = useCharacterStore();
+  deck.value = candidate.cards.map(card => {
+    const raw = store.characters.find(c => c.name === card.name);
+    if (!raw) throw new Error(`Unknown card: ${card.name}`);
+    const slot = createEmptyDeckSlot();
+    slot.character = { ...raw };
+    slot.level = card.level;
+    slot.totsu = card.totsu;
+    slot.maxHp = Number(raw.hp);
+    slot.maxAtk = Number(raw.atk);
+    slot.magicLevels = { 1: card.magicLevels[0], 2: card.magicLevels[1], 3: card.magicLevels[2] };
+    slot.buddyLevels = { 1: card.buddyLevels[0], 2: card.buddyLevels[1], 3: card.buddyLevels[2] };
+    for (const m of [1, 2, 3] as MagicSlot[]) {
+      slot.magicAttributes[m] = normalizeElement((raw as any)[`magic${m}atr`]);
+      slot.magicPowers[m] = (raw as any)[`magic${m}pow`] || '単発(弱)';
+      slot.magicHeals[m] = (raw as any)[`magic${m}heal`] || '';
+      slot.magicEffects[m] = (raw as any)[`magic${m}etc`] || '';
+    }
+    slot.selectedMagicSlots = [...card.selectedMagic];
+    return slot;
+  });
+  deck.value.forEach((_, i) => recalculateDeckStats(i));
+  const scoutTargets=new Set<number>(),characters=new Set(deck.value.map(slot=>slot.character?.chara));
+  for(const [index,slot] of deck.value.entries()) {
+    const raw=slot.character!;
+    for(const buff of parseMagicBuffsFromEtc(raw,{allowM3:true})) {
+      if(buff.buffOption!=='クリティカル'||criticalRatePowerScale[buff.powerOption]>=100
+        ||!slot.selectedMagicSlots.includes(Number(buff.magicOption.slice(1)) as MagicSlot))continue;
+      if(['allySelected','allyAll'].includes(buff.targetType??'self'))deck.value.forEach((_,i)=>scoutTargets.add(i));
+      else if((buff.targetType??'self')==='self')scoutTargets.add(index);
+    }
+    for(const buddyIndex of [1,2,3] as const)if(characters.has((raw as any)[`buddy${buddyIndex}c`])
+      &&getBuddyStatusForCharacter(raw,buddyIndex,{totsu:slot.totsu,isActive:true}).includes('クリティカル'))scoutTargets.add(index);
+  }
+  resourceCriticalScoutTargets=[...scoutTargets].sort((a,b)=>a-b);
+  // Let reactive derived values invalidate before constructing the per-deck cache.
+  await nextTick();
+  simulationRuntimeCache = createSimulationRuntimeCache();
+  resourceFlexibleSteps=[];
+  if(resourcePreferredPlanMode==='flexible' && exam.value.kind==='BASIC' && resourcePreferredPlan.length<=5) {
+    resourceFlexibleSteps=resourcePreferredPlan.map((ids,index)=>({ids,earliestTurn:index===resourcePreferredPlan.length-1?resourcePreferredPlan.length:1,requires:[]}));
+    for(const [index,pair] of resourcePreferredPlan.entries())for(const id of pair) {
+      const parsed=parseMagicId(id)!;
+      const effects=getPlayerEffectPlans(id,pair.find(other=>other!==id)!,parsed).filter(plan=>
+        plan.duration>=2&&['ATKUP','ダメージUP','属性ダメUP','クリティカル'].includes(plan.buff.buffOption));
+      for(let next=index+1;next<resourceFlexibleSteps.length;next++)for(const effect of effects) {
+        if(!resourceFlexibleSteps[next].ids.some(target=>{
+          const targetMagic=magicById(target)!;
+          return effect.targets.includes(targetMagic.deckIndex)&&(!effect.buff.attributeOption||effect.buff.attributeOption===targetMagic.element);
+        }))continue;
+        resourceFlexibleSteps[index].earliestTurn=Math.max(resourceFlexibleSteps[index].earliestTurn,next+2-effect.duration);
+        resourceFlexibleSteps[next].requires.push(id);
+      }
+    }
+  }
+  resourcePublicEnemyActions = enemySlots.value.flatMap((slot,slotIndex)=>slot.actions.filter(isEnemyActionEnabled).map((action,actionIndex)=>({
+    ...action,slotKey:'resource-unrevealed',slotName:slot.name,slotLabel:`敵${slotIndex+1}`,identity:`resource-public:${slotIndex}:${actionIndex}`,
+  } as RuntimeEnemyAction)));
+}
+
+function runResourceTrial(seedText: string, policy: PolicyKind, keepLog = false) {
+  const plan: PlayerPair[] | undefined = keepLog ? [] : undefined;
+  const result = runOneSimulation(createRng(seedText), keepLog, { resourcePolicy: policy, recordPairs: plan });
+  return { score: result.score, retired: result.retired, finishTurn: result.finishTurn, fitness: resourceTrialFitness(result), log: result.log, plan };
+}
+
+function scoutResourceCritical(seedText:string,policy:PolicyKind,cardIndex:number,idealHand=false,magic?:MagicSlot) {
+  if(!Number.isInteger(cardIndex)||cardIndex<0||cardIndex>=deck.value.length)throw new Error('Invalid critical scout card');
+  const previous=resourceCriticalScoutCard,previousMagic=resourceCriticalScoutMagic,previousHits=resourceCriticalScoutHits,plan:PlayerPair[]=[];
+  const previousIdealHand=resourceIdealHandTraining;
+  resourceCriticalScoutCard=cardIndex;resourceCriticalScoutMagic=magic;resourceCriticalScoutHits=0;resourceIdealHandTraining=idealHand;
+  try {
+    const result=runOneSimulation(createRng(seedText),false,{resourcePolicy:policy,recordPairs:plan});
+    return {score:result.score,retired:result.retired,finishTurn:result.finishTurn,fitness:resourceTrialFitness(result),plan,forcedHits:resourceCriticalScoutHits};
+  } finally {resourceCriticalScoutCard=previous;resourceCriticalScoutMagic=previousMagic;resourceCriticalScoutHits=previousHits;resourceIdealHandTraining=previousIdealHand;}
+}
+
+function resourceCriticalTargets(){return [...resourceCriticalScoutTargets];}
+
+function replayResourceTrial(seedText: string, plan: PlayerPair[], keepLog = false) {
+  const result = runOneSimulation(createRng(seedText), keepLog, { forcedPairs: plan });
+  return { score: result.score, retired: result.retired, finishTurn: result.finishTurn, fitness: resourceTrialFitness(result), log: result.log, plan };
+}
+
+function resourceTrialFitness(result: SimulationStats) {
+  // This is a search gradient, never a displayed game score or target success.
+  // Zero-score deaths must still distinguish near-wins from ineffective decks.
+  return result.retired ? 10000 * Math.min(1, result.playerDamage / Math.max(1, result.enemyMaxHp))
+    + 500 * result.finishTurn : result.score;
+}
+
+async function learnResourcePlan(seed: string, durationMs: number): Promise<PlayerPair[] | null> {
+  // Offline training only. The resulting fixed instructions are evaluated on
+  // independent seeds; validation never invokes this hindsight optimizer.
+  const start = getSimulationClock(), previousStop = stopRequested.value;
+  stopRequested.value = false;
+  try {
+    const result = await searchAutoBestSeed(seed, () => {
+      if (getSimulationClock() - start >= durationMs) stopRequested.value = true;
+    }, undefined, undefined, resourceTrainingPolicy,start+durationMs);
+    return result.bestPlan.length ? result.bestPlan.map(pair => [...pair]) : null;
+  } finally { stopRequested.value = previousStop; }
+}
+
+async function learnResourceCriticalPlan(seed:string,durationMs:number,cardIndex:number,idealHand=false,magic?:MagicSlot):Promise<PlayerPair[]|null> {
+  if(!Number.isInteger(cardIndex)||cardIndex<0||cardIndex>=deck.value.length)throw new Error('Invalid critical scout card');
+  const previous=resourceCriticalScoutCard,previousMagic=resourceCriticalScoutMagic,previousHits=resourceCriticalScoutHits,previousIdealHand=resourceIdealHandTraining;
+  resourceCriticalScoutCard=cardIndex;resourceCriticalScoutMagic=magic;resourceCriticalScoutHits=0;resourceIdealHandTraining=idealHand;
+  try {return await learnResourcePlan(seed,durationMs);}
+  finally {resourceCriticalScoutCard=previous;resourceCriticalScoutMagic=previousMagic;resourceCriticalScoutHits=previousHits;resourceIdealHandTraining=previousIdealHand;}
+}
+
+function runResourceImportanceTrial(seedText:string,policy:PolicyKind) {
+  const previousWeight=resourceImportanceWeight,previousScout=resourceCriticalScoutCard,previousMagic=resourceCriticalScoutMagic;
+  const previousIdeal=resourceIdealHandTraining;
+  resourceImportanceWeight=1;resourceCriticalScoutCard=undefined;resourceCriticalScoutMagic=undefined;resourceIdealHandTraining=false;
+  try {
+    const result=runResourceTrial(seedText,policy);
+    return {...result,weight:resourceImportanceWeight};
+  } finally {
+    resourceImportanceWeight=previousWeight;resourceCriticalScoutCard=previousScout;resourceCriticalScoutMagic=previousMagic;resourceIdealHandTraining=previousIdeal;
+  }
+}
+
+function observeResourceBattle(turnIndex: number, visible: string[], state: SimulationState,
+  playerHp: number, enemyHp: number, knownEnemy: RuntimeEnemyAction | undefined, stats: SimulationStats, effectAware: boolean, unusedMagic: string[], scoreAware=false, publicForecast=false, tailAware=false,duoAware=false): BattleObservation {
+  let futureSpend:((pair:PlayerPair)=>number)|undefined;
+  if(duoAware&&exam.value.kind!=='DEFENCE'){
+    if(resourcePairRuntime!==simulationRuntimeCache||!resourcePairSpend){
+      if(!resourceInitialState||!resourceInitialStats)throw new Error('Initial public battle state is unavailable');
+      // Use only deterministic starting effects. No enemy deck, draw order or
+      // effects observed on an earlier random trial enter this shared cache.
+      const future=cloneSimulationState(resourceInitialState);
+      const futureTurn=exam.value.kind==='BASIC'?4:5;
+      for(let i=1;i<futureTurn;i++)tickTimedEffects(future);
+      const later=observeResourceBattle(futureTurn-1,handMagicIds.value,future,resourceInitialStats.playerTotalHp,
+        resourceInitialStats.enemyMaxHp,undefined,resourceInitialStats,true,handMagicIds.value,false,false,true,false);
+      const key=(a:string,b:string)=>[a,b].sort().join('|'),values=new Map<string,number>();
+      for(const pair of later.pairs)values.set(key(...pair.ids),Math.max(values.get(key(...pair.ids))??0,pair.damage));
+      resourcePairSpend=createPairSpend(handMagicIds.value,(a,b)=>values.get(key(a,b))??0);
+      resourcePairRuntime=simulationRuntimeCache;
+    }
+    futureSpend=resourcePairSpend(unusedMagic,exam.value.kind==='BASIC'?Math.max(1,4-turnIndex):Math.floor(unusedMagic.length/2));
+  }
+  const knownIndex = knownEnemySlotIndexForTurn(turnIndex);
+  // The unrevealed action is represented by a distinct public-unknown target;
+  // no enemy identity, deck order or RNG state is read for the forecast.
+  const publicEnemyAt=[0,1].map(index=>{
+    if(index===knownIndex)return knownEnemy;
+    const fixed=publicForecast?resourcePublicEnemyActions.filter(a=>a.fixedOrder===turnIndex*2+index+1):[];
+    return fixed.length===1?fixed[0]:undefined;
+  });
+  const publicTargets = publicEnemyAt.map(action=>action??{slotKey:'resource-unrevealed'} as RuntimeEnemyAction);
+  // Only this public enemy slot is available to the policy, never the enemy deck.
+  const finisher = unusedMagic.reduce((best, id) => {
+    const magic = magicById(id), current = magicById(best);
+    const strength = (m: any, magicId: string) => {
+      if (!m) return 0;
+      if (!effectAware) return safeNumber(buildRuntimeCharacter(m.deckIndex)?.atk) * magicHitCount(m.power);
+      const parsed = parseMagicId(magicId)!;
+      const duo = unusedMagic.some(other => isDuoActiveForPair(magicId, other));
+      const target = exam.value.enemyElement === '全' ? '無' : exam.value.enemyElement;
+      const base=calculatePlayerDamageBaseFromState(state, magicId, parsed.deckIndex, parsed.magicSlot, target, 0, duo);
+      return (base?.damage??0)*(tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(m.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER):1);
+    };
+    return strength(magic, id) > strength(current, best) ? id : best;
+  }, '');
+  const finisherPartners = unusedMagic.filter(id => isDuoActiveForPair(finisher, id));
+  const pairs = enumerateVisiblePlayerPairs(visible).map(ids => {
+    // Evaluate the chosen cards' public effects before estimating their attacks.
+    // In particular, an immunity can enable the paired heal, and an ATK buff can
+    // make a finisher lethal. Branch state uses the same copy-on-write as DFS.
+    const predicted = cloneSimulationState(state);
+    const predictedStats = { ...stats, log: undefined, playerAttackSnapshots: undefined, playerHealSnapshots: undefined };
+    let predictedHeal = 0, predictedHp = playerHp;
+    if (effectAware) {
+      const activateOwn=(index:number)=>{
+        const id=ids[index];
+        activatePlayerMagicBuffs(id, ids[1-index], predicted, predictedStats, turnIndex + 1, index ? '後手' : '先手');
+        if(exam.value.kind==='DEFENCE')activatePlayerContinueHeal(id,ids[1-index],predicted,predictedStats);
+        activatePlayerOpponentDebuffs(id, publicTargets[index], publicTargets[1-index], predicted, () => 0.5,
+          predictedStats, turnIndex + 1, index ? '後手' : '先手');
+        const amount = Math.min(calculatePlayerHeal(id, predicted), Math.max(0, stats.playerTotalHp - predictedHp));
+        predictedHp += amount; predictedHeal += amount;
+      };
+      if(publicForecast)for(let phase=0;phase<4;phase++) {
+        const index=phase>>1;
+        if((phase%2===0)===isPlayerFirstTurn(turnIndex))activateOwn(index);
+        else {
+          const action=publicEnemyAt[index];
+          if(!action)continue;
+          const frozen=isEnemySideTarget(action.effectTarget)&&isEnemyFrozen(predicted,action.slotKey)&&isEnemyFreezeBlockedEffectKind(action.effectKind);
+          if(!frozen) {
+            applyEnemySelfEffects(action,predicted,enemyHp,stats.enemyMaxHp,predictedStats,publicTargets[1-index]);
+            applyEnemyAdditionalEffects(action,ids[index],ids[1-index],predicted,()=>0.5,predictedStats,publicTargets[1-index]);
+          }
+        }
+      } else ids.forEach((_,index)=>activateOwn(index));
+    }
+    const continuing=(value:SimulationState)=>remainingContinuousHealing(value.playerContinueHeals,turnIndex+1,deckCardHp,index=>isPlayerCursed(value,index));
+    const continuousGain=effectAware&&exam.value.kind==='DEFENCE'?Math.max(0,continuing(predicted)-continuing(state)):0;
+    let damage = 0, firstDamage = 0, duo = 0, heal = predictedHeal+continuousGain, utility = 0, defense = 0;
+    ids.forEach((id, index) => {
+      const parsed = parseMagicId(id)!;
+      const magic = magicById(id)!;
+      const activeDuo = isDuoActiveForPair(id, ids[1 - index]);
+      const target = publicEnemyAt[index] ? effectiveEnemyActionElement(publicEnemyAt[index]!)
+        : exam.value.enemyElement === '全' ? '無' : exam.value.enemyElement;
+      const targetKey = effectAware ? publicTargets[index].slotKey : index === knownIndex ? knownEnemy?.slotKey ?? '' : '';
+      const reduction = sumDamageDownRatesForCard(predicted.playerDamageDowns, parsed.deckIndex, magic.element)
+        + sumDamageRatesForElementAndEnemy(predicted.enemyDamageReductions, magic.element, targetKey)
+        - (effectAware ? sumDamageRatesForElementAndEnemy(predicted.enemyDamageTakenUps, magic.element, targetKey) : 0);
+      const base = calculatePlayerDamageBaseFromState(predicted, id, parsed.deckIndex, parsed.magicSlot, target, reduction, activeDuo);
+      // damage already includes the full multi-hit multiplier in the shared engine.
+      const d = hasEnemyDamageNull(predicted, magic.element, targetKey) ? 0 : (base?.damage ?? 0)
+        * Math.max(0, 1 - sumDamageDownRatesForCard(predicted.playerAttackDowns, parsed.deckIndex, magic.element) / 100)
+        * (tailAware?criticalTailMultiplier(base?.criticalChance??0,activeDuo?3:magicHitCount(magic.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER)
+          :effectAware ? 1 + (base?.criticalChance ?? 0) * (CRITICAL_DAMAGE_MULTIPLIER - 1) : 1);
+      damage += d;
+      if (index === 0) firstDamage = d;
+      duo += Number(activeDuo && parsed.magicSlot === 2);
+      const slot = deck.value[parsed.deckIndex];
+      const effects = effectAware ? getPlayerEffectPlans(id, ids[1 - index], parsed).map(plan => plan.buff.buffOption).join(' ')
+        : slot.magicEffects[parsed.magicSlot];
+      const text = `${effects} ${slot.magicHeals[parsed.magicSlot]}`;
+      if (!effectAware && text.includes('回復') && !isPlayerCursed(predicted, parsed.deckIndex)) heal += slot.customHp * 0.15;
+      if (/解除|無効/.test(text)) utility++;
+      if (effectAware) {
+        const compatibility = getCompatibility(magic.element, target);
+        defense += compatibility === 'advantage' ? 1 : compatibility === 'disadvantage' ? -1 : 0;
+        const hits = index === knownIndex && knownEnemy ? getEnemyActionRuntimeMeta(knownEnemy).hitCount : 2;
+        defense += Math.min(1, sumRatesForCard(predicted.playerEvasions, parsed.deckIndex) / 100) * hits * 0.6;
+        defense += sumDamageTakenDownRatesForCard(predicted.playerDamageTakenDowns, parsed.deckIndex, target) / 100;
+        defense += (sumRatesForEnemy(predicted.enemyAttackDowns, targetKey)
+          + sumDamageRatesForElementAndEnemy(predicted.enemyDamageDowns, target, targetKey)) / 100;
+      } else if (index === knownIndex && knownEnemy) defense += getCompatibility(magic.element, target) === 'advantage' ? 1 : 0;
+    });
+    let setup = 0;
+    if (effectAware && exam.value.kind === 'BASIC' && turnIndex < 3) {
+      const duration = 4-turnIndex;
+      const before = cloneSimulationState(state), after = cloneSimulationState(predicted);
+      before.playerBuffs = state.playerBuffs.filter(b=>b.turns>=duration);
+      after.playerBuffs = predicted.playerBuffs.filter(b=>b.turns>=duration);
+      const futureIds = new Set([finisher,...ids.map(id=>`${parseMagicId(id)!.deckIndex}-M2`)]);
+      let beforePeak=0,afterPeak=0;
+      for (const id of futureIds) {
+        if (!unusedMagic.includes(id)||ids.includes(id)) continue;
+        const parsed=parseMagicId(id)!;
+        const duo=unusedMagic.some(other=>!ids.includes(other)&&isDuoActiveForPair(id,other));
+        const target=exam.value.enemyElement==='全'?'無':exam.value.enemyElement;
+        const damage=(s:SimulationState)=>{
+          const base=calculatePlayerDamageBaseFromState(s,id,parsed.deckIndex,parsed.magicSlot,target,0,duo);
+          const magic=magicById(id)!;
+          const critical=tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(magic.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER)
+            :1+(base?.criticalChance??0)*(CRITICAL_DAMAGE_MULTIPLIER-1);
+          return (base?.damage??0)*critical;
+        };
+        beforePeak=Math.max(beforePeak,damage(before));afterPeak=Math.max(afterPeak,damage(after));
+      }
+      setup=Math.max(0,afterPeak-beforePeak);
+    }
+    if (effectAware && exam.value.kind === 'DEFENCE') {
+      utility += Math.max(0,predictedStats.evasion-stats.evasion)*0.8
+        + Math.max(0,predictedStats.debuff-stats.debuff)*0.4;
+    }
+    let projectedScore: number | undefined;
+    if(scoreAware && (exam.value.kind==='ATTACK'||exam.value.kind==='BASIC') && damage>=enemyHp) {
+      const firstKill=firstDamage>=enemyHp;
+      const projected={...predictedStats,finishTurn:turnIndex+1,
+        playerDamage:stats.playerDamage+(firstKill?firstDamage:damage)};
+      for(const [index,id] of ids.entries()) {
+        if(index===1&&firstKill)break;
+        const magic=magicById(id)!;
+        const target=publicEnemyAt[index]?effectiveEnemyActionElement(publicEnemyAt[index]!)
+          :exam.value.enemyElement==='全'?'無':exam.value.enemyElement;
+        incrementCompatibilityStats(projected,getCompatibility(magic.element,target),
+          isDuoActiveForPair(id,ids[1-index])?3:magicHitCount(magic.power));
+        if(exam.value.kind==='BASIC'&&isDuoActiveForPair(id,ids[1-index])&&magic.magicSlot===2)projected.duo++;
+      }
+      projectedScore=calculateScore(projected);
+    }
+    if (scoreAware && exam.value.kind === 'DEFENCE') {
+      const forecastState=cloneSimulationState(predicted);
+      if(knownEnemy)applyEnemySelfEffects(knownEnemy,forecastState,enemyHp,stats.enemyMaxHp,predictedStats);
+      const projected={...predictedStats,finishTurn:5,playerRemainHp:predictedHp,playerHeal:stats.playerHeal+predictedHeal,
+        playerDamage:stats.playerDamage+(firstDamage>=enemyHp?firstDamage:damage)};
+      const firstKill=firstDamage>=enemyHp,secondKill=!firstKill&&damage>=enemyHp,playerFirst=isPlayerFirstTurn(turnIndex);
+      for(const [index,id] of ids.entries()) {
+        if(firstKill&&(playerFirst||index===1)||secondKill&&playerFirst&&index===1)continue;
+        const actions=index===knownIndex&&knownEnemy?[knownEnemy]:resourcePublicEnemyActions;
+        let incoming=0,advantageDamage=0,disadvantageDamage=0;
+        for(const action of actions) {
+          const base=calculateEnemyDamage(action,id,forecastState,()=>1,predictedStats);
+          const parsed=parseMagicId(id)!;
+          const evade=Math.min(1,sumRatesForCard(forecastState.playerEvasions,parsed.deckIndex)/100);
+          const blind=Math.min(1,sumRatesForEnemy(forecastState.enemyBlinds,action.slotKey)/100);
+          const critical=Math.min(1,sumRatesForEnemy(forecastState.enemyCriticals,action.slotKey)/100);
+          const compatibility=base.defenceCompatibility;
+          const amount=base.equalDamage*(compatibility==='advantage'?0.5:compatibility==='disadvantage'?1.5:1)
+            *(1-evade)*(1-blind)*(1+critical*(CRITICAL_DAMAGE_MULTIPLIER-1))/Math.max(1,actions.length);
+          incoming+=amount;
+          if(compatibility==='advantage')advantageDamage+=amount;
+          if(compatibility==='disadvantage')disadvantageDamage+=amount;
+        }
+        projected.playerRemainHp-=incoming;
+        projected.advantageDamaged+=advantageDamage;
+        projected.disadvantageDamaged+=disadvantageDamage;
+      }
+      // Reuse the actual score formula. This is only a one-turn public forecast;
+      // the independently simulated battle, never this forecast, is reported.
+      if(projected.playerRemainHp>0) {
+        const recovery=Math.min(continuousGain,Math.max(0,stats.playerTotalHp-projected.playerRemainHp));
+        projected.playerRemainHp+=recovery;projected.playerHeal+=recovery;
+      }
+      projectedScore=projected.playerRemainHp<=0?-100000:calculateScore(projected);
+    }
+    const spendsLastPartner = finisherPartners.length > 0 && finisherPartners.every(id => ids.includes(id));
+    return { ids, damage, firstDamage, duo, heal, utility, defense, setup, projectedScore, futureDamageSpent:futureSpend?.(ids), finisherUsed: ids.includes(finisher) || spendsLastPartner };
+  });
+  return { turn: turnIndex + 1, kind: exam.value.kind, playerHp, enemyHp, maxHp: totalDeckHp.value, pairs };
+}
+
+defineExpose({ runAutoBestWorkerPartition, requestAutoBestWorkerStop, prepareResourceCandidate, runResourceTrial, runResourceImportanceTrial, scoutResourceCritical, resourceCriticalTargets, replayResourceTrial, learnResourcePlan, learnResourceCriticalPlan });
 
 function requestSimulationStop() {
   stopRequested.value = true;
@@ -4383,6 +4626,7 @@ function clearResults() {
 }
 
 function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: SimulationRunOptions = {}): SimulationStats {
+  const resourcePolicy = options.resourcePolicy ?? (!options.autoBestMode ? resourcePreviewPolicy.value : null);
   const resumed = options.checkpoint;
   const runtimeCache = simulationRuntimeCache;
   const turnLimit = runtimeCache?.turnLimit ?? maxTurnCount.value;
@@ -4466,13 +4710,21 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
     activateInitialBuddyEffects(state);
     if (stats.log) pushLog(stats, () => `開始: 自分HP ${formatNumber(playerHp)} / 敵HP ${formatNumber(enemyHp)} / ${exam.value.kind}`);
     activateInitialSpecialChallenges(state, stats);
+    if(resourceInitialRuntime!==runtimeCache||!resourceInitialState){
+      resourceInitialRuntime=runtimeCache;
+      resourceInitialState=cloneSimulationState(state);
+      resourceInitialStats={...stats,log:undefined,playerAttackSnapshots:undefined,playerHealSnapshots:undefined};
+    }
   }
 
+  // Track only our own already-played cards; hidden draw order is never exposed.
+  const resourceUsedMagic = new Set<string>();
   battleLoop:
   for (let turnIndex = resumed?.turnIndex ?? 0; turnIndex < turnLimit; turnIndex += 1) {
     if (handState.visible.length < 2 && handState.hidden.length === 0) {
       if (turnIndex >= 5) {
         handState = createHandCycle(rng);
+        resourceUsedMagic.clear();
         if (stats.log) pushLog(stats, () => `${turnIndex + 1}T 手札再配布`);
       } else {
         stats.finishTurn = turnIndex + 1;
@@ -4493,6 +4745,15 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
       selected = resumed && options.checkpoint && options.autoBestMode
         ? forcedPair
         : (isValidVisiblePlayerPair(forcedPair, handState.visible) ? forcedPair : null);
+    } else if (resourcePolicy) {
+      const scorePolicy=resourcePolicy==='effects-score'||resourcePolicy==='effects-duo';
+      const preferred = resourcePreferredPlan[turnIndex];
+      selected = resourcePreferredPlanMode==='flexible'?chooseFlexiblePlanPair(turnIndex+1,handState.visible,resourceUsedMagic,resourceFlexibleSteps)
+        :resourcePreferredPlanMode === 'turn' && preferred && isValidVisiblePlayerPair(preferred, handState.visible) ? preferred:null;
+      selected ??= chooseObservedPair(observeResourceBattle(turnIndex, handState.visible, state, playerHp, enemyHp,
+        enemyDeck[turnIndex * 2 + knownEnemySlotIndexForTurn(turnIndex)], stats, resourcePolicy.startsWith('effects'),
+        handMagicIds.value.filter(id => !resourceUsedMagic.has(id)), scorePolicy, resourcePolicy==='effects-public'||resourcePolicy==='effects-tail'||scorePolicy&&exam.value.kind!=='DEFENCE', resourcePolicy==='effects-tail'||scorePolicy&&exam.value.kind!=='DEFENCE',resourcePolicy==='effects-duo'), resourcePolicy,
+        resourcePreferredPlanMode === 'priority' ? resourcePreferredPlan : undefined);
     } else if (options.autoBestMode) {
       const candidates = enumerateVisiblePlayerPairs(handState.visible);
       if (options.pauseAtUnforcedDecision && candidates.length > 0) {
@@ -4529,6 +4790,8 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
         : `${turnIndex + 1}T 許容組み合わせなし`);
       break;
     }
+    options.recordPairs?.push([...selected]);
+    selected.forEach(id => resourceUsedMagic.add(id));
     handState = consumeHand(handState, selected);
     const playerActsFirst = isPlayerFirstTurn(turnIndex);
 
@@ -4674,6 +4937,9 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
 }
 
 function cloneSimulationState(state: SimulationState): SimulationState {
+  // Both branches now share the arrays. The source must also detach on its
+  // next append, otherwise a saved initial state inherits later battle buffs.
+  state._ownedMask = 0;
   return { ...state, _ownedMask: 0 };
 }
 
@@ -4744,6 +5010,9 @@ function cloneSimulationStats(stats: SimulationStats, keepLog: boolean): Simulat
 
 function createHandCycle(rng: () => number) {
   const shuffled = shuffle(handMagicIds.value, rng);
+  // Offline template discovery only. Normal trials always use the real five
+  // visible cards. These hypothetical scores never enter reported samples.
+  if(resourceIdealHandTraining)return {visible:shuffled,hidden:[] as string[]};
   return {
     visible: shuffled.slice(0, 5),
     hidden: shuffled.slice(5),
@@ -5948,7 +6217,15 @@ function calculatePlayerDamage(
         continue;
       }
     }
-    const criticalActive = damageBase.criticalChance > 0 && rollEffect(damageBase.criticalChance * 100, rng);
+    // Still consume the ordinary roll. Scouting only forces an already
+    // possible critical on one chosen card, never on enemies or frozen buffs.
+    const proposal=resourceImportanceWeight===undefined?undefined:criticalProposal(damageBase.criticalChance);
+    const criticalRolled = damageBase.criticalChance > 0 && rollEffect((proposal?.proposal??damageBase.criticalChance) * 100, rng);
+    if(proposal)resourceImportanceWeight!*=proposal.weight(criticalRolled);
+    const criticalForced = !criticalRolled&&damageBase.criticalChance>0&&resourceCriticalScoutCard===parsed.deckIndex
+      &&(resourceCriticalScoutMagic===undefined||resourceCriticalScoutMagic===parsed.magicSlot);
+    if(criticalForced)resourceCriticalScoutHits++;
+    const criticalActive = criticalRolled || criticalForced;
     const criticalMultiplier = criticalActive ? CRITICAL_DAMAGE_MULTIPLIER : 1;
     const randomFactor = nextDamageFactor(rng);
     const raw = (baseDamage * criticalMultiplier / hitCount) * randomFactor;
@@ -6759,8 +7036,8 @@ function tickRateList<T extends TimedRate>(list: T[]): T[] {
   return next;
 }
 
-function buildEnemyActionDeck(rng: () => number, requiredActions: number) {
-  const perSlot = enemySlots.value
+function createEnemyActionPools(): RuntimeEnemyAction[][] {
+  return enemySlots.value
     .map((slot, slotIndex) => slot.actions
       .filter(isEnemyActionEnabled)
       .map((action, actionIndex) => ({
@@ -6771,6 +7048,12 @@ function buildEnemyActionDeck(rng: () => number, requiredActions: number) {
         identity: `${slot.id}:${action.id}:${actionIndex}`,
       } as RuntimeEnemyAction)))
     .filter((actions) => actions.length > 0);
+}
+
+function buildEnemyActionDeck(rng: () => number, requiredActions: number) {
+  // Only the immutable action definitions are shared. Selection and shuffling
+  // still run with each battle's RNG, in the original order.
+  const perSlot = simulationRuntimeCache?.enemyActionPools ?? createEnemyActionPools();
   const allActions = perSlot.flat();
   if (!allActions.length) return [];
   const firstDeck = buildFiveTurnEnemyDeck(perSlot, allActions, rng);
@@ -7401,12 +7684,68 @@ function formatRatePercent(value: number) {
   margin: 10px 0 0;
 }
 
+.common-exam-conditions {
+  margin-bottom: 10px;
+}
+
+.selected-exam-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  border: 1px solid #d9e2ea;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.selected-exam-summary > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.selected-exam-summary strong {
+  overflow-wrap: anywhere;
+}
+
+.common-special-challenges {
+  margin-top: 12px;
+  padding: 12px 0 2px;
+}
+
+.common-special-challenges .panel-heading {
+  margin-bottom: 10px;
+}
+
+.detail-panel {
+  margin-bottom: 14px;
+}
+
+.manual-challenge-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  white-space: nowrap;
+}
+
 .main-tabs {
   margin-top: 10px;
   border: 1px solid #d9e2ea;
   border-radius: 8px;
   background: #ffffff;
   overflow: hidden;
+}
+
+.flow-tabs {
+  margin-top: 0;
+}
+
+.manual-tabs {
+  margin-top: 8px;
 }
 
 .main-tabs :deep(.v-tab) {
@@ -7525,7 +7864,7 @@ function formatRatePercent(value: number) {
 
 .special-challenge-item {
   display: grid;
-  grid-template-columns: 18px 28px minmax(0, 1fr) auto;
+  grid-template-columns: 18px max-content minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-height: 42px;
@@ -7549,6 +7888,7 @@ function formatRatePercent(value: number) {
 }
 
 .special-rank {
+  white-space: nowrap;
   color: #89530d;
   font-weight: 900;
 }
@@ -8861,169 +9201,6 @@ button.combo-priority {
   text-overflow: clip;
 }
 
-.log-body {
-  max-height: 68vh;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.log-line {
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-  line-height: 1.65;
-}
-
-.log-turn-group {
-  display: grid;
-  gap: 6px;
-  padding: 10px 0 12px;
-  border-bottom: 1px solid #e2e9ef;
-}
-
-.log-turn-group:last-child {
-  border-bottom: 0;
-}
-
-.log-turn-title {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  width: max-content;
-  min-width: 56px;
-  padding: 4px 10px;
-  border: 1px solid #cfdae3;
-  border-radius: 999px;
-  color: #334a5c;
-  background: #ffffff;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.battle-log-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-
-.battle-log-row.enemy {
-  justify-content: flex-start;
-  padding-right: 0;
-}
-
-.battle-log-row.player {
-  justify-content: flex-end;
-  padding-left: 0;
-}
-
-.battle-log-row.system {
-  justify-content: center;
-}
-
-.log-combatant {
-  flex: 0 0 auto;
-  min-width: 44px;
-  height: 28px;
-  padding: 0 6px;
-  border: 1px solid #cfdbe4;
-  border-radius: 6px;
-  color: #526a7c;
-  background: #f7fafc;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.log-marker {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-}
-
-.log-avatar {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  border: 1px solid #cfdbe4;
-  border-radius: 6px;
-  background: #f7fafc;
-}
-
-.log-avatar {
-  object-fit: cover;
-}
-
-.log-element-icon {
-  width: 18px;
-  height: 18px;
-  flex: 0 0 auto;
-  object-fit: contain;
-}
-
-.log-arrow {
-  flex: 0 0 auto;
-  color: #236c8e;
-  font-size: 18px;
-  font-weight: 900;
-  line-height: 1;
-}
-
-.log-bubble,
-.log-system-line {
-  min-width: 0;
-  padding: 7px 9px;
-  border: 1px solid #dfe7ee;
-  border-radius: 8px;
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-  line-height: 1.55;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.log-bubble {
-  flex: 1 1 auto;
-  background: #fbfcfd;
-}
-
-.battle-log-row.emphasized .log-bubble,
-.battle-log-row.emphasized .log-system-line {
-  border-color: #8fbad7;
-  background: #eef7fc;
-  font-weight: 800;
-}
-
-.battle-log-row.enemy .log-bubble {
-  border-color: #e4d3c9;
-  background: #fff8f4;
-}
-
-.battle-log-row.player .log-bubble {
-  border-color: #cadcea;
-  background: #f4f9fd;
-}
-
-.battle-log-row.enemy.emphasized .log-bubble {
-  border-color: #d8a48c;
-  background: #fff2eb;
-}
-
-.battle-log-row.player.emphasized .log-bubble {
-  border-color: #8fbad7;
-  background: #eef7fc;
-}
-
-.log-system-line {
-  width: 100%;
-  color: #5d7080;
-  background: #f7f9fb;
-  text-align: center;
-}
-
 @media (max-width: 1180px) {
   .exam-header,
   .panel-heading {
@@ -9156,6 +9333,11 @@ button.combo-priority {
 @media (max-width: 720px) {
   .exam-simulator {
     padding: 8px 6px 18px;
+  }
+
+  .selected-exam-summary {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .exam-header,
@@ -9297,7 +9479,7 @@ button.combo-priority {
   }
 
   .special-challenge-item {
-    grid-template-columns: 18px 28px minmax(0, 1fr);
+    grid-template-columns: 18px max-content minmax(0, 1fr);
   }
 
   .special-score {

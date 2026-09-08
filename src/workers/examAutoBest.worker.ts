@@ -1,6 +1,7 @@
 import { createRenderer } from 'vue';
 import { createI18n } from 'vue-i18n';
 import { createPinia } from 'pinia';
+import { routerKey } from 'vue-router';
 import ja from '@/i18n/ja.json';
 import en from '@/i18n/en.json';
 import workerHost from '../generated/examAutoBestWorkerHost';
@@ -43,6 +44,10 @@ function getSimulator() {
       const app = renderer.createApp(component);
       app.use(createPinia());
       app.use(createI18n({ legacy: false, locale: 'ja', messages: { ja, en } }));
+      // The simulator reads route query state during setup, but an optimizer
+      // worker has no browser router. Match the headless resource host's
+      // minimal injection so setup can complete without mounting navigation.
+      app.provide(routerKey, { currentRoute: { value: { query: {} } } } as any);
       return app.mount(createNode()) as any;
     });
   }

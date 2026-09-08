@@ -1,6 +1,5 @@
 // キャラクター選択の共通ロジック
 import { normalizeLegacyDeckBuffs, parseMagicBuffsFromEtc } from '@/utils/buffParser';
-import { loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
@@ -30,6 +29,7 @@ export const getPowerOption = (buffString: string) => {
 
 // キャラクター画像の動的読み込み
 export const loadCharacterImage = async (characterName: string) => {
+  const { loadCharacterImageUrl } = await import('@/utils/characterAssets');
   return loadCharacterImageUrl(characterName);
 };
 
@@ -78,7 +78,7 @@ const pushAutomaticBuff = (buffs: any[], buff: any) => {
 };
 
 // キャラクター選択時の共通処理
-export const processCharacterSelection = async (chara: any, customLevel?: number, ignoreHandCollection = false) => {
+export const processCharacterSelection = async (chara: any, customLevel?: number, ignoreHandCollection = false, loadImage = true) => {
   const handCollectionStore = useHandCollectionStore();
   
   // 手持ちコレクション設定を確認
@@ -172,7 +172,7 @@ export const processCharacterSelection = async (chara: any, customLevel?: number
   Object.assign(chara, initialSettings);
   
   // 画像を動的に読み込む
-  chara.imgUrl = await loadCharacterImage(chara.name);
+  chara.imgUrl = loadImage ? await loadCharacterImage(chara.name) : '';
   
   return chara;
 };

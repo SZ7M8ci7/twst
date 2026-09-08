@@ -144,6 +144,9 @@ const exactTextMap: Record<string, string> = {
 };
 
 const textReplacements: Array<[RegExp, string]> = [
+  [/第(\d+)回統一/g, 'Unified Exam $1 '],
+  [/味方が/g, 'Allies: '],
+  [/相手が/g, 'Foes: '],
   [/火属性被ダメージDOWN/g, 'Fire Damage Taken DOWN'],
   [/水属性被ダメージDOWN/g, 'Water Damage Taken DOWN'],
   [/木属性被ダメージDOWN/g, 'Flora Damage Taken DOWN'],
@@ -168,6 +171,8 @@ const textReplacements: Array<[RegExp, string]> = [
   [/属性ダメUP/g, 'Element Damage UP'],
   [/被ダメージDOWN/g, 'Damage Taken DOWN'],
   [/被ダメージUP/g, 'Damage Taken UP'],
+  [/被ダメDOWN/g, 'Damage Taken DOWN'],
+  [/被ダメUP/g, 'Damage Taken UP'],
   [/ダメージDOWN/g, 'Damage DOWN'],
   [/ダメージUP/g, 'Damage UP'],
   [/ダメDOWN/g, 'Damage DOWN'],

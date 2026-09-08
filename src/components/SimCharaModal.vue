@@ -1,33 +1,37 @@
 <template>
-  <div class="modal-overlay" @click.self="closeModal">
+  <v-dialog :model-value="true" max-width="1200" @update:model-value="!$event && closeModal()">
     <div class="modal-content">
+      <div class="picker-toolbar"><v-btn variant="text" @click="closeModal">{{ t('common.close') }}</v-btn></div>
       <!-- タブセクション -->
       <div class="tab-section">
         <div class="tab-header">
-          <div 
+          <button type="button"
             class="tab-item"
             :class="{ active: activeTab === 'filter' }"
+            :aria-expanded="activeTab === 'filter' && isExpanded"
             @click="handleTabClick('filter')"
           >
             <span>{{ t('common.filter') }}</span>
             <v-icon>{{ activeTab === 'filter' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-          </div>
-          <div 
+          </button>
+          <button type="button"
             class="tab-item"
             :class="{ active: activeTab === 'sort' }"
+            :aria-expanded="activeTab === 'sort' && isExpanded"
             @click="handleTabClick('sort')"
           >
             <span>{{ t('common.sort') }}</span>
             <v-icon>{{ activeTab === 'sort' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-          </div>
-          <div 
+          </button>
+          <button type="button"
             class="tab-item"
             :class="{ active: activeTab === 'handCollection' }"
+            :aria-expanded="activeTab === 'handCollection' && isExpanded"
             @click="handleTabClick('handCollection')"
           >
             <span>{{ t('common.hand') }}</span>
             <v-icon>{{ activeTab === 'handCollection' && isExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-          </div>
+          </button>
         </div>
         
         <v-expand-transition>
@@ -120,11 +124,12 @@
           {{ t('simulator.noMatchingCharacters') }}
         </div>
         <div v-else class="character-grid">
-          <div 
+          <button type="button"
             v-for="character in filteredCharacters" 
             :key="character.name" 
             @click="selectImage(character)" 
             class="character-item"
+            :aria-label="`${localizeCharacterName(character.chara, locale)} / ${localizeGameText(character.costume, locale)}`"
             :style="{ backgroundColor: getDormColor(getDormFromCharacter(character)) }"
           >
             <div class="character-image-wrapper" :data-character-name="character.name">
@@ -157,16 +162,17 @@
               </div>
             </div>
             <div class="character-name">{{ getDisplayText(character) }}</div>
-          </div>
+          </button>
         </div>
       </div>
       
     </div>
-  </div>
+  </v-dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue';
+const previouslyFocusedElement = typeof document === 'undefined' ? null : document.activeElement;
 import { useI18n } from 'vue-i18n';
 import { useCharacterStore } from '@/store/characters';
 import { useSimulatorStore } from '@/store/simulatorStore';
@@ -1647,6 +1653,11 @@ watch(filteredAndSortedCharacters, () => {
 
 // クリーンアップ
 onUnmounted(() => {
+  nextTick(() => {
+    if (previouslyFocusedElement?.isConnected && previouslyFocusedElement instanceof HTMLElement) {
+      previouslyFocusedElement.focus({ preventScroll: true });
+    }
+  });
   if (imageObserver) {
     imageObserver.disconnect();
   }
@@ -1665,27 +1676,22 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 20;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
 .modal-content {
   background: white;
   padding: 20px;
   border-radius: 8px;
   max-height: 90vh;
-  width: 90%;
+  width: 100%;
   max-width: 1200px;
   overflow-y: auto;
+}
+.picker-toolbar { display: flex; justify-content: flex-end; position: sticky; top: -20px; z-index: 2; background: white; padding: 4px 0; }
+.tab-item:focus-visible, .character-item:focus-visible { outline: 2px solid #1769aa; outline-offset: 2px; }
+@media (max-width: 600px) {
+  .modal-content { padding: 12px; }
+  .picker-toolbar { top: -12px; }
+  .tab-header .tab-item { padding: 10px 4px; min-width: 0; font-size: 12px; }
+  .tab-header .tab-item span { margin-right: 2px; white-space: nowrap; }
 }
 
 .tab-section {

@@ -1,6 +1,6 @@
 <template>
   <div class="toolbar-items">
-    <v-app-bar-nav-icon @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
+    <v-app-bar-nav-icon :aria-label="t('common.navigationMenu')" :aria-expanded="drawer" @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
     <div class="language-links">
       <button type="button" lang="ja" aria-label="日本語" :aria-pressed="locale === 'ja'" :class="{ 'text-muted': locale !== 'ja' }" @click="changeLanguage('ja')">JA</button>
       <span>/</span>
@@ -106,7 +106,7 @@ import { useLocale } from 'vuetify';
 import { normalizeLocale, saveLocale, type SupportedLocale } from '@/i18n/locales';
 const drawer = ref(false);
 
-const { locale } = useI18n();
+const { locale, t } = useI18n();
 const { current: vuetifyLocale } = useLocale();
 watch(locale, (value) => {
   const language = normalizeLocale(value) ?? 'ja';
