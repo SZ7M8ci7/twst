@@ -2,6 +2,7 @@
   "name": "main",
   "version": "0.0.0",
   "scripts": {
+    "test:exam-search": "node --test tests/exam-damage-calculation.test.cjs tests/exam-search.test.cjs tests/exam-search-completion.test.cjs tests/exam-search-auto-score.test.cjs tests/exam-search-auto-scheduler.test.cjs tests/exam-search-worker-retry.test.cjs tests/character-selection-images.test.cjs tests/exam-search-transfer.test.cjs tests/exam-search-result-filters.test.cjs tests/exam-search-constraint-matrix.test.cjs && node tests/exam-search-integration.mjs",
     "test:i18n": "node --test tests/localization.test.cjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

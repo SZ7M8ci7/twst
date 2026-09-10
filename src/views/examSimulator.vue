@@ -4494,7 +4494,6 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
       const base = calculatePlayerDamageBaseFromState(predicted, id, parsed.deckIndex, parsed.magicSlot, target, reduction, activeDuo);
       // damage already includes the full multi-hit multiplier in the shared engine.
       const d = hasEnemyDamageNull(predicted, magic.element, targetKey) ? 0 : (base?.damage ?? 0)
-        * Math.max(0, 1 - sumDamageDownRatesForCard(predicted.playerAttackDowns, parsed.deckIndex, magic.element) / 100)
         * (tailAware?criticalTailMultiplier(base?.criticalChance??0,activeDuo?3:magicHitCount(magic.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER)
           :effectAware ? 1 + (base?.criticalChance ?? 0) * (CRITICAL_DAMAGE_MULTIPLIER - 1) : 1);
       damage += d;
@@ -6018,7 +6017,8 @@ function calculatePlayerDamageBaseFromState(
     }
   }
 
-  const baseAtk = runtimeAtk + atkBuffTotal + buddyAtk;
+  const attackDownRate = sumDamageDownRatesForCard(state.playerAttackDowns, deckIndex, magicAttribute);
+  const baseAtk = Math.max(0, runtimeAtk + atkBuffTotal + buddyAtk - runtimeAtk * attackDownRate / 100);
   const damageTerm = Math.max(0, magicRatio * attributeAdjust + dmgBuffTotal);
   const reductionValue = reductionRate / 100;
   const damageTermAfterReduction = Math.max(0, damageTerm - reductionValue);
@@ -6033,6 +6033,7 @@ function calculatePlayerDamageBaseFromState(
     buddyAtk,
     baseAtk,
     atkBuffTotal,
+    attackDownRate,
     dmgBuffTotal,
     criticalChance,
     damageTerm,
@@ -6179,8 +6180,7 @@ function calculatePlayerDamage(
   if (!damageBase) {
     return { damage: 0, compatibility: 'equal' as ScoreCompatibility, hitCount: 1, isDuo: false, evasionCount: 0, blindMiss: false, criticalCount: 0 };
   }
-  const attackDownRate = Math.min(100, sumDamageDownRatesForCard(state.playerAttackDowns, parsed.deckIndex, magic.element));
-  const baseDamage = enemyDamageNullActive ? 0 : damageBase.damage * Math.max(0, 1 - attackDownRate / 100);
+  const baseDamage = enemyDamageNullActive ? 0 : damageBase.damage;
   const transferSnapshot: PlayerAttackTransferSnapshot = {
     deckIndex: parsed.deckIndex,
     magicSlot: parsed.magicSlot,
@@ -6188,7 +6188,7 @@ function calculatePlayerDamage(
     hitCount,
     criticalCount: 0,
     atkBuffRate: damageBase.runtimeAtk > 0 ? (damageBase.atkBuffTotal / damageBase.runtimeAtk) * 100 : 0,
-    attackDownRate,
+    attackDownRate: damageBase.attackDownRate,
     damageBuffRate: damageBase.dmgBuffTotal * 100,
     damageReductionRate: reductionRate,
   };
@@ -6228,7 +6228,7 @@ function calculatePlayerDamage(
     const criticalMultiplier = criticalActive ? CRITICAL_DAMAGE_MULTIPLIER : 1;
     const randomFactor = nextDamageFactor(rng);
     const raw = (baseDamage * criticalMultiplier / hitCount) * randomFactor;
-    const hitDamage = ceilDamage(raw);
+    const hitDamage = floorAttackDamage(raw);
     if (criticalActive && hitDamage > 0) criticalCount += 1;
     damage += hitDamage;
   }
@@ -6462,7 +6462,7 @@ function calculateEnemyDamage(
     const criticalActive = criticalRate > 0 && rollEffect(criticalRate * 100, rng);
     const criticalMultiplier = criticalActive ? CRITICAL_DAMAGE_MULTIPLIER : 1;
     const raw = (equalDamage * elementMultiplier * criticalMultiplier / hitCount) * randomFactor;
-    const hitDamage = ceilDamage(raw);
+    const hitDamage = floorAttackDamage(raw);
     if (criticalActive && hitDamage > 0) criticalCount += 1;
     hitDamages?.push(hitDamage);
     damage += hitDamage;
@@ -7366,6 +7366,10 @@ function sumDamageTakenDownRatesForCard(list: TargetedTimedRate[], cardIndex: nu
 function nextDamageFactor(rng: () => number) {
   const roll = rng();
   return 0.95 + roll * 0.1;
+}
+
+function floorAttackDamage(value: number) {
+  return Math.floor(Math.max(0, value));
 }
 
 function ceilDamage(value: number) {

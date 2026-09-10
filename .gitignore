@@ -23,3 +23,16 @@ pnpm-debug.log*
 *.sln
 *.sw?
 .serena
+.video_analysis
+
+# Local research documents and generated investigation/test output
+/docs/
+/artifacts/
+/tests/
+
+# Local workspace and assistant settings
+*.code-workspace
+/.claude/settings.local.json
+
+# Temporary execution logs
+*.log

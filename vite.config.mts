@@ -31,6 +31,20 @@ export default defineConfig({
     }),
   ],
   define: { 'process.env': {} },
+  optimizeDeps: {
+    include: [
+      'vuetify/components/VAlert',
+      'vuetify/components/VBtn',
+      'vuetify/components/VCard',
+      'vuetify/components/VChip',
+      'vuetify/components/VDialog',
+      'vuetify/components/VGrid',
+      'vuetify/components/VProgressLinear',
+      'vuetify/components/VSwitch',
+      'vuetify/components/VTextField',
+      'vuetify/components/VMenu',
+    ],
+  },
   worker: {
     format: 'es',
     plugins: () => [examAutoBestWorkerHostPlugin()],
