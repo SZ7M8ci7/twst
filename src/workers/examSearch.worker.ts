@@ -23,7 +23,7 @@ type ChildOperationRequest = Exclude<ChildRequest, { method: 'stop' }>;
 type ChildMessage = { id: number; island: number; progress?: SearchProgress; checkpoint?: SessionCheckpoint; catalogVersion?: string; preview?: unknown; error?: string; diagnostic?: { stack?: string };
   boot?: { stage: 'loading' | 'loaded'; url: string }; bootstrapError?: { message: string; stack?: string; url: string;
     diagnostic?: { bootstrapUrl?: string; runtimeSpecifier?: string; failedUrl?: string; resources?: Array<{ name: string; responseStatus: number | null; duration: number }> } } };
-type Child = { worker?: Worker; island: number; finished: boolean; validMessageSeen: boolean; retryCount: number;
+type Child = { worker?: Pick<Worker, 'postMessage' | 'terminate'>; island: number; finished: boolean; validMessageSeen: boolean; retryCount: number;
   originalRequest?: ChildOperationRequest; bootstrapStage?: 'loading' | 'loaded'; bootstrapUrl?: string };
 type Operation = {
   id: number; method: Request['method']; input: SearchInput; startedAt: number; deadline: number; baseElapsed: number; baseNonce: string;
@@ -106,6 +106,7 @@ function startupFailureMessage(child: Child, event: { message?: string }) {
   return `Search island ${child.island} failed ${phase}${details}.`;
 }
 function spawnChild(op: Operation, child: Child) {
+  if (typeof Worker === 'undefined') return spawnInlineChild(op, child);
   const worker = new Worker(new URL('./examSearchIsland.worker.ts', import.meta.url), { type: 'module' });
   child.worker = worker;
   worker.onmessage = ({ data: message }: MessageEvent<ChildMessage>) => {
@@ -122,7 +123,7 @@ function spawnChild(op: Operation, child: Child) {
       worker.terminate();
       try {
         const retryWorker = spawnChild(op, child);
-        retryWorker.postMessage(child.originalRequest);
+        retryWorker.postMessage(child.originalRequest!);
       } catch (retryError) {
         failOperation(op, startupFailureMessage(child, retryError instanceof Error ? retryError : event));
       }
@@ -130,6 +131,33 @@ function spawnChild(op: Operation, child: Child) {
     }
     failOperation(op, startupFailureMessage(child, event));
   };
+  return worker;
+}
+// Older Safari exposes Worker on the page, but not inside a dedicated worker.
+// Keep the same runtime and message boundaries inside this background worker.
+function spawnInlineChild(op: Operation, child: Child) {
+  let runtime: ReturnType<typeof import('./examSearchIslandRuntime')['createIslandRuntime']> | undefined;
+  let terminated = false, pending = false, stopRequested = false;
+  const worker = {
+    postMessage(message: ChildRequest) {
+      if (terminated) return;
+      if (message.method === 'stop') { stopRequested = true; runtime?.stop(); return; }
+      if (pending) return;
+      pending = true;
+      const request = structuredClone(message);
+      void import('./examSearchIslandRuntime').then(module => {
+        if (terminated) return;
+        runtime ??= module.createIslandRuntime(data => {
+          if (!terminated && operation === op && child.worker === worker) handleChild(op, child, structuredClone(data));
+        });
+        return runtime.handle(request, stopRequested);
+      }).catch(error => {
+        if (!terminated) failOperation(op, startupFailureMessage(child, error instanceof Error ? error : { message: String(error) }));
+      }).finally(() => { pending = false; });
+    },
+    terminate() { terminated = true; stopRequested = true; runtime?.stop(); },
+  };
+  child.worker = worker;
   return worker;
 }
 function sendChildRequest(child: Child, request: ChildOperationRequest) {
@@ -183,7 +211,7 @@ function sendOperation(op: Operation, data: SearchRequest, checkpoints: SessionC
 function startSearch(data: Extract<Request,{method:'start'}>) {
   const issue = validateInput(data.input, catalog); if (issue) throw new Error(issue);
   const cores = globalThis.navigator?.hardwareConcurrency, memory = (globalThis.navigator as Navigator & { deviceMemory?: number })?.deviceMemory;
-  const count = chooseIslandCount(cores, memory), baseNonce = `${Date.now()}:${Math.random()}`;
+  const count = typeof Worker === 'undefined' ? 1 : chooseIslandCount(cores, memory), baseNonce = `${Date.now()}:${Math.random()}`;
   operation = makeOperation(data, [], {}, baseNonce, count); sendOperation(operation, data, []);
 }
 function resumeSearch(data: Extract<Request,{method:'resume'|'evaluate'}>) {
