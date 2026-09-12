@@ -23,6 +23,7 @@
               color="primary" 
               size="small"
               :loading="saving"
+              :disabled="handCollectionStore.loadFailed || handCollectionStore.hasConflict"
               prepend-icon="mdi-content-save"
             >
               {{ $t('handCollection.save') }}
@@ -31,13 +32,21 @@
               @click="resetUnsavedChanges" 
               color="grey" 
               size="small"
-              :disabled="!hasUnsavedChanges"
+              :disabled="!hasUnsavedChanges || saving"
               prepend-icon="mdi-undo"
             >
               {{ $t('handCollection.undo') }}
             </v-btn>
           </div>
         </div>
+
+        <v-alert v-if="storageWarning" type="warning" variant="tonal" class="mb-3">
+          {{ storageWarning }}
+          <v-btn
+            v-if="handCollectionStore.loadFailed || handCollectionStore.hasConflict"
+            class="mt-2" size="small" :disabled="saving" @click="reloadSavedCollection"
+          >{{ $t('handCollection.reloadSaved') }}</v-btn>
+        </v-alert>
 
         <!-- 一括操作コントロール -->
         <div class="controls-main-container">
@@ -313,8 +322,14 @@ const showFilterModal = ref(false);
 const bulkLevel = ref(getInputMaxLevel('SSR'));
 const bulkTotsu = ref(4);
 const windowWidth = ref(window.innerWidth);
-const saving = ref(false);
-const hasUnsavedChanges = ref(false);
+const { saving, hasUnsavedChanges } = storeToRefs(handCollectionStore);
+const storageWarning = computed(() => {
+  if (handCollectionStore.loadFailed) return t('handCollection.loadError');
+  if (handCollectionStore.hasConflict) return t('handCollection.saveConflict');
+  if (handCollectionStore.saveFailed) return t('handCollection.saveError');
+  if (handCollectionStore.draftFailed && hasUnsavedChanges.value) return t('handCollection.draftError');
+  return '';
+});
 const totsuOptions = [0, 1, 2, 3, 4].map(value => ({
   title: value.toString(),
   value,
@@ -323,9 +338,6 @@ const totsuOptions = [0, 1, 2, 3, 4].map(value => ({
 // ソート機能
 const sortKey = ref<string>('default');
 const sortOrder = ref<'asc' | 'desc'>('asc');
-
-// 保存前の状態を保存（元に戻す機能用）
-const savedState = ref<string>('');
 
 
 // データ管理用
@@ -466,7 +478,6 @@ function getSortIcon(key: string): string {
 
 function updateOwnership(cardName: string, isOwned: boolean) {
   handCollectionStore.updateHandCard(cardName, { isOwned });
-  markAsUnsaved();
 }
 
 function updateLevel(cardName: string, level: string | number) {
@@ -478,12 +489,10 @@ function updateLevel(cardName: string, level: string | number) {
   const clampedLevel = Math.max(0, Math.min(numLevel, maxLevel));
   
   handCollectionStore.updateHandCard(cardName, { level: clampedLevel });
-  markAsUnsaved();
 }
 
 function updateTotsu(cardName: string, value: string | number | null) {
   handCollectionStore.updateHandCard(cardName, { totsu: clampTotsuCount(value) });
-  markAsUnsaved();
 }
 
 function handleTableTotsuChange(cardName: string, event: Event) {
@@ -494,80 +503,59 @@ function getMaxLevel(rare: string): number {
   return getInputMaxLevel(rare);
 }
 
-// 変更追跡機能
-function markAsUnsaved() {
-  hasUnsavedChanges.value = true;
-}
-
 // 保存機能
 async function saveHandCollection() {
-  saving.value = true;
   try {
-    // 現在の状態を保存
-    savedState.value = JSON.stringify(handCollectionStore.handCollection);
-    
-    // 手持ちコレクションを保存
-    handCollectionStore.saveHandCollectionManually();
+    await handCollectionStore.saveHandCollectionManually();
 
     // 永続ストレージ要求の拒否や未対応は、通常の保存結果へ影響させない。
     void requestPersistentStorage();
     
-    // 未保存フラグをリセット
-    hasUnsavedChanges.value = false;
-    
     showSnackbar(t('handCollection.saveSuccess'));
   } catch (error) {
     console.error('保存エラー:', error);
-    showSnackbar(t('handCollection.saveError'), 'error');
-  } finally {
-    saving.value = false;
+    showSnackbar(storageWarning.value || t('handCollection.saveError'), 'error');
   }
 }
 
 // 元に戻す機能
 function resetUnsavedChanges() {
-  if (savedState.value) {
-    try {
-      // 保存済みの状態に戻す
-      const saved = JSON.parse(savedState.value);
-      Object.keys(handCollectionStore.handCollection).forEach(key => {
-        delete handCollectionStore.handCollection[key];
-      });
-      Object.assign(handCollectionStore.handCollection, saved);
-      
-      hasUnsavedChanges.value = false;
-      showSnackbar(t('handCollection.undoSuccess'));
-    } catch (error) {
-      console.error('復元エラー:', error);
-      showSnackbar(t('handCollection.undoError'), 'error');
-    }
-  }
+  handCollectionStore.resetUnsavedChanges();
+  showSnackbar(t('handCollection.undoSuccess'));
+}
+
+function reloadSavedCollection() {
+  if (hasUnsavedChanges.value && !window.confirm(t('handCollection.reloadConfirm'))) return;
+  if (!handCollectionStore.reloadHandCollection()) showSnackbar(t('handCollection.loadError'), 'error');
 }
 
 // 一括レベル設定
 function applyBulkLevel() {
-  filteredCharacters.value.forEach(character => {
-    const maxLevel = getMaxLevel(character.rare);
-    const clampedLevel = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
-    handCollectionStore.updateHandCard(character.name, { level: clampedLevel });
+  handCollectionStore.batchUpdates(() => {
+    filteredCharacters.value.forEach(character => {
+      const maxLevel = getMaxLevel(character.rare);
+      const clampedLevel = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
+      handCollectionStore.updateHandCard(character.name, { level: clampedLevel });
+    });
   });
-  markAsUnsaved();
 }
 
 // 一括所持設定
 function applyBulkOwnership(isOwned: boolean) {
-  filteredCharacters.value.forEach(character => {
-    handCollectionStore.updateHandCard(character.name, { isOwned });
+  handCollectionStore.batchUpdates(() => {
+    filteredCharacters.value.forEach(character => {
+      handCollectionStore.updateHandCard(character.name, { isOwned });
+    });
   });
-  markAsUnsaved();
 }
 
 // 一括完凸設定
 function applyBulkTotsu() {
-  filteredCharacters.value.forEach(character => {
-    handCollectionStore.updateHandCard(character.name, { totsu: bulkTotsu.value });
+  handCollectionStore.batchUpdates(() => {
+    filteredCharacters.value.forEach(character => {
+      handCollectionStore.updateHandCard(character.name, { totsu: bulkTotsu.value });
+    });
   });
-  markAsUnsaved();
 }
 
 function handleFilterApplied() {
@@ -666,6 +654,10 @@ async function handleBackupFileSelected(event: Event) {
 }
 
 function importFromText() {
+  handCollectionStore.batchUpdates(importDataText);
+}
+
+function importDataText() {
   try {
     let importedCount = 0;
     const trimmed = dataText.value.trim();
@@ -735,8 +727,6 @@ function importFromText() {
     if (importedCount === 0) {
       throw new Error('No importable hand collection data found');
     }
-
-    markAsUnsaved();
     closeDataModal();
     showSnackbar(t('handCollection.importSuccess', { count: importedCount }));
   } catch (error) {
@@ -780,8 +770,6 @@ function importFromText() {
       if (importedCount === 0) {
         throw error;
       }
-
-      markAsUnsaved();
       closeDataModal();
       showSnackbar(t('handCollection.importSuccess', { count: importedCount }));
     } catch (fallbackError) {
@@ -842,8 +830,6 @@ onMounted(async () => {
       });
     }
     
-    // 初期状態を保存
-    savedState.value = JSON.stringify(handCollectionStore.handCollection);
     
   } finally {
     loading.value = false;
