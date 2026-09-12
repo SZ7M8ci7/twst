@@ -1,0 +1,19 @@
+{
+  "id": "/twst/",
+  "name": "ツイステツール置き場",
+  "short_name": "ツイステツール",
+  "lang": "ja",
+  "start_url": "/twst/top",
+  "scope": "/twst/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f5de4",
+  "icons": [
+    {
+      "src": "./app-icon.png",
+      "sizes": "150x150",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -22,7 +22,7 @@
       dense
       class="drawer-list"
     >
-      <RouterLink :to="{ name: 'top' }">
+      <RouterLink :to="{ name: 'twstTop' }">
         <v-list-item
           class="drawer-root-item drawer-root-top"
           title="TOP"
