@@ -888,12 +888,14 @@ onUnmounted(() => {
 
 .controls-main-container {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
 }
 
 .controls-container {
-  flex: 1;
+  flex: 1 1 320px;
+  min-width: 0;
   padding: 16px;
   background-color: #f5f5f5;
   border-radius: 8px;
@@ -1038,6 +1040,10 @@ onUnmounted(() => {
     flex-direction: column;
     gap: 12px;
   }
+
+  .controls-container {
+    flex: auto;
+  }
   
   .save-controls-container {
     flex: 1;
@@ -1155,11 +1161,15 @@ onUnmounted(() => {
 }
 
 .table-header {
-  display: flex;
   background-color: #f5f5f5;
   font-weight: bold;
   border-bottom: 2px solid #ddd;
-  min-width: 740px;
+}
+
+.table-header,
+.table-row {
+  display: grid;
+  grid-template-columns: minmax(56px, 1fr) minmax(64px, .75fr) minmax(72px, 1fr) minmax(100px, 1fr) minmax(60px, .75fr) minmax(100px, 2fr);
 }
 
 .sortable-header {
@@ -1186,11 +1196,9 @@ onUnmounted(() => {
 }
 
 .table-row {
-  display: flex;
   border-bottom: 1px solid #eee;
   min-height: 60px;
   align-items: center;
-  min-width: 740px;
 }
 
 .table-row:hover {
@@ -1202,6 +1210,7 @@ onUnmounted(() => {
 }
 
 .header-cell, .data-cell {
+  min-width: 0;
   padding: 8px;
   display: flex;
   align-items: center;
@@ -1220,34 +1229,22 @@ onUnmounted(() => {
   border-right: none;
 }
 
-.character-col {
-  flex: 0 0 120px;
-  min-width: 120px;
+.level-col .level-input {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 
-.checkbox-col {
-  flex: 0 0 88px;
-  min-width: 88px;
+.level-col :deep(.v-field__field) {
+  padding-inline: 4px !important;
 }
 
-.totsu-col {
-  flex: 0 0 120px;
-  min-width: 120px;
-}
-
-.level-col {
-  flex: 0 0 100px;
-  min-width: 100px;
-}
-
-.rare-col {
-  flex: 0 0 90px;
-  min-width: 90px;
+.level-col :deep(.v-field__input) {
+  padding-inline: 4px !important;
 }
 
 .costume-col {
-  flex: 1;
-  min-width: 120px;
+  overflow-wrap: anywhere;
   text-align: left;
   justify-content: flex-start;
 }
@@ -1263,27 +1260,15 @@ onUnmounted(() => {
 @media (max-width: 600px) {
   .table-header,
   .table-row {
-    min-width: 420px;
+    grid-template-columns: minmax(48px, 1fr) minmax(56px, 1fr) minmax(64px, 1fr) minmax(88px, 1.3fr);
   }
 
-  .character-col {
-    flex: 0 0 90px;
-    min-width: 90px;
-  }
-  
-  .checkbox-col {
-    flex: 0 0 72px;
-    min-width: 72px;
+  .header-cell, .data-cell {
+    padding-inline: 4px;
   }
 
-  .totsu-col {
-    flex: 0 0 108px;
-    min-width: 108px;
-  }
-  
-  .level-col {
-    flex: 1;
-    min-width: 80px;
+  .sortable-header {
+    gap: 2px;
   }
   
   .character-image {
