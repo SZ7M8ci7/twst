@@ -60,12 +60,12 @@ function tab(disk = storage(envelope({ sample: card })), session = storage(), lo
     const filename = path.join(root, 'src/views/HandCollection.vue');
     const source = fs.readFileSync(filename, 'utf8').match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1];
     const characters = vue.ref([{ name: 'sample', rare: 'SSR', visible: true, imgUrl: 'stub' }]);
-    const exports = evaluate(source + '\nexport { updateOwnership, saveHandCollection, hasUnsavedChanges, resetUnsavedChanges, reloadSavedCollection, snackbar };', filename, {
+    const exports = evaluate(source + '\nexport { updateOwnership, saveHandCollection, hasUnsavedChanges, resetUnsavedChanges, reloadSavedCollection, snackbar, characters, ownedOnly, filteredCharacters, resetFilters, applyBulkLevel, applyBulkOwnership, applyBulkTotsu, bulkLevel, bulkTotsu };', filename, {
       vue: { ...vue, onMounted: fn => mounted.push(fn), onUnmounted() {} },
       pinia: { ...pinia, storeToRefs: target => target === store ? pinia.storeToRefs(store) : { characters } },
       '@/store/handCollection': { useHandCollectionStore: () => store },
       '@/store/characters': { useCharacterStore: () => ({}) },
-      '@/store/filterd': { useFilterdStore: () => ({}) },
+      '@/store/filterd': { useFilterdStore: () => ({ resetFilterState() {} }) },
       '@/assets/img/default.webp': 'stub',
       '@/utils/characterAssets': { hydrateCharacterImageUrls: async () => {} },
       '@/components/FilterModal.vue': {}, '@/components/LazyCharacterImage.vue': {},
@@ -78,6 +78,56 @@ function tab(disk = storage(envelope({ sample: card })), session = storage(), lo
   }
   return { store, page, warnings, window, disk, session, event: (name, event) => listeners.get(name)?.(event) };
 }
+
+test('owned-only display combines with other filters, reacts to edits, and resets from empty results', async () => {
+  const current = tab(), page = await current.page();
+  page.characters.value.push({ name: 'unowned', rare: 'SSR', visible: true });
+  const names = () => Array.from(page.filteredCharacters.value, item => item.name);
+  assert.deepEqual(names(), ['sample', 'unowned']);
+  page.ownedOnly.value = true;
+  assert.deepEqual(names(), ['sample']);
+  assert.equal(page.hasUnsavedChanges.value, false);
+  page.characters.value[0].visible = false;
+  assert.deepEqual(names(), []);
+  page.resetFilters();
+  assert.equal(page.ownedOnly.value, false);
+  assert.deepEqual(names(), ['sample', 'unowned']);
+  page.ownedOnly.value = true;
+  page.updateOwnership('sample', false);
+  assert.deepEqual(names(), []);
+  page.resetUnsavedChanges();
+  assert.deepEqual(names(), ['sample']);
+});
+
+test('bulk actions in owned-only mode leave hidden and unowned cards intact and clear every shown card', async () => {
+  const current = tab(), page = await current.page();
+  page.characters.value.push(
+    { name: 'second', rare: 'SSR', visible: true },
+    { name: 'hidden', rare: 'SSR', visible: false },
+    { name: 'unowned', rare: 'SSR', visible: true },
+  );
+  current.store.updateHandCard('second', { isOwned: true, level: 20, totsu: 1 });
+  current.store.updateHandCard('hidden', { isOwned: true, level: 30, totsu: 2 });
+  current.store.updateHandCard('unowned', { isOwned: false, level: 10, totsu: 0 });
+  page.ownedOnly.value = true;
+  page.bulkLevel.value = 90;
+  page.bulkTotsu.value = 4;
+  page.applyBulkLevel();
+  page.applyBulkTotsu();
+  for (const name of ['sample', 'second']) {
+    assert.equal(current.store.peekHandCard(name).level, 90);
+    assert.equal(current.store.peekHandCard(name).totsu, 4);
+  }
+  assert.equal(current.store.peekHandCard('hidden').level, 30);
+  assert.equal(current.store.peekHandCard('hidden').totsu, 2);
+  assert.equal(current.store.peekHandCard('unowned').level, 10);
+  assert.equal(current.store.peekHandCard('unowned').totsu, 0);
+  page.applyBulkOwnership(false);
+  assert.equal(page.filteredCharacters.value.length, 0);
+  assert.equal(current.store.isCharacterOwned('sample'), false);
+  assert.equal(current.store.isCharacterOwned('second'), false);
+  assert.equal(current.store.isCharacterOwned('hidden'), true);
+});
 
 test('save failure stays unsaved, shows error, and undo retains the committed baseline', async () => {
   const current = tab(), page = await current.page();

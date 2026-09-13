@@ -52,38 +52,43 @@
         <div class="controls-main-container">
           <div class="controls-container">
             <h3 class="controls-title">{{ $t('handCollection.bulkSettings') }}</h3>
+            <p class="controls-description">{{ $t('handCollection.bulkScope') }}</p>
             <div class="bulk-controls">
+              <div class="control-group">
+                <div class="control-label">{{ $t('handCollection.owned') }}</div>
+                <div class="control-fields">
+                  <v-btn @click="applyBulkOwnership(true)" color="success" size="small">{{ $t('handCollection.ownershipSetting') }}</v-btn>
+                  <v-btn @click="applyBulkOwnership(false)" color="grey" variant="outlined" size="small">{{ $t('handCollection.ownershipCancel') }}</v-btn>
+                </div>
+              </div>
               <!-- レベル設定 -->
               <div class="control-group">
-                <v-text-field 
-                  type="number" 
-                  v-model="bulkLevel" 
-                  class="level-input" 
-                  :label="$t('handCollection.level')" 
-                  hide-details 
-                  :min="0" 
-                  :max="getMaxLevel('SSR')"
-                  variant="outlined"
-                  density="compact"
-                />
-                <v-btn @click="applyBulkLevel" color="primary" size="small">{{ $t('handCollection.levelSetting') }}</v-btn>
-              </div>
-              
-              <!-- 所持設定 -->
-              <div class="control-group">
-                <v-btn @click="applyBulkOwnership(true)" color="success" size="small">{{ $t('handCollection.ownershipSetting') }}</v-btn>
-                <v-btn @click="applyBulkOwnership(false)" color="grey" size="small">{{ $t('handCollection.ownershipCancel') }}</v-btn>
+                <label for="bulk-level" class="control-label">{{ $t('handCollection.level') }}</label>
+                <div class="control-fields">
+                  <v-text-field
+                    id="bulk-level"
+                    type="number"
+                    v-model="bulkLevel"
+                    class="level-input"
+                    hide-details
+                    :min="0"
+                    :max="getMaxLevel('SSR')"
+                    variant="outlined"
+                    density="compact"
+                  />
+                  <v-btn @click="applyBulkLevel" color="primary" size="small">{{ $t('handCollection.levelSetting') }}</v-btn>
+                </div>
               </div>
               
               <!-- 凸数設定 -->
               <div class="control-group">
-                <div class="native-select-group level-input">
-                  <label class="native-select-label">{{ $t('handCollection.totsu') }}</label>
-                  <select v-model.number="bulkTotsu" class="native-select">
+                <label for="bulk-totsu" class="control-label">{{ $t('handCollection.totsu') }}</label>
+                <div class="control-fields">
+                  <select id="bulk-totsu" v-model.number="bulkTotsu" class="native-select">
                     <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
                   </select>
+                  <v-btn @click="applyBulkTotsu" color="primary" size="small">{{ $t('handCollection.totsuSetting') }}</v-btn>
                 </div>
-                <v-btn @click="applyBulkTotsu" color="success" size="small">{{ $t('handCollection.totsuSetting') }}</v-btn>
               </div>
             </div>
           </div>
@@ -115,6 +120,18 @@
           </div>
         </div>
 
+
+        <div class="collection-display-controls">
+          <v-switch
+            v-model="ownedOnly"
+            :label="$t('handCollection.ownedOnly')"
+            color="primary"
+            hide-details
+            density="compact"
+            inset
+          />
+          <span class="display-count">{{ $t('handCollection.displayCount', { count: filteredCharacters.length }) }}</span>
+        </div>
 
         <!-- カード一覧テーブル -->
         <div v-if="loading" class="text-center">
@@ -319,6 +336,7 @@ const { characters } = storeToRefs(characterStore);
 // UI State
 const loading = ref(true);
 const showFilterModal = ref(false);
+const ownedOnly = ref(false);
 const bulkLevel = ref(getInputMaxLevel('SSR'));
 const bulkTotsu = ref(4);
 const windowWidth = ref(window.innerWidth);
@@ -387,6 +405,7 @@ const filteredCharacters = computed(() => {
         level: handCard.level
       };
     })
+    .filter(character => !ownedOnly.value || character.isOwned)
     .sort((a, b) => {
       // ソートキーに基づく並び替え
       if (sortKey.value === 'default') {
@@ -781,6 +800,7 @@ function importDataText() {
 
 // フィルターリセット機能
 function resetFilters() {
+  ownedOnly.value = false;
   // 全キャラクターを表示状態にリセット
   characters.value.forEach(character => {
     character.visible = true;
@@ -902,24 +922,81 @@ onUnmounted(() => {
 }
 
 .controls-title {
-  margin: 0 0 12px 0;
+  margin: 0 0 4px;
   font-size: 1.1rem;
   font-weight: 600;
   color: #333;
 }
 
 .bulk-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 12px;
 }
 
 .control-group {
-  display: flex;
+  min-width: 0;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+}
+
+.controls-description {
+  margin: 0 0 12px;
+  font-size: .8rem;
+  color: #616161;
+}
+
+.control-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.control-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 8px;
+}
+
+.control-fields .level-input {
+  min-width: 0;
+  max-width: none;
+  width: 100%;
+}
+
+.control-fields .v-btn {
+  min-width: 0;
+  min-height: 44px;
+  height: auto;
+  padding: 6px;
+  white-space: normal;
+}
+
+.control-fields :deep(.v-btn__content) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.collection-display-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
+  column-gap: 12px;
+  margin-bottom: 12px;
+}
+
+.collection-display-controls :deep(.v-input) {
+  flex: 0 1 auto;
+}
+
+.display-count {
+  font-size: .85rem;
+  color: #616161;
 }
 
 .save-controls-container {
@@ -1050,13 +1127,7 @@ onUnmounted(() => {
   }
   
   .bulk-controls {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  
-  .control-group {
-    justify-content: center;
+    grid-template-columns: minmax(0, 1fr);
   }
   
   .character-header {
