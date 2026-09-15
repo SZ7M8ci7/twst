@@ -29,6 +29,10 @@ pnpm-debug.log*
 /docs/
 /artifacts/
 /tests/
+/.cache/
+/public/recognition-runtime/
+/public/recognition/
+/scripts/recognition/__pycache__/
 
 # Local workspace and assistant settings
 *.code-workspace

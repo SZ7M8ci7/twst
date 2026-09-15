@@ -49,6 +49,7 @@
         </v-alert>
 
         <!-- 一括操作コントロール -->
+        <div class="mb-3"><HandScreenshotImport /></div>
         <div class="controls-main-container">
           <div class="controls-container">
             <h3 class="controls-title">{{ $t('handCollection.bulkSettings') }}</h3>
@@ -310,7 +311,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
+const HandScreenshotImport = defineAsyncComponent(() => import('@/components/HandScreenshotImport.vue'));
 import { useHandCollectionStore, type HandCard } from '@/store/handCollection';
 import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';

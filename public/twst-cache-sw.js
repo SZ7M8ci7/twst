@@ -13,7 +13,8 @@ const isCacheableRequest = (request) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return false
 
-  return url.pathname.includes('/assets/') ||
+  return url.pathname.includes('/recognition-runtime/v7/') ||
+    url.pathname.includes('/assets/') ||
     CACHEABLE_EXTENSION_PATTERN.test(url.pathname)
 }
 

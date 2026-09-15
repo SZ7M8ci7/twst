@@ -209,6 +209,12 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
     persistDraft();
   }
 
+  // 取り込み前に存在しなかった設定を、取り消し時に戻す。
+  function removeHandCard(cardName: string): void {
+    delete handCollection[cardName];
+    persistDraft();
+  }
+
   // キャラクターの所持状況を確認
   function isCharacterOwned(cardName: string): boolean {
     return !!peekHandCard(cardName)?.isOwned;
@@ -291,6 +297,7 @@ export const useHandCollectionStore = defineStore('handCollection', () => {
     peekHandCard,
     getHandCard,
     updateHandCard,
+    removeHandCard,
     batchUpdates,
     isCharacterOwned,
     setUseHandCollection,

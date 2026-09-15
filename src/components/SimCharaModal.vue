@@ -1,7 +1,7 @@
 <template>
   <v-dialog :model-value="true" max-width="1200" @update:model-value="!$event && closeModal()">
     <div class="modal-content">
-      <div class="picker-toolbar"><v-btn variant="text" @click="closeModal">{{ t('common.close') }}</v-btn></div>
+      <div class="picker-toolbar"><v-btn v-if="catalogMode" variant="text" @click="emit('clear')">{{ t('screenshot.skip') }}</v-btn><v-btn variant="text" @click="closeModal">{{ t('common.close') }}</v-btn></div>
       <!-- タブセクション -->
       <div class="tab-section">
         <div class="tab-header">
@@ -40,6 +40,9 @@
             <div v-show="activeTab === 'filter'">
               <FilterModal 
                 :embedded="true"
+                :isolated="catalogMode"
+                :initial-selection="catalogFilterSelection"
+                @local-filter="updateCatalogVisibility"
                 @close="handleFilterClose"
                 @filter-applied="handleFilterApplied"
               />
@@ -80,14 +83,14 @@
                 <v-col cols="12" class="pa-2">
                   <div class="hand-collection-options">
                     <v-switch
-                      v-model="handCollectionStore.useHandCollection"
+                      v-model="useHandCollection"
                       :label="t('simulator.selectOwnedCards')"
                       color="primary"
                       hide-details
                       inset
                     />
                     <div class="mt-2 text-caption text-grey">
-                      <template v-if="handCollectionStore.useHandCollection">
+                      <template v-if="useHandCollection">
                         {{ t('simulator.ownedCardsDescription') }}
                       </template>
                       <template v-else>
@@ -149,7 +152,7 @@
               </div>
               <!-- デュオ相手のアイコン -->
               <div 
-                v-if="character.duo && getDuoIconSync(character.duo)" 
+                v-if="!catalogMode && character.duo && getDuoIconSync(character.duo)"
                 class="modal-duo-icon-container"
                 :class="{ 'duo-active': isDuoActive(character) }"
                 :title="duoTitle(character)"
@@ -207,6 +210,17 @@ import { calculateLegacyBuddyContinueHealAmount, getBuddyAtkRate, getBuddyHpRate
 import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 
 const { t, locale } = useI18n();
+const props = defineProps({
+  catalogMode: { type: Boolean, default: false },
+  charaIndex: {
+    type: Number,
+    default: -1 // -1は新規追加を意味する
+  },
+  selectedAttribute: {
+    type: String,
+    default: '対全'
+  }
+});
 
 // characters_info.jsonから日本語名から英語名への変換マップを動的に生成
 const jpName2enName = charactersInfo.reduce((map, character) => {
@@ -308,6 +322,11 @@ const simulatorStore = useSimulatorStore();
 const { deckCharacters } = storeToRefs(simulatorStore);
 const filterdStore = useFilterdStore();
 const handCollectionStore = useHandCollectionStore();
+const catalogOwnedOnly = ref(false);
+const useHandCollection = computed({
+  get: () => props.catalogMode ? catalogOwnedOnly.value : handCollectionStore.useHandCollection,
+  set: value => { if (props.catalogMode) catalogOwnedOnly.value = value; else handCollectionStore.useHandCollection = value; },
+});
 
 const ASYNC_SORT_KEYS = ['hp', 'atk', 'effectiveCardHP', 'effectiveCardATK', 'effectiveDeckHP', 'deckDamage', 'deckHPBuddyCount', 'deckBuddyCount', 'minBuddyHPIncrease', 'duoCount'];
 
@@ -332,7 +351,16 @@ const activeTab = ref('filter');
 const isExpanded = ref(false);
 
 // ソート設定（ストアから取得）
-const { sortBy, sortOrder } = storeToRefs(filterdStore);
+const { sortBy: storedSortBy, sortOrder: storedSortOrder } = storeToRefs(filterdStore);
+const catalogSortBy = ref('default'), catalogSortOrder = ref('asc');
+const sortBy = computed({
+  get: () => props.catalogMode ? catalogSortBy.value : storedSortBy.value,
+  set: value => { if (props.catalogMode) catalogSortBy.value = value; else storedSortBy.value = value; },
+});
+const sortOrder = computed({
+  get: () => props.catalogMode ? catalogSortOrder.value : storedSortOrder.value,
+  set: value => { if (props.catalogMode) catalogSortOrder.value = value; else storedSortOrder.value = value; },
+});
 
 // ソート更新を強制するためのリアクティブカウンター
 const sortUpdateCounter = ref(0);
@@ -362,7 +390,7 @@ const sortOrderOptions = computed(() => [
 // ソート設定の保存と監視
 watch(sortBy, (newValue, oldValue) => {
   // 値が実際に変更された場合、ユーザーが変更したとマーク
-  if (newValue !== oldValue) {
+  if (!props.catalogMode && newValue !== oldValue) {
     filterdStore.markSortAsModified();
     filterdStore.saveCurrentSortState();
   }
@@ -378,7 +406,7 @@ watch(sortBy, (newValue, oldValue) => {
 
 watch(sortOrder, (newValue, oldValue) => {
   // 値が実際に変更された場合、ユーザーが変更したとマーク
-  if (newValue !== oldValue) {
+  if (!props.catalogMode && newValue !== oldValue) {
     filterdStore.markSortAsModified();
     filterdStore.saveCurrentSortState();
   }
@@ -463,7 +491,7 @@ function calculateEffectiveCardHP(character, memberNameDict) {
   let characterHP = character.hp || 0;
   let hasM3 = character.hasM3;
   
-  if (handCollectionStore.useHandCollection) {
+  if (useHandCollection.value) {
     const handCard = getReadOnlyHandCard(character.name);
     if (!handCard.isOwned) {
       // 未所持の場合は計算しない
@@ -479,8 +507,8 @@ function calculateEffectiveCardHP(character, memberNameDict) {
   
   // バディHP増加分
   let buddyHP = 0;
-  const handCard = handCollectionStore.useHandCollection ? getReadOnlyHandCard(character.name) : null;
-  const totsu = handCollectionStore.useHandCollection
+  const handCard = useHandCollection.value ? getReadOnlyHandCard(character.name) : null;
+  const totsu = useHandCollection.value
     ? getCharacterTotsu(character, handCard)
     : getCharacterTotsu(character);
   if (memberNameDict[character.buddy1c]) {
@@ -512,7 +540,7 @@ function calculateEffectiveCardHP(character, memberNameDict) {
 // ソート用のステータス値を取得（手持ち設定を考慮）
 function getStatForSort(character, statType) {
   // 手持ち設定が有効な場合
-  if (handCollectionStore.useHandCollection) {
+  if (useHandCollection.value) {
     const handCard = getReadOnlyHandCard(character.name);
     if (!handCard.isOwned) {
       // 未所持の場合は0を返す（実質HPの計算と一貫性を保つ）
@@ -535,7 +563,7 @@ function calculateEffectiveCardATK(character, memberNameDict) {
   
   let baseATK = character.atk || 0;
   
-  if (handCollectionStore.useHandCollection) {
+  if (useHandCollection.value) {
     const handCard = getReadOnlyHandCard(character.name);
     if (!handCard.isOwned) {
       // 未所持の場合は計算しない
@@ -548,8 +576,8 @@ function calculateEffectiveCardATK(character, memberNameDict) {
   
   // バディATK増加分
   let buddyATK = 0;
-  const handCard = handCollectionStore.useHandCollection ? getReadOnlyHandCard(character.name) : null;
-  const totsu = handCollectionStore.useHandCollection
+  const handCard = useHandCollection.value ? getReadOnlyHandCard(character.name) : null;
+  const totsu = useHandCollection.value
     ? getCharacterTotsu(character, handCard)
     : getCharacterTotsu(character);
   if (memberNameDict[character.buddy1c]) {
@@ -696,7 +724,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       recalculatedChara.originalMaxATK = chara.atk;
       
       // 手持ち設定がONの場合、候補キャラクターのHP/ATKを手持ちレベルで再計算
-      if (handCollectionStore.useHandCollection) {
+      if (useHandCollection.value) {
         const handCard = getReadOnlyHandCard(chara.name);
         if (handCard.isOwned) {
           recalculatedChara.level = Number(handCard.level);
@@ -771,7 +799,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     let hasM3 = chara.hasM3;
     let isOwned = true; // デッキキャラクターは手持ち設定に関係なく常に含む   
     
-    if (handCollectionStore.useHandCollection && isCandidate) {
+    if (useHandCollection.value && isCandidate) {
       // 候補キャラクターのみ手持ち設定を適用
       const handCard = getReadOnlyHandCard(chara.name);
       isOwned = handCard.isOwned;
@@ -791,7 +819,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
     
     // バディHP増加分計算
     // デッキキャラクターは手持ち設定に関係なく計算に含む、候補キャラクターのみ所持チェック
-    const buddyTotsu = handCollectionStore.useHandCollection && isCandidate
+    const buddyTotsu = useHandCollection.value && isCandidate
       ? getCharacterTotsu(chara, getReadOnlyHandCard(chara.name))
       : getCharacterTotsu(chara);
     if ((!isCandidate || isOwned) && memberNameSet.has(chara.buddy1c)) {
@@ -871,7 +899,7 @@ function calculateDeckStats(candidateCharacter, sortKey) {
       const allDamages = [];
       let candidateHasM3 = !!chara.hasM3;
 
-      if (handCollectionStore.useHandCollection) {
+      if (useHandCollection.value) {
         const handCard = getReadOnlyHandCard(chara.name);
         candidateHasM3 = handCard.isOwned && isM3Unlocked(chara.rare, handCard.totsu);
       }
@@ -974,18 +1002,16 @@ function getMemberNameSet(candidateCharacter = null, excludeIndex = null) {
 
 
 // Props定義
-const props = defineProps({
-  charaIndex: {
-    type: Number,
-    default: -1 // -1は新規追加を意味する
-  },
-  selectedAttribute: {
-    type: String,
-    default: '対全'
-  }
-});
 
-const emit = defineEmits(['close', 'select']);
+
+const emit = defineEmits(['close', 'select', 'clear']);
+const catalogFilterSelection = ref(null);
+const catalogVisibleNames = ref(null);
+function updateCatalogVisibility({ selection, cardNames }) {
+  catalogFilterSelection.value = selection;
+  catalogVisibleNames.value = new Set(cardNames);
+  void updateFilteredCharacters();
+}
 const deckTargetAttributes = computed(() => (
   simulatorStore.deckCharacters.map(char => ({
     magic1TargetAttribute: char.magic1TargetAttribute,
@@ -1087,10 +1113,10 @@ const updateFilteredCharacters = async () => {
   // 新しい配列を作成（Vue リアクティブシステム対応）
   let filtered = [...characters.value.filter(character => {
     // visibleフラグをチェック（FilterModalから適用されたフィルター）
-    if (!character.visible) return false;
+    if (props.catalogMode ? catalogVisibleNames.value && !catalogVisibleNames.value.has(character.name) : !character.visible) return false;
     
     // 手持ちコレクション設定をチェック
-    if (handCollectionStore.useHandCollection) {
+    if (useHandCollection.value) {
       // 手持ちモードの場合、所持していないカードを除外
       if (!handCollectionStore.isCharacterOwned(character.name)) {
         return false;
@@ -1241,7 +1267,7 @@ watch([
 });
 
 // 手持ちコレクション設定変更時に候補キャラクターの表示を更新
-watch(() => handCollectionStore.useHandCollection, () => {
+watch(() => useHandCollection.value, () => {
   updateFilteredCharacters();
 });
 
@@ -1250,8 +1276,9 @@ const closeModal = () => {
 };
 
 const selectImage = (character) => {
+  if (props.catalogMode) { emit('select', { ...character }); return; }
   // 手持ちコレクション設定が有効な場合、キャラクターにその設定を適用
-    if (handCollectionStore.useHandCollection) {
+    if (useHandCollection.value) {
       const handCard = getReadOnlyHandCard(character.name);
       if (handCard.isOwned) {
         // 手持ち設定に基づいてキャラクターのステータスを調整
@@ -1607,6 +1634,7 @@ const ensureVisiblePropertiesInitialized = (character) => {
 
 // コンポーネントがマウントされた後に初期化
 onMounted(async () => {
+  if (props.catalogMode) { await updateFilteredCharacters(); loadCharacterImages(); return; }
   try {
     // 手持ち設定の初期化：同一セッション内の初回表示時のみ手持ち設定の有無で判定、2回目以降は前回の値を使用
     if (handCollectionStore.isFirstModalOpen()) {

@@ -33,16 +33,39 @@ export default defineConfig({
   define: { 'process.env': {} },
   optimizeDeps: {
     include: [
+      // The OCR client and OpenCV Worker are first requested after file selection.
+      // Prebundle them at startup so late dependency discovery cannot reload the
+      // page and discard the selected File objects and in-progress recognition.
+      '@techstark/opencv-js',
+      'tesseract.js',
+      // Vuetify's auto-import transform is not visible to the dependency scanner.
+      // Include the components used by lazy routes and their import dialogs too.
+      'vuetify/components/VApp',
+      'vuetify/components/VAppBar',
+      'vuetify/components/VAutocomplete',
       'vuetify/components/VAlert',
       'vuetify/components/VBtn',
+      'vuetify/components/VBtnToggle',
       'vuetify/components/VCard',
+      'vuetify/components/VCheckbox',
       'vuetify/components/VChip',
       'vuetify/components/VDialog',
       'vuetify/components/VGrid',
+      'vuetify/components/VIcon',
+      'vuetify/components/VList',
+      'vuetify/components/VMain',
+      'vuetify/components/VNavigationDrawer',
+      'vuetify/components/VProgressCircular',
       'vuetify/components/VProgressLinear',
+      'vuetify/components/VSelect',
+      'vuetify/components/VSnackbar',
       'vuetify/components/VSwitch',
+      'vuetify/components/VTable',
+      'vuetify/components/VTabs',
+      'vuetify/components/VTextarea',
       'vuetify/components/VTextField',
       'vuetify/components/VMenu',
+      'vuetify/components/transitions',
     ],
   },
   worker: {

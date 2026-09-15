@@ -204,12 +204,14 @@ const selectedAttr = ref<string[]>([]);
 const selectedEffects = ref<string[]>([]);
 const selectedBuddyBonusEffects = ref<string[]>([]);
 const costumeSearch = ref('');
-const emit = defineEmits(['close', 'filter-applied']);
+const emit = defineEmits(['close', 'filter-applied', 'local-filter']);
 const displayBlockWidth = ref(0);
 const imgUrlDictionary: Ref<Record<string, string>> = ref({});
 
 // プロパティ定義
 const props = defineProps({
+  isolated: { type: Boolean, default: false },
+  initialSelection: { type: Object, default: null },
   embedded: {
     type: Boolean,
     default: false
@@ -294,7 +296,16 @@ const resizeListener = () => {
 
 onMounted(async () => {
   // 初期化処理
-  if (isFirst.value) {
+  if (props.isolated) {
+    const initial = props.initialSelection;
+    selectedCharacters.value = initial ? [...initial.characters] : characterData.map(character => character.name_en);
+    selectedRare.value = initial ? [...initial.rare] : [...rareOptions];
+    selectedType.value = initial ? [...initial.types] : typeOptions.value.map(type => type.value);
+    selectedAttr.value = initial ? [...initial.attributes] : attrOptions.value.map(attr => attr.value);
+    selectedEffects.value = initial ? [...initial.effects] : [...defaultSelectedEffectValues];
+    selectedBuddyBonusEffects.value = initial ? [...initial.buddyEffects] : [...defaultSelectedBuddyBonusEffectValues];
+    costumeSearch.value = initial?.costumeSearch || '';
+  } else if (isFirst.value) {
     selectedCharacters.value = allCharacterNames.value;
     selectedRare.value = ['SSR']; // SSRのみをデフォルトで選択
     selectedType.value = ['バランス', 'ディフェンス', 'アタック'];
@@ -320,20 +331,23 @@ onMounted(async () => {
     selectedBuddyBonusEffects.value = [...tempSelectedBuddyBonusEffects.value];
     costumeSearch.value = tempCostumeSearch.value;
   }
-  isFirst.value = false;
+  if (!props.isolated) isFirst.value = false;
 
   // display-block幅の更新
   updateDisplayBlockWidth();
   window.addEventListener('resize', resizeListener);
   imgUrlDictionary.value = await loadImageUrls(characterData, (item: any) => item.name_en, 'icon/');
   // 画像辞書読み込み後に初期選択が未設定なら、画像がある項目のみ全選択
-  if (selectedCharacters.value.length === 0) {
+  if (!props.isolated && selectedCharacters.value.length === 0) {
     selectedCharacters.value = allCharacterNames.value;
   }
   
+  if (props.isolated) updateCharacterVisibility();
+
   // 埋め込みモードの場合はリアルタイム更新のためのwatcherを設定
   if (props.embedded) {
     watch([selectedCharacters, selectedRare, selectedType, selectedAttr, selectedEffects, selectedBuddyBonusEffects, costumeSearch], () => {
+      if (props.isolated) { updateCharacterVisibility(); return; }
       // 選択状態を一時保存エリアに更新
       tempSelectedCharacters.value = [...selectedCharacters.value];
       tempSelectedRare.value = [...selectedRare.value];
@@ -359,6 +373,12 @@ onBeforeUnmount(() => {
 });
 
 function applyFilter() {
+  if (props.isolated) {
+    updateCharacterVisibility();
+    emit('filter-applied');
+    if (!props.embedded) emit('close');
+    return;
+  }
   // 選択された項目を一時保存
   tempSelectedCharacters.value = [...selectedCharacters.value];
   tempSelectedRare.value = [...selectedRare.value];
@@ -392,6 +412,8 @@ function resetFilter() {
   selectedEffects.value = [...defaultSelectedEffectValues];
   selectedBuddyBonusEffects.value = [...defaultSelectedBuddyBonusEffectValues];
   costumeSearch.value = '';
+
+  if (props.isolated) { updateCharacterVisibility(); return; }
 
   // 一時保存エリアも更新
   tempSelectedCharacters.value = [...selectedCharacters.value];
@@ -440,7 +462,9 @@ const getCharacterItemStyle = (characterName: string) => {
 function updateCharacterVisibility() {
   const normalizedCostumeSearch = normalizeSearchText(costumeSearch.value);
 
-  characters.value.forEach(character => {
+  // Local pickers run the existing filter on copies, preserving shared visibility.
+  const targets = props.isolated ? characters.value.map(character => ({ ...character })) : characters.value;
+  targets.forEach(character => {
     // レア度チェック
     if (!selectedRareSet.value.has(character.rare)) {
       character.visible = false;
@@ -499,6 +523,15 @@ function updateCharacterVisibility() {
         !matchesAnySelectedBuddyBonusEffect(character, selectedBuddyBonusEffects.value)) {
       character.visible = false;
     }
+  });
+  if (props.isolated) emit('local-filter', {
+    cardNames: targets.filter(character => character.visible).map(character => character.name),
+    selection: {
+      characters: [...selectedCharacters.value], rare: [...selectedRare.value],
+      types: [...selectedType.value], attributes: [...selectedAttr.value],
+      effects: [...selectedEffects.value], buddyEffects: [...selectedBuddyBonusEffects.value],
+      costumeSearch: costumeSearch.value || '',
+    },
   });
 }
 

@@ -1,3 +1,6 @@
+import cardCatalog from '@/assets/chara.json';
+const imageAliases = new Map((cardCatalog as Array<{ name: string; imageKey?: string }>).filter(card => card.imageKey).map(card => [card.name, card.imageKey!]));
+
 type ImageNameAccessor<T> = keyof T | ((item: T) => string);
 type ImageModuleRegistry = Record<string, string>;
 
@@ -50,7 +53,7 @@ function loadImageModuleUrl(imageName: string, prefix = ''): string {
     return cached;
   }
 
-  const moduleKey = resolveModuleKey(imageName, prefix);
+  const moduleKey = resolveModuleKey(prefix ? imageName : imageAliases.get(imageName) ?? imageName, prefix);
   const registry = getModuleRegistry(prefix);
   const imageUrl = registry[moduleKey];
   if (!imageUrl) {
