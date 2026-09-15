@@ -30,13 +30,15 @@
     </fieldset>
     <p v-if="!rosterReady" class="missing">{{ t('examSearch.simple.missingCards', {count:usesSupport?4:5}) }} · <router-link to="/twst/hand-collection">{{ t('examSearch.simple.manageHand') }}</router-link></p>
     <v-alert v-if="error" class="my-3" type="error">{{ error }}</v-alert>
+    <v-switch v-model="continuousSearch" data-testid="continuous-search" :disabled="busy" color="primary" hide-details :label="t('examSearch.continuous')" />
+    <p v-if="continuousSearch" class="continuous-help">{{ t('examSearch.continuousHelp') }}</p>
     <div class="actions my-4">
       <v-btn data-testid="search-settings-open" class="search-settings-open" variant="text" :disabled="busy" @click="searchSettingsOpen = true">
         {{ t('examSearch.changeConditions') }}
       </v-btn>
       <v-btn color="primary" class="resource-start" :disabled="busy" data-testid="resource-start" @click="start(180000)">{{ t('examSearch.start') }}</v-btn>
-      <v-btn v-if="canResume && !busy" @click="resume">{{ t('examSearch.resume') }}</v-btn>
-      <v-btn v-if="busy" @click="stop">{{ t('examSearch.stop') }}</v-btn>
+      <v-btn v-if="canResume && !busy" data-testid="resource-resume" @click="resume">{{ t('examSearch.resume') }}</v-btn>
+      <v-btn v-if="busy" data-testid="resource-stop" @click="stop">{{ t('examSearch.stop') }}</v-btn>
     </div>
     <v-progress-linear v-if="busy" indeterminate color="primary" />
     <p v-if="progress" aria-live="polite">{{ t(`examSearch.phase.${progress.phase}`) }} · {{ t('examSearch.progress', { tasks: progress.tasksDone, total: progress.tasksTotal, count: progress.evaluated, seconds: Math.round(progress.elapsedMs / 1000) }) }}<span v-if="busy && ['done','stopped'].includes(progress.phase)"> · {{ t('examSearch.saving') }}</span></p>
@@ -120,6 +122,7 @@ import type { RosterCard, SearchInput, SearchProgress, SearchResult } from '@/do
 import { ENGINE_VERSION } from '@/domain/examSearch/types';
 import { loadSimulatorWindowState, loadStoredAutoSaveDeck, loadStoredSavedDecks } from '@/storage/simulatorStorage';
 import { groupExamBattleLog, type BattleLogActionElement, type BattleLogGroup } from '@/utils/examBattleLog';
+import { SearchContinuation } from '@/utils/examSearchContinuation';
 
 const { t, locale } = useI18n();
 const router = useRouter();
@@ -151,6 +154,7 @@ if (!props.conditions && props.preset && props.preset.id !== input.value.preset.
   input.value.challengeLocks = {};
 }
 const busy = ref(false), error = ref(''), progress = ref<SearchProgress | null>(null);
+const continuousSearch = ref(false);
 const evaluatedInput = ref<SearchInput | null>(null), runFingerprint = ref('');
 const previewOpen = ref(false), previewGroups = ref<BattleLogGroup[]>([]);
 const searchSettingsOpen = ref(false);
@@ -169,10 +173,11 @@ const characterFilter = ref<string[]>([...(input.value.requiredCharacters ?? [])
 const persistedSession = ref<SavedSearchSession | null>(loadSearchSession());
 let worker: Worker | null = null, requestId = 0;
 const idleWaiters: Array<(saved:boolean)=>void> = [];
-function finishRequest(saved=true) {
+const continuation = new SearchContinuation(resumeBatch, saved => {
   busy.value=false;
   idleWaiters.splice(0).forEach(resolve=>resolve(saved));
-}
+});
+function finishRequest(saved=true) { continuation.finish(saved); }
 const hand = useHandCollectionStore();
 const additionalBreaks = computed({ get: () => input.value.budget / input.value.itemsPerLimitBreak, set: n => { input.value.budget = n * input.value.itemsPerLimitBreak; } });
 const additionalBreaksError = computed(() => Number.isInteger(additionalBreaks.value) && additionalBreaks.value >= 0 && additionalBreaks.value <= 4
@@ -180,7 +185,7 @@ const additionalBreaksError = computed(() => Number.isInteger(additionalBreaks.v
 const attemptsError = computed(() => Number.isInteger(input.value.attempts) && input.value.attempts >= 1 && input.value.attempts <= 100000
   ? '' : t('examSearch.validation.attempts'));
 const cardLabel = (name: string) => catalog[name] ? `${localizeCharacterName(catalog[name].chara, locale.value)} / ${localizeCostumeName(catalog[name], locale.value)}` : name;
-const canResume = computed(() => !!progress.value && runFingerprint.value === JSON.stringify(input.value) && (!!worker || !!persistedSession.value));
+const canResume = computed(() => !!progress.value && runFingerprint.value === JSON.stringify(input.value) && !!persistedSession.value);
 const characterOptions = computed(() => charactersInfo.map(character => character.name_ja).filter(name => cards.some(card => card.chara === name)));
 const characterChoices = computed(() => characterOptions.value.map(name => ({
   name,
@@ -374,7 +379,7 @@ if (persistedSession.value && JSON.stringify(persistedSession.value.input) === J
   runFingerprint.value = JSON.stringify(input.value);
   const checkpoint = constrainCheckpoint(input.value, persistedSession.value.checkpoint, catalog);
   persistedSession.value.checkpoint = checkpoint;
-  progress.value = { phase: 'stopped', generated: checkpoint.seen.length, evaluated: checkpoint.evaluatedCount ?? checkpoint.pool.length,
+  progress.value = { phase: 'stopped', generated: checkpoint.generatedCount ?? checkpoint.seen.length, evaluated: checkpoint.evaluatedCount ?? checkpoint.pool.length,
     tasksDone: checkpoint.cursor, tasksTotal: checkpoint.tasksTotal ?? checkpoint.cursor, elapsedMs: checkpoint.elapsed, results: checkpoint.finalists };
 }
 function getWorker() {
@@ -383,7 +388,7 @@ function getWorker() {
   worker.onmessage = ({ data }) => {
     if (data.id !== requestId) return;
     if (data.diagnostic) console.error('Exam search failed', JSON.stringify(data.diagnostic));
-    if (data.error) { error.value = t('examSearch.failure') + ': ' + data.error; finishRequest(false); }
+    if (data.error) { error.value = t('examSearch.failure') + ': ' + data.error; finishRequest(false); return; }
     if (data.progress) {
       progress.value = data.progress;
     }
@@ -391,7 +396,7 @@ function getWorker() {
       persistedSession.value = { input: clone(evaluatedInput.value), checkpoint: data.checkpoint, catalogVersion: data.catalogVersion, version: ENGINE_VERSION };
       const saved=saveSearchSession(persistedSession.value,data.serializedSession);
       if (!saved) error.value = t('examSearch.sessionSaveFailed');
-      finishRequest(saved);
+      continuation.saved(saved);
     }
     if (data.preview) {
       previewScore.value = Number(data.preview.score || 0);
@@ -419,15 +424,35 @@ function start(durationMs: number) {
   if (!saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');
   worker?.terminate(); worker = null;
   runFingerprint.value = JSON.stringify(input.value);
+  persistedSession.value = null;
   evaluatedInput.value = clone(input.value); progress.value = null; busy.value = true;
-  getWorker().postMessage({ method: 'start', id: ++requestId, input: clone(input.value), durationMs });
+  continuation.begin(continuousSearch.value);
+  try {
+    getWorker().postMessage({ method: 'start', id: ++requestId, input: clone(input.value), durationMs, continuous: continuousSearch.value });
+  } catch (cause) { requestFailed(cause); }
 }
 function resume() {
+  error.value = '';
+  continuation.begin(continuousSearch.value);
   busy.value = true;
-  getWorker().postMessage({ method: 'resume', id: ++requestId, durationMs: 180000,
-    input: clone(evaluatedInput.value), checkpoint: persistedSession.value ? clone(persistedSession.value.checkpoint) : undefined, catalogVersion: persistedSession.value?.catalogVersion });
+  resumeBatch();
 }
-function stop() { worker?.postMessage({ method: 'stop', id: requestId }); }
+function resumeBatch() {
+  try {
+    getWorker().postMessage({ method: 'resume', id: ++requestId, durationMs: 180000, continuous: continuousSearch.value,
+      input: clone(evaluatedInput.value), checkpoint: persistedSession.value ? clone(persistedSession.value.checkpoint) : undefined, catalogVersion: persistedSession.value?.catalogVersion });
+  } catch (cause) { requestFailed(cause); }
+}
+function requestFailed(cause: unknown) {
+  error.value = `${t('examSearch.failure')}: ${cause instanceof Error ? cause.message : String(cause)}`;
+  worker?.terminate(); worker = null;
+  finishRequest(false);
+}
+function stop() {
+  if (continuation.stop()) {
+    if (progress.value) progress.value = { ...progress.value, phase: 'stopped' };
+  } else worker?.postMessage({ method: 'stop', id: requestId });
+}
 async function requestStopAndSave() {
   if (!busy.value) return true;
   const saved = new Promise<boolean>(resolve => idleWaiters.push(resolve));
@@ -468,7 +493,7 @@ function variantCardSummary(result: SearchResult) {
     .map(card => `${localizeCharacterName(catalog[card.name].chara, locale.value)} +${card.totsu - card.originalTotsu}`).join(' · ') || t('examSearch.noUpgrade');
 }
 onBeforeRouteLeave(() => requestStopAndSave());
-onBeforeUnmount(() => { worker?.terminate(); });
+onBeforeUnmount(() => { continuation.cancel(); worker?.terminate(); });
 </script>
 
 <style scoped>
@@ -476,6 +501,7 @@ onBeforeUnmount(() => { worker?.terminate(); });
 .resource-search.embedded { max-width: none; padding: 0 !important; }
 .resource-search.embedded .setup { border: 0; background: transparent; }
 .search-settings-fields { display: grid; gap: 20px; padding-top: 8px; border: 0; }
+.continuous-help { color: #657582; font-size: .85rem; }
 .required-card-setting, .character-setting { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 16px; padding: 12px 0; }
 .selection-label { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
 .optional-label { font-size: .75rem; color: #657582; font-weight: normal; }

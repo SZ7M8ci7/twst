@@ -12,11 +12,14 @@ const DISCOVERY_SAMPLES = 32;
 const MAX_FINALISTS = 8;
 const WIDE_DISCOVERY_SAMPLES = 8;
 const WIDE_SCOUT_SAMPLES = 8;
+const MAX_RECENT_CANDIDATES = 4096;
+const CONTINUOUS_VALIDATION_SAMPLES = 32768;
 export interface SessionCheckpoint {
   cursor: number; seen: string[]; pool: SearchResult[]; finalists: SearchResult[]; pending: SearchResult[];
   round: number; elapsed: number; trialSerial: number; nonce: string;
   evaluatedCount?: number; tasksTotal?: number;
   mutationRound?: number;
+  generatedCount?: number;
   partition?: TaskPartition;
   parallel?: { baseNonce: string; checkpoints: SessionCheckpoint[]; owners: Record<string, number> };
 }
@@ -73,6 +76,8 @@ export class SearchSession {
   private knownTasksTotal = 0;
   private cursor = 0;
   private seen = new Set<string>();
+  private generatedCount = 0;
+  private continuous = false;
   private pool: SearchResult[] = [];
   private finalists: SearchResult[] = [];
   private pending: SearchResult[] = [];
@@ -87,6 +92,7 @@ export class SearchSession {
     this.partition = validateTaskPartition(checkpoint?.partition ?? partition);
     if (checkpoint) {
       this.cursor = checkpoint.cursor; this.seen = new Set(checkpoint.seen);
+      this.generatedCount = checkpoint.generatedCount ?? checkpoint.seen.length;
       const valid = (result: SearchResult) => candidateIncludesRequired(this.input,result.candidate,this.catalog);
       this.pool = checkpoint.pool.filter(valid);
       this.finalists = checkpoint.finalists.filter(valid);
@@ -100,7 +106,43 @@ export class SearchSession {
   checkpoint(): SessionCheckpoint {
     return { cursor: this.cursor, seen: [...this.seen], pool: this.pool, finalists: this.finalists, pending: this.pending,
       round: this.round, elapsed: this.elapsed, trialSerial: this.trialSerial, nonce: this.nonce, evaluatedCount: this.evaluatedCount, tasksTotal: this.knownTasksTotal, mutationRound: this.mutationRound,
-      partition: this.partition };
+      partition: this.partition, generatedCount: this.generatedCount };
+  }
+  private remember(id: string) {
+    if (!this.seen.has(id)) { this.seen.add(id); this.generatedCount++; }
+    if (this.continuous && this.seen.size > MAX_RECENT_CANDIDATES * 2) this.trimHistory();
+  }
+  private trimPool() {
+    if (this.pool.length <= 240) return;
+    const rare=this.closeLosses(4);
+    const ceilings=this.diverseParents(3);
+    const sorted = this.pool.sort((a, b) => this.quality(b) - this.quality(a));
+    const kept = new Map<number, number>(), compositions = new Map<string,number>();
+    this.pool = sorted.filter(r => {
+      const c=r.candidate.cost,n=kept.get(c)??0,key=JSON.stringify([c,r.candidate.cards.map(card=>card.name)]), count=compositions.get(key)??0;
+      if(n>=24||count>=2) return false;
+      kept.set(c,n+1); compositions.set(key,count+1); return true;
+    });
+    this.pool=[...new Set([...this.pool,...rare,...ceilings])];
+  }
+  private trimHistory() {
+    // Keep all live candidates protected; forget only old discarded proposals.
+    const live = new Set([...this.pool, ...this.finalists, ...this.pending].map(r => r.candidate.id));
+    for (const id of this.seen) {
+      if (this.seen.size <= MAX_RECENT_CANDIDATES) break;
+      if (!live.has(id)) this.seen.delete(id);
+    }
+  }
+  private continueValidation(previous: SearchResult[]) {
+    const existing = new Map(previous.map(result => [result.candidate.id, result]));
+    this.finalists = this.finalists.map(result => {
+      const prior = existing.get(result.candidate.id);
+      if (!prior) return result;
+      // Append independent trials to the same cards and plan. Keep the best
+      // replay and cap sample storage even when the search runs for many hours.
+      return { ...prior, validationTarget: Math.max(prior.validationTarget,
+        Math.min(CONTINUOUS_VALIDATION_SAMPLES, prior.validation.scores.length + VALIDATION_SAMPLES)) };
+    });
   }
   stop() { this.stopped = true; }
   refineValidation(candidateId: string) {
@@ -350,8 +392,10 @@ export class SearchSession {
     this.finalists=[...retained,...selected.slice(0,MAX_FINALISTS-retained.length).map(r=>({...r,validation:emptySamples(),validationBest:undefined,validationTarget:VALIDATION_SAMPLES}))];
     this.round++;
   }
-  async run(durationMs: number, publish: (progress: SearchProgress) => void) {
+  async run(durationMs: number, publish: (progress: SearchProgress) => void, continuous = false) {
     this.stopped = false;
+    this.continuous = continuous;
+    if (continuous) { this.trimPool(); this.trimHistory(); }
     const wideInitialScreen = usesWideInitialScreen(this.input, this.partition);
     const discoverySamples = wideInitialScreen ? WIDE_DISCOVERY_SAMPLES : DISCOVERY_SAMPLES;
     const discoveryScoutSamples = wideInitialScreen ? WIDE_SCOUT_SAMPLES : DISCOVERY_SAMPLES;
@@ -359,7 +403,7 @@ export class SearchSession {
     const loadoutDeadline = start + durationMs * 0.55;
     const contenderDeadline = start + durationMs * 0.65;
     const planDeadline = start + durationMs * 0.7;
-    const report = (phase: SearchProgress['phase']) => publish({ phase, generated: this.seen.size,
+    const report = (phase: SearchProgress['phase']) => publish({ phase, generated: this.generatedCount,
       evaluated: this.evaluatedCount, tasksDone: this.cursor, tasksTotal: this.knownTasksTotal,
       elapsedMs: this.elapsed + performance.now() - start, results: this.finalists });
     let lastReport = 0;
@@ -400,7 +444,7 @@ export class SearchSession {
           }
           if (!candidates) break;
           for (const candidate of candidates) if (candidateIncludesRequired(this.input,candidate,this.catalog) && !this.seen.has(candidate.id)) {
-            this.seen.add(candidate.id);
+            this.remember(candidate.id);
             this.pending.push({ candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES });
           }
         }
@@ -421,19 +465,7 @@ export class SearchSession {
         }
         if (result.development.scores.length >= discoverySamples) {
           this.pool.push(result); this.pending.shift(); this.evaluatedCount++;
-          // Bound memory, retaining candidates separately in each resource band.
-          if (this.pool.length > 240) {
-            const rare=this.closeLosses(4);
-            const ceilings=this.diverseParents(3);
-            const sorted = this.pool.sort((a, b) => this.quality(b) - this.quality(a));
-            const kept = new Map<number, number>(), compositions = new Map<string,number>();
-            this.pool = sorted.filter(r => {
-              const c=r.candidate.cost,n=kept.get(c)??0,key=JSON.stringify([c,r.candidate.cards.map(card=>card.name)]), count=compositions.get(key)??0;
-              if(n>=24||count>=2) return false;
-              kept.set(c,n+1); compositions.set(key,count+1); return true;
-            });
-            this.pool=[...new Set([...this.pool,...rare,...ceilings])];
-          }
+          this.trimPool();
         }
         await progress('generate');
       }
@@ -458,7 +490,7 @@ export class SearchSession {
           result.development.retired+=Number(trial.retired);result.development.turns+=trial.finishTurn;
           if(i%8===0)await progress('generate');
         }
-        if(result.development.scores.length){this.pool.push(result);this.seen.add(candidate.id);this.evaluatedCount++;}
+        if(result.development.scores.length){this.pool.push(result);this.remember(candidate.id);this.evaluatedCount++;}
       }
       // Rare successful draws are easily missed by the short ordinary screen.
       // Give promising compositions in every resource band equal extra batches
@@ -525,7 +557,7 @@ export class SearchSession {
             result.development.turns += trial.finishTurn;
             if (i % 8 === 0) await progress('generate');
           }
-          if (result.development.scores.length === 64) { this.pool.push(result); this.seen.add(candidate.id); this.evaluatedCount++; }
+          if (result.development.scores.length === 64) { this.pool.push(result); this.remember(candidate.id); this.evaluatedCount++; }
           }
         }
       }
@@ -557,9 +589,11 @@ export class SearchSession {
           result.development.retired+=Number(trial.retired);result.development.turns+=trial.finishTurn;
           if(i%8===0)await progress('generate');
         }
-        if(result.development.scores.length===64){this.pool.push(result);this.seen.add(candidate.id);this.evaluatedCount++;}
+        if(result.development.scores.length===64){this.pool.push(result);this.remember(candidate.id);this.evaluatedCount++;}
       }
+      const previous = this.finalists;
       this.selectFinalists();
+      if (continuous) this.continueValidation(previous);
     }
     // Reuse prepared deck/runtime caches for 64 trials, but keep the same
     // 16-trial cooperative boundary for cancellation and progress messages.
@@ -586,5 +620,6 @@ export class SearchSession {
     }
     report(this.stopped ? 'stopped' : 'done');
     this.elapsed += performance.now() - start;
+    if (continuous) { this.trimPool(); this.trimHistory(); }
   }
 }

@@ -89,6 +89,7 @@ export function createParallelCheckpoint(
     cursor: sum('cursor'), seen, pool: [], finalists: merged.results, pending: [],
     round: max('round'), elapsed: normalizedElapsed, trialSerial: sum('trialSerial'), nonce: baseNonce,
     evaluatedCount: sum('evaluatedCount'), tasksTotal: sum('tasksTotal'), mutationRound: max('mutationRound'),
+    generatedCount: children.reduce((total, checkpoint) => total + (checkpoint.generatedCount ?? checkpoint.seen.length), 0),
     parallel: { baseNonce, checkpoints: children, owners: merged.owners },
   };
 }

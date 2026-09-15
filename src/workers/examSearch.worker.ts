@@ -11,12 +11,12 @@ import { displayProgress } from '@/domain/examSearch/statistics';
 const catalog = Object.fromEntries(cards.map(c => [c.name, c]));
 const catalogVersion = JSON.stringify(cards).split('').reduce((hash, c) => Math.imul(hash ^ c.charCodeAt(0), 16777619), 2166136261).toString(16);
 type ParallelCheckpoint = SessionCheckpoint & { parallel?: { baseNonce: string; checkpoints: SessionCheckpoint[]; owners: Record<string, number> } };
-type Request = { method: 'start'; id: number; input: SearchInput; durationMs: number }
-  | { method: 'resume' | 'evaluate'; id: number; durationMs: number; input?: SearchInput; checkpoint?: ParallelCheckpoint; catalogVersion?: string; candidateId?: string }
+type Request = { method: 'start'; id: number; input: SearchInput; durationMs: number; continuous?: boolean }
+  | { method: 'resume' | 'evaluate'; id: number; durationMs: number; continuous?: boolean; input?: SearchInput; checkpoint?: ParallelCheckpoint; catalogVersion?: string; candidateId?: string }
   | { method: 'stop'; id: number }
   | { method: 'preview'; id: number; input: SearchInput; candidate: Candidate; best?: {seed:string;score:number} };
-type ChildRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; deadline: number; nonce: string; serialize: false }
-  | { method: 'resume' | 'evaluate'; id: number; island: number; durationMs: number; deadline: number; input: SearchInput; checkpoint: SessionCheckpoint; catalogVersion: string; serialize: false; candidateId?: string; nonce?: string }
+type ChildRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; continuous?: boolean; deadline: number; nonce: string; serialize: false }
+  | { method: 'resume' | 'evaluate'; id: number; island: number; durationMs: number; continuous?: boolean; deadline: number; input: SearchInput; checkpoint: SessionCheckpoint; catalogVersion: string; serialize: false; candidateId?: string; nonce?: string }
   | { method: 'stop'; id: number }
   | { method: 'preview'; id: number; island: number; input: SearchInput; candidate: Candidate; best?: {seed:string;score:number} };
 type ChildOperationRequest = Exclude<ChildRequest, { method: 'stop' }>;
@@ -37,7 +37,7 @@ let childRequest = 0;
 
 function checkpointProgress(checkpoint: SessionCheckpoint, input: SearchInput): SearchProgress {
   const finalists=checkpoint.finalists.filter(result=>candidateIncludesRequired(input,result.candidate,catalog));
-  return displayProgress({ phase: 'done', generated: checkpoint.seen.length, evaluated: checkpoint.evaluatedCount ?? checkpoint.pool.length,
+  return displayProgress({ phase: 'done', generated: checkpoint.generatedCount ?? checkpoint.seen.length, evaluated: checkpoint.evaluatedCount ?? checkpoint.pool.length,
     tasksDone: checkpoint.cursor, tasksTotal: checkpoint.tasksTotal ?? checkpoint.cursor, elapsedMs: checkpoint.elapsed, results: finalists }, input.target, input.attempts, input.desiredProbability);
 }
 function postAggregate(op: Operation, finalPhase?: 'done' | 'stopped') {
@@ -197,12 +197,12 @@ function sendOperation(op: Operation, data: SearchRequest, checkpoints: SessionC
     if (child.finished || !child.worker) continue;
     const island = child.island; op.required.add(island);
     if (data.method === 'start') {
-      sendChildRequest(child, { method: 'start', id: op.id, island, islandCount: op.children.length, input: data.input, durationMs: data.durationMs, deadline: op.deadline,
+      sendChildRequest(child, { method: 'start', id: op.id, island, islandCount: op.children.length, input: data.input, durationMs: data.durationMs, continuous: data.continuous, deadline: op.deadline,
         nonce: `${op.baseNonce}:island:${island}`, serialize: false });
     } else {
       const checkpoint = checkpoints[island];
       if (!checkpoint) { failOperation(op, 'Saved island checkpoint is missing.'); return; }
-      sendChildRequest(child, { method: data.method, id: op.id, island, input: data.input!, durationMs: data.durationMs, deadline: op.deadline,
+      sendChildRequest(child, { method: data.method, id: op.id, island, input: data.input!, durationMs: data.durationMs, continuous: data.continuous, deadline: op.deadline,
         checkpoint, catalogVersion: data.catalogVersion ?? catalogVersion, serialize: false, candidateId: data.candidateId,
         nonce: checkpoint.nonce });
     }
@@ -236,7 +236,7 @@ function resumeSearch(data: Extract<Request,{method:'resume'|'evaluate'}>) {
     const child = operation.children.find(c => c.island === island);
     if (!child || !child.worker || !checkpoints[island]) throw new Error('Candidate owner island is missing.');
     operation.required = new Set([island]);
-    sendChildRequest(child, { method: 'evaluate', id: operation.id, island, input: data.input, durationMs: data.durationMs, deadline: operation.deadline,
+    sendChildRequest(child, { method: 'evaluate', id: operation.id, island, input: data.input, durationMs: data.durationMs, continuous: data.continuous, deadline: operation.deadline,
       checkpoint: checkpoints[island], catalogVersion, serialize: false, candidateId: data.candidateId, nonce: checkpoints[island].nonce });
   } else {
     operation = makeOperation(data, checkpoints, owners, baseNonce, checkpoints.length, undefined, data.checkpoint.elapsed);

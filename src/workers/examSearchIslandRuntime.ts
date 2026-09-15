@@ -10,8 +10,8 @@ const catalog = Object.fromEntries(cards.map(c => [c.name, c]));
 // Invalidate persisted statistics whenever source combat data changes.
 const catalogVersion = JSON.stringify(cards).split('').reduce((hash, c) => Math.imul(hash ^ c.charCodeAt(0), 16777619), 2166136261).toString(16);
 
-export type IslandRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; deadline?: number; nonce: string; serialize?: boolean }
-  | { method: 'resume' | 'evaluate'; id: number; island: number; durationMs: number; deadline?: number; input?: SearchInput; checkpoint?: SessionCheckpoint; catalogVersion?: string; candidateId?: string; nonce?: string; serialize?: boolean }
+export type IslandRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; continuous?: boolean; deadline?: number; nonce: string; serialize?: boolean }
+  | { method: 'resume' | 'evaluate'; id: number; island: number; durationMs: number; continuous?: boolean; deadline?: number; input?: SearchInput; checkpoint?: SessionCheckpoint; catalogVersion?: string; candidateId?: string; nonce?: string; serialize?: boolean }
   | { method: 'stop'; id: number }
   | { method: 'preview'; id: number; island: number; input: SearchInput; candidate: Candidate; best?: {seed:string;score:number} };
 
@@ -52,7 +52,9 @@ export function createIslandRuntime(emit: (message: IslandMessage) => void) {
       if (!session) throw new Error('session');
       if (data.method === 'evaluate') session.refineValidation(data.candidateId ?? '');
       const deadline = data.deadline ?? Date.now() + Math.max(0, Math.min(180000, data.durationMs));
-      await runSessionWithinBudget(session, deadline, progress => emit({ id: data.id, island: data.island,
+      const runner = { run: (duration: number, publish: Parameters<SearchSession['run']>[1]) =>
+        session!.run(duration, publish, data.method !== 'evaluate' && data.continuous === true) };
+      await runSessionWithinBudget(runner, deadline, progress => emit({ id: data.id, island: data.island,
         progress: displayProgress(progress, session!.input.target, session!.input.attempts, session!.input.desiredProbability) }), {
         allowRepeat: data.method === 'start' || data.method === 'resume',
         shouldStop: () => stopRequested,
