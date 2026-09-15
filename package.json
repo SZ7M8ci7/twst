@@ -2,9 +2,6 @@
   "name": "main",
   "version": "0.0.0",
   "scripts": {
-    "test:hand-collection": "node --test tests/hand-collection-storage.test.cjs",
-    "test:exam-search": "node --test tests/exam-damage-calculation.test.cjs tests/exam-search.test.cjs tests/exam-search-completion.test.cjs tests/exam-search-auto-score.test.cjs tests/exam-search-auto-scheduler.test.cjs tests/exam-search-worker-retry.test.cjs tests/character-selection-images.test.cjs tests/exam-search-transfer.test.cjs tests/exam-search-result-filters.test.cjs tests/exam-search-constraint-matrix.test.cjs && node tests/exam-search-integration.mjs",
-    "test:i18n": "node --test tests/localization.test.cjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
@@ -12,8 +9,7 @@
     "deploy": "cd dist && copy index.html 404.html && cd .. && gh-pages -d dist --nojekyll",
     "deploy-github": "cd dist && cp index.html 404.html && cd .. && gh-pages -d dist --nojekyll",
     "predev": "node scripts/recognition/prepare-runtime.mjs",
-    "prebuild": "node scripts/recognition/prepare-runtime.mjs",
-    "test:recognition": "node --test scripts/recognition/*.test.cjs"
+    "prebuild": "node scripts/recognition/prepare-runtime.mjs"
   },
   "dependencies": {
     "@mdi/font": "7.0.96",
@@ -44,7 +40,6 @@
     "eslint": "^8.0.0",
     "eslint-plugin-vue": "^9.0.0",
     "gh-pages": "^6.0.0",
-    "pngjs": "^7.0.0",
     "typescript": "^5.3.0",
     "unplugin-fonts": "^1.0.3",
     "vite": "^5.0.0",

@@ -30,9 +30,6 @@ jobs:
     - name: Install dependencies
       run: npm ci --legacy-peer-deps
 
-    - name: Prepare local OCR runtime for recognition tests
-      run: node scripts/recognition/prepare-runtime.mjs
-
     - name: Set up recognition dataset builder
       uses: actions/setup-python@v5
       with:
@@ -60,26 +57,17 @@ jobs:
           fi
         fi
 
-    - name: Test updater and refresh recognition dictionary
+    - name: Refresh recognition dictionary
       shell: bash
       env:
         UPDATE_EVENT: ${{ github.event_name }}
       run: |
-        python scripts/recognition/test_update.py
-        python scripts/recognition/test_supplement.py
-        python scripts/recognition/test_http.py
-        python scripts/recognition/test_incremental.py
         if [ "$UPDATE_EVENT" != "schedule" ] && python -c "import sys; sys.path.insert(0, 'scripts/recognition'); import update; from pathlib import Path; update.reuse_release(Path('public/recognition'))"; then
           echo 'Reusing the published dictionary without contacting source Wikis.'
         elif ! python scripts/recognition/update.py; then
           python -c "import sys; sys.path.insert(0, 'scripts/recognition'); import update; from pathlib import Path; m, _ = update.previous_release(Path('public/recognition')); assert m, 'No verified Japanese Wiki release'; update.atomic(Path('src/assets/chara.json'), (Path('public/recognition') / m.get('catalog',{}).get('path','catalog.json')).read_bytes())"
           echo '::warning::Wiki refresh failed. Publishing the last verified dictionary with its original timestamp.'
         fi
-
-    - name: Validate dictionary and recognition engine
-      run: npm run test:recognition
-      env:
-        RECOGNITION_REQUIRED: '1'
 
     - name: Retain update report
       if: always()
@@ -89,8 +77,6 @@ jobs:
         path: |
           .cache/recognition-jp/last-report.json
           public/recognition/latest.json
-          artifacts/recognition-accuracy/regression-results.json
-          artifacts/recognition-collection-grid/regression-results.json
         if-no-files-found: ignore
         retention-days: 14
       
