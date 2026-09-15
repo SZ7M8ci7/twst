@@ -2,7 +2,7 @@
   "note": "132 complete cards visually verified. Cropped bottom rows excluded. Identity source comparisons and original current/max values reviewed separately.",
   "images": [
     {
-      "file": "Screenshot_2026.09.15_05.54.21.527.png",
+      "file": "collection-grid-01.png",
       "sha256": "aaaeba8661c927304ff320a11b358944b1df67191c2cef5b42944c02f6ed2495",
       "expected": [
         "scully_Nightmare_Suit",
@@ -62,7 +62,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.25.410.png",
+      "file": "collection-grid-02.png",
       "sha256": "7f411ed5fd70a0e220e27d659fac6275536955593993b47181b9d06eb7c7a678",
       "expected": [
         "lilia_birth",
@@ -122,7 +122,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.28.410.png",
+      "file": "collection-grid-03.png",
       "sha256": "cefff0d8c39e3ed1e0cb8c2c07f69b32fb0aecd70c6c37e3fb9389fa4cff8e3a",
       "expected": [
         "silver_Armor_at_Dawn",
@@ -182,7 +182,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.31.210.png",
+      "file": "collection-grid-04.png",
       "sha256": "74115db2dd921392d6dd0ebe45daed1ead497da3c8b45c9b8cefb000cd6838fe",
       "expected": [
         "idia_tmu",
@@ -242,7 +242,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.34.043.png",
+      "file": "collection-grid-05.png",
       "sha256": "8834b067f1f2a43e241ce44d3d5f743e9fcb110ab59f415a0ac808e4704e9858",
       "expected": [
         "epel_birth5",
@@ -302,7 +302,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.37.359.png",
+      "file": "collection-grid-06.png",
       "sha256": "0b3277d1972aa5289d097e0ce5afb3f5d4db8ba07f6649f28536be83e3a2d277",
       "expected": [
         "vil_scary",
@@ -362,7 +362,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.40.343.png",
+      "file": "collection-grid-07.png",
       "sha256": "87ece7c48353f11ee11742efbf533e901960f6622a1c45bcf7a0372ad2f72bb4",
       "expected": [
         "kalim_dormitory",
@@ -422,7 +422,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.43.560.png",
+      "file": "collection-grid-08.png",
       "sha256": "424900b8d20d4662410233efae57455d6ce499fd60c5b241807f7e4565f02b40",
       "expected": [
         "ruggie_Ivory_Cliff_Uniform",
@@ -482,7 +482,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.47.627.png",
+      "file": "collection-grid-09.png",
       "sha256": "7f3ee1049d07268bcfe6fe6dc9f219f1f1fae8f810db80f604a25cf7f81f8d33",
       "expected": [
         "leona_gara",
@@ -542,7 +542,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.51.193.png",
+      "file": "collection-grid-10.png",
       "sha256": "f32a3b0fcc5fdc0ab7ec0f47d93a05e2800ae17f2afc4f76725c32e3f7d7aada",
       "expected": [
         "ace_playful_dress",
@@ -602,7 +602,7 @@
       ]
     },
     {
-      "file": "Screenshot_2026.09.15_05.54.55.360.png",
+      "file": "collection-grid-11.png",
       "sha256": "f9fdb722360c584a8c1914b71cb79403e94b5844786135cad9384a1e0678f56e",
       "expected": [
         "lilia_Nightmare_Courier",

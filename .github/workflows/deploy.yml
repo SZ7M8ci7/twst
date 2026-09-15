@@ -90,7 +90,7 @@ jobs:
           .cache/recognition-jp/last-report.json
           public/recognition/latest.json
           artifacts/recognition-accuracy/regression-results.json
-          artifacts/recognition-nox/regression-results.json
+          artifacts/recognition-collection-grid/regression-results.json
         if-no-files-found: ignore
         retention-days: 14
       

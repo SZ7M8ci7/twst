@@ -14,8 +14,8 @@ function check(report,fixtures){
  return count;
 }
 if(require.main===module){
- const nox=JSON.parse(fs.readFileSync('artifacts/recognition-nox/final.json'));
- console.log('Nox cards/current/max/uncaps:',check(nox,require('./nox-fixture.json').images));
+ const grid=JSON.parse(fs.readFileSync('artifacts/recognition-collection-grid/final.json'));
+ console.log('Collection grid cards/current/max/uncaps:',check(grid,require('./collection-grid-fixture.json').images));
  const posts=JSON.parse(fs.readFileSync('artifacts/recognition-real-posts/final.json'));
  console.log('Original post identities:',check(posts,Object.entries(require('./post-identities.json').images).map(([file,expected])=>({file,expected}))));
 }

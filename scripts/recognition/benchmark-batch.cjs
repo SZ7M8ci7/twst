@@ -5,10 +5,10 @@ const fs=require('node:fs'),path=require('node:path'),{PNG}=require('pngjs'),{lo
  const {recognizeLevels}=load('src/domain/handScreenshot/levelOcr.ts');
  const {createWorker,PSM}=require('tesseract.js'),ocr=await createWorker('eng',1,{langPath:'public/recognition-runtime/v7',cachePath:'.cache/recognition-ocr'});
  await ocr.setParameters({tessedit_pageseg_mode:PSM.SINGLE_LINE,tessedit_char_whitelist:'0123456789/Lv',user_defined_dpi:'150'});
- const dir=process.argv[2]||'artifacts/recognition-nox',out=process.argv[3]||dir+'/baseline.json',report={};
+ const dir=process.argv[2]||'artifacts/recognition-collection-grid',out=process.argv[3]||dir+'/baseline.json',report={};
  const dict='public/recognition',m=JSON.parse(fs.readFileSync(dict+'/latest.json')),index=JSON.parse(fs.readFileSync(dict+'/'+m.index.path)),bin=Buffer.concat(m.features.parts.map(p=>fs.readFileSync(dict+'/'+p.path))),engine=new Recognizer(cv,index,bin.buffer.slice(bin.byteOffset,bin.byteOffset+bin.byteLength));
  const cards=new Map(require('../../src/assets/chara.json').map(c=>[c.name,c]));
- try {for(const file of fs.readdirSync(dir).filter(n=>/^(Screenshot_.*|\d{19}-\d)\.png$/.test(n)&&!n.includes('-audit')).sort()) {
+ try {for(const file of fs.readdirSync(dir).filter(n=>/^(collection-grid-\d{2}|\d{19}-\d)\.png$/.test(n)&&!n.includes('-audit')).sort()) {
   const png=PNG.sync.read(fs.readFileSync(path.join(dir,file))),src=cv.matFromImageData(png),scale=Math.min(1,1400/png.width),scout=new cv.Mat();cv.resize(src,scout,new cv.Size(Math.round(png.width*scale),Math.round(png.height*scale)));
   const boxes=detectBoxes(cv,{width:scout.cols,height:scout.rows,data:scout.data}).map(b=>Object.fromEntries(Object.entries(b).map(([k,v])=>[k,v/scale])));scout.delete();
   const rows=[];
