@@ -62,9 +62,11 @@ jobs:
       env:
         UPDATE_EVENT: ${{ github.event_name }}
       run: |
-        if [ "$UPDATE_EVENT" != "schedule" ] && python -c "import sys; sys.path.insert(0, 'scripts/recognition'); import update; from pathlib import Path; update.reuse_release(Path('public/recognition'))"; then
-          echo 'Reusing the published dictionary without contacting source Wikis.'
-        elif ! python scripts/recognition/update.py; then
+        update_args=()
+        if [ "$UPDATE_EVENT" != "schedule" ]; then
+          update_args+=(--reuse-if-available)
+        fi
+        if ! python scripts/recognition/update.py "${update_args[@]}"; then
           python -c "import sys; sys.path.insert(0, 'scripts/recognition'); import update; from pathlib import Path; m, _ = update.previous_release(Path('public/recognition')); assert m, 'No verified Japanese Wiki release'; update.atomic(Path('src/assets/chara.json'), (Path('public/recognition') / m.get('catalog',{}).get('path','catalog.json')).read_bytes())"
           echo '::warning::Wiki refresh failed. Publishing the last verified dictionary with its original timestamp.'
         fi

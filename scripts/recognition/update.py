@@ -129,11 +129,12 @@ def publish(output,cards,templates,catalog_pending):
 def reuse_release(output):
  # Keep repository edits and stable generated IDs when deploying without a crawl.
  output=Path(output);manifest,_=previous_release(output)
- if not manifest:raise ValueError('No verified dictionary; initial build required')
+ if not manifest:return False
  previous=json.loads((output/manifest['catalog']['path']).read_text(encoding='utf-8'))
  path=ROOT/'src/assets/chara.json';current=json.loads(path.read_text(encoding='utf-8'))
  cards,_=merge_catalog(current,[],previous)
  if cards!=current:atomic(path,json.dumps(cards,ensure_ascii=False,indent=2).encode('utf-8')+b'\n')
+ return True
 
 def pages_to_collect(pages,cards,templates,catalog_pending=()):
  bypage={page_name(card['wikiURL']):card for card in cards}
@@ -211,4 +212,10 @@ def build(output,cache,max_age=86400):
 
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--output',type=Path,default=ROOT/'public/recognition');p.add_argument('--cache',type=Path,default=ROOT/'.cache/recognition-jp');p.add_argument('--max-age',type=int,default=86400)
- a=p.parse_args();build(a.output,a.cache,a.max_age)
+ p.add_argument('--reuse-if-available',action='store_true',help='Reuse a valid published dictionary; build it normally when unavailable')
+ a=p.parse_args()
+ if a.reuse_if_available and reuse_release(a.output):
+  print('Reusing the published dictionary without contacting source Wikis.',flush=True)
+ else:
+  if a.reuse_if_available:print('No reusable dictionary found. Starting the initial dictionary build.',flush=True)
+  build(a.output,a.cache,a.max_age)
