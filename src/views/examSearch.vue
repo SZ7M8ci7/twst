@@ -115,7 +115,7 @@ import { sharedExamConditionsKey, type SharedExamConditions } from '@/utils/shar
 import { useHandCollectionStore } from '@/store/handCollection';
 import { localizeCharacterName, localizeCostumeName, localizeGameText } from '@/utils/localizedDisplay';
 import { loadExamSearch, saveExamSearch, loadSearchSession, saveSearchSession, saveSearchTransfer, loadSearchSeedTeams, type SavedSearchSession } from '@/storage/examSearchStorage';
-import { validateInput, examUsesSupport } from '@/domain/examSearch/variants';
+import { validateInput, invalidSearchCards, examUsesSupport } from '@/domain/examSearch/variants';
 import { constrainCheckpoint } from '@/domain/examSearch/requiredCheckpoint';
 import { rankedResults } from '@/domain/examSearch/statistics';
 import type { RosterCard, SearchInput, SearchProgress, SearchResult } from '@/domain/examSearch/types';
@@ -418,6 +418,8 @@ function start(durationMs: number) {
   if (issue) {
     error.value = issue === 'roster'
       ? t('examSearch.simple.missingCards', { count: usesSupport.value ? 4 : 5 })
+      : issue === 'card'
+      ? t('examSearch.validation.card', { cards: [...new Set(invalidSearchCards(input.value, catalog).map(card => cardLabel(card.name)))].join(', ') })
       : t(`examSearch.validation.${issue}`);
     return;
   }

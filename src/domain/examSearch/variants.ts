@@ -1,5 +1,6 @@
 import type { RosterCard, SearchInput, SearchCard, Candidate, PolicyKind } from '@/domain/examSearch/types';
 import { isM3Unlocked } from '@/utils/totsu';
+import { getInputMaxLevel } from '@/constants/levels';
 
 export function examUsesSupport(preset: SearchInput['preset']): boolean {
   return preset.title.includes('統一') || (preset.specialChallenges?.length??0)>0;
@@ -159,6 +160,18 @@ export function* allocationCards(input: SearchInput, parent: Candidate, catalog:
   }
 }
 
+export function invalidSearchCards(input: Pick<SearchInput, 'roster' | 'supports'>,
+  catalog: Record<string, { rare: string }>): RosterCard[] {
+  return [...input.roster, ...input.supports].filter(card => {
+    const rare = catalog[card.name]?.rare;
+    return !rare || !Number.isInteger(card.totsu) || card.totsu < 0 || card.totsu > 4
+      || !Number.isInteger(card.level) || card.level < 1 || card.level > getInputMaxLevel(rare)
+      || !Array.isArray(card.magicLevels) || card.magicLevels.length !== 3
+      || !Array.isArray(card.buddyLevels) || card.buddyLevels.length !== 3
+      || [...card.magicLevels, ...card.buddyLevels].some(level => !Number.isInteger(level) || level < 1 || level > 10);
+  });
+}
+
 export function validateInput(input: SearchInput, catalog: Record<string, { rare: string; chara?: string }>): string | null {
   if (!challengeVariants(input).length) return 'challenges';
   const support=examUsesSupport(input.preset);
@@ -170,13 +183,7 @@ export function validateInput(input: SearchInput, catalog: Record<string, { rare
     || !Number.isFinite(input.tolerance) || input.tolerance < 0 || (input.target === 0 ? input.tolerance !== 0 : input.tolerance >= input.target)
     || !Number.isFinite(input.desiredProbability) || input.desiredProbability <= 0 || input.desiredProbability >= 1) return 'target';
   if (!Number.isFinite(input.preset.enemyHp) || input.preset.enemyHp <= 0 || !Number.isFinite(input.preset.difficulty) || input.preset.difficulty! <= 0) return 'exam';
-  for (const c of [...input.roster, ...input.supports]) {
-    const rare = catalog[c.name]?.rare;
-    const max = rare === 'SSR' ? 120 : rare === 'SR' ? 90 : 70;
-    if (!rare || !Number.isInteger(c.totsu) || c.totsu < 0 || c.totsu > 4 || !Number.isInteger(c.level) || c.level < 1 || c.level > max
-      || c.magicLevels.length !== 3 || c.buddyLevels.length !== 3
-      || [...c.magicLevels, ...c.buddyLevels].some(l => !Number.isInteger(l) || l < 1 || l > 10)) return 'card';
-  }
+  if (invalidSearchCards(input, catalog).length) return 'card';
   if (input.requiredCards !== undefined) {
     if (!Array.isArray(input.requiredCards) || input.requiredCards.length > 5) return 'required-cards-limit';
     if (input.requiredCards.some(name => typeof name !== 'string' || !name.length)) return 'required-cards';

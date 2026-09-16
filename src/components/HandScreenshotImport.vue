@@ -44,6 +44,7 @@
                 <label>{{ t('screenshot.uncaps') }}<select :aria-label="t('screenshot.uncaps')" :value="displayTotsu(row) ?? ''" :disabled="busy || applied" :class="{unknown:displayTotsu(row)===undefined}" @change="changeTotsu(row,$event)"><option value="">{{ t('screenshot.uncapsUnknownOption') }}</option><option v-for="count in [0,1,2,3,4]" :key="count" :value="count">{{ t('screenshot.uncapsValue',{count}) }}</option></select></label>
               </div>
               <p v-if="hasDuplicateConflict(row)" class="card-warning">{{ t('screenshot.duplicateShort') }}</p>
+              <p v-if="invalidLevelCardKeys.has(row.selected)" class="card-warning">{{ t('screenshot.invalidLevel', { max: getInputMaxLevel(catalog.get(row.selected)?.rare) }) }}</p>
             </article>
           </div>
           <p v-if="!busy && !visibleRows.some(row=>row.fileIndex===fileIndex)" class="empty-group">{{ rows.some(row=>row.fileIndex===fileIndex) ? t('screenshot.noReview') : t('screenshot.noCards') }}</p>
@@ -56,7 +57,7 @@
           <v-btn v-if="busy" variant="text" @click="cancel">{{ t('screenshot.cancel') }}</v-btn>
           <v-btn v-if="applied" :disabled="store.saving" variant="outlined" @click="undo">{{ t('screenshot.undo') }}</v-btn>
           <v-btn v-if="applied" color="primary" variant="flat" @click="open=false">{{ t('screenshot.close') }}</v-btn>
-          <v-btn v-else :disabled="busy || !merged.length || store.loadFailed || store.hasConflict || store.saving" color="primary" variant="flat" @click="apply">{{ t('screenshot.apply') }}</v-btn>
+          <v-btn v-else :disabled="busy || !merged.length || invalidLevelCardKeys.size > 0 || store.loadFailed || store.hasConflict || store.saving" color="primary" variant="flat" @click="apply">{{ t('screenshot.apply') }}</v-btn>
         </div>
       </footer>
       <v-dialog v-model="exportOpen" :max-width="exportPages.length ? 860 : 1100" :persistent="exporting" class="screenshot-modal">
@@ -108,7 +109,7 @@ import SimCharaModal from '@/components/SimCharaModal.vue';
 import ScreenshotImageOrder from '@/components/ScreenshotImageOrder.vue';
 import { useHandCollectionStore, type HandCard } from '@/store/handCollection';
 import { loadImageUrls } from '@/utils/characterAssets';
-import { getInputMaxLevel } from '@/constants/levels';
+import { getInputMaxLevel, isValidInputLevel } from '@/constants/levels';
 import { localizeCharacterName, localizeCostumeName } from '@/utils/localizedDisplay';
 import { mergeDetections, type Box, type Detection } from '@/domain/handScreenshot/types';
 import { combinedDetections, primaryDetections, uncapSourceFiles } from '@/domain/handScreenshot/supplement';
@@ -170,7 +171,7 @@ function displayTotsu(row: Detection) {
   return card&&!card.totsuConflict?card.totsu:row.totsu;
 }
 function totsuLabel(row: Detection) { const count=displayTotsu(row); return count === undefined ? t('screenshot.uncapsUnknown') : t('screenshot.uncapsValue',{count}); }
-function needsReview(row: ImportDetection) { return !row.selected || !displayLevel(row) || displayTotsu(row)===undefined || hasDuplicateConflict(row); }
+function needsReview(row: ImportDetection) { return !row.selected || !isValidInputLevel(displayLevel(row), catalog.get(row.selected)?.rare, 1) || invalidLevelCardKeys.value.has(row.selected) || displayTotsu(row)===undefined || hasDuplicateConflict(row); }
 function changeLevel(row: ImportDetection, event: Event) {
   if (busy.value || applied.value) return;
   setImportLevel(row,levelMode.value,(event.target as HTMLInputElement).value);
@@ -228,6 +229,10 @@ let session: ScreenshotSession | undefined;
 let operationId = 0;
 let undoEntries: { key: string; before?: HandCard; after: HandCard }[] = [];
 const primaryRows = computed(()=>primaryDetections(rows.value));
+const invalidLevelCardKeys = computed(() => new Set(primaryRows.value.filter(row => {
+  const level = getImportLevel(row, levelMode.value);
+  return row.selected && level !== undefined && !isValidInputLevel(level, catalog.get(row.selected)?.rare, 1);
+}).map(row => row.selected)));
 const primaryFileOrder = computed(()=>{
   const supplemental=uncapSourceFiles(rows.value);
   return fileOrder.value.filter(index=>!supplemental.has(index));
@@ -314,7 +319,7 @@ async function recognize(manual?: { box: Box; fileIndex: number }) {
 }
 function cancel() { operationId++; session?.stop(); }
 function apply() {
-  if (busy.value || store.loadFailed || store.hasConflict || store.saving) return;
+  if (busy.value || invalidLevelCardKeys.value.size || store.loadFailed || store.hasConflict || store.saving) return;
   undoEntries = [];
   store.batchUpdates(() => {
     for (const row of merged.value) {

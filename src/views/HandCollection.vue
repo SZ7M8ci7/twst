@@ -270,6 +270,17 @@
                   <span class="ml-2">{{ $t('handCollection.close') }}</span>
                 </v-btn>
               </div>
+              <v-alert v-if="importIssues.length" type="warning" variant="tonal" role="alert" data-testid="import-review">
+                <strong>{{ t('handCollection.importReviewTitle') }}</strong>
+                <p>{{ t('handCollection.importReviewHelp', { count: importAcceptedCount }) }}</p>
+                <ul>
+                  <li v-for="(issue, index) in importIssues" :key="index">
+                    {{ importCardLabel(issue.cardName) }} — {{ t('handCollection.importReviewValue', {
+                      field: t(`handCollection.${issue.field}`), value: issue.value, max: issue.max
+                    }) }}
+                  </li>
+                </ul>
+              </v-alert>
               <v-textarea
                 v-model="dataText"
                 outlined
@@ -324,8 +335,9 @@ import LazyCharacterImage from '@/components/LazyCharacterImage.vue';
 import charactersInfo from '@/assets/characters_info.json';
 import { useI18n } from 'vue-i18n';
 import { getInputMaxLevel } from '@/constants/levels';
-import { clampTotsuCount, deriveTotsuCount } from '@/utils/totsu';
-import { localizeCostumeName } from '@/utils/localizedDisplay';
+import { clampTotsuCount } from '@/utils/totsu';
+import { localizeCharacterName, localizeCostumeName } from '@/utils/localizedDisplay';
+import { parseHandCollectionImport, type HandImportIssue } from '@/utils/handCollectionImport';
 import { requestPersistentStorage } from '@/storage/persistentStorage';
 
 // Stores and i18n
@@ -363,6 +375,12 @@ const sortOrder = ref<'asc' | 'desc'>('asc');
 // データ管理用
 const dataModal = ref(false);
 const dataText = ref('');
+const importIssues = ref<HandImportIssue[]>([]);
+const importAcceptedCount = ref(0);
+function importCardLabel(name: string) {
+  const card = characters.value.find(card => card.name === name);
+  return card ? `${localizeCharacterName(card.chara, locale.value)} / ${localizeCostumeName(card, locale.value)}` : name;
+}
 const backupFileInput = ref<HTMLInputElement | null>(null);
 const snackbar = ref({
   show: false,
@@ -609,12 +627,12 @@ function createBackupJson(): string {
 
 function openDataModal() {
   dataModal.value = true;
-  dataText.value = createBackupJson();
+  if (!importIssues.value.length) dataText.value = createBackupJson();
 }
 
 function closeDataModal() {
   dataModal.value = false;
-  dataText.value = '';
+  if (!importIssues.value.length) dataText.value = '';
 }
 
 function showSnackbar(text: string, color: 'success' | 'error' = 'success') {
@@ -679,124 +697,22 @@ function importFromText() {
 }
 
 function importDataText() {
+  importIssues.value = [];
+  importAcceptedCount.value = 0;
   try {
-    let importedCount = 0;
-    const trimmed = dataText.value.trim();
-    const parsedJson = trimmed ? JSON.parse(trimmed) : null;
-
-    if (parsedJson && typeof parsedJson === 'object') {
-      const cards = Array.isArray((parsedJson as any).cards)
-        ? (parsedJson as any).cards
-        : Object.entries((parsedJson as any).cards || {}).map(([cardName, value]) => ({
-            cardName,
-            ...(value as Record<string, unknown>),
-          }));
-
-      cards.forEach((entry: any) => {
-        const character = characters.value.find(char =>
-          (entry.cardName && char.name === entry.cardName) ||
-          (entry.chara && entry.costume && char.chara === entry.chara && char.costume === entry.costume)
-        );
-        if (!character) return;
-
-        handCollectionStore.updateHandCard(character.name, {
-          isOwned: Boolean(entry.isOwned ?? entry.level > 0),
-          level: Number(entry.level) || 0,
-          totsu: clampTotsuCount(entry.totsu),
-        });
-        importedCount++;
-      });
-    }
-
-    if (importedCount === 0) {
-      const lines = dataText.value.split('\n').filter(line => line.trim());
-      lines.forEach(line => {
-        const parts = line.split('\t');
-        if (parts.length < 2) return;
-        const [chara, costume] = parts;
-        const character = characters.value.find(
-          char => char.chara === chara && char.costume === costume
-        );
-        if (!character) return;
-
-        if (parts.length === 5) {
-          const [, , level, , hasM3] = parts;
-          handCollectionStore.updateHandCard(character.name, {
-            isOwned: (parseInt(level) || 0) > 0,
-            level: parseInt(level) || 0,
-            totsu: deriveTotsuCount({ isM3: hasM3.toLowerCase() === 'true' }),
-          });
-          importedCount++;
-          return;
-        }
-
-        if (parts.length === 7) {
-          const [, , level, , hasM3, isOwned, isLimitBreak] = parts;
-          handCollectionStore.updateHandCard(character.name, {
-            isOwned: isOwned.toLowerCase() === 'true',
-            level: parseInt(level) || 0,
-            totsu: deriveTotsuCount({
-              isLimitBreak: isLimitBreak.toLowerCase() === 'true',
-              isM3: hasM3.toLowerCase() === 'true',
-            }),
-          });
-          importedCount++;
-        }
-      });
-    }
-
-    if (importedCount === 0) {
-      throw new Error('No importable hand collection data found');
+    const result = parseHandCollectionImport(dataText.value, characters.value);
+    importIssues.value = result.issues;
+    for (const update of result.updates) handCollectionStore.updateHandCard(update.cardName, update.values);
+    importAcceptedCount.value = result.updates.length;
+    if (result.issues.length) {
+      dataModal.value = true;
+      return;
     }
     closeDataModal();
-    showSnackbar(t('handCollection.importSuccess', { count: importedCount }));
+    showSnackbar(t('handCollection.importSuccess', { count: result.updates.length }));
   } catch (error) {
-    try {
-      let importedCount = 0;
-      const lines = dataText.value.split('\n').filter(line => line.trim());
-      lines.forEach(line => {
-        const parts = line.split('\t');
-        if (parts.length < 2) return;
-        const [chara, costume] = parts;
-        const character = characters.value.find(
-          char => char.chara === chara && char.costume === costume
-        );
-        if (!character) return;
-
-        if (parts.length === 5) {
-          const [, , level, , hasM3] = parts;
-          handCollectionStore.updateHandCard(character.name, {
-            isOwned: (parseInt(level) || 0) > 0,
-            level: parseInt(level) || 0,
-            totsu: deriveTotsuCount({ isM3: hasM3.toLowerCase() === 'true' }),
-          });
-          importedCount++;
-          return;
-        }
-
-        if (parts.length === 7) {
-          const [, , level, , hasM3, isOwned, isLimitBreak] = parts;
-          handCollectionStore.updateHandCard(character.name, {
-            isOwned: isOwned.toLowerCase() === 'true',
-            level: parseInt(level) || 0,
-            totsu: deriveTotsuCount({
-              isLimitBreak: isLimitBreak.toLowerCase() === 'true',
-              isM3: hasM3.toLowerCase() === 'true',
-            }),
-          });
-          importedCount++;
-        }
-      });
-
-      if (importedCount === 0) {
-        throw error;
-      }
-      closeDataModal();
-      showSnackbar(t('handCollection.importSuccess', { count: importedCount }));
-    } catch (fallbackError) {
-      console.error('インポートエラー:', fallbackError);
-      showSnackbar(t('handCollection.importError'), 'error');
-    }
+    console.error('インポートエラー:', error);
+    showSnackbar(t('handCollection.importError'), 'error');
   }
 }
 
