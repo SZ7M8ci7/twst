@@ -990,6 +990,7 @@
     "allCards": "すべてのカード",
     "level": "Lv",
     "importLevel": "取り込むレベル",
+    "combinedScreenshots": "レベル表示と限界突破表示の画像を一緒に選ぶと、同じカードのレベル・凸数をまとめて取り込めます。",
     "maximumLevel": "最大レベル",
     "currentLevel": "現在レベル",
     "unknown": "未確認",

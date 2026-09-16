@@ -89,8 +89,53 @@ export function levelRegion(box: Box, imageHeight: number): Box {
   return {x:Math.round(box.x+box.width*.08),y,width:Math.round(box.width*.88),height:Math.max(0,Math.min(Math.round(box.width*.23),imageHeight-y))};
 }
 
+/** Four equally spaced circles distinguish the uncap footer from the Lv footer. */
+export function readUncapDots(image: Pixels): number | undefined {
+  const { width:w, height:h, data } = image;
+  const mask = new Uint8Array(w*h);
+  for (let y=Math.round(w*1.025); y<Math.min(h,Math.round(w*1.245)); y++) {
+    for (let x=Math.round(w*.31); x<Math.round(w*.98); x++) {
+      const i=(y*w+x)*4, r=data[i], g=data[i+1], b=data[i+2];
+      const purple=r>65 && b>70 && Math.min(r,b)-g>25;
+      const gray=Math.min(r,g,b)>65 && Math.max(r,g,b)<150 && Math.max(r,g,b)-Math.min(r,g,b)<35;
+      if (purple || gray) mask[y*w+x]=purple?2:1;
+    }
+  }
+  const dots: {x:number;y:number;filled:boolean}[]=[];
+  for (let i=0;i<mask.length;i++) {
+    if (!mask[i]) continue;
+    const queue=[i];let purple=0,minX=w,maxX=0,minY=h,maxY=0;
+    for (let j=0;j<queue.length;j++) {
+      const p=queue[j], kind=mask[p];if (!kind) continue;
+      mask[p]=0;if(kind===2)purple++;
+      const x=p%w,y=Math.floor(p/w);minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+      for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nx=x+dx,ny=y+dy;if(nx>=0&&nx<w&&ny>=0&&ny<h&&mask[ny*w+nx])queue.push(ny*w+nx);
+      }
+    }
+    const dw=maxX-minX+1,dh=maxY-minY+1;
+    // Queue entries may repeat; use the bounding box and colored center below.
+    if(dw<w*.045||dw>w*.145||dh<w*.045||dh>w*.145||dw/dh<.55||dw/dh>1.85)continue;
+    let area=0;
+    for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++) {
+      const p=(y*w+x)*4,r=data[p],g=data[p+1],b=data[p+2];
+      if((r>65&&b>70&&Math.min(r,b)-g>25)||(Math.min(r,g,b)>65&&Math.max(r,g,b)<150&&Math.max(r,g,b)-Math.min(r,g,b)<35))area++;
+    }
+    if(area/(dw*dh)<.45)continue;
+    dots.push({x:(minX+maxX)/2/w,y:(minY+maxY)/2/w,filled:purple/area>.45});
+  }
+  dots.sort((a,b)=>a.x-b.x);
+  if(dots.length!==4||Math.abs(dots[0].x-.405)>.055||Math.abs(dots[3].x-.88)>.055)return;
+  if(dots.some((dot,i)=>Math.abs(dot.y-dots[0].y)>.025||(i>0&&Math.abs(dot.x-dots[i-1].x-.16)>.035)))return;
+  const firstEmpty=dots.findIndex(dot=>!dot.filled), count=firstEmpty<0?4:firstEmpty;
+  if(dots.slice(count).some(dot=>dot.filled))return;
+  return count;
+}
+
 /** Read visual evidence first; SSR level-cap evidence is applied after identifying the card. */
-export function readUncaps(image: Pixels): { totsu?: number; totsuEvidence: 'black-frame' | 'magic3' | 'unknown' } {
+export function readUncaps(image: Pixels): { totsu?: number; totsuEvidence: 'dots' | 'black-frame' | 'magic3' | 'unknown' } {
+  const dots=readUncapDots(image);
+  if(dots!==undefined)return {totsu:dots,totsuEvidence:'dots'};
   const {width:w,height:h,data}=image;
   const fraction=(x0:number,y0:number,x1:number,y1:number,predicate:(r:number,g:number,b:number)=>boolean)=>{
     let count=0,total=0;

@@ -16,6 +16,7 @@
         </div>
         <p v-if="!sources.length" class="privacy-note">{{ t('screenshot.description') }}</p>
         <label class="level-import-option">{{ t('screenshot.importLevel') }}<select v-model="levelMode" :disabled="busy || applied" :aria-label="t('screenshot.importLevel')"><option value="maximum">{{ t('screenshot.maximumLevel') }}</option><option value="current">{{ t('screenshot.currentLevel') }}</option></select></label>
+        <p class="help">{{ t('screenshot.combinedScreenshots') }}</p>
         <div v-if="busy" class="processing-state"><v-progress-linear :model-value="progress" :indeterminate="progress === 0" color="primary" rounded /><p role="status" aria-live="polite">{{ status }}</p></div>
         <p v-else-if="status && !rows.length" class="help" role="status">{{ status }}</p>
         <v-alert v-if="error" type="warning" variant="tonal" density="compact" class="import-alert">{{ error }}</v-alert>
@@ -39,8 +40,8 @@
                 <span class="card-number">{{ rows.filter(item=>item.fileIndex===fileIndex).indexOf(row)+1 }}</span>
               </div>
               <div class="inline-fields">
-                <label>{{ t('screenshot.level') }}<input :value="getImportLevel(row,levelMode) ?? ''" :aria-label="t('screenshot.level')" type="number" min="1" :max="getInputMaxLevel(catalog.get(row.selected)?.rare)" :disabled="busy || applied" :placeholder="t('screenshot.unknown')" @input="changeLevel(row,$event)" /></label>
-                <label>{{ t('screenshot.uncaps') }}<select :aria-label="t('screenshot.uncaps')" :value="row.totsu ?? ''" :disabled="busy || applied" :class="{unknown:row.totsu===undefined}" @change="changeTotsu(row,$event)"><option value="">{{ t('screenshot.uncapsUnknownOption') }}</option><option v-for="count in [0,1,2,3,4]" :key="count" :value="count">{{ t('screenshot.uncapsValue',{count}) }}</option></select></label>
+                <label>{{ t('screenshot.level') }}<input :value="displayLevel(row) ?? ''" :aria-label="t('screenshot.level')" type="number" min="1" :max="getInputMaxLevel(catalog.get(row.selected)?.rare)" :disabled="busy || applied" :placeholder="t('screenshot.unknown')" @input="changeLevel(row,$event)" /></label>
+                <label>{{ t('screenshot.uncaps') }}<select :aria-label="t('screenshot.uncaps')" :value="displayTotsu(row) ?? ''" :disabled="busy || applied" :class="{unknown:displayTotsu(row)===undefined}" @change="changeTotsu(row,$event)"><option value="">{{ t('screenshot.uncapsUnknownOption') }}</option><option v-for="count in [0,1,2,3,4]" :key="count" :value="count">{{ t('screenshot.uncapsValue',{count}) }}</option></select></label>
               </div>
               <p v-if="hasDuplicateConflict(row)" class="card-warning">{{ t('screenshot.duplicateShort') }}</p>
             </article>
@@ -85,7 +86,7 @@
             <div v-if="activeSource" ref="sourceFrame" class="source-frame" :class="{drawing:drawMode}" @pointerdown="startDraw($event, activeFile)" @pointerup="finishDraw($event, activeFile)" @pointercancel="drag=undefined">
               <img :key="activeSource.url" :src="activeSource.url" :alt="activeSource.name" draggable="false" @load="sourceLoaded($event)" />
               <svg v-if="activeSource.width" :viewBox="`0 0 ${activeSource.width} ${activeSource.height}`" preserveAspectRatio="none">
-                <g v-for="(row,index) in sourceRows" :key="row.id" role="button" tabindex="0" :aria-label="`${index+1}. ${cardLabel(row.selected)} Lv ${getImportLevel(row,levelMode) ?? '?'} ${totsuLabel(row)}`" @click.stop="!drawMode && jumpToRow(row)" @keydown.enter.prevent="jumpToRow(row)" @keydown.space.prevent="jumpToRow(row)">
+                <g v-for="(row,index) in sourceRows" :key="row.id" role="button" tabindex="0" :aria-label="`${index+1}. ${cardLabel(row.selected)} Lv ${displayLevel(row) ?? '?'} ${totsuLabel(row)}`" @click.stop="!drawMode && jumpToRow(row)" @keydown.enter.prevent="jumpToRow(row)" @keydown.space.prevent="jumpToRow(row)">
                   <rect :x="row.box.x" :y="row.box.y" :width="row.box.width" :height="row.box.height*1.27" :class="{active:activeId===row.id,uncertain:needsReview(row)}" />
                   <text :x="row.box.x+4" :y="row.box.y+row.box.width*.15" :font-size="row.box.width*.13">{{ index+1 }}</text>
                 </g>
@@ -150,8 +151,17 @@ void loadImageUrls(cards, 'name', '', 'notyet').then(images => { cardImages.valu
 const activeRow = computed(()=>rows.value.find(row=>row.id===activeId.value));
 const activeSource = computed(()=>sources.value[activeFile.value]);
 const sourceRows = computed(()=>rows.value.filter(row=>row.fileIndex===activeFile.value));
-function totsuLabel(row: Detection) { return row.totsu === undefined ? t('screenshot.uncapsUnknown') : t('screenshot.uncapsValue',{count:row.totsu}); }
-function needsReview(row: ImportDetection) { return !row.selected || !getImportLevel(row,levelMode.value) || row.totsu===undefined || hasDuplicateConflict(row); }
+function displayLevel(row: ImportDetection) {
+  const own=getImportLevel(row,levelMode.value);
+  if(own!==undefined||Object.prototype.hasOwnProperty.call(row.levelOverrides??{},levelMode.value))return own;
+  return mergedByKey.value.get(row.selected)?.level;
+}
+function displayTotsu(row: Detection) {
+  const card=mergedByKey.value.get(row.selected);
+  return card&&!card.totsuConflict?card.totsu:row.totsu;
+}
+function totsuLabel(row: Detection) { const count=displayTotsu(row); return count === undefined ? t('screenshot.uncapsUnknown') : t('screenshot.uncapsValue',{count}); }
+function needsReview(row: ImportDetection) { return !row.selected || !displayLevel(row) || displayTotsu(row)===undefined || hasDuplicateConflict(row); }
 function changeLevel(row: ImportDetection, event: Event) {
   if (busy.value || applied.value) return;
   setImportLevel(row,levelMode.value,(event.target as HTMLInputElement).value);
@@ -199,13 +209,17 @@ function clearCard() {
   pickerOpen.value=false;
 }
 function changeTotsu(row: Detection, event: Event) {
+  if(busy.value||applied.value)return;
   const value=(event.target as HTMLSelectElement).value;
-  row.totsu=value===''?undefined:Number(value); row.totsuEvidence='manual';
+  for(const item of row.selected?rows.value.filter(item=>item.selected===row.selected):[row]) {
+    item.totsu=value===''?undefined:Number(value); item.totsuEvidence='manual';
+  }
 }
 let session: ScreenshotSession | undefined;
 let operationId = 0;
 let undoEntries: { key: string; before?: HandCard; after: HandCard }[] = [];
 const merged = computed(() => mergeDetections(rows.value.map(row=>({...row,level:getImportLevel(row,levelMode.value)}))).filter(row => catalog.has(row.cardKey)));
+const mergedByKey = computed(() => new Map(merged.value.map(card=>[card.cardKey,card])));
 const visibleRows = computed(() => rows.value.filter(row => !reviewOnly.value || needsReview(row)));
 function cardLabel(key: string) {
   const card = catalog.get(key); return card ? `${localizeCharacterName(card.chara, locale.value)} / ${localizeCostumeName(card, locale.value)}` : key;

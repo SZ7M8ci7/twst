@@ -74,7 +74,7 @@ export class ScreenshotSession {
         const context = crop(bitmap, { ...box, height: Math.min(box.width * 1.28, bitmap.height-box.y) }, 256, Math.round(Math.min(box.width*1.28,bitmap.height-box.y)/box.width*256));
         result.thumbnail = context.toDataURL('image/webp', .9);
         Object.assign(result, readUncaps(context.getContext('2d')!.getImageData(0,0,context.width,context.height)));
-        {
+        if (result.totsuEvidence !== 'dots') {
           try {
             if (!this.ocr) {
               const base = publicAsset('recognition-runtime/v7');

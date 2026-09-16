@@ -22,7 +22,7 @@ export interface Candidate { cardKey: string; variant: string; score: number; in
 export interface Detection {
   id: string; fileIndex: number; box: Box; candidates: Candidate[]; confident: boolean;
   selected: string; level?: number; maxLevel?: number; levelConflict?: boolean; thumbnail?: string;
-  totsu?: number; totsuEvidence?: 'black-frame' | 'magic3' | 'max-level' | 'unknown' | 'manual';
+  totsu?: number; totsuEvidence?: 'dots' | 'black-frame' | 'magic3' | 'max-level' | 'unknown' | 'manual';
 }
 
 export function parseLevels(text: string, confidence: number): { level: number; maxLevel: number } | undefined {
@@ -40,17 +40,24 @@ export function parseLevel(text: string, confidence: number): number | undefined
 export function mergeDetections(detections: Detection[]): { cardKey: string; level?: number; conflict: boolean; totsu?: number; totsuConflict?: boolean }[] {
   const cards = new Map<string, Set<number>>();
   const uncaps = new Map<string, Set<number>>();
+  const uncapPriority = new Map<string, number>();
   for (const detection of detections) {
     if (!detection.selected) continue;
     const levels = cards.get(detection.selected) ?? new Set<number>();
     if (Number.isInteger(detection.level) && detection.level! > 0 && detection.level! <= 120) levels.add(detection.level!);
     cards.set(detection.selected, levels);
-    const values=uncaps.get(detection.selected)??new Set<number>();
-    if(Number.isInteger(detection.totsu) && detection.totsu!>=0 && detection.totsu!<=4) values.add(detection.totsu!);
-    uncaps.set(detection.selected,values);
+    const priority=detection.totsuEvidence==='manual'?3:detection.totsuEvidence==='dots'?2:1;
+    if(detection.totsuEvidence==='manual'||(Number.isInteger(detection.totsu)&&detection.totsu!>=0&&detection.totsu!<=4)) {
+      const previousPriority=uncapPriority.get(detection.selected)??0;
+      if(priority>=previousPriority) {
+        const values=priority>previousPriority?new Set<number>():uncaps.get(detection.selected)??new Set<number>();
+        if(Number.isInteger(detection.totsu)&&detection.totsu!>=0&&detection.totsu!<=4)values.add(detection.totsu!);
+        uncaps.set(detection.selected,values);uncapPriority.set(detection.selected,priority);
+      }
+    }
   }
   return [...cards].map(([cardKey, levels]) => {
-    const values=uncaps.get(cardKey)!;
+    const values=uncaps.get(cardKey)??new Set<number>();
     return { cardKey, level: levels.size === 1 ? [...levels][0] : undefined, conflict: levels.size > 1,
       ...(values.size===1?{totsu:[...values][0]}:{}), ...(values.size>1?{totsuConflict:true}:{}) };
   });

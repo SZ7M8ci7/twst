@@ -990,6 +990,7 @@
     "allCards": "All cards",
     "level": "Lv",
     "importLevel": "Level to import",
+    "combinedScreenshots": "Select level and limit-break screenshots together to combine each card’s level and limit breaks.",
     "maximumLevel": "Maximum level",
     "currentLevel": "Current level",
     "unknown": "Unknown",
