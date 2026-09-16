@@ -1,4 +1,5 @@
 import type { Detection } from './types';
+import { primaryDetections } from './supplement';
 
 export function moveImage(order: number[], index: number, offset: number): number[] {
   const next = order.slice(), target = index + offset;
@@ -8,7 +9,8 @@ export function moveImage(order: number[], index: number, offset: number): numbe
 }
 
 export function orderedCards(rows: Detection[], order: number[]): Detection[] {
-  return order.flatMap(fileIndex => rows.filter(row => row.fileIndex === fileIndex).sort((a, b) =>
+  const primary=primaryDetections(rows);
+  return order.flatMap(fileIndex => primary.filter(row => row.fileIndex === fileIndex).sort((a, b) =>
     Math.abs(a.box.y - b.box.y) < Math.min(a.box.width, b.box.width) * .3 ? a.box.x - b.box.x : a.box.y - b.box.y));
 }
 
@@ -29,6 +31,7 @@ export async function exportCollection(files: File[], rows: Detection[], order: 
   const signatureCanvas = document.createElement('canvas'); signatureCanvas.width = signatureCanvas.height = 32;
   const signatureContext = signatureCanvas.getContext('2d', { willReadFrequently: true })!;
   for (const fileIndex of order) {
+    if (!selected.some(row=>row.fileIndex===fileIndex)) continue;
     const bitmap = await createImageBitmap(files[fileIndex]);
     try {
       for (const row of selected.filter(row => row.fileIndex === fileIndex)) {

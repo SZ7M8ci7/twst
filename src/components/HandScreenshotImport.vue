@@ -24,8 +24,8 @@
           <div><h3>{{ t('screenshot.overview') }}</h3><p>{{ t('screenshot.overviewHelp') }}</p></div>
           <label class="review-filter"><input v-model="reviewOnly" type="checkbox" /> {{ t('screenshot.reviewOnly') }}</label>
         </div>
-        <div v-if="sources.length && !busy" class="export-toolbar"><v-btn variant="outlined" prepend-icon="mdi-image-multiple-outline" :disabled="!rows.length || exporting" @click="openExport">{{ t('screenshot.exportButton') }}</v-btn></div>
-        <section v-for="(fileIndex,position) in fileOrder" :key="sources[fileIndex].url" class="source-group" :aria-label="sources[fileIndex].name">
+        <div v-if="sources.length && !busy" class="export-toolbar"><v-btn variant="outlined" prepend-icon="mdi-image-multiple-outline" :disabled="!primaryRows.length || exporting" @click="openExport">{{ t('screenshot.exportButton') }}</v-btn></div>
+        <section v-for="(fileIndex,position) in primaryFileOrder" :key="sources[fileIndex].url" class="source-group" :aria-label="sources[fileIndex].name">
           <header class="source-group-heading">
             <img :src="sources[fileIndex].url" alt="" /><div><strong>{{ t('screenshot.imageNumber',{number:position+1}) }}</strong><span :title="sources[fileIndex].name">{{ sources[fileIndex].name }}</span></div>
             <span v-if="!busy" class="source-count">{{ t('screenshot.detectedCount',{count:rows.filter(row=>row.fileIndex===fileIndex).length}) }}</span>
@@ -34,7 +34,7 @@
           <div class="result-grid">
             <article v-for="row in visibleRows.filter(row=>row.fileIndex===fileIndex)" :key="row.id" :id="`screenshot-${row.id}`" class="result-card" :class="{ unresolved: !row.selected }" :aria-label="cardLabel(row.selected) || t('screenshot.unrecognized')">
               <div class="card-pair">
-                <figure><img :src="row.thumbnail" :alt="t('screenshot.crop')" loading="lazy" /><figcaption>{{ t('screenshot.original') }}</figcaption></figure>
+                <figure class="original-crops"><img :src="row.thumbnail" :alt="t('screenshot.crop')" loading="lazy" /><img v-for="supplement in uncapCrops(row)" :key="supplement.id" class="uncap-crop" :src="supplement.uncapThumbnail" :alt="t('screenshot.uncapCrop')" loading="lazy" /><figcaption>{{ t('screenshot.original') }}</figcaption></figure>
                 <span class="pair-arrow" aria-hidden="true">→</span>
                 <figure><button type="button" class="card-icon-button" :disabled="busy || applied" :aria-label="`${t('screenshot.changeCard')}: ${cardLabel(row.selected) || t('screenshot.unrecognized')}`" @click="openCardPicker(row)"><img v-if="row.selected" :src="cardImages[row.selected]" :alt="cardLabel(row.selected)" loading="lazy" /><span v-else class="missing-icon">?</span><span class="icon-edit-mark" aria-hidden="true"><v-icon size="12">mdi-pencil</v-icon></span></button><figcaption>{{ t('screenshot.recognized') }}</figcaption></figure>
                 <span class="card-number">{{ rows.filter(item=>item.fileIndex===fileIndex).indexOf(row)+1 }}</span>
@@ -52,7 +52,7 @@
       <footer class="import-footer">
         <p class="uncaps-note">{{ t('screenshot.uncapsHelp') }}</p>
         <p v-if="applied" class="applied-message" role="status">{{ t('screenshot.applied') }}</p>
-        <div class="footer-actions"><p class="import-summary" role="status" aria-live="polite">{{ t('screenshot.summary',{count:merged.length,review:rows.filter(needsReview).length}) }}</p>
+        <div class="footer-actions"><p class="import-summary" role="status" aria-live="polite">{{ t('screenshot.summary',{count:merged.length,review:primaryRows.filter(needsReview).length}) }}</p>
           <v-btn v-if="busy" variant="text" @click="cancel">{{ t('screenshot.cancel') }}</v-btn>
           <v-btn v-if="applied" :disabled="store.saving" variant="outlined" @click="undo">{{ t('screenshot.undo') }}</v-btn>
           <v-btn v-if="applied" color="primary" variant="flat" @click="open=false">{{ t('screenshot.close') }}</v-btn>
@@ -77,7 +77,7 @@
           <div v-if="busy || error" class="source-status"><v-progress-linear v-if="busy" :model-value="progress" :indeterminate="progress===0" color="primary" /><p v-if="busy" class="help" role="status">{{ status }}</p><v-alert v-if="error" type="warning" variant="tonal" density="compact">{{ error }}</v-alert><v-btn v-if="busy" size="small" variant="text" @click="cancel">{{ t('screenshot.cancel') }}</v-btn></div>
         <section class="image-panel" :aria-label="t('screenshot.original')">
           <div class="image-toolbar">
-            <select v-model.number="activeFile" :aria-label="t('screenshot.sourceImage')" @change="changeSource"><option v-for="(index,position) in fileOrder" :key="sources[index].url" :value="index">{{ position+1 }}. {{ sources[index].name }}</option></select>
+            <select v-model.number="activeFile" :aria-label="t('screenshot.sourceImage')" @change="changeSource"><option v-for="(index,position) in primaryFileOrder" :key="sources[index].url" :value="index">{{ position+1 }}. {{ sources[index].name }}</option></select>
             <v-btn size="small" :variant="drawMode ? 'flat' : 'outlined'" :disabled="busy || applied" :aria-pressed="drawMode" @click="drawMode = !drawMode">{{ t('screenshot.selectRegion') }}</v-btn>
           </div>
           <p v-if="drawMode" class="help">{{ t('screenshot.drawHelp') }}</p>
@@ -111,6 +111,7 @@ import { loadImageUrls } from '@/utils/characterAssets';
 import { getInputMaxLevel } from '@/constants/levels';
 import { localizeCharacterName, localizeCostumeName } from '@/utils/localizedDisplay';
 import { mergeDetections, type Box, type Detection } from '@/domain/handScreenshot/types';
+import { combinedDetections, primaryDetections, uncapSourceFiles } from '@/domain/handScreenshot/supplement';
 import { validateScreenshot } from '@/domain/handScreenshot/input';
 import { applyMaxLevelUncaps } from '@/domain/handScreenshot/metadata';
 import { getImportLevel, setImportLevel, type ImportDetection, type ImportLevelMode } from '@/domain/handScreenshot/importLevel';
@@ -127,12 +128,18 @@ const exportOrder = ref<number[]>([]);
 const exportPages = ref<ExportPage[]>([]), exportCount = ref(0), exportDuplicates = ref(0);
 let exportGeneration = 0;
 function clearExport() { exportGeneration++; exportPages.value.forEach(page=>URL.revokeObjectURL(page.url)); exportPages.value=[]; }
-function openExport() { clearExport(); error.value=''; exportOpen.value=true; }
+function openExport() {
+  if(!primaryRows.value.length)return;
+  const available=new Set(primaryFileOrder.value);
+  exportOrder.value=exportOrder.value.filter(index=>available.has(index));
+  for(const index of primaryFileOrder.value)if(!exportOrder.value.includes(index))exportOrder.value.push(index);
+  clearExport(); error.value=''; exportOpen.value=true;
+}
 async function createExport() {
   if (busy.value || exporting.value) return;
   exporting.value=true; error.value=''; clearExport();
   const generation = exportGeneration;
-  const snapshot = rows.value.map(row=>({...row,box:{...row.box}}));
+  const snapshot = primaryRows.value.map(row=>({...row,box:{...row.box}}));
   try {
     const { exportCollection } = await import('@/domain/handScreenshot/export');
     const result = await exportCollection(files.value.slice(),snapshot,exportOrder.value.slice());
@@ -218,9 +225,23 @@ function changeTotsu(row: Detection, event: Event) {
 let session: ScreenshotSession | undefined;
 let operationId = 0;
 let undoEntries: { key: string; before?: HandCard; after: HandCard }[] = [];
-const merged = computed(() => mergeDetections(rows.value.map(row=>({...row,level:getImportLevel(row,levelMode.value)}))).filter(row => catalog.has(row.cardKey)));
+const primaryRows = computed(()=>primaryDetections(rows.value));
+const primaryFileOrder = computed(()=>{
+  const supplemental=uncapSourceFiles(rows.value);
+  return fileOrder.value.filter(index=>!supplemental.has(index));
+});
+const uncapRowsByCard = computed(()=>{
+  const supplemental=uncapSourceFiles(rows.value), byCard=new Map<string,ImportDetection[]>();
+  for(const row of rows.value)if(supplemental.has(row.fileIndex)&&row.selected&&row.uncapThumbnail) {
+    const matches=byCard.get(row.selected)??[];
+    matches.push(row);byCard.set(row.selected,matches);
+  }
+  return byCard;
+});
+function uncapCrops(row: Detection) { return uncapRowsByCard.value.get(row.selected)??[]; }
+const merged = computed(() => mergeDetections(combinedDetections(rows.value).map(row=>({...row,level:getImportLevel(row,levelMode.value)}))).filter(row => catalog.has(row.cardKey)));
 const mergedByKey = computed(() => new Map(merged.value.map(card=>[card.cardKey,card])));
-const visibleRows = computed(() => rows.value.filter(row => !reviewOnly.value || needsReview(row)));
+const visibleRows = computed(() => primaryRows.value.filter(row => !reviewOnly.value || needsReview(row)));
 function cardLabel(key: string) {
   const card = catalog.get(key); return card ? `${localizeCharacterName(card.chara, locale.value)} / ${localizeCostumeName(card, locale.value)}` : key;
 }
@@ -279,7 +300,7 @@ async function recognize(manual?: { box: Box; fileIndex: number }) {
     }
     session.abort.signal.throwIfAborted();
     rows.value = manual ? [...rows.value, ...staged] : staged;
-    await focusRow(manual ? staged[0] : rows.value[0]);
+    await focusRow(manual ? staged.find(row=>row.displayMode!=='uncaps') : primaryRows.value[0]);
     status.value = staged.length ? t('screenshot.done') : t('screenshot.noCards');
   } catch (cause) {
     if (operation !== operationId || (cause instanceof Error && cause.name === 'AbortError')) status.value = t('screenshot.cancelled');
@@ -356,6 +377,7 @@ onUnmounted(() => { cancel(); clearSources(); clearExport(); });
 @container (min-width:1160px) { .result-grid { grid-template-columns:repeat(6,minmax(0,1fr)); } }
 .result-card { position:relative; border:1px solid var(--import-border); border-radius:14px; background:rgb(var(--v-theme-surface)); padding:14px 12px 12px; min-width:0; }.result-card.unresolved { border-color:#c7a36a; }
 .card-pair { display:flex; align-items:center; justify-content:center; gap:5px; margin-bottom:10px; }.card-pair figure { margin:0; text-align:center; }.card-pair img,.missing-icon { display:block; width:64px; height:82px; object-fit:contain; }.missing-icon { display:grid; place-items:center; font-size:2rem; color:#a89d8d; background:rgba(var(--v-theme-on-surface),.04); border-radius:8px; }.card-pair figcaption { margin-top:4px; font-size:.62rem; opacity:.55; }.pair-arrow { opacity:.3; }.card-number { position:absolute; top:5px; left:8px; font-size:.6rem; opacity:.45; }
+.card-pair .original-crops .uncap-crop { height:auto; aspect-ratio:256/82; margin-top:3px; border-radius:2px; }
 .card-icon-button { position:relative; display:block; border:1px solid var(--import-border); border-radius:8px; padding:0 3px; transition:border-color .15s; }.card-icon-button:hover { border-color:rgb(var(--v-theme-primary)); }.card-icon-button:focus-visible { outline:3px solid rgb(var(--v-theme-primary)); outline-offset:2px; }.card-icon-button:disabled { opacity:.7; }.icon-edit-mark { position:absolute; bottom:2px; right:2px; display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:rgb(var(--v-theme-primary)); color:white; border:2px solid rgb(var(--v-theme-surface)); }
 .inline-fields { display:grid; grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr); gap:8px; }.inline-fields label { font-size:.67rem; opacity:.9; }.inline-fields input,.inline-fields select { width:100%; min-width:0; font-size:.8rem; padding:7px 5px; margin-top:3px; }.inline-fields input { font-weight:600; font-variant-numeric:tabular-nums; }.inline-fields select { appearance:auto; }.inline-fields select.unknown { color:#896124; background:#d8a64712; }
 .card-warning { color:#9a6313; font-size:.65rem; margin-top:6px; }.empty-group { padding:20px; text-align:center; font-size:.8rem; opacity:.65; }

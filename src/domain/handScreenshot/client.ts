@@ -105,6 +105,17 @@ export class ScreenshotSession {
         }
         detections.push(result); progress(detections.length, boxes.length);
       }
+      // Keep source classification separate from editable recognition evidence.
+      if (detections.length && detections.filter(row=>row.totsuEvidence==='dots').length >= Math.ceil(detections.length/2)) {
+        for (const row of detections) {
+          row.displayMode='uncaps';
+          delete row.level; delete row.maxLevel;
+          // Include the last 4% of the portrait above the footer for visual context.
+          const y=row.box.y+row.box.width*.96;
+          const strip=crop(bitmap,{x:row.box.x,y,width:row.box.width,height:Math.min(row.box.width*.32,bitmap.height-y)},256,82);
+          row.uncapThumbnail=strip.toDataURL('image/webp',.95);
+        }
+      }
       return detections;
     } finally { bitmap.close(); }
   }

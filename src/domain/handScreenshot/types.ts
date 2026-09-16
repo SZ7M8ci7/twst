@@ -22,6 +22,7 @@ export interface Candidate { cardKey: string; variant: string; score: number; in
 export interface Detection {
   id: string; fileIndex: number; box: Box; candidates: Candidate[]; confident: boolean;
   selected: string; level?: number; maxLevel?: number; levelConflict?: boolean; thumbnail?: string;
+  displayMode?: 'uncaps'; uncapThumbnail?: string;
   totsu?: number; totsuEvidence?: 'dots' | 'black-frame' | 'magic3' | 'max-level' | 'unknown' | 'manual';
 }
 
