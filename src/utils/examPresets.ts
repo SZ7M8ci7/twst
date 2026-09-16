@@ -88,6 +88,80 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/09-2無BS',
+    title: '2026/09-2無BS',
+    kind: 'BASIC',
+    enemyElement: '無',
+    enemyHp: 91000,
+    enemies: [
+      {
+        name: 'カリム',
+        actions: [
+          { name: '相手選択ATKDOWN強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkDown', effectTarget: '相手選択', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+        ],
+      },
+      {
+        name: 'ジャミル',
+        actions: [
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'シルバー',
+        actions: [
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'セベク',
+        actions: [
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/09-2水DF',
+    title: '2026/09-2水DF',
+    kind: 'DEFENCE',
+    enemyElement: '水',
+    enemyHp: 99000,
+    enemies: [
+      {
+        name: 'ケイト',
+        actions: [
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 5200, effectKind: 'damageUp', effectTarget: '自', effectValue: 6, duration: 3 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 8800 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 11700, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'トレイ',
+        actions: [
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 5500, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 9400 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 12400, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'リドル',
+        actions: [
+          { name: '弱3連', element: '水', power: '3連撃(弱)', estimatedDamage: 13000 },
+          { name: 'ATKUP弱3連', element: '水', power: '3連撃(弱)', estimatedDamage: 17200, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '強3連', element: '水', power: '3連撃(強)', estimatedDamage: 17300 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/09-1木DF',
     title: '2026/09-1木DF',
     kind: 'DEFENCE',
