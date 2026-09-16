@@ -1,0 +1,1 @@
+function u(e){switch(e){case"R":return 70;case"SR":return 90;case"SSR":return 120;default:return 120}}function n(e){switch(e){case"R":return 70;case"SR":return 90;case"SSR":return 120;default:return 120}}function a(e,t,r=0){return typeof e=="number"&&Number.isInteger(e)&&e>=r&&e<=n(t)}export{u as a,n as g,a as i};
