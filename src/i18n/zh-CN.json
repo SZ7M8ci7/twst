@@ -1005,7 +1005,7 @@
     "undo": "撤销本次导入",
     "close": "关闭",
     "loading": "正在准备识别数据，首次下载可能需要一些时间。",
-    "processing": "正在分析：{name}",
+    "processing": "正在分析（{current}/{total}张）：{name}",
     "fileError": "无法分析{name}。请使用不超过30MB、2400万像素的PNG/JPEG/WebP图片。",
     "done": "分析完成，请确认候选卡牌和等级。",
     "noCards": "未检测到卡牌边框。请在原图上框选卡面进行添加。",

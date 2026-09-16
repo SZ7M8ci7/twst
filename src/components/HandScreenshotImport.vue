@@ -17,7 +17,7 @@
         <p v-if="!sources.length" class="privacy-note">{{ t('screenshot.description') }}</p>
         <label class="level-import-option">{{ t('screenshot.importLevel') }}<select v-model="levelMode" :disabled="busy || applied" :aria-label="t('screenshot.importLevel')"><option value="maximum">{{ t('screenshot.maximumLevel') }}</option><option value="current">{{ t('screenshot.currentLevel') }}</option></select></label>
         <p class="help">{{ t('screenshot.combinedScreenshots') }}</p>
-        <div v-if="busy" class="processing-state"><v-progress-linear :model-value="progress" :indeterminate="progress === 0" color="primary" rounded /><p role="status" aria-live="polite">{{ status }}</p></div>
+        <div v-if="busy" class="processing-state"><v-progress-linear :model-value="progress" :indeterminate="!progressKnown" :aria-label="status" color="primary" rounded /><p class="progress-caption" role="status" aria-live="polite"><span>{{ status }}</span><strong v-if="progressKnown">{{ progressPercent }}%</strong></p></div>
         <p v-else-if="status && !rows.length" class="help" role="status">{{ status }}</p>
         <v-alert v-if="error" type="warning" variant="tonal" density="compact" class="import-alert">{{ error }}</v-alert>
         <div v-if="sources.length && !busy" class="overview-toolbar">
@@ -74,7 +74,7 @@
       <v-dialog v-model="sourceOpen" max-width="900" :persistent="busy" class="screenshot-modal">
         <v-card class="import-dialog source-dialog">
           <header class="modal-heading"><h2>{{ t('screenshot.original') }}</h2><v-btn class="heading-close" icon="mdi-close" variant="text" :aria-label="t('screenshot.close')" :disabled="busy" @click="sourceOpen=false" /></header>
-          <div v-if="busy || error" class="source-status"><v-progress-linear v-if="busy" :model-value="progress" :indeterminate="progress===0" color="primary" /><p v-if="busy" class="help" role="status">{{ status }}</p><v-alert v-if="error" type="warning" variant="tonal" density="compact">{{ error }}</v-alert><v-btn v-if="busy" size="small" variant="text" @click="cancel">{{ t('screenshot.cancel') }}</v-btn></div>
+          <div v-if="busy || error" class="source-status"><v-progress-linear v-if="busy" :model-value="progress" :indeterminate="!progressKnown" :aria-label="status" color="primary" /><p v-if="busy" class="help progress-caption" role="status"><span>{{ status }}</span><strong v-if="progressKnown">{{ progressPercent }}%</strong></p><v-alert v-if="error" type="warning" variant="tonal" density="compact">{{ error }}</v-alert><v-btn v-if="busy" size="small" variant="text" @click="cancel">{{ t('screenshot.cancel') }}</v-btn></div>
         <section class="image-panel" :aria-label="t('screenshot.original')">
           <div class="image-toolbar">
             <select v-model.number="activeFile" :aria-label="t('screenshot.sourceImage')" @change="changeSource"><option v-for="(index,position) in primaryFileOrder" :key="sources[index].url" :value="index">{{ position+1 }}. {{ sources[index].name }}</option></select>
@@ -149,6 +149,8 @@ async function createExport() {
   finally { exporting.value=false; }
 }
 const rows = ref<ImportDetection[]>([]), progress = ref(0), status = ref(''), error = ref('');
+const progressKnown = ref(false);
+const progressPercent = computed(()=>Math.floor(Math.max(0,Math.min(100,progress.value))));
 const input = ref<HTMLInputElement>();
 const drawMode = ref(false), sourceOpen = ref(false), pickerOpen = ref(false), dragOver = ref(false);
 const activeId = ref(''), activeFile = ref(0);
@@ -268,7 +270,7 @@ async function selectFiles(selection: File[]) {
 async function recognize(manual?: { box: Box; fileIndex: number }) {
   if (exporting.value) return;
   const operation = ++operationId;
-  session?.stop(); busy.value = true; progress.value = 0; error.value = ''; status.value = t('screenshot.loading');
+  session?.stop(); busy.value = true; progress.value = 0; progressKnown.value=false; error.value = ''; status.value = t('screenshot.loading');
   if (!manual) rows.value = [];
   try {
     const targets: number[] = [];
@@ -281,12 +283,14 @@ async function recognize(manual?: { box: Box; fileIndex: number }) {
     const { ScreenshotSession } = await import('@/domain/handScreenshot/client');
     if (operation !== operationId) throw new DOMException('Cancelled', 'AbortError');
     session = new ScreenshotSession();
-    await session.load(value => { progress.value=value.totalBytes ? value.loadedBytes/value.totalBytes*100 : 0; status.value=value.totalBytes ? t('screenshot.preparing', { loaded:(value.loadedBytes/1_000_000).toFixed(1), total:(value.totalBytes/1_000_000).toFixed(1) }) : t('screenshot.loading'); });
+    await session.load(value => { progressKnown.value=!!value.totalBytes; progress.value=value.totalBytes ? value.loadedBytes/value.totalBytes*100 : 0; status.value=value.totalBytes ? t('screenshot.preparing', { loaded:(value.loadedBytes/1_000_000).toFixed(1), total:(value.totalBytes/1_000_000).toFixed(1) }) : t('screenshot.loading'); });
     const staged: Detection[] = [];
-    for (const fileIndex of targets) {
-      status.value = t('screenshot.processing', { name: files.value[fileIndex].name });
+    progressKnown.value=true;
+    for (const [imageIndex,fileIndex] of targets.entries()) {
+      progress.value=imageIndex/targets.length*100;
+      status.value = t('screenshot.processing', { name: files.value[fileIndex].name, current:imageIndex+1, total:targets.length });
       try {
-        const detected = await session.analyze(files.value[fileIndex], fileIndex, (done, total) => { progress.value = done / total * 100; }, manual?.box);
+        const detected = await session.analyze(files.value[fileIndex], fileIndex, (done, total) => { progress.value = (imageIndex+(total>0?Math.min(1,Math.max(0,done/total)):0))/targets.length*100; }, manual?.box);
         for (const row of detected) {
           row.id = `${Date.now()}-${fileIndex}-${row.id}`;
           if (!catalog.has(row.selected)) row.selected = '';
@@ -297,6 +301,7 @@ async function recognize(manual?: { box: Box; fileIndex: number }) {
         if (session.abort.signal.aborted) throw cause;
         error.value = t('screenshot.fileError', { name: files.value[fileIndex].name });
       }
+      progress.value=(imageIndex+1)/targets.length*100;
     }
     session.abort.signal.throwIfAborted();
     rows.value = manual ? [...rows.value, ...staged] : staged;
@@ -357,6 +362,7 @@ onUnmounted(() => { cancel(); clearSources(); clearExport(); });
 .level-import-option { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:16px 0; font-size:.8rem; font-weight:600; }
 .level-import-option select { min-width:150px; font-weight:400; }
 .level-import-option select:disabled { opacity:.6; }
+.progress-caption { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }.progress-caption span { min-width:0; overflow-wrap:anywhere; }.progress-caption strong { flex-shrink:0; font-variant-numeric:tabular-nums; }
 .export-order { padding:20px 24px; overflow:auto; min-height:0; }.export-actions { display:flex; justify-content:flex-end; padding:14px 24px; border-top:1px solid var(--import-border); flex-shrink:0; }
 @media (max-width:600px) { .export-order { padding:12px; } }
 .import-dialog { --import-border:rgba(var(--v-theme-on-surface),.13); max-height:94dvh; display:flex; flex-direction:column; overflow:hidden; border-radius:22px!important; background:rgb(var(--v-theme-surface)); }

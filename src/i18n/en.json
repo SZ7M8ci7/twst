@@ -1005,7 +1005,7 @@
     "undo": "Undo this import",
     "close": "Close",
     "loading": "Preparing recognition data. The first download may take a while.",
-    "processing": "Analyzing: {name}",
+    "processing": "Analyzing ({current}/{total} images): {name}",
     "fileError": "Could not analyze {name}. Use PNG/JPEG/WebP files up to 30 MB and 24 megapixels.",
     "done": "Analysis complete. Review the candidates and levels.",
     "noCards": "No card frames found. Drag around a card’s artwork in the source image to add it.",
