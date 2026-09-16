@@ -38,6 +38,7 @@ type RecommendedTool = {
 const recommendedTools: RecommendedTool[] = [
   { routeName: 'handCollection', titleKey: 'tool.handCollection', icon: 'mdi-cards-outline' },
   { routeName: 'sim', titleKey: 'tool.sim', icon: 'mdi-cards-playing-outline' },
+  { routeName: 'examSimulator', titleKey: 'tool.examSimulator', icon: 'mdi-clipboard-text-outline' },
   { routeName: 'search', titleKey: 'tool.deckExplorationTools', icon: 'mdi-magnify' },
   { routeName: 'finisherDamage', titleKey: 'tool.finisherDamage', icon: 'mdi-target' },
 ];
