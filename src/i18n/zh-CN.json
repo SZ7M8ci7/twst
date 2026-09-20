@@ -721,6 +721,7 @@
     "transferStorageFull": "浏览器存储空间不足，无法传递队伍。",
     "transferSaveFailed": "无法保存用于配队模拟器的队伍。",
     "priority": "容许优先级",
+    "deckPositionHint": "图片左上角及参考信息行首的数字表示编队位置。",
     "elementCompatibilityPriority": "优先属性克制",
     "elementCompatibilityPriorityTitle": "在全属性考试中，根据已公开的敌方属性及剩余候选计算克制概率并选择",
     "turnElementCompatibilityPriorityTitle": "仅本回合优先属性克制",

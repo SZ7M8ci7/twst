@@ -721,6 +721,7 @@
     "transferStorageFull": "ブラウザの保存容量が不足しているため、編成を引き継げませんでした。",
     "transferSaveFailed": "デッキシミュレータ用の編成を保存できませんでした。",
     "priority": "許容優先度",
+    "deckPositionHint": "画像左上と参考情報の行頭の番号は編成順です。",
     "elementCompatibilityPriority": "属性相性優先",
     "elementCompatibilityPriorityTitle": "全属性試験で公開敵属性と残り候補から有利確率を計算して選択",
     "turnElementCompatibilityPriorityTitle": "このターンだけ属性相性優先を使う",

@@ -721,6 +721,7 @@
     "transferStorageFull": "The deck could not be transferred because browser storage is full.",
     "transferSaveFailed": "The deck could not be saved for the Deck Simulator.",
     "priority": "Priority",
+    "deckPositionHint": "Numbers at the top left of images and at the start of reference rows show deck positions.",
     "elementCompatibilityPriority": "Prioritize Element Matchup",
     "elementCompatibilityPriorityTitle": "For Omni exams, choose by advantage probability from revealed enemy elements and remaining candidates.",
     "turnElementCompatibilityPriorityTitle": "Use element matchup priority only for this turn",

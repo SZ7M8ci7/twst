@@ -207,6 +207,7 @@
               <div class="panel-heading">
                 <div>
                   <h2>{{ t('examSimulator.priority') }}</h2>
+                  <p class="plan-identity-hint">{{ t('examSimulator.deckPositionHint') }}</p>
                 </div>
                 <div class="plan-heading-actions">
                   <label
@@ -300,6 +301,7 @@
                         class="combo-drop-slot"
                         :class="{ filled: !!combo.firstMagicId, active: comboIndex === activeComboIndex && activeComboSlot === 'firstMagicId' }"
                         :data-testid="`combo-${activeTurnIndex}-${comboIndex}-first`"
+                        :title="planMagicTitle(combo.firstMagicId)"
                         @click.stop="openMagicPicker(comboIndex, 'firstMagicId')"
                         @dragenter.prevent.stop
                         @dragover.prevent.stop="onMagicDragOver"
@@ -309,6 +311,7 @@
                       >
                         <template v-if="magicById(combo.firstMagicId)">
                           <img :src="magicById(combo.firstMagicId)?.imageUrl || defaultImg" class="combo-image" alt="" />
+                          <span class="card-index-badge">{{ (magicById(combo.firstMagicId)?.deckIndex ?? 0) + 1 }}</span>
                           <span class="magic-badge">M{{ magicById(combo.firstMagicId)?.magicSlot }}</span>
                         </template>
                         <span v-else class="combo-placeholder">1</span>
@@ -317,6 +320,7 @@
                         class="combo-drop-slot"
                         :class="{ filled: !!combo.secondMagicId, active: comboIndex === activeComboIndex && activeComboSlot === 'secondMagicId' }"
                         :data-testid="`combo-${activeTurnIndex}-${comboIndex}-second`"
+                        :title="planMagicTitle(combo.secondMagicId)"
                         @click.stop="openMagicPicker(comboIndex, 'secondMagicId')"
                         @dragenter.prevent.stop
                         @dragover.prevent.stop="onMagicDragOver"
@@ -326,6 +330,7 @@
                       >
                         <template v-if="magicById(combo.secondMagicId)">
                           <img :src="magicById(combo.secondMagicId)?.imageUrl || defaultImg" class="combo-image" alt="" />
+                          <span class="card-index-badge">{{ (magicById(combo.secondMagicId)?.deckIndex ?? 0) + 1 }}</span>
                           <span class="magic-badge">M{{ magicById(combo.secondMagicId)?.magicSlot }}</span>
                         </template>
                         <span v-else class="combo-placeholder">2</span>
@@ -355,10 +360,13 @@
                           class="picker-magic-cell"
                           :class="{ selected: choice.magic && isMagicInActiveCombo(choice.magic.id) }"
                           :disabled="!choice.magic"
+                          :title="choice.magic ? planMagicTitle(choice.magic.id) : undefined"
+                          :aria-label="choice.magic ? planMagicTitle(choice.magic.id) : `M${choice.slot}`"
                           @click="choice.magic && chooseMagicFromPicker(choice.magic.id)"
                         >
                           <template v-if="choice.magic">
                             <img :src="choice.magic.imageUrl || defaultImg" alt="" />
+                            <span class="card-index-badge">{{ row.deckIndex + 1 }}</span>
                             <span class="magic-badge">M{{ choice.slot }}</span>
                           </template>
                           <span v-else>M{{ choice.slot }}</span>
@@ -379,6 +387,7 @@
 
               <div v-if="planReferenceCards.length" class="plan-reference-list">
                 <article v-for="entry in planReferenceCards" :key="entry.deckIndex" class="plan-reference-card">
+                  <span class="plan-reference-number">{{ entry.deckIndex + 1 }}</span>
                   <div class="plan-reference-image-wrap">
                     <img :src="entry.imageUrl || defaultImg" alt="" class="plan-reference-image" />
                     <div
@@ -7526,6 +7535,11 @@ function describeDeckCard(deckIndex: number) {
   return slot?.character ? `${slot.character.chara}/${slot.character.costume}` : `枠${deckIndex + 1}`;
 }
 
+function planMagicTitle(magicId: string) {
+  const magic = magicById(magicId);
+  return magic ? `#${magic.deckIndex + 1} ${localizeExamLogText(describeMagic(magicId))}` : t('examSimulator.unselected');
+}
+
 function describeEnemyAction(action?: RuntimeEnemyAction) {
   if (!action) return '行動なし';
   return `${enemyDisplayLabel(action)}:${action.name}(${effectiveEnemyActionElement(action)}, ${action.power}, 等倍${formatNumber(action.estimatedDamage)}, ATK${formatNumber(deriveEnemyBaseAtk(action))})`;
@@ -8015,7 +8029,7 @@ function formatRatePercent(value: number) {
 
 .plan-reference-card {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: 22px 42px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -8023,6 +8037,13 @@ function formatRatePercent(value: number) {
   border: 1px solid #dfe7ee;
   border-radius: 8px;
   background: #fbfcfd;
+}
+
+.plan-reference-number {
+  color: #526879;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
 }
 
 .plan-reference-image-wrap {
@@ -8631,9 +8652,18 @@ function formatRatePercent(value: number) {
 }
 
 .card-index-badge {
-  right: 3px;
+  left: 3px;
   top: 3px;
   border-radius: 4px;
+  min-width: 18px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.plan-identity-hint {
+  margin-top: 4px;
+  color: #637686;
+  font-size: 11px;
 }
 
 .turn-tabs {
