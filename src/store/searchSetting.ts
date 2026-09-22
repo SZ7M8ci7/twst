@@ -70,7 +70,7 @@ export const createDefaultSearchSettingsState = (): SearchSettingsState => ({
   maxResult: 30,
   attackNum: 10,
   sortOptions: [
-    { prop: 'settingModal.effectiveHP', order: 'settingModal.desc' }
+    { prop: 'comments.effectiveHP', order: 'settingModal.desc' }
   ],
   mustCharacters: [],
   convertedMustCharacters: [],

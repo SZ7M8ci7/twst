@@ -3833,10 +3833,12 @@ export async function calcDecks(
     return controls.isSearching();
   };
   const availableSortProps = getAvailableSortProps(t);
+  const sortPropKeys = getAvailableSortProps((key) => key);
   // Opt-101: ソート項目のインデックスを辞書化
   const sortPropIndexMap: Record<string, number> = Object.create(null);
   for (let i = 0; i < availableSortProps.length; i++) {
     sortPropIndexMap[availableSortProps[i]] = i;
+    sortPropIndexMap[sortPropKeys[i]] = i;
   }
   // Opt-102: sortOptions の参照をローカル化
   const sortOptionsValue = settings.sortOptions;
@@ -3847,9 +3849,13 @@ export async function calcDecks(
     if (idx === undefined) continue;
     let order = '降順';
     switch (key.order) {
+      case 'settingModal.asc':
+      case t('settingModal.asc'):
       case 'ASC':
         order = '昇順';
         break;
+      case 'settingModal.desc':
+      case t('settingModal.desc'):
       case 'DESC':
         order = '降順';
         break;

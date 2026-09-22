@@ -63,7 +63,7 @@
             v-model="option.prop"
             :items="availableSortProps"
             :label="$t('settingModal.sortKey')"
-            item-text="prop"
+            item-title="title"
             item-value="value"
             class="ma-0 pa-0"
             hide-details
@@ -71,7 +71,7 @@
           ></v-select>
           <v-select
             v-model="option.order"
-            :items="[$t('settingModal.asc'), $t('settingModal.desc')]"
+            :items="sortOrderItems"
             :label="$t('settingModal.order')"
             class="ma-0 pa-0"
             hide-details
@@ -180,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { createDefaultSearchSettingsState, useSearchSettingsStore, type SearchSettingsState } from '@/store/searchSetting';
 import { onBeforeMount, onMounted } from 'vue';
 import { cloneDeep } from 'lodash';
@@ -200,7 +200,7 @@ interface MustCharacterOption {
 }
 
 interface MinimumSettingOption {
-  prop: string;
+  prop: MinimumSettingKey | '';
   value: number;
 }
 
@@ -334,7 +334,11 @@ const minimumSettings = ref<MinimumSettingOption[]>([]);
 const mustCharacterSelection = ref<string[]>([]);
 const mustCharacterIconUrls = ref<Record<string, string>>({});
 
-const availableSortProps = getAvailableSortProps(t);
+// Keep stable keys as values; only the labels depend on the current language.
+const availableSortProps = computed(() => getAvailableSortProps((key) => key)
+  .map((key) => ({ title: t(key), value: key })));
+const sortOrderItems = computed(() => ['settingModal.asc', 'settingModal.desc']
+  .map((key) => ({ title: t(key), value: key })));
 const mustCharacterList = (characterData as MustCharacterInfo[]).filter(
   (character) => character.name_ja !== 'サム'
 );
@@ -343,11 +347,7 @@ onBeforeMount(() => {
   // sortOptionsの初期状態を保持するためのリアクティブな参照
   initialSortOptions = cloneDeep(searchSettingsStore.sortOptions ?? []);
   // ユーザーによる変更を保持するためのリアクティブな参照
-  sortOptions.value = cloneDeep(initialSortOptions).map((option: SortOption) => ({
-    ...option,
-    prop: t(option.prop),
-    order: t(option.order),
-  }));
+  sortOptions.value = cloneDeep(initialSortOptions);
   mustCharacterSelection.value = (searchSettingsStore.mustCharacters ?? [])
     .map((option) => enName2jpName[option.prop] || option.prop)
     .filter((name): name is string => typeof name === 'string' && name.length > 0);
@@ -370,19 +370,11 @@ function getMinimumSettingValues(source: Pick<SearchSettingsState, MinimumSettin
   }, {} as Record<MinimumSettingKey, number>);
 }
 
-function getMinimumSettingLabel(key: MinimumSettingKey): string {
-  return t(minimumSettingDefinitions.find((definition) => definition.key === key)?.labelKey ?? '');
-}
-
-function getMinimumSettingKey(label: string): MinimumSettingKey | undefined {
-  return minimumSettingDefinitions.find((definition) => t(definition.labelKey) === label)?.key;
-}
-
 function buildMinimumSettingRows(values: Partial<Record<MinimumSettingKey, number>>): MinimumSettingOption[] {
   return minimumSettingDefinitions
     .filter((definition) => (values[definition.key] ?? 0) > 0)
     .map((definition) => ({
-      prop: getMinimumSettingLabel(definition.key),
+      prop: definition.key,
       value: values[definition.key] ?? 0,
     }));
 }
@@ -391,7 +383,7 @@ function setMinimumSettings(values: Partial<Record<MinimumSettingKey, number>>) 
   minimumSettings.value = buildMinimumSettingRows(values);
 }
 
-function getAvailableMinimumProps(index: number): string[] {
+function getAvailableMinimumProps(index: number) {
   const currentValue = minimumSettings.value[index]?.prop ?? '';
   const selectedValues = new Set(
     minimumSettings.value
@@ -399,16 +391,15 @@ function getAvailableMinimumProps(index: number): string[] {
       .filter((prop) => prop !== '')
   );
   return minimumSettingDefinitions
-    .map((definition) => t(definition.labelKey))
-    .filter((label) => label === currentValue || !selectedValues.has(label));
+    .filter((definition) => definition.key === currentValue || !selectedValues.has(definition.key))
+    .map((definition) => ({ title: t(definition.labelKey), value: definition.key }));
 }
 
 function addMinimumSetting() {
   const currentSelections = new Set(minimumSettings.value.map((option) => option.prop));
-  const nextLabel = minimumSettingDefinitions
-    .map((definition) => t(definition.labelKey))
-    .find((label) => !currentSelections.has(label)) ?? '';
-  minimumSettings.value.push({ prop: nextLabel, value: 0 });
+  const nextKey = minimumSettingDefinitions
+    .find((definition) => !currentSelections.has(definition.key))?.key ?? '';
+  minimumSettings.value.push({ prop: nextKey, value: 0 });
 }
 
 function removeMinimumSetting(index: string | number) {
@@ -425,11 +416,7 @@ function applyPreset(preset: SearchPreset) {
   selectedPreset.value = preset.name;
 
   // ソートオプションの適用
-  sortOptions.value = preset.sortOptions.map((option) => ({
-    ...option,
-    prop: t(option.prop),
-    order: t(option.order),
-  }));
+  sortOptions.value = preset.sortOptions.map((option) => ({ ...option }));
 
   setMinimumSettings({
     ...defaultMinimumSettingValues,
@@ -461,7 +448,7 @@ function resetAllSettings() {
 }
 
 function addSortOption() {
-  sortOptions.value.push({ prop: '', order: t('settingModal.desc') });
+  sortOptions.value.push({ prop: '', order: 'settingModal.desc' });
 }
 function removeSortOption(index: string | number) {
   sortOptions.value.splice(Number(index), 1);
@@ -489,33 +476,6 @@ function toFiniteInt(value: unknown, fallback: number, min?: number, max?: numbe
 function applyFilter() {
   const convertedMustCharacters = [...mustCharacterSelection.value];
   const storedMustCharacters: MustCharacterOption[] = convertedMustCharacters.map((name) => ({ prop: name }));
-
-  // ソートオプションの翻訳キーを元のプロパティ名に戻す
-  const convertedSortOptions = sortOptions.value.map((option: SortOption) => {
-    // 表示用の翻訳されたプロパティ名から元のキーを見つける
-    let originalProp = option.prop;
-    let originalOrder = option.order;
-    
-    // commentsセクションから元のキーを検索
-    const commentsEntries = Object.entries(t('comments'));
-    const foundCommentProp = commentsEntries.find(([, value]) => value === option.prop);
-    if (foundCommentProp) {
-      originalProp = `comments.${foundCommentProp[0]}`;
-    }
-    
-    // settingModalセクションから元のキーを検索
-    const settingModalEntries = Object.entries(t('settingModal'));
-    const foundSettingProp = settingModalEntries.find(([, value]) => value === option.order);
-    if (foundSettingProp) {
-      originalOrder = `settingModal.${foundSettingProp[0]}`;
-    }
-    
-    return {
-      ...option,
-      prop: originalProp,
-      order: originalOrder
-    };
-  });
 
   const rawMaxResult = maxResult.value;
   const normalizedMaxResult = toFiniteInt(rawMaxResult, 30, 0);
@@ -551,14 +511,13 @@ function applyFilter() {
   }, {} as Record<MinimumSettingKey, number>);
 
   minimumSettings.value.forEach((option) => {
-    const originalKey = getMinimumSettingKey(option.prop);
-    if (!originalKey) return;
-    normalizedMinimumSettings[originalKey] = toFiniteInt(option.value, 0, 0);
+    if (!option.prop) return;
+    normalizedMinimumSettings[option.prop] = toFiniteInt(option.value, 0, 0);
   });
 
   searchSettingsStore.updateSearchSettings({
     ...normalizedMinimumSettings,
-    sortOptions: convertedSortOptions,
+    sortOptions: sortOptions.value.map((option) => ({ ...option })),
     maxResult: normalizedMaxResult,
     attackNum: normalizedAttackNum,
     allowSameCharacter: allowSameCharacter.value,
