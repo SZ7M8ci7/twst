@@ -745,6 +745,10 @@
     "stop": "Stop",
     "clear": "Clear",
     "normalMode": "Normal",
+    "normalModeHelp": "Normal mode chooses allowed pairs in the priority order set under Actions. To try automatic actions without setting pairs yourself, select Auto best.",
+    "autoBestModeHelp": "Auto best searches actions using the spells selected in your deck. It does not use the allowed pairs under Actions. Check the iteration count, then press Run.",
+    "recoveryDefeat": "The team ran out of HP before finishing.",
+    "recoveryEditDeck": "Review deck",
     "autoBestMode": "Auto Best",
     "completedIterations": "Completed Runs",
     "currentIteration": "Current Run",
@@ -907,7 +911,6 @@
       "reserve": "Policy: reserve a strong spell until turn 4 in BS; prioritize healing and survival in DF, and consider remaining HP as well as damage in ATK."
     },
     "validation": {
-      "challenges": "Enable at least one challenge.",
       "roster": "Enter at least four owned cards and one support.",
       "duplicate": "Duplicate owned card.",
       "budget": "Set the total to 0–4 additional limit breaks and a positive integer item cost per break.",
@@ -964,6 +967,13 @@
     }
   },
   "screenshot": {
+    "guideTitle": "Which screen should I capture?",
+    "guideIntro": "Capture the card list in the game's card training screen.",
+    "guideOptional": "For limit breaks too",
+    "guideLevelTitle": "Card list: level display",
+    "guideLevelAlt": "The game's card training list, with current and maximum levels such as Lv95/95 and Lv42/80 beneath card artwork.",
+    "guideUncapTitle": "Card list: limit-break display",
+    "guideUncapAlt": "Four circles beneath each card show its limit breaks.",
     "exportHelp": "Drag images to reorder them. Export follows this order and removes overlaps.",
     "dragKeyboardHelp": "Use arrow keys to reorder this image.",
     "exportButton": "Create collection image",
@@ -995,7 +1005,7 @@
     "allCards": "All cards",
     "level": "Lv",
     "importLevel": "Level to import",
-    "combinedScreenshots": "Select limit-break screenshots together with level screenshots. Matching limit breaks and cropped evidence appear beneath the original card image. Limit-break screenshots are excluded from the results list and exported collection images.",
+    "combinedScreenshots": "Select these together with level screenshots showing the same cards. You can select the images in any order.",
     "uncapCrop": "Limit-break crop from the matching card",
     "maximumLevel": "Maximum level",
     "currentLevel": "Current level",
@@ -1018,7 +1028,6 @@
     "loadError": "Could not prepare recognition data. Check your connection and try again.",
     "undoConflict": "Cards edited after the import were excluded from undo.",
     "alwaysLevel": "Levels are always read. The left number in current / maximum is applied.",
-    "uncapsHelp": "For SSR cards with M3 locked, max Lv 80–84 means 0 uncaps and 106–110 means 2. Unknown (0–2) is applied as 0. At 2 uncaps, buddy effects change, so please set this manually.",
     "uncapsUnknown": "Unknown (0–2) → use 0",
     "uncapsValue": "{count} uncaps",
     "uncaps": "Uncaps",
@@ -1039,7 +1048,6 @@
       "unknown": "Uncaps cannot be determined. Applied as 0 unless edited.",
       "manual": "Uncaps set manually."
     },
-    "overviewIntro": "Compare each image with its results, then add cards to your collection.",
     "uploadTitle": "Drop screenshots here",
     "uploadHint": "Select multiple images · PNG / JPEG / WebP",
     "selectedFiles": "{count} images selected",

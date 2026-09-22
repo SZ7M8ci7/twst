@@ -4,10 +4,11 @@
     <v-card class="import-dialog">
       <header class="modal-heading">
         <div class="heading-mark" aria-hidden="true"><v-icon>mdi-image-multiple-outline</v-icon></div>
-        <div><h2>{{ t('screenshot.button') }}</h2><p>{{ t('screenshot.overviewIntro') }}</p></div>
+        <div><h2>{{ t('screenshot.button') }}</h2></div>
         <v-btn class="heading-close" icon="mdi-close" variant="text" :aria-label="t('screenshot.close')" :disabled="busy" @click="open=false" />
       </header>
       <div class="import-content">
+        <ScreenshotCaptureGuide :has-sources="sources.length > 0" />
         <div class="upload-area" :class="{ compact: sources.length, dragging: dragOver }" @dragover.prevent="dragOver = !busy" @dragleave.prevent="dragOver=false" @drop.prevent="dropFiles">
           <input ref="input" class="file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple :disabled="busy" :aria-label="t('screenshot.files')" @change="chooseFiles" />
           <v-icon v-if="!sources.length" size="32" aria-hidden="true">mdi-image-plus-outline</v-icon>
@@ -16,7 +17,6 @@
         </div>
         <p v-if="!sources.length" class="privacy-note">{{ t('screenshot.description') }}</p>
         <label class="level-import-option">{{ t('screenshot.importLevel') }}<select v-model="levelMode" :disabled="busy || applied" :aria-label="t('screenshot.importLevel')"><option value="maximum">{{ t('screenshot.maximumLevel') }}</option><option value="current">{{ t('screenshot.currentLevel') }}</option></select></label>
-        <p class="help">{{ t('screenshot.combinedScreenshots') }}</p>
         <div v-if="busy" class="processing-state"><v-progress-linear :model-value="progress" :indeterminate="!progressKnown" :aria-label="status" color="primary" rounded /><p class="progress-caption" role="status" aria-live="polite"><span>{{ status }}</span><strong v-if="progressKnown">{{ progressPercent }}%</strong></p></div>
         <p v-else-if="status && !rows.length" class="help" role="status">{{ status }}</p>
         <v-alert v-if="error" type="warning" variant="tonal" density="compact" class="import-alert">{{ error }}</v-alert>
@@ -51,7 +51,6 @@
         </section>
       </div>
       <footer class="import-footer">
-        <p class="uncaps-note">{{ t('screenshot.uncapsHelp') }}</p>
         <p v-if="applied" class="applied-message" role="status">{{ t('screenshot.applied') }}</p>
         <div class="footer-actions"><p class="import-summary" role="status" aria-live="polite">{{ t('screenshot.summary',{count:merged.length,review:primaryRows.filter(needsReview).length}) }}</p>
           <v-btn v-if="busy" variant="text" @click="cancel">{{ t('screenshot.cancel') }}</v-btn>
@@ -107,6 +106,7 @@ import { useI18n } from 'vue-i18n';
 import cards from '@/assets/chara.json';
 import SimCharaModal from '@/components/SimCharaModal.vue';
 import ScreenshotImageOrder from '@/components/ScreenshotImageOrder.vue';
+import ScreenshotCaptureGuide from '@/components/ScreenshotCaptureGuide.vue';
 import { useHandCollectionStore, type HandCard } from '@/store/handCollection';
 import { loadImageUrls } from '@/utils/characterAssets';
 import { getInputMaxLevel, isValidInputLevel } from '@/constants/levels';
@@ -392,7 +392,7 @@ onUnmounted(() => { cancel(); clearSources(); clearExport(); });
 .card-icon-button { position:relative; display:block; border:1px solid var(--import-border); border-radius:8px; padding:0 3px; transition:border-color .15s; }.card-icon-button:hover { border-color:rgb(var(--v-theme-primary)); }.card-icon-button:focus-visible { outline:3px solid rgb(var(--v-theme-primary)); outline-offset:2px; }.card-icon-button:disabled { opacity:.7; }.icon-edit-mark { position:absolute; bottom:2px; right:2px; display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:rgb(var(--v-theme-primary)); color:white; border:2px solid rgb(var(--v-theme-surface)); }
 .inline-fields { display:grid; grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr); gap:8px; }.inline-fields label { font-size:.67rem; opacity:.9; }.inline-fields input,.inline-fields select { width:100%; min-width:0; font-size:.8rem; padding:7px 5px; margin-top:3px; }.inline-fields input { font-weight:600; font-variant-numeric:tabular-nums; }.inline-fields select { appearance:auto; }.inline-fields select.unknown { color:#896124; background:#d8a64712; }
 .card-warning { color:#9a6313; font-size:.65rem; margin-top:6px; }.empty-group { padding:20px; text-align:center; font-size:.8rem; opacity:.65; }
-.import-footer { flex-shrink:0; padding:14px 26px 18px; border-top:1px solid var(--import-border); }.uncaps-note { font-size:.72rem; line-height:1.7; opacity:.7; margin:0 0 12px; }.footer-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }.import-summary { margin-right:auto; font-size:.8rem; }.applied-message { font-size:.8rem; color:rgb(var(--v-theme-primary)); margin-bottom:8px; }
+.import-footer { flex-shrink:0; padding:14px 26px 18px; border-top:1px solid var(--import-border); }.footer-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }.import-summary { margin-right:auto; font-size:.8rem; }.applied-message { font-size:.8rem; color:rgb(var(--v-theme-primary)); margin-bottom:8px; }
 .help { font-size:.75rem; color:rgb(var(--v-theme-on-surface)); opacity:.7; margin:6px 0; line-height:1.6; }
 .image-panel { display:flex; flex-direction:column; min-height:0; padding:16px 20px 20px; height:70dvh; }
 .image-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }.image-toolbar select { flex:1; min-width:0; width:100px; }
@@ -403,6 +403,6 @@ input[type=number],select { display:block; border:1px solid var(--import-border)
  .import-dialog { max-height:95dvh; border-radius:16px!important; }.modal-heading { padding:14px; gap:10px; }.modal-heading h2 { font-size:1rem; }.modal-heading p { font-size:.7rem; }.heading-mark { display:none; }.heading-close { width:32px; height:32px; }
  .import-content { padding:12px; }.upload-area.compact { flex-wrap:wrap; padding:12px; gap:8px; }.upload-area.compact .upload-copy { flex:1; }.upload-area.compact .upload-copy p { display:none; }.upload-area.compact .upload-copy strong { font-size:.72rem; }.upload-area.compact .v-btn { font-size:.7rem; padding:0 10px; }.upload-copy strong { font-size:.85rem; }.upload-copy p { font-size:.68rem; }.overview-toolbar { margin-top:18px; }.source-group-heading { gap:6px; }.source-group-heading>img { display:none; }.source-group-heading div>span { max-width:115px; }.source-count { font-size:.65rem; }
  .result-grid { grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; }.result-card { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 9px 10px; }.card-pair { margin:0; gap:5px; }.card-pair img,.missing-icon { width:60px; height:78px; }.pair-arrow { font-size:.7rem; }.inline-fields { flex:1; min-width:80px; grid-template-columns:1fr; gap:5px; }.inline-fields input,.inline-fields select { padding:5px; font-size:.75rem; }.card-warning { width:100%; margin:0; }
- .import-footer { padding:10px 14px 12px; }.uncaps-note { font-size:.65rem; line-height:1.6; margin-bottom:8px; }.footer-actions { gap:6px; justify-content:flex-end; }.import-summary { width:100%; font-size:.72rem; }.image-panel { padding:10px 12px 12px; }
+ .import-footer { padding:10px 14px 12px; }.footer-actions { gap:6px; justify-content:flex-end; }.import-summary { width:100%; font-size:.72rem; }.image-panel { padding:10px 12px 12px; }
 }
 </style>

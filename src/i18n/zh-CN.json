@@ -745,6 +745,10 @@
     "stop": "停止",
     "clear": "清空",
     "normalMode": "普通",
+    "normalModeHelp": "普通模式按照「行动」中设置的优先顺序选择允许组合。如需不手动设置行动即可尝试，请选择「自动最优」。",
+    "autoBestModeHelp": "自动最优会使用编队中选定的魔法搜索行动，不使用「行动」中的允许组合。请确认次数后点击「运行」。",
+    "recoveryDefeat": "HP不足，队伍在途中被击败。",
+    "recoveryEditDeck": "检查编队",
     "autoBestMode": "自动最优",
     "completedIterations": "已完成试验",
     "currentIteration": "正在搜索的试验",
@@ -907,7 +911,6 @@
       "reserve": "行动规则：基础考试优先将强力魔法留到第4回合后；防御考试优先回复及生存；攻击考试兼顾伤害与剩余HP。"
     },
     "validation": {
-      "challenges": "请启用至少一个特别课题。",
       "roster": "请输入至少四张自有卡片及一张支援。",
       "duplicate": "自有卡片重复。",
       "budget": "追加突破总上限须为0至4次，每次突破消耗须为正整数。",
@@ -964,6 +967,13 @@
     }
   },
   "screenshot": {
+    "guideTitle": "需要截取哪个画面？",
+    "guideIntro": "请截取游戏「卡牌育成」中的卡牌一览画面。",
+    "guideOptional": "同时读取突破次数时",
+    "guideLevelTitle": "卡牌一览：等级显示",
+    "guideLevelAlt": "游戏卡牌育成的一览画面，卡牌下方显示Lv95/95、Lv42/80等当前等级和最大等级。",
+    "guideUncapTitle": "卡牌一览：限界突破显示",
+    "guideUncapAlt": "卡牌下方用4个圆点显示限界突破次数。",
     "exportHelp": "拖动图片调整顺序，按此顺序生成去重后的卡牌一览图。",
     "dragKeyboardHelp": "也可以使用方向键调整顺序。",
     "exportButton": "生成一览图",
@@ -995,7 +1005,7 @@
     "allCards": "所有卡牌",
     "level": "等级",
     "importLevel": "导入等级",
-    "combinedScreenshots": "请同时选择等级和限界突破界面的截图。系统会补充同一卡牌的突破次数，并在原图下方显示对应裁剪图。限界突破截图不会单独列入识别结果或导出的卡牌一览图。",
+    "combinedScreenshots": "请与包含相同卡牌的等级截图一起选择。图片的选择顺序不限。",
     "uncapCrop": "同一卡牌的限界突破裁剪图",
     "maximumLevel": "最高等级",
     "currentLevel": "当前等级",
@@ -1018,7 +1028,6 @@
     "loadError": "无法准备识别数据，请检查网络后重试。",
     "undoConflict": "导入后再次编辑过的卡牌未被撤销。",
     "alwaysLevel": "始终读取等级。采用「当前 / 上限」左侧的当前等级。",
-    "uncapsHelp": "SSR未解锁M3时，最大等级80～84＝未突破，106～110＝突破2次。未知（0～2次）按0次反映。突破2次时搭档效果会发生变化，请自行设置。",
     "uncapsUnknown": "不明（0～2破）→按0破",
     "uncapsValue": "{count}破",
     "uncaps": "突破次数",
@@ -1039,7 +1048,6 @@
       "unknown": "无法确定突破次数。若不修改，将按0破处理。",
       "manual": "突破次数已手动指定。"
     },
-    "overviewIntro": "对照原图与识别结果，一次添加至持有卡牌。",
     "uploadTitle": "将截图拖到这里",
     "uploadHint": "支持多选 · PNG / JPEG / WebP",
     "selectedFiles": "已选择{count}张图片",

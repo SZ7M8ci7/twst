@@ -46,15 +46,15 @@ export function candidateIncludesRequired(input: SearchInput, candidate: Pick<Ca
 export function challengeVariants(input: Pick<SearchInput, 'preset' | 'challengeLocks' | 'maxRemoved'>): string[][] {
   if (!input.preset.specialChallenges?.length) return [[]];
   const base = (input.preset.specialChallenges ?? []).filter(c => input.challengeLocks[c.id] !== 'off').map(c => c.id);
-  if (!base.length) return [];
+  if (!base.length) return [[]];
   const removable = base.filter(id => input.challengeLocks[id] !== 'on');
   const results = [base];
   for (let i = 0; i < removable.length; i++) {
     const one = base.filter(id => id !== removable[i]);
-    if (one.length) results.push(one);
+    results.push(one);
     if (input.maxRemoved === 2) for (let j = i + 1; j < removable.length; j++) {
       const two = one.filter(id => id !== removable[j]);
-      if (two.length) results.push(two);
+      results.push(two);
     }
   }
   return results;
@@ -173,7 +173,6 @@ export function invalidSearchCards(input: Pick<SearchInput, 'roster' | 'supports
 }
 
 export function validateInput(input: SearchInput, catalog: Record<string, { rare: string; chara?: string }>): string | null {
-  if (!challengeVariants(input).length) return 'challenges';
   const support=examUsesSupport(input.preset);
   if (input.roster.length < (support?4:5) || support&&!input.supports.length) return 'roster';
   if (new Set(input.roster.map(c => c.name)).size !== input.roster.length) return 'duplicate';

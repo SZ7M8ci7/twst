@@ -449,6 +449,15 @@
               </div>
             </div>
 
+            <p class="simulation-mode-help">{{ t(simulationMode === 'normal' ? 'examSimulator.normalModeHelp' : 'examSimulator.autoBestModeHelp') }}</p>
+
+            <v-alert v-if="normalRecovery" type="warning" variant="tonal" density="compact" class="simulation-recovery" data-testid="simulation-recovery">
+              <p>{{ t('examSimulator.recoveryDefeat') }}</p>
+              <div class="recovery-actions">
+                <v-btn variant="outlined" size="small" @click="manualTab = 'deck'">{{ t('examSimulator.recoveryEditDeck') }}</v-btn>
+              </div>
+            </v-alert>
+
             <div v-if="simulationMode === 'autoBest' && autoBestProgress" class="auto-best-progress" data-testid="auto-best-progress">
               <v-progress-linear v-if="isRunning" color="primary" indeterminate height="3" />
               <div class="auto-best-progress-grid">
@@ -796,6 +805,7 @@ import {
   localizeOptionItems,
 } from '@/utils/localizedDisplay';
 import { groupExamBattleLog, type BattleLogGroup } from '@/utils/examBattleLog';
+import { normalSimulationRecovery } from '@/utils/examSimulationRecovery';
 
 
 Chart.register(...registerables);
@@ -1598,6 +1608,7 @@ let autoBestRunToken = 0;
 let autoBestSnapshotKey = '';
 let autoBestRootWeights: number[] | null = null;
 const simulationAggregate = ref<SimulationResultAggregate | null>(null);
+const normalRecovery = computed(() => normalSimulationRecovery(simulationAggregate.value, simulationMode.value, isRunning.value));
 const bestSimulationResult = ref<SimulationStats | null>(null);
 const simulationResultGeneration = ref(0);
 const imageCache = ref<Record<string, string>>({});
@@ -7621,6 +7632,11 @@ function formatRatePercent(value: number) {
 </script>
 
 <style scoped>
+.simulation-mode-help { margin: 8px 0 16px; color: #526477; font-size: .85rem; line-height: 1.7; }
+.simulation-recovery { margin-bottom: 16px; }
+.simulation-recovery :deep(.v-alert__content) { color: rgb(var(--v-theme-on-surface)); }
+.simulation-recovery p + p { margin-top: 8px; }
+.recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .exam-simulator {
   max-width: none;
   min-height: calc(100vh - 64px);
