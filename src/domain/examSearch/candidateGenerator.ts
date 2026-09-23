@@ -1206,16 +1206,30 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
     if (best) selected.push(best.candidate);
     if (bestM2) selected.push(bestM2.candidate);
   }
-  selected.push(...parent.cards.flatMap((slot,index)=>{
-    const options=proposals.filter(p=>p.index===index);
+  const alternativeOptions:typeof proposals=[];
+  for (const [index,slot] of parent.cards.entries()) {
+    // Choose the original-style champion among legal replacements. Otherwise
+    // an unrelated card can occupy that protected slot and be discarded only
+    // after alternative styles have already displaced the best legal choice.
+    const options=proposals.filter(p=>p.index===index&&candidateIncludesRequired(input,p.candidate,catalog));
     // Spell alternatives must not consume every mutation slot. A card that
     // only becomes useful after a replacement or upgrade needs a real battle.
     const choices=[options.find(p=>p.spellOnly),
       options.find(p=>p.option.name!==slot.name),
       options.find(p=>p.option.name===slot.name&&p.option.totsu!==slot.totsu)];
-    return [...new Set([...choices.filter((p):p is typeof options[number]=>!!p),...options])]
-      .slice(0,3).map(p=>p.candidate);
-  }));
+    const primary=[...new Set(choices.filter((p):p is typeof options[number]=>!!p))];
+    const previous=[...new Set([...primary,...options])].slice(0,3);
+    selected.push(...previous.map(p=>p.candidate));
+    // Keep every original choice, including its spell alternatives. Additional
+    // scoring views can explore a few other identities after the old work.
+    const usedNames=new Set(previous.map(p=>p.option.name));
+    let alternatives=0;
+    for (const option of options) {
+      if (option.option.name===slot.name||usedNames.has(option.option.name)) continue;
+      usedNames.add(option.option.name);alternativeOptions.push(option);
+      if(++alternatives>=8)break;
+    }
+  }
   const allocations=new Map<string,Candidate>();
   for(const cards of allocationCards(input,parent,catalog)) {
     if(++count%64===0){await yieldToHost();if(stop())return [];}
@@ -1270,7 +1284,27 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
     }
     if(best){selected.push(best);unique.add(best.id);}
   }
-  return selected.filter(candidate => candidateIncludesRequired(input,candidate,catalog));
+  const returned=new Set<string>();
+  const result=selected.filter(candidate => candidateIncludesRequired(input,candidate,catalog)
+    &&!returned.has(candidate.id)&&!!returned.add(candidate.id));
+  // The scheduler evaluates this array in order. Append at most two new teams
+  // after all original swaps, allocations and linked pairs, so broadening the
+  // search never replaces an established candidate or postpones it within this
+  // neighborhood. At most 5 * 8 candidates use each additional estimator.
+  for(const style of [1,2]) {
+    if(!alternativeOptions.length)break;
+    await yieldToHost();if(stop())return result;
+    const alternative=cachedEstimator(input,{anchor:'',totsu:0,cost:0,challenges:parent.challengeIds,style},catalog);
+    let best:Candidate|undefined,bestValue=-Infinity,estimated=0;
+    for(const option of alternativeOptions) {
+      if(returned.has(option.candidate.id))continue;
+      const value=alternative(option.candidate.cards);
+      if(value>bestValue){best=option.candidate;bestValue=value;}
+      if(++estimated%8===0){await yieldToHost();if(stop())return result;}
+    }
+    if(best){result.push(best);returned.add(best.id);}
+  }
+  return result;
 }
 
 // Recombine two measured teams to cross valleys that a single-card replacement

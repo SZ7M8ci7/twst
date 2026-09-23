@@ -35,10 +35,14 @@ export function expectedBestScore(samples: Samples, attempts: number): number {
     (Math.pow((index+1)/n,attempts)-Math.pow(index/n,attempts)),0);
 }
 export function scoreDistribution(samples: Samples):ScoreDistribution {
-  const scores=samples.scores.map(normalizedScore);
-  if(!scores.length)return {n:0,max:0,p95:null};
-  const sorted=[...scores].sort((a,b)=>a-b);
-  return {n:scores.length,max:scores.reduce((best,score)=>Math.max(best,score),0),p95:sorted[Math.ceil(sorted.length*.95)-1]};
+  return distributionFromSorted(samples.scores.length, sortedPositiveScores(samples));
+}
+function sortedPositiveScores(samples: Samples): number[] {
+  return samples.scores.filter(score => Number.isFinite(score) && score > 0).sort((a, b) => b - a);
+}
+function distributionFromSorted(n: number, positive: number[]): ScoreDistribution {
+  // Non-positive/invalid trials remain zeroes in the full distribution.
+  return { n, max: positive[0] ?? 0, p95: n ? positive[n - Math.ceil(n * .95)] ?? 0 : null };
 }
 /**
  * Estimate the positive score reachable at least once in `attempts` ordinary
@@ -46,14 +50,15 @@ export function scoreDistribution(samples: Samples):ScoreDistribution {
  * inversion; it is a screening reference rather than a post-selection CI.
  */
 export function autoScoreMetrics(samples: Samples, attempts: number, desired: number, z = 3.5): AutoScoreMetrics {
+  return autoScoreFromSorted(samples, attempts, desired, z, sortedPositiveScores(samples));
+}
+function autoScoreFromSorted(samples: Samples, attempts: number, desired: number, z: number, positive: number[]): AutoScoreMetrics {
   // Every ordinary trial remains in the denominator. Invalid or non-positive
   // scores are failed positive-score trials rather than silently discarded.
-  const scores=samples.scores.map(score=>Number.isFinite(score)&&score>0?score:0);
   const n=samples.scores.length;
-  const max=scores.reduce((best,score)=>Math.max(best,score),0);
+  const max=positive[0] ?? 0;
   let empiricalScore:number|null=null, conservativeScore:number|null=null;
   if(n && Number.isInteger(attempts) && attempts>0 && Number.isFinite(desired) && desired>0 && desired<1 && Number.isFinite(z) && z>0) {
-    const positive=scores.filter(score=>score>0).sort((a,b)=>b-a);
     let index=0, successes=0;
     while(index<positive.length) {
       const threshold=positive[index];
@@ -87,8 +92,12 @@ export function resultScoreDistribution(result:SearchResult):ScoreDistribution {
 }
 export function displayProgress(progress:SearchProgress,target:number,attempts:number,desiredProbability=0.05):SearchProgress {
   return {...progress,results:progress.results.map(result=>{
-    const auto=target===0?autoScoreMetrics(result.validation,attempts,desiredProbability):undefined;
-    const scoreDistribution=resultScoreDistribution(result);
+    // Each progress packet needs both summaries. Sort the growing validation
+    // batch once so frequent UI updates leave more time for battle trials.
+    const positive=target===0?sortedPositiveScores(result.validation):undefined;
+    const auto=positive?autoScoreFromSorted(result.validation,attempts,desiredProbability,3.5,positive):undefined;
+    const scoreDistribution=positive && result.validation.scores.length
+      ? distributionFromSorted(result.validation.scores.length,positive) : resultScoreDistribution(result);
     return {candidate:result.candidate,development:emptySamples(),validation:{...result.validation,scores:[]},validationTarget:result.validationTarget,
       validationBest:result.validationBest,validationSummary:{target,attempts,scoreDistribution,metrics:auto?{n:auto.n,successes:0,p:0,reach:0,low:0,high:0,max:auto.max}:metrics(result.validation,target,attempts),
         ...(auto?{auto:{attempts,desiredProbability,metrics:auto}}:{})}};

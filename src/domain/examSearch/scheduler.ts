@@ -116,7 +116,7 @@ export class SearchSession {
     if (this.pool.length <= 240) return;
     const rare=this.closeLosses(4);
     const ceilings=this.diverseParents(3);
-    const sorted = this.pool.sort((a, b) => this.quality(b) - this.quality(a));
+    const sorted = this.pool.sort(this.qualityComparator());
     const kept = new Map<number, number>(), compositions = new Map<string,number>();
     this.pool = sorted.filter(r => {
       const c=r.candidate.cost,n=kept.get(c)??0,key=JSON.stringify([c,r.candidate.cards.map(card=>card.name)]), count=compositions.get(key)??0;
@@ -169,6 +169,19 @@ export class SearchSession {
     // A retry-oriented target can be worthwhile even with a modest average.
     // Use the observed ceiling to explore; independent validation decides reach.
     return m.reach * this.input.target + m.max + mean * 0.1;
+  }
+  private qualityComparator() {
+    // Scores can grow between selection stages. Cache only for this sort so
+    // repeated comparisons reuse a rank without carrying stale sample data.
+    const cache = new Map<SearchResult, number>();
+    const qualityOf = (result: SearchResult) => {
+      const cached = cache.get(result);
+      if (cached !== undefined) return cached;
+      const value = this.quality(result);
+      cache.set(result, value);
+      return value;
+    };
+    return (a: SearchResult, b: SearchResult) => qualityOf(b) - qualityOf(a);
   }
   private tailLikelihood(result:SearchResult) {
     return result.importance?.n?result.importance.successWeight/result.importance.n:0;
@@ -230,7 +243,7 @@ export class SearchSession {
     }
   }
   private diverseParents(limit: number) {
-    const sorted = [...this.pool].sort((a,b)=>this.quality(b)-this.quality(a));
+    const sorted = [...this.pool].sort(this.qualityComparator());
     const peak=(result:SearchResult)=>result.development.scores.reduce((a,b)=>Math.max(a,b),0);
     const ceilings=[...sorted].sort((a,b)=>peak(b)-peak(a));
     const bands=[...new Set(sorted.map(r=>r.candidate.cost))].sort((a,b)=>a-b).map(cost=>{
@@ -268,9 +281,17 @@ export class SearchSession {
       return chosen.slice(0,4);
     });
   }
+  private finalistCostOrder(costs: number[], available: number) {
+    if (costs.length <= available || available <= 0) return costs;
+    // Retained winners can leave fewer challenger slots than cost bands.
+    // Rotate those scarce slots across rounds and islands so higher costs
+    // are not always discarded by the final width limit.
+    const offset = (this.round + this.partition.islandIndex) % costs.length;
+    return [...costs.slice(offset), ...costs.slice(0, offset)];
+  }
   private selectFinalists() {
     if(this.input.target===0){this.selectAutoFinalists();return;}
-    const sorted = [...this.pool].sort((a, b) => this.quality(b) - this.quality(a));
+    const sorted = [...this.pool].sort(this.qualityComparator());
     const costs = [...new Set(sorted.map(r => r.candidate.cost))].sort((a, b) => a - b);
     // Continue searching without discarding the strongest already evaluated
     // option in each item band. Keep its fixed holdout unchanged; it is never
@@ -282,7 +303,7 @@ export class SearchSession {
       }).slice(0,1));
     const retainedIds=new Set(retained.map(r=>r.candidate.id));
     const selected: SearchResult[] = [];
-    for (const cost of costs) {
+    for (const cost of this.finalistCostOrder(costs, MAX_FINALISTS-retained.length)) {
       const compositions = new Set<string>();
       const peak=(result:SearchResult)=>result.development.scores.reduce((max,score)=>Math.max(max,score),0);
       const ceiling=[...sorted].filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id)).sort((a,b)=>
@@ -364,7 +385,7 @@ export class SearchSession {
           ||conservative(bm.empiricalScore)-conservative(am.empiricalScore)||bm.max-am.max;
       }).slice(0,1));
     const retainedIds=new Set(retained.map(r=>r.candidate.id)),selected:SearchResult[]=[];
-    for(const cost of costs){
+    for(const cost of this.finalistCostOrder(costs, MAX_FINALISTS-retained.length)){
       const band=sorted.filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id));
       const empirical=band[0],weighted=this.weightedChampion(band,0);
       const scout=band.filter(r=>(r.criticalScout?.score??0)>0).sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
@@ -564,7 +585,7 @@ export class SearchSession {
       // Check whether each promising upgraded team can work with fewer items,
       // including the same learned instructions when its spells remain legal.
       const plannedParents=[...this.pool].filter(r=>r.candidate.preferredPlan?.length)
-        .sort((a,b)=>this.quality(b)-this.quality(a));
+        .sort(this.qualityComparator());
       const plannedCosts=new Set<number>();
       const trainingParents=[...new Set([...this.diverseParents(1),...plannedParents.filter(r=>{
         if(plannedCosts.has(r.candidate.cost))return false;plannedCosts.add(r.candidate.cost);return true;
