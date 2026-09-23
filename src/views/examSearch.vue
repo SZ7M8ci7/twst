@@ -372,7 +372,14 @@ const savedTeams=[loadSimulatorWindowState(),loadStoredAutoSaveDeck<StoredTeam>(
   .map(team=>team?.deckCharacters?.map(c=>c?.name??'')??[]).filter(team=>team.length===5&&team.every(name=>!!catalog[name]));
 input.value.seedTeams??=savedTeams;
 watch(() => hand.ownedCards.map(c => [c.cardName, c.level, c.totsu] as const), owned => {
-  input.value.roster = owned.filter(([name]) => catalog[name]).map(([name, level, totsu]) => maxSkillsCard(name, Math.max(1, level), totsu));
+  const roster = owned.filter(([name, level]) => catalog[name] && level >= 1)
+    .map(([name, level, totsu]) => maxSkillsCard(name, level, totsu));
+  if (JSON.stringify(input.value.roster) === JSON.stringify(roster)) return;
+  input.value.roster = roster;
+  // Collection changes can arrive from another tab, including between batches.
+  // Discard results and cancel continuation before an old roster can resume.
+  invalidateActiveSearch();
+  finishRequest();
 }, { immediate: true });
 if (persistedSession.value && JSON.stringify(persistedSession.value.input) === JSON.stringify(input.value)) {
   evaluatedInput.value = clone(input.value);
