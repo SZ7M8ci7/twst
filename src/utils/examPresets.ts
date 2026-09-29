@@ -1065,6 +1065,169 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
     ],
   },
   {
+    id: '第16回統一火DF',
+    title: '第16回統一火DF',
+    kind: 'DEFENCE',
+    enemyElement: '火',
+    enemyHp: 100000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'アズール',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 5500, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 9350 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 12450, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'フロイド',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 7450, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強単発', element: '火', power: '単発(強)', estimatedDamage: 8650, effectKind: 'atkUp', effectTarget: '自', effectValue: 21.5, duration: 1 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 16900, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジェイド',
+        actions: [
+          { name: '相手選択バフ解除弱2連', element: '火', power: '2連撃(弱)', estimatedDamage: 7450, effectKind: 'buffRemoval', effectTarget: '相手選択', effectValue: 0, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 9950 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 13150, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '第16回統一水ATK',
+    title: '第16回統一水ATK',
+    kind: 'ATTACK',
+    enemyElement: '水',
+    enemyHp: 225000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'マレウス',
+        actions: [
+          { name: '強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '回復強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'heal', effectTarget: '自', effectValue: 3670, duration: 1 },
+        ],
+      },
+      {
+        name: 'リリア',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'シルバー',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'セベク',
+        actions: [
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメDOWN強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageDown', effectTarget: '相手', effectValue: 5, duration: 1 },
+          { name: '被ダメDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '第16回統一木BS',
+    title: '第16回統一木BS',
+    kind: 'BASIC',
+    enemyElement: '木',
+    enemyHp: 113000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'カリム',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '継続回復強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'continueHeal', effectTarget: '自', effectValue: 3000, duration: 3 },
+        ],
+      },
+      {
+        name: 'ジャミル',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '第16回統一無DF',
+    title: '第16回統一無DF',
+    kind: 'DEFENCE',
+    enemyElement: '無',
+    enemyHp: 93000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'イデア',
+        actions: [
+          { name: '相手選択呪い強単発', element: '無', power: '単発(強)', estimatedDamage: 3900, effectKind: 'curse', effectTarget: '相手選択', effectValue: 100, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 7000 },
+          { name: 'ダメUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 7500, effectKind: 'damageUp', effectTarget: '自', effectValue: 8, duration: 1 },
+        ],
+      },
+      {
+        name: 'オルト',
+        actions: [
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 4450, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 7650 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 10100, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '第16回統一全ATK',
+    title: '第16回統一全ATK',
+    kind: 'ATTACK',
+    enemyElement: '全',
+    enemyHp: 210000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'ジャック',
+        actions: [
+          { name: '火ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '火強2連', element: '火', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '無ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ラギー',
+        actions: [
+          { name: '水強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '水ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '水ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'レオナ',
+        actions: [
+          { name: '木強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '木相手選択木ダメDOWN強単発', element: '木', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageDown', effectTarget: '相手選択', effectAttribute: '木', effectValue: 9.6, duration: 1 },
+          { name: '木相手選択木ダメDOWN強2連', element: '木', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageDown', effectTarget: '相手選択', effectAttribute: '木', effectValue: 9.6, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/05-2全ATK',
     title: '2026/05-2全ATK',
     kind: 'ATTACK',
