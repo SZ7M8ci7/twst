@@ -27,6 +27,8 @@ export interface SearchInput {
   preset: ExamPresetDefinition;
   roster: RosterCard[];
   supports: RosterCard[];
+  /** Support exclusions persist across normal/unified preset changes. */
+  excludedSupportNames?: string[];
   budget: number;
   itemsPerLimitBreak: number;
   target: number;

@@ -827,6 +827,8 @@
     "card": "Card",
     "addOwn": "Add owned",
     "addSupport": "Add support",
+    "supportCandidates": "Support candidates",
+    "supportRequired": "Enable at least one support candidate.",
     "role": "Role",
     "level": "Level",
     "totsu": "Current limit breaks",

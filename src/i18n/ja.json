@@ -827,6 +827,8 @@
     "card": "カード",
     "addOwn": "自前に追加",
     "addSupport": "サポートに追加",
+    "supportCandidates": "サポート候補",
+    "supportRequired": "サポート候補を1枚以上ONにしてください。",
     "role": "枠",
     "level": "レベル",
     "totsu": "現在凸数",

@@ -3,7 +3,7 @@
     <div class="support-toolbar">
       <v-btn
         color="primary"
-        class="support-toolbar-button"
+        class="support-toolbar-button" :disabled="disabled"
         size="small"
         @click="selectAll"
       >
@@ -11,7 +11,7 @@
       </v-btn>
       <v-btn
         color="error"
-        class="support-toolbar-button"
+        class="support-toolbar-button" :disabled="disabled"
         size="small"
         @click="deselectAll"
       >
@@ -19,7 +19,7 @@
       </v-btn>
       <v-btn
         color="success"
-        class="support-toolbar-button"
+        class="support-toolbar-button" :disabled="disabled"
         size="small"
         @click="selectHeal"
       >
@@ -27,7 +27,7 @@
       </v-btn>
       <v-btn
         color="warning"
-        class="support-toolbar-button"
+        class="support-toolbar-button" :disabled="disabled"
         size="small"
         @click="deselectHeal"
       >
@@ -35,7 +35,7 @@
       </v-btn>
       <v-btn
         color="success"
-        class="support-toolbar-button"
+        class="support-toolbar-button" :disabled="disabled"
         size="small"
         @click="selectRegen"
       >
@@ -43,7 +43,7 @@
       </v-btn>
       <v-btn
         color="warning"
-        class="support-toolbar-button"
+        class="support-toolbar-button" :disabled="disabled"
         size="small"
         @click="deselectRegen"
       >
@@ -52,7 +52,7 @@
     </div>
     <div class="character-grid">
       <div
-        v-for="character in ssrCharacters"
+        v-for="character in selectableCharacters"
         :key="character.name"
         :class="[
           'character-item',
@@ -65,11 +65,18 @@
             { 'unselected-character': !isSelected(character.name) },
           ]"
           @click="toggleCharacter(character.name)"
+          @keydown.enter.prevent="toggleCharacter(character.name)"
+          @keydown.space.prevent="toggleCharacter(character.name)"
+          role="button"
+          :tabindex="disabled ? -1 : 0"
+          :disabled="disabled"
+          :aria-label="`${localizeCharacterName(character.chara, locale)} / ${localizeGameText(character.costume, locale)}`"
+          :aria-pressed="isSelected(character.name)"
           class="character-card"
           elevation="2"
         >
           <v-img
-            :src="character.imgUrl"
+            :src="imageUrls?.[character.name] || character.imgUrl"
             height="60"
             width="60"
             class="character-image"
@@ -86,6 +93,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useCharacterStore } from '@/store/characters';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
+import { localizeCharacterName, localizeGameText } from '@/utils/localizedDisplay';
 import characters_info from '@/assets/characters_info.json';
 import { findNearestVerticalScrollContainer, scrollElementToViewportCenter, scrollElementWithinContainerToCenter, waitForLayoutStability } from '@/utils/scrollPosition';
 
@@ -105,25 +114,39 @@ type FocusRequest = {
 
 const props = defineProps<{
   focusRequest: FocusRequest | null;
+  modelValue?: string[];
+  includeAllRarities?: boolean;
+  imageUrls?: Record<string, string>;
+  disabled?: boolean;
 }>();
+const emit = defineEmits<{ (event: 'update:modelValue', names: string[]): void }>();
+const { locale } = useI18n();
 
 const characterStore = useCharacterStore();
 const searchSettingsStore = useSearchSettingsStore();
 const { characters } = storeToRefs(characterStore);
-const { selectedSupportCharacters } = storeToRefs(searchSettingsStore);
+const selectedSupportCharacters = computed({
+  get: () => props.modelValue ?? searchSettingsStore.selectedSupportCharacters,
+  set: (names: string[]) => {
+    if (props.disabled) return;
+    if (props.modelValue !== undefined) emit('update:modelValue', names);
+    else searchSettingsStore.selectedSupportCharacters = names;
+  },
+});
 
 const highlightedCharacterName = ref('');
 const characterElements = new Map<string, HTMLElement>();
 let focusHighlightTimeout: number | null = null;
 const FOCUS_HIGHLIGHT_DURATION_MS = 1300;
 
-const ssrCharacters = computed(() => {
+const selectableCharacters = computed(() => {
   const characterOrder = characters.value
-    .filter(character => character.rare === 'SSR')
+    .filter(character => props.includeAllRarities || character.rare === 'SSR')
     .map(chara => ({
       name: chara.name,
       imgUrl: chara.imgUrl,
       chara: chara.chara,
+      costume: chara.costume,
       magic1heal: chara.magic1heal,
       magic2heal: chara.magic2heal,
       magic3heal: chara.magic3heal
@@ -173,16 +196,11 @@ const isSelected = (characterName: string) => {
 };
 
 const toggleCharacter = (characterName: string) => {
-  const index = selectedSupportCharacters.value.indexOf(characterName);
-  if (index === -1) {
-    selectedSupportCharacters.value.push(characterName);
-  } else {
-    selectedSupportCharacters.value.splice(index, 1);
-  }
+  updateSelection([characterName], !isSelected(characterName));
 };
 
 const selectAll = () => {
-  selectedSupportCharacters.value = ssrCharacters.value.map(char => char.name);
+  selectedSupportCharacters.value = selectableCharacters.value.map(char => char.name);
 };
 
 const deselectAll = () => {
@@ -191,28 +209,28 @@ const deselectAll = () => {
 
 const selectHeal = () => {
   updateSelection(
-    ssrCharacters.value.filter(character => hasInstantHeal(character)).map(character => character.name),
+    selectableCharacters.value.filter(character => hasInstantHeal(character)).map(character => character.name),
     true
   );
 };
 
 const deselectHeal = () => {
   updateSelection(
-    ssrCharacters.value.filter(character => hasInstantHeal(character)).map(character => character.name),
+    selectableCharacters.value.filter(character => hasInstantHeal(character)).map(character => character.name),
     false
   );
 };
 
 const selectRegen = () => {
   updateSelection(
-    ssrCharacters.value.filter(character => hasRegen(character)).map(character => character.name),
+    selectableCharacters.value.filter(character => hasRegen(character)).map(character => character.name),
     true
   );
 };
 
 const deselectRegen = () => {
   updateSelection(
-    ssrCharacters.value.filter(character => hasRegen(character)).map(character => character.name),
+    selectableCharacters.value.filter(character => hasRegen(character)).map(character => character.name),
     false
   );
 };
@@ -260,7 +278,7 @@ watch(
 );
 
 onMounted(() => {
-  selectAll();
+  if (props.modelValue === undefined) selectAll();
 });
 
 onBeforeUnmount(() => {

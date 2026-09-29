@@ -827,6 +827,8 @@
     "card": "卡片",
     "addOwn": "添加自有卡片",
     "addSupport": "添加支援",
+    "supportCandidates": "支援候选卡",
+    "supportRequired": "请至少启用一张支援候选卡。",
     "role": "位置",
     "level": "等级",
     "totsu": "当前突破数",

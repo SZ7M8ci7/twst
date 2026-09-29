@@ -85,8 +85,19 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
   const source = read('src/views/examSearch.vue').split('<script setup lang="ts">')[1].split('</script>')[0]
     .replaceAll('import.meta.url', JSON.stringify('file:///examSearch.vue'));
   const viewContext = { ...context, exports: {}, require: localRequire };
-  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave };'), viewContext));
-  return { view: viewContext.view, load, workers, timers, persistence,
+  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave, setSupportCandidates, selectPreset, applySharedConditions };'), viewContext));
+  function supportPicker(modelValue, includeAllRarities = true) {
+    const props = vue.reactive({ modelValue, includeAllRarities, focusRequest: null, disabled: false });
+    const mounted = [];
+    const pickerContext = { ...context, exports: {}, defineProps: () => props,
+      defineEmits: () => (event, names) => { assert.equal(event, 'update:modelValue'); props.modelValue = names; },
+      require: id => id === 'vue' ? { ...vue, onMounted: callback => mounted.push(callback), onBeforeUnmount() {} } : localRequire(id) };
+    const script = read('src/components/SupportBody.vue').split('<script setup lang="ts">')[1].split('</script>')[0];
+    scope.run(() => vm.runInNewContext(compile(script + '\nglobalThis.picker = { selectableCharacters, selectedSupportCharacters, searchSettingsStore, toggleCharacter, selectAll, deselectAll, selectHeal, deselectHeal };'), pickerContext));
+    mounted.forEach(callback => callback());
+    return { ...pickerContext.picker, props };
+  }
+  return { view: viewContext.view, load, workers, timers, persistence, supportPicker,
     flushTimers() { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(callback => callback()); } };
 }
 
@@ -221,4 +232,105 @@ test('changing an excluded card leaves a valid continuous search running', async
   flushTimers();
   assert.equal(worker.messages.at(-1).method, 'resume');
   assert.ok(worker.messages.at(-1).input.roster.every(card => card.name !== names[5]));
+});
+
+test('support selection persists through preset changes, shared conditions and reload', t => {
+  const { view, persistence } = runtime(t, names.slice(0, 5).map(name => handCard(name)), searchInput(true));
+  const selected = [names[4], names[6]];
+  view.setSupportCandidates(selected);
+  assert.deepEqual(clone(view.input.value.supports.map(card => card.name)).sort(), [...selected].sort());
+  const saved = persistence.loadExamSearch();
+  assert.ok(saved.excludedSupportNames.includes(names[0]));
+  view.selectPreset({ ...searchInput(false).preset, id: 'normal' });
+  assert.equal(view.input.value.supports.length, 0);
+  view.selectPreset({ ...searchInput(true).preset, id: 'unified-again' });
+  assert.deepEqual(clone(view.input.value.supports.map(card => card.name)).sort(), [...selected].sort());
+  view.applySharedConditions({ preset: { ...searchInput(true).preset, id: '第16回統一火DF', title: '第16回統一火DF' }, challengeLocks: {}, maxRemoved: 1 });
+  assert.deepEqual(clone(view.input.value.supports.map(card => card.name)).sort(), [...selected].sort());
+  const restored = runtime(t, names.slice(0, 5).map(name => handCard(name)), saved).view;
+  assert.deepEqual(clone(restored.input.value.supports), clone(saved.supports));
+});
+
+test('all supports OFF survives reload and preset changes and blocks search with a support-specific message', t => {
+  const { view, workers, persistence } = runtime(t, names.slice(0, 5).map(name => handCard(name)), searchInput(true));
+  view.setSupportCandidates([]);
+  assert.equal(view.rosterReady.value, false);
+  view.start(1000);
+  assert.equal(workers.length, 0);
+  assert.equal(view.error.value, 'examSearch.supportRequired:');
+  const saved = persistence.loadExamSearch();
+  const restored = runtime(t, names.slice(0, 5).map(name => handCard(name)), saved).view;
+  assert.equal(restored.input.value.supports.length, 0);
+  restored.applySharedConditions({ preset: { ...searchInput(true).preset, id: 'different' }, challengeLocks: {}, maxRemoved: 1 });
+  assert.equal(restored.input.value.supports.length, 0);
+  restored.selectPreset({ ...searchInput(false).preset, id: 'normal' });
+  restored.selectPreset({ ...searchInput(true).preset, id: 'unified' });
+  assert.equal(restored.input.value.supports.length, 0);
+});
+
+test('OFF support cards cannot enter generated teams as supports but remain available as owned cards', t => {
+  const { view, load, workers } = runtime(t, names.slice(0, 5).map(name => handCard(name)), searchInput(true));
+  view.setSupportCandidates([names[6]]);
+  view.input.value.requiredCards = [names[0]];
+  const input = clone(view.input.value);
+  const { buildTasks, generateCandidates } = load('src/domain/examSearch/candidateGenerator.ts');
+  const tasks = buildTasks(input, catalog);
+  const candidates = generateCandidates(input, tasks[0], catalog);
+  assert.ok(candidates.length);
+  for (const candidate of candidates) {
+    assert.deepEqual(clone(candidate.cards.filter(card => card.support).map(card => card.name)), [names[6]]);
+    assert.ok(candidate.cards.some(card => !card.support && card.name === names[0]));
+  }
+  view.start(1000);
+  assert.deepEqual(clone(workers[0].messages[0].input.supports.map(card => card.name)), [names[6]]);
+  view.setSupportCandidates([]);
+  assert.deepEqual(clone(view.input.value.supports.map(card => card.name)), [names[6]], 'cannot edit during a search');
+});
+
+test('changing support candidates invalidates the previous session and prevents resume', t => {
+  const input = searchInput(true);
+  input.roster = names.slice(0, 5).map(name => rosterCard(name));
+  const { view } = runtime(t, names.slice(0, 5).map(name => handCard(name)), input, checkpoint());
+  assert.equal(view.canResume.value, true);
+  view.setSupportCandidates([names[5]]);
+  assert.equal(view.canResume.value, false);
+  assert.equal(view.progress.value, null);
+  assert.equal(view.evaluatedInput.value, null);
+});
+
+test('reused support picker keeps exam selections isolated and preserves all-OFF on mount', t => {
+  const { supportPicker } = runtime(t, []);
+  const picker = supportPicker([]);
+  const legacyNames = clone(picker.searchSettingsStore.selectedSupportCharacters);
+  assert.equal(picker.selectableCharacters.value.length, cards.length);
+  assert.deepEqual(clone(picker.selectedSupportCharacters.value), []);
+  picker.toggleCharacter(names[0]);
+  assert.deepEqual(clone(picker.props.modelValue), [names[0]]);
+  picker.toggleCharacter(names[0]);
+  assert.deepEqual(clone(picker.props.modelValue), []);
+  picker.selectAll();
+  assert.equal(picker.props.modelValue.length, cards.length);
+  picker.deselectAll();
+  picker.selectHeal();
+  assert.ok(picker.props.modelValue.length > 0);
+  assert.ok(picker.props.modelValue.every(name => [catalog[name].magic1heal, catalog[name].magic2heal, catalog[name].magic3heal]
+    .some(value => value.startsWith('回復(') || value.startsWith('回復&継続回復('))));
+  picker.deselectHeal();
+  assert.deepEqual(clone(picker.props.modelValue), []);
+  picker.props.disabled = true;
+  picker.selectAll();
+  picker.toggleCharacter(names[0]);
+  assert.deepEqual(clone(picker.props.modelValue), []);
+  assert.deepEqual(clone(picker.searchSettingsStore.selectedSupportCharacters), legacyNames);
+});
+
+test('existing support picker usage still defaults to all SSR cards in its original store', t => {
+  const { supportPicker } = runtime(t, []);
+  const picker = supportPicker(undefined, false);
+  assert.equal(picker.selectableCharacters.value.length, cards.filter(card => card.rare === 'SSR').length);
+  assert.equal(picker.searchSettingsStore.selectedSupportCharacters.length, picker.selectableCharacters.value.length);
+  picker.deselectAll();
+  assert.deepEqual(clone(picker.searchSettingsStore.selectedSupportCharacters), []);
+  picker.toggleCharacter(names[0]);
+  assert.deepEqual(clone(picker.searchSettingsStore.selectedSupportCharacters), [names[0]]);
 });

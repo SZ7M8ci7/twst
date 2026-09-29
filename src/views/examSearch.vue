@@ -27,8 +27,25 @@
           {{ t('examSearch.chooseCharacters') }}<span v-if="characterFilter.length" class="filter-count">{{ characterFilter.length }}/5</span>
         </v-btn>
       </div>
+      <div v-if="usesSupport" class="character-setting" data-testid="support-candidates-setting">
+        <div class="selection-label">{{ t('examSearch.supportCandidates') }}</div>
+        <v-btn data-testid="support-candidates-open" class="character-picker-open" variant="outlined" :disabled="busy" @click="supportPickerOpen = true">
+          {{ t('examSearch.simple.editCards') }}<span class="filter-count">{{ input.supports.length }}/{{ cards.length }}</span>
+        </v-btn>
+      </div>
     </fieldset>
-    <p v-if="!rosterReady" class="missing">{{ t('examSearch.simple.missingCards', {count:usesSupport?4:5}) }} · <router-link to="/twst/hand-collection">{{ t('examSearch.simple.manageHand') }}</router-link></p>
+    <p v-if="input.roster.length < (usesSupport ? 4 : 5)" class="missing">{{ t('examSearch.simple.missingCards', {count:usesSupport?4:5}) }} · <router-link to="/twst/hand-collection">{{ t('examSearch.simple.manageHand') }}</router-link></p>
+    <p v-if="usesSupport && !input.supports.length" class="missing">{{ t('examSearch.supportRequired') }}</p>
+    <v-dialog v-if="usesSupport" v-model="supportPickerOpen" max-width="1080" scrollable data-testid="support-candidates-dialog">
+      <v-card class="modal-card">
+        <v-card-title class="modal-title">{{ t('examSearch.supportCandidates') }}</v-card-title>
+        <v-card-text>
+          <SupportBody v-if="supportPickerOpen" :focus-request="null" :model-value="input.supports.map(card => card.name)"
+            :include-all-rarities="true" :image-urls="cardImages" :disabled="busy" @update:model-value="setSupportCandidates" />
+        </v-card-text>
+        <v-card-actions><v-spacer /><v-btn data-testid="support-candidates-close" color="primary" variant="tonal" @click="supportPickerOpen = false">{{ t('common.close') }}</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-alert v-if="error" class="my-3" type="error">{{ error }}</v-alert>
     <v-switch v-model="continuousSearch" data-testid="continuous-search" :disabled="busy" color="primary" hide-details :label="t('examSearch.continuous')" />
     <p v-if="continuousSearch" class="continuous-help">{{ t('examSearch.continuousHelp') }}</p>
@@ -104,6 +121,7 @@ import ExamSearchPresetPicker from '@/components/ExamSearchPresetPicker.vue';
 import SimCharaModal from '@/components/SimCharaModal.vue';
 import ExamBattleLog from '@/components/ExamBattleLog.vue';
 import ExamSearchResultsTable from '@/components/ExamSearchResultsTable.vue';
+import SupportBody from '@/components/SupportBody.vue';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import defaultImg from '@/assets/img/default.webp';
 import fireIcon from '@/assets/img/fire.webp';
@@ -162,6 +180,12 @@ const previewScore = ref(0);
 const previewCandidate = ref<SearchResult['candidate'] | null>(null);
 const previewIsBest = ref(false);
 const usesSupport=computed(()=>examUsesSupport(input.value.preset));
+const supportPickerOpen = ref(false);
+const excludedSupportNames = ref<string[]>(Array.isArray(input.value.excludedSupportNames)
+  ? [...input.value.excludedSupportNames]
+  : usesSupport.value && input.value.supports.length
+    ? cards.filter(card => !input.value.supports.some(support => support.name === card.name)).map(card => card.name)
+    : []);
 const rosterReady = computed(() => input.value.roster.length >= (usesSupport.value?4:5) && (!usesSupport.value||input.value.supports.length>=1));
 const cardImages = ref<Record<string, string>>({});
 const characterIconImages = ref<Record<string, string>>({});
@@ -235,6 +259,12 @@ function openVariants(result: SearchResult) {
 }
 watch(() => visibleResults.value.flatMap(r => r.candidate.cards.map(c => c.name)), names => {
   for (const name of new Set(names)) if (!cardImages.value[name]) void loadCharacterImageUrl(name).then(url => { cardImages.value[name] = url; });
+});
+watch(supportPickerOpen, open => {
+  if (!open) return;
+  for (const card of cards) if (!cardImages.value[card.name]) {
+    void loadCharacterImageUrl(card.name).then(url => { cardImages.value[card.name] = url; });
+  }
 });
 watch([() => visibleCharacterOptions.value.map(character => character.name), characterFilterOpen], ([names, open]) => {
   if (!open) return;
@@ -319,7 +349,7 @@ function applySharedConditions(conditions: SharedExamConditions) {
   input.value.preset = clone(conditions.preset);
   input.value.challengeLocks = clone(conditions.challengeLocks);
   input.value.maxRemoved = conditions.maxRemoved;
-  if (input.value.supports.length === 0 && examUsesSupport(input.value.preset)) syncSupports();
+  syncSupports();
   invalidateActiveSearch();
 }
 function applyPreset(p: typeof presets[number]) {
@@ -364,9 +394,21 @@ function maxSkillsCard(name: string, level: number, totsu: number): RosterCard {
   return { name, level, totsu, magicLevels: [10, 10, 10], buddyLevels: [10, 10, 10], allowUpgrade: true };
 }
 function syncSupports() {
-  input.value.supports=examUsesSupport(input.value.preset)?cards.map(c => maxSkillsCard(c.name,c.rare==='SSR'?120:c.rare==='SR'?90:70,4)):[];
+  const excluded = new Set(excludedSupportNames.value);
+  const previous = new Map(input.value.supports.map(card => [card.name, card]));
+  input.value.supports=examUsesSupport(input.value.preset)?cards.filter(card => !excluded.has(card.name))
+    .map(c => previous.get(c.name) ?? maxSkillsCard(c.name,c.rare==='SSR'?120:c.rare==='SR'?90:70,4)):[];
 }
-if (input.value.supports.length === 0 && examUsesSupport(input.value.preset)) syncSupports();
+function setSupportCandidates(names: string[]) {
+  if (busy.value || !usesSupport.value) return;
+  const selected = new Set(names);
+  excludedSupportNames.value = cards.filter(card => !selected.has(card.name)).map(card => card.name);
+  input.value.excludedSupportNames = [...excludedSupportNames.value];
+  syncSupports();
+  invalidateActiveSearch();
+  if (!saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');
+}
+if (input.value.excludedSupportNames !== undefined || (input.value.supports.length === 0 && usesSupport.value)) syncSupports();
 type StoredTeam={deckCharacters?: {name?:string}[]};
 const savedTeams=[loadSimulatorWindowState(),loadStoredAutoSaveDeck<StoredTeam>(),...loadStoredSavedDecks<StoredTeam>()]
   .map(team=>team?.deckCharacters?.map(c=>c?.name??'')??[]).filter(team=>team.length===5&&team.every(name=>!!catalog[name]));
@@ -418,6 +460,10 @@ function start(durationMs: number) {
   error.value = '';
   if (additionalBreaksError.value || attemptsError.value) {
     error.value = additionalBreaksError.value || attemptsError.value;
+    return;
+  }
+  if (usesSupport.value && !input.value.supports.length) {
+    error.value = t('examSearch.supportRequired');
     return;
   }
   input.value.seedTeams=[...loadSearchSeedTeams(input.value.preset.id),...savedTeams];
