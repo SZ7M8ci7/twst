@@ -3,6 +3,7 @@ import { loadDataset, type DatasetProgress } from './dataset';
 import { recognizeLevels } from './levelOcr';
 import { abortable } from './abortable';
 import { levelRegion, prepareLevelImage, readUncaps } from './metadata';
+import { readGroovyStatus } from './groovyRibbon';
 import { createWorker, PSM, type Worker as OcrWorker } from 'tesseract.js';
 
 // Resolve beside the application entry, independent of the current history route.
@@ -73,7 +74,14 @@ export class ScreenshotSession {
         const { result } = await this.request({ type: 'match', image, box, fileIndex }, [image.data.buffer]);
         const context = crop(bitmap, { ...box, height: Math.min(box.width * 1.28, bitmap.height-box.y) }, 256, Math.round(Math.min(box.width*1.28,bitmap.height-box.y)/box.width*256));
         result.thumbnail = context.toDataURL('image/webp', .9);
-        Object.assign(result, readUncaps(context.getContext('2d')!.getImageData(0,0,context.width,context.height)));
+        const pixels = context.getContext('2d')!.getImageData(0,0,context.width,context.height);
+        result.groovyStatus = readGroovyStatus(pixels, {
+          width: box.width,
+          // A manual region or incomplete card cannot prove a missing ribbon.
+          complete: !manualBox && box.height >= box.width * .97 && box.x >= 0 && box.y >= 0 &&
+            box.x + box.width <= bitmap.width && box.y + box.width * 1.28 <= bitmap.height,
+        });
+        Object.assign(result, readUncaps(pixels));
         if (result.totsuEvidence !== 'dots') {
           try {
             if (!this.ocr) {

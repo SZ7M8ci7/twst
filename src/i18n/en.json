@@ -999,6 +999,8 @@
     "selectRegion": "Select region",
     "summary": "Cards to apply: {count} / To review: {review}",
     "invalidLevel": "Check the level: enter an integer from 1 to {max}. Correct it before importing.",
+    "groovyWarning": "This card was recognized as not Groovified. Its stats may differ.",
+    "groovyUnknown": "This card was recognized as not Groovified. Its stats may differ.",
     "reviewOnly": "Show items needing review only",
     "crop": "Cropped card image",
     "card": "Card candidates",

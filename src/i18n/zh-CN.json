@@ -999,6 +999,8 @@
     "selectRegion": "选择区域",
     "summary": "将导入：{count}张 ／ 待确认：{review}处",
     "invalidLevel": "请确认等级，输入1至{max}之间的整数。修正后才能导入。",
+    "groovyWarning": "该卡牌被识别为未进行Groovy。属性可能存在差异。",
+    "groovyUnknown": "该卡牌被识别为未进行Groovy。属性可能存在差异。",
     "reviewOnly": "仅显示需要确认的项目",
     "crop": "截取的卡面",
     "card": "候选卡牌",
