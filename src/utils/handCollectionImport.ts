@@ -17,6 +17,10 @@ function importNumber(value: unknown): number {
   return NaN;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
 export function parseHandCollectionImport(text: string, catalog: ImportCard[]) {
   const updates: { cardName: string; values: Partial<HandCard> }[] = [];
   const issues: HandImportIssue[] = [];
@@ -30,18 +34,34 @@ export function parseHandCollectionImport(text: string, catalog: ImportCard[]) {
       cardName: card.name, field: 'totsu', value: String(rawTotsu), max: 4,
     });
     issues.push(...cardIssues);
-    if (!cardIssues.length) updates.push({ cardName: card.name, values: { level, totsu, isOwned: Boolean(isOwned ?? level > 0) } });
+    if (!cardIssues.length) updates.push({ cardName: card.name, values: { level, totsu, isOwned: isOwned === undefined ? level > 0 : isOwned as boolean } });
   };
-  let parsed: any;
-  try { parsed = JSON.parse(text.trim()); } catch { /* Legacy tab-separated data. */ }
-  if (parsed && typeof parsed === 'object') {
-    const entries = Array.isArray(parsed.cards) ? parsed.cards
-      : Object.entries(parsed.cards || {}).map(([cardName, value]) => ({ cardName, ...(value as object) }));
+  let parsed: unknown, json = false;
+  try { parsed = JSON.parse(text.trim()); json = true; } catch {
+    if (/^[{[]/.test(text.trim())) throw new Error('Invalid JSON hand collection');
+    // Legacy tab-separated data.
+  }
+  if (json) {
+    if (!isRecord(parsed) || (parsed.format !== undefined &&
+        !['twst-hand-collection-v1', 'twst-hand-collection-v2', 'twst-hand-collection-v3'].includes(parsed.format as string))) {
+      throw new Error('Unsupported hand collection format');
+    }
+    // The old local version1 envelope and bare card maps can also be assigned
+    // through this importer without changing their saved source data.
+    const source = parsed.cards ?? (parsed.version === 1 ? parsed.data :
+      parsed.format === undefined && parsed.version === undefined ? parsed : undefined);
+    if (!Array.isArray(source) && !isRecord(source)) throw new Error('Invalid hand collection cards');
+    const entries = Array.isArray(source) ? source
+      : Object.entries(source).map(([cardName, value]) => {
+        if (!isRecord(value)) throw new Error('Invalid hand collection card');
+        return { ...value, cardName };
+      });
     for (const entry of entries) {
-      if (!entry || typeof entry !== 'object') continue;
+      if (!isRecord(entry) || ['isOwned', 'isM3', 'isLimitBreak'].some(field =>
+        entry[field] !== undefined && typeof entry[field] !== 'boolean')) throw new Error('Invalid hand collection ownership');
       const card = catalog.find(card => (entry.cardName && card.name === entry.cardName)
         || (entry.chara && entry.costume && card.chara === entry.chara && card.costume === entry.costume));
-      if (card) stage(card, entry.level, entry.totsu, entry.isOwned);
+      if (card) stage(card, entry.level, entry.totsu === undefined ? deriveTotsuCount(entry) : entry.totsu, entry.isOwned);
     }
   } else {
     for (const line of text.split(/\r?\n/).filter(line => line.trim())) {
@@ -49,6 +69,9 @@ export function parseHandCollectionImport(text: string, catalog: ImportCard[]) {
       if (parts.length !== 5 && parts.length !== 7) continue;
       const [chara, costume, level, , hasM3, isOwned, isLimitBreak] = parts;
       const card = catalog.find(card => card.chara === chara && card.costume === costume);
+      if (card && [hasM3, ...(parts.length === 7 ? [isOwned, isLimitBreak] : [])].some(value => !/^(true|false)$/i.test(value))) {
+        throw new Error('Invalid legacy ownership value');
+      }
       if (card) stage(card, level, deriveTotsuCount({
         isM3: hasM3.toLowerCase() === 'true', isLimitBreak: isLimitBreak?.toLowerCase() === 'true',
       }), parts.length === 7 ? isOwned.toLowerCase() === 'true' : undefined);

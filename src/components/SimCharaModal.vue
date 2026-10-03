@@ -1271,6 +1271,11 @@ watch(() => useHandCollection.value, () => {
   updateFilteredCharacters();
 });
 
+// 開いた候補一覧も、共通ヘッダーで選び直した手持ちを参照する。
+watch(() => handCollectionStore.handCollection, () => {
+  if (useHandCollection.value) updateFilteredCharacters();
+}, { deep: true });
+
 const closeModal = () => {
   emit('close');
 };

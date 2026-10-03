@@ -331,7 +331,8 @@ onMounted(async () => {
     selectedBuddyBonusEffects.value = [...tempSelectedBuddyBonusEffects.value];
     costumeSearch.value = tempCostumeSearch.value;
   }
-  if (!props.isolated) isFirst.value = false;
+  // 閉じただけでは初期条件を消費しない。埋め込みは即時反映する。
+  if (!props.isolated && props.embedded) isFirst.value = false;
 
   // display-block幅の更新
   updateDisplayBlockWidth();
@@ -380,6 +381,7 @@ function applyFilter() {
     return;
   }
   // 選択された項目を一時保存
+  isFirst.value = false;
   tempSelectedCharacters.value = [...selectedCharacters.value];
   tempSelectedRare.value = [...selectedRare.value];
   tempSelectedType.value = [...selectedType.value];
@@ -680,6 +682,32 @@ function areAllCharactersSelected(): boolean {
 </script>
 
 <style scoped>
+
+/* 手持ち画面のダイアログ内だけに適用するサイズ調整 */
+.modal-background.hand-filter-content {
+  width: 100%;
+  min-width: 0;
+  max-height: calc(100dvh - 32px);
+  padding: 16px;
+}
+.hand-filter-content .card-attribute-groups {
+  grid-template-columns: .75fr 1.15fr 1.1fr;
+}
+.hand-filter-content .attribute-group--type .attribute-items {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.hand-filter-content .costume-search-container { max-width: none; }
+.hand-filter-content .character-list { min-width: 0; }
+.hand-filter-content .button-container .button {
+  width: auto;
+  flex: 0 1 150px;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .modal-background.hand-filter-content { padding: 12px; }
+  .hand-filter-content .card-attribute-groups { grid-template-columns: 1fr; }
+  .hand-filter-content .attribute-group--type .attribute-items { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .feature-select-all-container {
   display: flex;

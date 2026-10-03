@@ -192,3 +192,21 @@ test('present and unknown-only cards register directly', t => {
     view.undo();
   }
 });
+
+test('saving a new set and restoring a backup clear earlier screenshot undo context', async t => {
+  const { view } = runtime(t);
+  await view.store.saveNewSet('最初のセット');
+  view.rows.value = [detection()]; view.apply();
+  assert.equal(view.applied.value, true);
+  await view.store.saveNewSet('取り込み後のセット');
+  assert.equal(view.applied.value, false);
+  assert.equal(view.rows.value.length, 0);
+  const saved = JSON.stringify(view.store.handCollection);
+  view.undo(); assert.equal(JSON.stringify(view.store.handCollection), saved);
+  view.rows.value = [detection(first, 'normal', { level: 50 })]; view.apply();
+  const backup = JSON.parse(view.store.createSetsBackup());
+  await view.store.restoreSetsBackup({ version: 2, activeSetId: backup.activeSetId, sets: backup.sets }, true);
+  assert.equal(view.applied.value, false); assert.equal(view.rows.value.length, 0);
+  const restored = JSON.stringify(view.store.handCollection);
+  view.undo(); assert.equal(JSON.stringify(view.store.handCollection), restored);
+});

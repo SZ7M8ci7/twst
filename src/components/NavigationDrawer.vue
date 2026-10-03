@@ -8,7 +8,14 @@
       <span>/</span>
       <button type="button" lang="zh-CN" aria-label="中文（简体）" :aria-pressed="locale === 'zh-CN'" :class="{ 'text-muted': locale !== 'zh-CN' }" @click="changeLanguage('zh-CN')">中文</button>
     </div>
+    <select id="global-hand-slot-select" class="global-hand-slot-select" :aria-label="t('handCollection.switchSet')" :value="activeSlot" :disabled="switchingSlot || handCollectionStore.saving || handCollectionStore.loadFailed || handCollectionStore.hasConflict" @change="changeHandSlot">
+      <option v-for="slot in slots" :key="slot.slot" :value="slot.slot">{{ t('handCollection.slotLabel', { number: slot.slot }) }} — {{ slot.savedSet?.name || t('handCollection.emptySlot') }}</option>
+    </select>
   </div>
+  <v-alert v-if="handCollectionStore.loadFailed || handCollectionStore.hasConflict" type="warning" variant="tonal" density="compact" class="mx-2 mb-2">
+    {{ handCollectionStore.hasConflict ? t('handCollection.saveConflict') : t('handCollection.loadError') }}
+  </v-alert>
+  <v-snackbar v-model="slotError" color="error">{{ slotErrorMessage }}</v-snackbar>
   <v-navigation-drawer
     v-model="drawer"
     absolute
@@ -101,10 +108,40 @@
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { storeToRefs } from 'pinia';
+import { useHandCollectionStore } from '@/store/handCollection';
 import { useI18n } from 'vue-i18n';
 import { useLocale } from 'vuetify';
 import { normalizeLocale, saveLocale, type SupportedLocale } from '@/i18n/locales';
 const drawer = ref(false);
+const handCollectionStore = useHandCollectionStore();
+const { activeSlot, slots, hasUnsavedChanges } = storeToRefs(handCollectionStore);
+const switchingSlot = ref(false);
+const slotError = ref(false);
+const slotErrorMessage = ref('');
+
+async function changeHandSlot(event: Event) {
+  const select = event.target as HTMLSelectElement;
+  const slot = Number(select.value);
+  if (slot === activeSlot.value || switchingSlot.value || handCollectionStore.saving || handCollectionStore.loadFailed || handCollectionStore.hasConflict) {
+    select.value = String(activeSlot.value);
+    return;
+  }
+  if ((hasUnsavedChanges.value || handCollectionStore.hasUnsavedNameChanges) && !window.confirm(t('handCollection.switchSetConfirm'))) {
+    select.value = String(activeSlot.value);
+    return;
+  }
+  switchingSlot.value = true;
+  try {
+    await handCollectionStore.selectSlot(slot, true);
+  } catch {
+    slotErrorMessage.value = handCollectionStore.hasConflict ? t('handCollection.saveConflict') : handCollectionStore.loadFailed ? t('handCollection.loadError') : t('handCollection.saveError');
+    slotError.value = true;
+  } finally {
+    switchingSlot.value = false;
+    select.value = String(activeSlot.value);
+  }
+}
 
 const { locale, t } = useI18n();
 const { current: vuetifyLocale } = useLocale();
@@ -204,7 +241,8 @@ a {
 }
 
 .language-links {
-  margin-left: 16px;
+  margin-left: 4px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
 }
@@ -331,6 +369,29 @@ a.router-link-active .drawer-root-hand {
 .toolbar-items {
   display: flex;
   align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding-right: 8px;
+}
+.global-hand-slot-select {
+  appearance: auto;
+  margin-left: auto;
+  min-width: 0;
+  width: min(320px, 40vw);
+  height: 36px;
+  padding: 4px 24px 4px 8px;
+  border: 1px solid #cbd5e3;
+  border-radius: 6px;
+  background: white;
+  font-size: .85rem;
+  text-overflow: ellipsis;
+}
+.global-hand-slot-select:focus-visible { outline: 2px solid #1565c0; outline-offset: 2px; }
+.global-hand-slot-select:disabled { opacity: .6; }
+@media (max-width: 600px) {
+  .language-links button { margin-inline: 2px; }
+  .global-hand-slot-select { flex: 1; width: auto; max-width: 210px; font-size: .75rem; }
 }
 
 </style>

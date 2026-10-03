@@ -1,5 +1,5 @@
 <template>
-  <v-btn prepend-icon="mdi-image-plus" variant="outlined" @click="open = true">{{ t('screenshot.button') }}</v-btn>
+  <v-btn prepend-icon="mdi-image-plus" variant="outlined" :disabled="store.saving" @click="open = true">{{ t('screenshot.button') }}</v-btn>
   <v-dialog v-model="open" max-width="1320" :persistent="busy" class="screenshot-modal">
     <v-card class="import-dialog">
       <header class="modal-heading">
@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import cards from '@/assets/chara.json';
 import SimCharaModal from '@/components/SimCharaModal.vue';
@@ -230,7 +230,21 @@ function changeTotsu(row: Detection, event: Event) {
 }
 let session: ScreenshotSession | undefined;
 let operationId = 0;
+let resultContextRevision = store.collectionContextRevision;
 let undoEntries: { key: string; before?: HandCard; after: HandCard }[] = [];
+// Recognition and its undo belong to the editor context where they started.
+// A set switch or restore must never apply an earlier set's undo to another set.
+watch(() => store.collectionContextRevision, () => {
+  cancel(); clearSources(); clearExport();
+  rows.value = []; files.value = []; undoEntries = [];
+  fileOrder.value = []; exportOrder.value = [];
+  applied.value = false; open.value = false; exportOpen.value = false;
+  activeId.value = ''; activeFile.value = 0;
+  sourceOpen.value = false; pickerOpen.value = false; drawMode.value = false;
+  drag = undefined; dragOver.value = false;
+  busy.value = false; status.value = ''; error.value = ''; progress.value = 0;
+  resultContextRevision = store.collectionContextRevision;
+}, { flush: 'sync' });
 const primaryRows = computed(()=>primaryDetections(rows.value));
 const groovyStatusByCard = computed(() => groovyStatesByCard(combinedDetections(rows.value)));
 const invalidLevelCardKeys = computed(() => new Set(primaryRows.value.filter(row => {
@@ -279,27 +293,34 @@ async function selectFiles(selection: File[]) {
 async function recognize(manual?: { box: Box; fileIndex: number }) {
   if (exporting.value) return;
   const operation = ++operationId;
+  const contextRevision = store.collectionContextRevision;
+  const operationFiles = [...files.value];
+  let localSession: ScreenshotSession | undefined;
+  const isCurrent = () => operation === operationId && contextRevision === store.collectionContextRevision;
+  const assertCurrent = () => { if (!isCurrent()) throw new DOMException('Cancelled', 'AbortError'); };
   session?.stop(); busy.value = true; progress.value = 0; progressKnown.value=false; error.value = ''; status.value = t('screenshot.loading');
   if (!manual) rows.value = [];
   try {
     const targets: number[] = [];
-    for (const fileIndex of manual ? [manual.fileIndex] : files.value.map((_, i) => i)) {
-      try { await validateScreenshot(files.value[fileIndex]); targets.push(fileIndex); }
-      catch { error.value = t('screenshot.fileError', { name: files.value[fileIndex].name }); }
-      if (operation !== operationId) throw new DOMException('Cancelled', 'AbortError');
+    for (const fileIndex of manual ? [manual.fileIndex] : operationFiles.map((_, i) => i)) {
+      try { await validateScreenshot(operationFiles[fileIndex]); assertCurrent(); targets.push(fileIndex); }
+      catch { assertCurrent(); error.value = t('screenshot.fileError', { name: operationFiles[fileIndex].name }); }
+      assertCurrent();
     }
     if (!targets.length) { status.value=''; return; }
     const { ScreenshotSession } = await import('@/domain/handScreenshot/client');
-    if (operation !== operationId) throw new DOMException('Cancelled', 'AbortError');
-    session = new ScreenshotSession();
-    await session.load(value => { progressKnown.value=!!value.totalBytes; progress.value=value.totalBytes ? value.loadedBytes/value.totalBytes*100 : 0; status.value=value.totalBytes ? t('screenshot.preparing', { loaded:(value.loadedBytes/1_000_000).toFixed(1), total:(value.totalBytes/1_000_000).toFixed(1) }) : t('screenshot.loading'); });
+    assertCurrent();
+    localSession = new ScreenshotSession(); session = localSession;
+    await localSession.load(value => { if (!isCurrent()) return; progressKnown.value=!!value.totalBytes; progress.value=value.totalBytes ? value.loadedBytes/value.totalBytes*100 : 0; status.value=value.totalBytes ? t('screenshot.preparing', { loaded:(value.loadedBytes/1_000_000).toFixed(1), total:(value.totalBytes/1_000_000).toFixed(1) }) : t('screenshot.loading'); });
+    assertCurrent();
     const staged: Detection[] = [];
     progressKnown.value=true;
     for (const [imageIndex,fileIndex] of targets.entries()) {
       progress.value=imageIndex/targets.length*100;
-      status.value = t('screenshot.processing', { name: files.value[fileIndex].name, current:imageIndex+1, total:targets.length });
+      status.value = t('screenshot.processing', { name: operationFiles[fileIndex].name, current:imageIndex+1, total:targets.length });
       try {
-        const detected = await session.analyze(files.value[fileIndex], fileIndex, (done, total) => { progress.value = (imageIndex+(total>0?Math.min(1,Math.max(0,done/total)):0))/targets.length*100; }, manual?.box);
+        const detected = await localSession.analyze(operationFiles[fileIndex], fileIndex, (done, total) => { if (!isCurrent()) return; progress.value = (imageIndex+(total>0?Math.min(1,Math.max(0,done/total)):0))/targets.length*100; }, manual?.box);
+        assertCurrent();
         for (const row of detected) {
           row.id = `${Date.now()}-${fileIndex}-${row.id}`;
           if (!catalog.has(row.selected)) row.selected = '';
@@ -307,22 +328,27 @@ async function recognize(manual?: { box: Box; fileIndex: number }) {
         }
         staged.push(...detected);
       } catch (cause) {
-        if (session.abort.signal.aborted) throw cause;
-        error.value = t('screenshot.fileError', { name: files.value[fileIndex].name });
+        assertCurrent();
+        if (localSession.abort.signal.aborted) throw cause;
+        error.value = t('screenshot.fileError', { name: operationFiles[fileIndex].name });
       }
       progress.value=(imageIndex+1)/targets.length*100;
     }
-    session.abort.signal.throwIfAborted();
+    assertCurrent(); localSession.abort.signal.throwIfAborted();
     rows.value = manual ? [...rows.value, ...staged] : staged;
+    resultContextRevision = contextRevision;
     await focusRow(manual ? staged.find(row=>row.displayMode!=='uncaps') : primaryRows.value[0]);
+    assertCurrent();
     status.value = staged.length ? t('screenshot.done') : t('screenshot.noCards');
   } catch (cause) {
-    if (operation !== operationId || (cause instanceof Error && cause.name === 'AbortError')) status.value = t('screenshot.cancelled');
+    if (!isCurrent()) return;
+    if (cause instanceof Error && cause.name === 'AbortError') status.value = t('screenshot.cancelled');
     else error.value = t('screenshot.loadError');
-  } finally { busy.value = false; session?.stop(); session = undefined; }
+  } finally { localSession?.stop(); if (isCurrent()) { busy.value = false; if (session === localSession) session = undefined; } }
 }
-function cancel() { operationId++; session?.stop(); }
+function cancel() { operationId++; session?.stop(); session = undefined; if (busy.value) status.value = t('screenshot.cancelled'); busy.value = false; }
 function apply() {
+  if (resultContextRevision !== store.collectionContextRevision) return;
   if (busy.value || invalidLevelCardKeys.value.size || store.loadFailed || store.hasConflict || store.saving) return;
   if (applied.value || !merged.value.length) return;
   undoEntries = [];
@@ -339,6 +365,8 @@ function apply() {
   applied.value = true;
 }
 function undo() {
+  if (resultContextRevision !== store.collectionContextRevision) return;
+  if (store.saving) return;
   let skipped = false;
   store.batchUpdates(() => {
     for (const entry of undoEntries) {

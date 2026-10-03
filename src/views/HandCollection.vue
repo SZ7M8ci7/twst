@@ -1,72 +1,91 @@
 <template>
-  <v-container class="pa-2">
+  <v-container class="hand-workspace pa-2">
     <v-row class="ma-0">
       <v-col cols="12" class="pa-2">
         <!-- ヘッダー -->
         <div class="header-section">
           <div class="title-container">
-            <h2 class="page-title">{{ $t('handCollection.title') }}</h2>
-            <v-chip 
-              v-if="hasUnsavedChanges" 
-              color="warning" 
-              size="small"
-              class="unsaved-indicator"
-            >
-              {{ $t('handCollection.unsaved') }}
-            </v-chip>
+            <div><h2 class="page-title">{{ $t('handCollection.title') }}</h2><p class="page-description">{{ t('handCollection.workspaceHelp') }}</p></div>
           </div>
 
-          <!-- 保存・元に戻すボタン -->
-          <div class="header-actions">
-            <v-btn 
-              @click="saveHandCollection" 
-              color="primary" 
-              size="small"
-              :loading="saving"
-              :disabled="handCollectionStore.loadFailed || handCollectionStore.hasConflict"
-              prepend-icon="mdi-content-save"
-            >
-              {{ $t('handCollection.save') }}
-            </v-btn>
-            <v-btn 
-              @click="resetUnsavedChanges" 
-              color="grey" 
-              size="small"
-              :disabled="!hasUnsavedChanges || saving"
-              prepend-icon="mdi-undo"
-            >
-              {{ $t('handCollection.undo') }}
-            </v-btn>
+        <section class="saved-sets mb-3" :aria-label="t('handCollection.setName')">
+          <div class="saved-sets-actions">
+            <v-text-field id="inline-set-name" v-model="inlineSetName" :label="t('handCollection.setName')" :disabled="saving || saveDialog || deleteDialog || handCollectionStore.loadFailed || handCollectionStore.hasConflict" variant="outlined" density="compact" hide-details @keydown.enter.prevent="saveHandCollection" />
+            <v-btn size="small" color="primary" :disabled="saving || !inlineSetName.trim() || handCollectionStore.loadFailed || handCollectionStore.hasConflict" @click="saveHandCollection">{{ t('handCollection.save') }}</v-btn>
+            <v-btn size="small" color="error" variant="outlined" :disabled="saving || !activeSet || handCollectionStore.loadFailed || handCollectionStore.hasConflict" @click="openDeleteDialog">{{ t('handCollection.deleteSet') }}</v-btn>
           </div>
+        </section>
+
+        <v-dialog v-model="saveDialog" max-width="420" :persistent="saveSubmitting || saving">
+          <v-card>
+            <v-card-title>{{ t('handCollection.save') }}</v-card-title>
+            <v-card-text>
+              <p>{{ t('handCollection.saveSlotConfirm', { slot: t('handCollection.slotLabel', { number: saveContextSlot }), name: saveNewName.trim() }) }}</p>
+              <v-alert v-if="!saving && !saveContextValid" type="warning" variant="tonal" class="mt-2">{{ t('handCollection.confirmationChanged') }}</v-alert>
+            </v-card-text>
+            <v-card-actions>
+              <v-btn :disabled="saveSubmitting || saving" @click="saveDialog = false">{{ t('common.cancel') }}</v-btn>
+              <v-btn color="primary" :loading="saveSubmitting || saving" :disabled="saveSubmitting || saving || !saveContextValid || !saveNewName.trim()" @click="submitSave">{{ t('common.save') }}</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+
+        <v-dialog v-model="deleteDialog" max-width="420" :persistent="deleteSubmitting || saving">
+          <v-card>
+            <v-card-title>{{ t('handCollection.deleteSet') }}</v-card-title>
+            <v-card-text>
+              <p>{{ t('handCollection.deleteSlotConfirm', { slot: t('handCollection.slotLabel', { number: deleteContextSlot }), name: deleteContextName }) }}</p>
+              <v-alert v-if="!saving && !deleteContextValid" type="warning" variant="tonal" class="mt-2">{{ t('handCollection.confirmationChanged') }}</v-alert>
+              <p v-if="hasUnsavedChanges" class="mt-2">{{ t('handCollection.deleteDirtyWarning') }}</p>
+            </v-card-text>
+            <v-card-actions>
+              <v-btn :disabled="deleteSubmitting || saving" @click="deleteDialog = false">{{ t('common.cancel') }}</v-btn>
+              <v-btn color="error" :loading="deleteSubmitting || saving" :disabled="deleteSubmitting || saving || !deleteContextValid" @click="submitDelete">{{ t('handCollection.deleteSet') }}</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
         </div>
 
         <v-alert v-if="storageWarning" type="warning" variant="tonal" class="mb-3">
           {{ storageWarning }}
           <v-btn
             v-if="handCollectionStore.loadFailed || handCollectionStore.hasConflict"
-            class="mt-2" size="small" :disabled="saving" @click="reloadSavedCollection"
+            class="mt-2" size="small" :disabled="saving || (saving)" @click="reloadSavedCollection"
           >{{ $t('handCollection.reloadSaved') }}</v-btn>
         </v-alert>
 
-        <!-- 一括操作コントロール -->
-        <div class="mb-3"><HandScreenshotImport /></div>
-        <div class="controls-main-container">
-          <div class="controls-container">
-            <h3 class="controls-title">{{ $t('handCollection.bulkSettings') }}</h3>
-            <p class="controls-description">{{ $t('handCollection.bulkScope') }}</p>
+        <section class="transfer-strip" :aria-label="t('handCollection.transferTitle')">
+          <div><h3>{{ t('handCollection.transferTitle') }}</h3><p>{{ t('handCollection.transferHelp') }}</p></div>
+          <div class="transfer-actions"><HandScreenshotImport /><v-btn :disabled="saving" variant="text" prepend-icon="mdi-code-json" @click="openDataModal">{{ t('handCollection.jsonManagement') }}</v-btn></div>
+        </section>
+
+        <section class="card-workbench" :aria-label="t('handCollection.cardList')">
+          <header class="workbench-heading"><h3>{{ t('handCollection.cardList') }}</h3><span class="display-count">{{ t('handCollection.displayCount', { count: filteredCharacters.length }) }}</span></header>
+          <div class="list-search-row">
+            <v-text-field v-model="cardSearch" :disabled="saving" :label="t('handCollection.searchCards')" prepend-inner-icon="mdi-magnify" variant="outlined" density="compact" clearable hide-details />
+            <v-btn :disabled="saving" variant="outlined" prepend-icon="mdi-filter-outline" @click="showFilterModal = true">{{ t('handCollection.filter') }}</v-btn>
+          </div>
+          <div class="list-options-row">
+            <v-checkbox v-model="ownedOnly" :disabled="saving" :label="t('handCollection.ownedOnlyShort')" color="primary" density="compact" hide-details />
+            <div class="list-sort"><label for="card-sort">{{ t('handCollection.sortCards') }}</label><select id="card-sort" v-model="sortKey" :disabled="saving"><option v-for="option in sortOptions" :key="option.value" :value="option.value">{{ option.label }}</option></select><v-btn size="small" variant="text" :disabled="saving || sortKey === 'default'" :icon="sortOrder === 'asc' ? 'mdi-sort-ascending' : 'mdi-sort-descending'" :aria-label="t(sortOrder === 'asc' ? 'handCollection.sortAscending' : 'handCollection.sortDescending')" @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'" /></div>
+          </div>
+          <div v-if="hasActiveFilters" class="active-filter-summary"><span>{{ activeFilterSummary }}</span><v-btn :disabled="saving" size="small" variant="text" @click="resetFilters">{{ t('handCollection.resetFilters') }}</v-btn></div>
+          <details class="bulk-disclosure">
+            <summary><span>{{ t('handCollection.bulkSettings') }}</span><small>{{ t('handCollection.bulkTargetCount', { count: filteredCharacters.length }) }}</small><v-icon size="20" aria-hidden="true">mdi-chevron-down</v-icon></summary>
+            <div class="bulk-content">
             <div class="bulk-controls">
-              <div class="control-group">
+              <div class="control-group" data-bulk-kind="ownership">
                 <div class="control-label">{{ $t('handCollection.owned') }}</div>
                 <div class="control-fields">
-                  <v-btn @click="applyBulkOwnership(true)" color="success" size="small">{{ $t('handCollection.ownershipSetting') }}</v-btn>
-                  <v-btn @click="applyBulkOwnership(false)" color="grey" variant="outlined" size="small">{{ $t('handCollection.ownershipCancel') }}</v-btn>
+                  <v-btn :disabled="saving || !filteredCharacters.length" @click="applyBulkOwnership(true)" color="success" size="small">{{ $t('handCollection.ownershipSetting') }}</v-btn>
+                  <v-btn :disabled="saving || !filteredCharacters.length" @click="applyBulkOwnership(false)" color="grey" variant="outlined" size="small">{{ $t('handCollection.ownershipCancel') }}</v-btn>
                 </div>
               </div>
               <!-- レベル設定 -->
-              <div class="control-group">
+              <div class="control-group" data-bulk-kind="level">
                 <label for="bulk-level" class="control-label">{{ $t('handCollection.level') }}</label>
                 <div class="control-fields">
-                  <v-text-field
+                  <v-text-field :disabled="saving || !filteredCharacters.length"
                     id="bulk-level"
                     type="number"
                     v-model="bulkLevel"
@@ -77,62 +96,24 @@
                     variant="outlined"
                     density="compact"
                   />
-                  <v-btn @click="applyBulkLevel" color="primary" size="small">{{ $t('handCollection.levelSetting') }}</v-btn>
+                  <v-btn :disabled="saving || !filteredCharacters.length || !validBulkLevel" @click="applyBulkLevel" color="primary" size="small">{{ t('handCollection.bulkApply') }}</v-btn>
                 </div>
               </div>
               
               <!-- 凸数設定 -->
-              <div class="control-group">
+              <div class="control-group" data-bulk-kind="totsu">
                 <label for="bulk-totsu" class="control-label">{{ $t('handCollection.totsu') }}</label>
                 <div class="control-fields">
-                  <select id="bulk-totsu" v-model.number="bulkTotsu" class="native-select">
+                  <select :disabled="saving || !filteredCharacters.length" id="bulk-totsu" v-model.number="bulkTotsu" class="native-select">
                     <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
                   </select>
-                  <v-btn @click="applyBulkTotsu" color="primary" size="small">{{ $t('handCollection.totsuSetting') }}</v-btn>
+                  <v-btn :disabled="saving || !filteredCharacters.length" @click="applyBulkTotsu" color="primary" size="small">{{ t('handCollection.bulkApply') }}</v-btn>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- フィルター・データ管理 -->
-          <div class="save-controls-container">
-            <div class="save-controls data-management-controls">
-              <v-btn 
-                @click="showFilterModal = true" 
-                variant="outlined"
-                prepend-icon="mdi-filter"
-                size="default"
-                class="data-btn"
-              >
-                {{ $t('handCollection.filter') }}
-              </v-btn>
-              
-              <v-btn
-                color="primary"
-                variant="outlined"
-                @click="openDataModal"
-                prepend-icon="mdi-database"
-                size="default"
-                class="data-btn"
-              >
-                {{ $t('handCollection.dataManagementShort') }}
-              </v-btn>
             </div>
-          </div>
-        </div>
-
-
-        <div class="collection-display-controls">
-          <v-switch
-            v-model="ownedOnly"
-            :label="$t('handCollection.ownedOnly')"
-            color="primary"
-            hide-details
-            density="compact"
-            inset
-          />
-          <span class="display-count">{{ $t('handCollection.displayCount', { count: filteredCharacters.length }) }}</span>
-        </div>
+          </details>
 
         <!-- カード一覧テーブル -->
         <div v-if="loading" class="text-center">
@@ -143,7 +124,7 @@
         <div v-else-if="filteredCharacters.length === 0" class="text-center py-4">
           <v-icon size="48" color="grey">mdi-cards-outline</v-icon>
           <div class="mt-2 text-grey">{{ $t('handCollection.noMatchingCards') }}</div>
-          <v-btn @click="resetFilters" class="mt-2" color="primary" size="small">{{ $t('handCollection.resetFilters') }}</v-btn>
+          <v-btn :disabled="saving" @click="resetFilters" class="mt-2" color="primary" size="small">{{ $t('handCollection.resetFilters') }}</v-btn>
         </div>
         
         <div v-else>
@@ -179,6 +160,7 @@
               v-for="(item, index) in filteredCharacters" 
               :key="item.name"
               class="table-row"
+              :data-card-name="item.name"
               :class="{ 'even-row': index % 2 === 0 }"
             >
               <!-- キャラクター画像 -->
@@ -192,7 +174,7 @@
               
               <!-- 所持チェックボックス -->
               <div class="data-cell checkbox-col">
-                <v-checkbox 
+                <v-checkbox :disabled="saving" 
                   :model-value="item.isOwned"
                   @update:model-value="updateOwnership(item.name, $event ?? false)"
                   hide-details
@@ -206,7 +188,7 @@
                 <select
                   class="table-select"
                   :value="item.totsu ?? 0"
-                  :disabled="!item.isOwned"
+                  :disabled="saving || (!item.isOwned)"
                   @change="handleTableTotsuChange(item.name, $event)"
                 >
                   <option v-for="option in totsuOptions" :key="option.value" :value="option.value">{{ option.title }}</option>
@@ -225,7 +207,7 @@
                   density="compact"
                   :min="0" 
                   :max="getMaxLevel(item.rare)"
-                  :disabled="!item.isOwned"
+                  :disabled="saving || (!item.isOwned)"
                 />
               </div>
               
@@ -243,32 +225,48 @@
           
         </div>
 
+        </section>
+
         <!-- データ管理モーダル -->
         <v-dialog v-model="dataModal" max-width="800px">
-          <v-card>
+          <v-card class="data-management-card">
             <v-card-title>{{ $t('handCollection.dataManagement') }}</v-card-title>
             <v-card-text>
-              <div class="data-actions mb-4">
-                <v-btn color="primary" @click="downloadBackupFile" class="action-btn" size="small">
-                  <v-icon>mdi-download</v-icon>
-                  <span class="ml-2">{{ $t('handCollection.downloadJson') }}</span>
-                </v-btn>
-                <v-btn color="primary" @click="openBackupFilePicker" class="action-btn" size="small">
-                  <v-icon>mdi-upload</v-icon>
-                  <span class="ml-2">{{ $t('handCollection.loadJson') }}</span>
-                </v-btn>
-                <v-btn color="success" @click="importFromText" class="action-btn" size="small">
-                  <v-icon>mdi-database-import</v-icon>
-                  <span class="ml-2">{{ $t('handCollection.import') }}</span>
-                </v-btn>
-                <v-btn color="grey" @click="closeDataModal" class="action-btn" size="small">
-                  <v-icon>mdi-close</v-icon>
-                  <span class="ml-2">{{ $t('handCollection.close') }}</span>
-                </v-btn>
-              </div>
+              <section class="backup-section">
+                <h3>{{ t('handCollection.backupHeading') }}</h3>
+                <p class="data-help">{{ t('handCollection.backupHelp') }}</p>
+                <div class="json-editor mt-3">
+                  <v-textarea :model-value="backupText" readonly variant="outlined" rows="5" max-rows="8" auto-grow hide-details :label="t('handCollection.backupJson')" />
+                  <v-btn :disabled="saving || !backupText" class="json-copy-button" icon="mdi-content-copy" size="small" variant="text" color="primary" :aria-label="t('handCollection.copy')" :title="t('handCollection.copy')" @click="copyToClipboard" />
+                </div>
+                <v-btn :disabled="saving || !backupText" color="primary" prepend-icon="mdi-download" size="small" class="mt-3" @click="downloadSetsBackupFile">{{ t('handCollection.downloadAllSets') }}</v-btn>
+              </section>
+              <section class="restore-section">
+                <h3>{{ t('handCollection.restoreHeading') }}</h3>
+                <p class="data-help">{{ t('handCollection.restoreHelp') }}</p>
+                <v-textarea :disabled="saving" v-model="dataText" variant="outlined" rows="4" max-rows="8" auto-grow hide-details class="mt-3" :label="t('handCollection.importJson')" />
+                <div class="data-actions mt-3">
+                  <v-btn :disabled="saving" variant="outlined" prepend-icon="mdi-upload" size="small" @click="openBackupFilePicker">{{ t('handCollection.importJsonFile') }}</v-btn>
+                  <v-btn :disabled="saving || !dataText.trim()" color="success" prepend-icon="mdi-database-import" size="small" @click="importFromText">{{ t('handCollection.prepareImport') }}</v-btn>
+                </div>
+              </section>
+              <section v-if="importRows.length" class="import-assignment mt-4" data-testid="json-assignment">
+                <h3>{{ t('handCollection.assignmentHeading') }}</h3>
+                <p class="data-help">{{ t('handCollection.assignmentHelp') }}</p>
+                <div v-for="(row, index) in importRows" :key="index" class="assignment-row">
+                  <div class="assignment-source"><strong>{{ row.name }}</strong><small>{{ t('handCollection.assignmentCardCount', { count: Object.keys(row.data).length }) }}</small></div>
+                  <select v-model="row.destination" :aria-label="t('handCollection.assignmentDestination', { name: row.name })" :disabled="saving || importSubmitting || !importContextValid" class="native-select">
+                    <option :value="null" disabled>{{ t('handCollection.chooseDestination') }}</option>
+                    <option :value="0">{{ t('handCollection.skipImport') }}</option>
+                    <option v-for="number in 5" :key="number" :value="number" :disabled="importRows.some(other => other !== row && other.destination === number)">{{ t('handCollection.slotLabel', { number }) }} — {{ handCollectionStore.slots[number - 1]?.savedSet?.name || t('handCollection.emptySlot') }}</option>
+                  </select>
+                </div>
+                <v-alert v-if="!importContextValid" type="warning" variant="tonal" class="mt-2">{{ t('handCollection.confirmationChanged') }}</v-alert>
+                <v-btn :disabled="!canConfirmImport || saving || importSubmitting" color="success" size="small" class="mt-3" @click="importConfirmDialog = true">{{ t('handCollection.confirmAssignment') }}</v-btn>
+              </section>
               <v-alert v-if="importIssues.length" type="warning" variant="tonal" role="alert" data-testid="import-review">
                 <strong>{{ t('handCollection.importReviewTitle') }}</strong>
-                <p>{{ t('handCollection.importReviewHelp', { count: importAcceptedCount }) }}</p>
+                <p>{{ t('handCollection.assignmentInvalidHelp') }}</p>
                 <ul>
                   <li v-for="(issue, index) in importIssues" :key="index">
                     {{ importCardLabel(issue.cardName) }} — {{ t('handCollection.importReviewValue', {
@@ -277,37 +275,32 @@
                   </li>
                 </ul>
               </v-alert>
-              <div class="json-editor mt-4">
-                <v-textarea
-                  v-model="dataText"
-                  outlined
-                  auto-grow
-                  rows="10"
-                  max-rows="10"
-                  :label="$t('handCollection.dataFormat')"
-                ></v-textarea>
-                <v-btn
-                  class="json-copy-button"
-                  icon="mdi-content-copy"
-                  size="small"
-                  variant="text"
-                  color="primary"
-                  :aria-label="$t('handCollection.copy')"
-                  :title="$t('handCollection.copy')"
-                  @click="copyToClipboard"
-                />
-              </div>
               <input
                 ref="backupFileInput"
                 type="file"
+                :disabled="saving"
                 accept="application/json,.json"
                 class="backup-file-input"
                 @change="handleBackupFileSelected"
               />
             </v-card-text>
+            <v-card-actions><v-spacer /><v-btn @click="closeDataModal">{{ t('handCollection.close') }}</v-btn></v-card-actions>
           </v-card>
         </v-dialog>
         
+        <v-dialog v-model="importConfirmDialog" max-width="480" :persistent="saving || importSubmitting">
+          <v-card>
+            <v-card-title>{{ t('handCollection.confirmAssignment') }}</v-card-title>
+            <v-card-text>
+              <p>{{ t('handCollection.assignmentConfirmHelp') }}</p>
+              <ul class="assignment-confirm-list"><li v-for="row in selectedImportRows" :key="row.destination ?? 0">{{ row.name }} → {{ t('handCollection.slotLabel', { number: row.destination }) }} — {{ handCollectionStore.slots[row.destination! - 1]?.savedSet?.name || t('handCollection.emptySlot') }}</li></ul>
+              <p v-if="selectedImportRows.some(row => row.destination === selectedSlot)" class="mt-3">{{ t('handCollection.assignmentCurrentWarning') }}</p>
+              <v-alert v-if="!importContextValid" type="warning" variant="tonal" class="mt-2">{{ t('handCollection.confirmationChanged') }}</v-alert>
+            </v-card-text>
+            <v-card-actions><v-btn :disabled="saving || importSubmitting" @click="importConfirmDialog = false">{{ t('common.cancel') }}</v-btn><v-btn color="success" :loading="saving || importSubmitting" :disabled="saving || importSubmitting || !canConfirmImport" @click="submitAssignedImport">{{ t('handCollection.import') }}</v-btn></v-card-actions>
+          </v-card>
+        </v-dialog>
+
         <v-snackbar
           v-model="snackbar.show"
           :color="snackbar.color"
@@ -317,8 +310,9 @@
         </v-snackbar>
         
         <!-- FilterModal -->
-        <v-dialog v-model="showFilterModal" max-width="800" persistent>
+        <v-dialog v-model="showFilterModal" class="hand-filter-dialog" width="calc(100vw - 32px)" max-width="920" persistent>
           <FilterModal
+            class="hand-filter-content"
             :embedded="false"
             @close="showFilterModal = false"
             @filter-applied="handleFilterApplied"
@@ -330,9 +324,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue';
 const HandScreenshotImport = defineAsyncComponent(() => import('@/components/HandScreenshotImport.vue'));
-import { useHandCollectionStore, type HandCard } from '@/store/handCollection';
+import { useHandCollectionStore, type HandCard, type HandCollection } from '@/store/handCollection';
 import { useCharacterStore } from '@/store/characters';
 import { useFilterdStore } from '@/store/filterd';
 import { storeToRefs } from 'pinia';
@@ -344,9 +338,11 @@ import charactersInfo from '@/assets/characters_info.json';
 import { useI18n } from 'vue-i18n';
 import { getInputMaxLevel } from '@/constants/levels';
 import { clampTotsuCount } from '@/utils/totsu';
-import { localizeCharacterName, localizeCostumeName } from '@/utils/localizedDisplay';
+import { localizeCharacterName, localizeCostumeName, localizeGameText } from '@/utils/localizedDisplay';
 import { parseHandCollectionImport, type HandImportIssue } from '@/utils/handCollectionImport';
 import { requestPersistentStorage } from '@/storage/persistentStorage';
+import { parseHandCollectionSetsBackup } from '@/storage/handCollectionStorage';
+import { defaultSelectedEffectValues, defaultSelectedBuddyBonusEffectValues } from '@/store/searchResult';
 
 // Stores and i18n
 const { t, locale } = useI18n();
@@ -359,10 +355,83 @@ const { characters } = storeToRefs(characterStore);
 const loading = ref(true);
 const showFilterModal = ref(false);
 const ownedOnly = ref(false);
+const cardSearch = ref('');
+function readDetailedFilterState() {
+  return {
+    tempSelectedRare: [...filterdStore.tempSelectedRare], tempSelectedCharacters: [...filterdStore.tempSelectedCharacters],
+    tempSelectedAttr: [...filterdStore.tempSelectedAttr], tempSelectedType: [...filterdStore.tempSelectedType],
+    tempSelectedEffects: [...filterdStore.tempSelectedEffects], tempSelectedBuddyBonusEffects: [...filterdStore.tempSelectedBuddyBonusEffects],
+    tempCostumeSearch: filterdStore.tempCostumeSearch,
+  };
+}
+const appliedFilterState = ref<ReturnType<typeof readDetailedFilterState> | null>(null);
+const hasActiveFilters = computed(() => !!cardSearch.value?.trim() || ownedOnly.value || appliedFilterState.value !== null || characters.value.some(card => !card.visible));
+const activeFilterSummary = computed(() => {
+  const labels: string[] = [];
+  if (cardSearch.value?.trim()) labels.push(cardSearch.value.trim());
+  if (ownedOnly.value) labels.push(t('handCollection.ownedOnlyShort'));
+  if (appliedFilterState.value !== null || characters.value.some(card => !card.visible)) {
+    const filters = appliedFilterState.value ?? filterdStore;
+    const differs = (values: string[], defaults: string[]) => values.length !== defaults.length || values.some(value => !defaults.includes(value));
+    const effectText = (values: string[]) => values.map(value => localizeGameText(value, locale.value)).slice(0, 2).join(', ') + (values.length > 2 ? ` +${values.length - 2}` : '') || t('handCollection.noConditionSelection');
+    if (differs(filters.tempSelectedEffects, defaultSelectedEffectValues)) labels.push(t('handCollection.effectConditions', { value: effectText(filters.tempSelectedEffects) }));
+    if (differs(filters.tempSelectedBuddyBonusEffects, defaultSelectedBuddyBonusEffectValues)) labels.push(t('handCollection.buddyConditions', { value: effectText(filters.tempSelectedBuddyBonusEffects) }));
+    const selected = [
+      ...(filters.tempSelectedRare.length < 3 ? filters.tempSelectedRare : []),
+      ...(filters.tempSelectedCharacters.length < new Set(characters.value.map(card => card.chara)).size ? filters.tempSelectedCharacters.map(value => localizeCharacterName(value, locale.value)) : []),
+      ...(filters.tempSelectedAttr.length < 4 ? filters.tempSelectedAttr.map(value => localizeGameText(value, locale.value)) : []),
+      ...(filters.tempSelectedType.length < 3 ? filters.tempSelectedType.map(value => localizeGameText(value, locale.value)) : []),
+      filters.tempCostumeSearch,
+    ].filter(Boolean);
+    labels.push(...selected.length ? selected : [t('handCollection.filter')]);
+  }
+  return t('handCollection.activeFilterLabel', { value: labels.slice(0, 3).join(' / ') + (labels.length > 3 ? ` +${labels.length - 3}` : '') });
+});
 const bulkLevel = ref(getInputMaxLevel('SSR'));
+const validBulkLevel = computed(() => String(bulkLevel.value ?? '').trim() !== '' && Number.isInteger(Number(bulkLevel.value)));
 const bulkTotsu = ref(4);
 const windowWidth = ref(window.innerWidth);
-const { saving, hasUnsavedChanges } = storeToRefs(handCollectionStore);
+const { saving, hasUnsavedChanges, selectedSlot, activeSet } = storeToRefs(handCollectionStore);
+const saveDialog = ref(false);
+const saveNewName = ref('');
+const inlineSetName = computed({
+  get: () => handCollectionStore.nameDraft ?? activeSet.value?.name ?? '',
+  set: (value: string) => { handCollectionStore.nameDraft = value; },
+});
+const saveSubmitting = ref(false);
+const deleteDialog = ref(false);
+const deleteSubmitting = ref(false);
+const saveContextSlot = ref(1);
+const saveContextRevision = ref(0);
+const deleteContextSlot = ref(1);
+const deleteContextRevision = ref(0);
+const deleteContextName = ref('');
+const saveContextValid = computed(() => selectedSlot.value === saveContextSlot.value && handCollectionStore.collectionContextRevision === saveContextRevision.value);
+const deleteContextValid = computed(() => selectedSlot.value === deleteContextSlot.value && handCollectionStore.collectionContextRevision === deleteContextRevision.value);
+
+function openDeleteDialog() {
+  if (saving.value || deleteSubmitting.value || !activeSet.value) return;
+  deleteContextSlot.value = selectedSlot.value;
+  deleteContextRevision.value = handCollectionStore.collectionContextRevision;
+  deleteContextName.value = activeSet.value.name;
+  deleteDialog.value = true;
+}
+
+async function submitDelete() {
+  if (saving.value || deleteSubmitting.value || !deleteDialog.value || !deleteContextValid.value) return;
+  deleteSubmitting.value = true;
+  try {
+    await handCollectionStore.deleteSlot(deleteContextSlot.value, { deleteConfirmed: true, discardConfirmed: true });
+    deleteDialog.value = false;
+    showSnackbar(t('handCollection.deleteSetSuccess'));
+  } catch (error) {
+    console.error('Failed to delete hand collection slot:', error);
+    showSnackbar(storageWarning.value || t('handCollection.saveError'), 'error');
+  } finally {
+    deleteSubmitting.value = false;
+  }
+}
+
 const storageWarning = computed(() => {
   if (handCollectionStore.loadFailed) return t('handCollection.loadError');
   if (handCollectionStore.hasConflict) return t('handCollection.saveConflict');
@@ -378,13 +447,34 @@ const totsuOptions = [0, 1, 2, 3, 4].map(value => ({
 // ソート機能
 const sortKey = ref<string>('default');
 const sortOrder = ref<'asc' | 'desc'>('asc');
+const sortOptions = computed(() => [
+  { value: 'default', label: t('handCollection.sortDefault') },
+  { value: 'isOwned', label: t('handCollection.owned') },
+  { value: 'totsu', label: t('handCollection.totsu') },
+  { value: 'level', label: t('handCollection.level') },
+  { value: 'rare', label: t('handCollection.rarity') },
+  { value: 'costume', label: t('handCollection.costume') },
+]);
 
 
 // データ管理用
 const dataModal = ref(false);
 const dataText = ref('');
+const backupText = ref('');
+function refreshBackupText() {
+  backupText.value = handCollectionStore.createSetsBackup(inlineSetName.value.trim() || t('handCollection.unsavedSet'));
+}
 const importIssues = ref<HandImportIssue[]>([]);
-const importAcceptedCount = ref(0);
+type ImportAssignmentRow = { name: string; data: HandCollection; destination: number | null };
+const importRows = ref<ImportAssignmentRow[]>([]);
+const importStageRevision = ref(-1);
+const importConfirmDialog = ref(false);
+const importSubmitting = ref(false);
+const importContextValid = computed(() => importStageRevision.value === handCollectionStore.collectionContextRevision);
+const selectedImportRows = computed(() => importRows.value.filter(row => row.destination !== null && row.destination > 0));
+const canConfirmImport = computed(() => importContextValid.value && importRows.value.length > 0 && importRows.value.every(row => row.destination !== null) && selectedImportRows.value.length > 0 && new Set(selectedImportRows.value.map(row => row.destination)).size === selectedImportRows.value.length && !handCollectionStore.loadFailed && !handCollectionStore.hasConflict);
+watch(dataText, () => { importRows.value = []; importConfirmDialog.value = false; importIssues.value = []; }, { flush: 'sync' });
+watch(() => handCollectionStore.collectionContextRevision, () => { importRows.value = []; importConfirmDialog.value = false; });
 function importCardLabel(name: string) {
   const card = characters.value.find(card => card.name === name);
   return card ? `${localizeCharacterName(card.chara, locale.value)} / ${localizeCostumeName(card, locale.value)}` : name;
@@ -433,7 +523,8 @@ const filteredCharacters = computed(() => {
         level: handCard.level
       };
     })
-    .filter(character => !ownedOnly.value || character.isOwned)
+      .filter(character => !ownedOnly.value || character.isOwned)
+      .filter(character => !cardSearch.value?.trim() || [character.name, localizeCharacterName(character.chara, locale.value), localizeCostumeName(character, locale.value)].join(' ').toLocaleLowerCase().includes(cardSearch.value.trim().toLocaleLowerCase()))
     .sort((a, b) => {
       // ソートキーに基づく並び替え
       if (sortKey.value === 'default') {
@@ -551,9 +642,21 @@ function getMaxLevel(rare: string): number {
 }
 
 // 保存機能
-async function saveHandCollection() {
+function saveHandCollection() {
+  if (saving.value || saveSubmitting.value || saveDialog.value || !inlineSetName.value.trim()) return;
+  saveContextSlot.value = selectedSlot.value;
+  saveContextRevision.value = handCollectionStore.collectionContextRevision;
+  saveNewName.value = inlineSetName.value;
+  saveDialog.value = true;
+}
+
+async function submitSave() {
+  if (saving.value || saveSubmitting.value || !saveDialog.value || !saveContextValid.value) return;
+  if (!saveNewName.value.trim()) return;
+  saveSubmitting.value = true;
   try {
-    await handCollectionStore.saveHandCollectionManually();
+    await handCollectionStore.saveSlot(saveContextSlot.value, saveNewName.value.trim(), { overwriteConfirmed: true });
+    saveDialog.value = false;
 
     // 永続ストレージ要求の拒否や未対応は、通常の保存結果へ影響させない。
     void requestPersistentStorage();
@@ -562,13 +665,9 @@ async function saveHandCollection() {
   } catch (error) {
     console.error('保存エラー:', error);
     showSnackbar(storageWarning.value || t('handCollection.saveError'), 'error');
+  } finally {
+    saveSubmitting.value = false;
   }
-}
-
-// 元に戻す機能
-function resetUnsavedChanges() {
-  handCollectionStore.resetUnsavedChanges();
-  showSnackbar(t('handCollection.undoSuccess'));
 }
 
 function reloadSavedCollection() {
@@ -578,69 +677,61 @@ function reloadSavedCollection() {
 
 // 一括レベル設定
 function applyBulkLevel() {
+  const targets = [...filteredCharacters.value];
+  if (saving.value || !targets.length || !validBulkLevel.value) return;
   handCollectionStore.batchUpdates(() => {
-    filteredCharacters.value.forEach(character => {
+    targets.forEach(character => {
       const maxLevel = getMaxLevel(character.rare);
       const clampedLevel = Math.max(Math.min(bulkLevel.value, maxLevel), 0);
       handCollectionStore.updateHandCard(character.name, { level: clampedLevel });
     });
   });
+  showSnackbar(t('handCollection.bulkUpdated', { count: targets.length }));
 }
 
 // 一括所持設定
 function applyBulkOwnership(isOwned: boolean) {
+  const targets = [...filteredCharacters.value];
+  if (saving.value || !targets.length) return;
   handCollectionStore.batchUpdates(() => {
-    filteredCharacters.value.forEach(character => {
+    targets.forEach(character => {
       handCollectionStore.updateHandCard(character.name, { isOwned });
     });
   });
+  showSnackbar(t('handCollection.bulkUpdated', { count: targets.length }));
 }
 
 // 一括完凸設定
 function applyBulkTotsu() {
+  const targets = [...filteredCharacters.value];
+  if (saving.value || !targets.length) return;
   handCollectionStore.batchUpdates(() => {
-    filteredCharacters.value.forEach(character => {
+    targets.forEach(character => {
       handCollectionStore.updateHandCard(character.name, { totsu: bulkTotsu.value });
     });
   });
+  showSnackbar(t('handCollection.bulkUpdated', { count: targets.length }));
 }
 
 function handleFilterApplied() {
-  // FilterModalからフィルターが適用された際の処理
-  // characters.visibleプロパティが更新されているので、
-  // 表示が自動的に更新される
+  appliedFilterState.value = readDetailedFilterState();
 }
 
 // データ管理機能
-function createBackupJson(): string {
-  const cards = characters.value.reduce((result, char) => {
-    const handCard = getReadOnlyHandCard(char.name);
-    result[char.name] = {
-      chara: char.chara,
-      costume: char.costume,
-      rare: char.rare,
-      isOwned: handCard.isOwned,
-      level: handCard.level,
-      totsu: handCard.totsu,
-    };
-    return result;
-  }, {} as Record<string, { chara: string; costume: string; rare: string; isOwned: boolean; level: number; totsu: number }>);
-
-  return JSON.stringify({
-    format: 'twst-hand-collection-v3',
-    exportedAt: new Date().toISOString(),
-    cards,
-  }, null, 2);
-}
-
 function openDataModal() {
-  dataModal.value = true;
-  if (!importIssues.value.length) dataText.value = createBackupJson();
+  try {
+    refreshBackupText();
+    dataModal.value = true;
+  } catch {
+    showSnackbar(t('handCollection.downloadError'), 'error');
+  }
 }
 
 function closeDataModal() {
   dataModal.value = false;
   if (!importIssues.value.length) dataText.value = '';
+  importRows.value = [];
+  importConfirmDialog.value = false;
 }
 
 function showSnackbar(text: string, color: 'success' | 'error' = 'success') {
@@ -650,7 +741,7 @@ function showSnackbar(text: string, color: 'success' | 'error' = 'success') {
 }
 
 function copyToClipboard() {
-  navigator.clipboard.writeText(dataText.value)
+  navigator.clipboard.writeText(backupText.value)
     .then(() => {
       showSnackbar(t('handCollection.copySuccess'));
     })
@@ -660,23 +751,22 @@ function copyToClipboard() {
     });
 }
 
-function downloadBackupFile() {
+function downloadSetsBackupFile() {
+  if (saving.value) return;
   try {
-    const json = createBackupJson();
-    dataText.value = json;
-    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    const json = backupText.value;
+    if (!json) return;
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }));
     const anchor = document.createElement('a');
-    const date = new Date().toISOString().slice(0, 10);
     anchor.href = url;
-    anchor.download = `twst-hand-collection-${date}.json`;
+    anchor.download = `twst-hand-collection-sets-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     showSnackbar(t('handCollection.downloadSuccess'));
   } catch (error) {
-    console.error('JSONファイルの保存に失敗しました:', error);
+    console.error('Failed to export hand collection sets:', error);
     showSnackbar(t('handCollection.downloadError'), 'error');
   }
 }
@@ -686,46 +776,68 @@ function openBackupFilePicker() {
 }
 
 async function handleBackupFileSelected(event: Event) {
+  if (saving.value) return;
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
   input.value = '';
   if (!file) return;
 
+  const contextRevision = handCollectionStore.collectionContextRevision;
   try {
-    dataText.value = await file.text();
-    importFromText();
+    const text = await file.text();
+    if (saving.value || contextRevision !== handCollectionStore.collectionContextRevision) return;
+    dataText.value = text;
+    await importFromText();
   } catch (error) {
     console.error('JSONファイルの読み込みに失敗しました:', error);
     showSnackbar(t('handCollection.fileReadError'), 'error');
   }
 }
 
-function importFromText() {
-  handCollectionStore.batchUpdates(importDataText);
-}
-
-function importDataText() {
+async function importFromText() {
+  if (saving.value || importSubmitting.value) return;
+  importRows.value = [];
   importIssues.value = [];
-  importAcceptedCount.value = 0;
   try {
-    const result = parseHandCollectionImport(dataText.value, characters.value);
-    importIssues.value = result.issues;
-    for (const update of result.updates) handCollectionStore.updateHandCard(update.cardName, update.values);
-    importAcceptedCount.value = result.updates.length;
-    if (result.issues.length) {
-      dataModal.value = true;
-      return;
+    const backup = parseHandCollectionSetsBackup(dataText.value, characters.value);
+    if (backup) {
+      importRows.value = backup.sets.map(set => ({ name: set.name, data: JSON.parse(JSON.stringify(set.data)), destination: null }));
+    } else {
+      const result = parseHandCollectionImport(dataText.value, characters.value);
+      if (result.issues.length) { importIssues.value = result.issues; return; }
+      const data: HandCollection = {};
+      for (const update of result.updates) {
+        const card = characters.value.find(card => card.name === update.cardName);
+        const totsu = update.values.totsu ?? 0;
+        data[update.cardName] = { characterName: card?.chara ?? '', cardName: update.cardName, isOwned: update.values.isOwned ?? false, level: update.values.level ?? 0, totsu, isLimitBreak: totsu === 4, isM3: card?.rare === 'SSR' && totsu >= 3 };
+      }
+      importRows.value = [{ name: t('handCollection.importedSetName'), data, destination: null }];
     }
-    closeDataModal();
-    showSnackbar(t('handCollection.importSuccess', { count: result.updates.length }));
-  } catch (error) {
-    console.error('インポートエラー:', error);
+    importStageRevision.value = handCollectionStore.collectionContextRevision;
+  } catch {
     showSnackbar(t('handCollection.importError'), 'error');
   }
 }
 
+async function submitAssignedImport() {
+  if (saving.value || importSubmitting.value || !canConfirmImport.value || !importConfirmDialog.value) return;
+  const assignments = selectedImportRows.value.map(row => ({ slot: row.destination!, name: row.name, data: JSON.parse(JSON.stringify(row.data)) as HandCollection }));
+  importSubmitting.value = true;
+  try {
+    await handCollectionStore.importAssignedSets(assignments, { overwriteConfirmed: true, expectedRevision: importStageRevision.value });
+    importRows.value = [];
+    importConfirmDialog.value = false;
+    refreshBackupText();
+    showSnackbar(t('handCollection.assignedImportSuccess', { count: assignments.length }));
+  } catch {
+    showSnackbar(handCollectionStore.hasConflict ? t('handCollection.saveConflict') : t('handCollection.importError'), 'error');
+  } finally { importSubmitting.value = false; }
+}
+
 // フィルターリセット機能
 function resetFilters() {
+  appliedFilterState.value = null;
+  cardSearch.value = '';
   ownedOnly.value = false;
   // 全キャラクターを表示状態にリセット
   characters.value.forEach(character => {
@@ -789,228 +901,91 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.json-editor {
-  position: relative;
+.data-management-card { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); }
+.data-management-card :deep(.v-card-text) { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.data-management-card :deep(.v-card-title), .data-management-card :deep(.v-card-actions) { flex: 0 0 auto; }
+.hand-workspace { max-width: 1280px; color: #243248; }
+.header-section { margin-bottom: 18px; }
+.title-container { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 8px 0 18px; }
+.page-title { margin: 0; font-size: 1.65rem; font-weight: 700; letter-spacing: -.025em; }
+.page-description { margin-top: 4px; color: #69778c; font-size: .85rem; }
+.unsaved-indicator { flex-shrink: 0; margin-top: 5px; }
+.saved-sets { padding: 0; }
+.section-caption { color: #69778c; }
+.saved-sets-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.list-sort select, .native-select { border: 1px solid #cbd5e3; border-radius: 6px; background: white; min-width: 0; max-width: 100%; padding: 8px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.transfer-strip { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 2px 16px; margin-bottom: 4px; border-bottom: 1px solid #e6ebf2; }
+.transfer-strip h3 { font-size: .85rem; font-weight: 600; }
+.transfer-strip p { font-size: .75rem; color: #69778c; margin-top: 2px; }
+.transfer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.transfer-actions :deep(.v-btn) { font-size: .8rem; height: 36px; }
+.card-workbench { padding-top: 12px; }
+.workbench-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.workbench-heading h3 { font-size: 1.15rem; font-weight: 700; }
+.display-count { color: #69778c; font-size: .82rem; }
+.list-search-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; }
+.list-search-row :deep(.v-field) { border-radius: 8px; }
+.list-options-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0; }
+.list-options-row :deep(.v-input) { flex: 0 0 auto; }
+.list-options-row :deep(.v-label) { font-size: .82rem; }
+.list-sort { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.list-sort label { font-size: .75rem; color: #69778c; }
+.list-sort select { height: 34px; font-size: .82rem; }
+.active-filter-summary { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px; margin-bottom: 8px; font-size: .75rem; color: #48617e; overflow-wrap: anywhere; }
+.bulk-disclosure { width: min(100%, 360px); margin-bottom: 14px; border: 1px solid #e1e7ef; border-radius: 8px; background: white; }
+.bulk-disclosure > summary { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; list-style: none; font-size: .82rem; font-weight: 600; }
+.bulk-disclosure > summary::-webkit-details-marker { display: none; }
+.bulk-disclosure > summary small { margin-left: auto; font-weight: 400; color: #69778c; font-size: .72rem; }
+.bulk-disclosure[open] > summary .v-icon { transform: rotate(180deg); }
+.bulk-content { padding: 0 10px 10px; }
+.bulk-controls { display: grid; width: max-content; max-width: 100%; gap: 8px; }
+.control-group { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; padding: 0; }
+.control-label { margin: 0; font-size: .8rem; font-weight: 600; }
+.control-fields { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.control-fields .v-input, .control-fields select { flex: 0 0 88px; width: 88px; min-width: 0; max-width: 88px; }
+.control-fields .native-select { box-sizing: border-box; height: 34px; min-height: 34px; width: 88px; flex: 0 0 88px; padding: 0 8px; }
+.control-fields :deep(.v-field), .control-fields :deep(.v-field__input) { min-height: 34px; height: 34px; }
+.control-fields :deep(.v-field__input) { padding-block: 4px; }
+.control-fields :deep(.v-btn) { height: 34px; min-width: 0; padding-inline: 10px; font-size: .75rem; }
+.backup-section h3, .restore-section h3 { font-size: 1rem; }
+.data-help { margin-top: 6px; font-size: .8rem; line-height: 1.7; color: #58677c; }
+.restore-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e1e7ef; }
+.assignment-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(140px, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e1e7ef; }
+.assignment-source { min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
+.assignment-source small { display: block; margin-top: 2px; color: #69778c; }
+.assignment-row select { width: 100%; font-size: .85rem; }
+.assignment-confirm-list { padding-left: 20px; margin-top: 12px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .assignment-row { grid-template-columns: 1fr; gap: 6px; } }
+.data-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.action-btn { flex: 1 1 120px; }
+.backup-file-input { display: none; }
+.json-editor { position: relative; }
+.json-copy-button { position: absolute; top: 8px; right: 8px; z-index: 1; }
+.json-editor :deep(textarea.v-field__input) { padding-right: 56px; }
+@media (max-width: 600px) {
+ .page-title { font-size: 1.35rem; }
+ .page-description { font-size: .75rem; }
+ .title-container { margin-bottom: 12px; }
+ .header-section { margin-bottom: 12px; }
+ .saved-sets { padding: 0; }
+ .saved-sets-actions { gap: 6px; }
+ .saved-sets-actions :deep(.v-btn) { min-width: 46px; padding-inline: 10px; }
+  .transfer-strip { display: block; padding-bottom: 12px; }
+ .transfer-strip p { display: none; }
+ .transfer-actions { margin-top: 6px; gap: 4px; }
+ .transfer-actions :deep(.v-btn) { font-size: .72rem; padding-inline: 8px; }
+ .workbench-heading { margin-bottom: 8px; }
+ .workbench-heading h3 { font-size: 1rem; }
+ .list-search-row :deep(.v-btn) { font-size: .75rem; min-width: 60px; padding-inline: 8px; }
+ .list-options-row { gap: 6px; }
+ .list-sort { flex: 1; justify-content: flex-end; }
+ .list-sort label { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+ .list-sort select { max-width: 115px; }
+ .bulk-disclosure > summary { padding: 9px 10px; }
+
+ .action-btn { flex-basis: 100%; }
 }
-
-.json-copy-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-}
-
-.json-editor :deep(textarea.v-field__input) {
-  padding-right: 56px;
-}
-
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.title-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.unsaved-indicator {
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.stats-summary {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-
-.controls-main-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.controls-container {
-  flex: 1 1 320px;
-  min-width: 0;
-  padding: 16px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
-}
-
-.controls-title {
-  margin: 0 0 4px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #333;
-}
-
-.bulk-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-  gap: 12px;
-}
-
-.control-group {
-  min-width: 0;
-  padding: 12px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-}
-
-.controls-description {
-  margin: 0 0 12px;
-  font-size: .8rem;
-  color: #616161;
-}
-
-.control-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: .85rem;
-  font-weight: 600;
-}
-
-.control-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: center;
-  gap: 8px;
-}
-
-.control-fields .level-input {
-  min-width: 0;
-  max-width: none;
-  width: 100%;
-}
-
-.control-fields .v-btn {
-  min-width: 0;
-  min-height: 44px;
-  height: auto;
-  padding: 6px;
-  white-space: normal;
-}
-
-.control-fields :deep(.v-btn__content) {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.collection-display-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  column-gap: 12px;
-  margin-bottom: 12px;
-}
-
-.collection-display-controls :deep(.v-input) {
-  flex: 0 1 auto;
-}
-
-.display-count {
-  font-size: .85rem;
-  color: #616161;
-}
-
-.save-controls-container {
-  flex: 0 0 300px;
-  padding: 16px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #dee2e6;
-}
-
-.save-controls {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.data-management-controls {
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-}
-
-.data-btn {
-  flex: 0 1 auto !important;
-  min-width: 120px;
-}
-
-.level-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.level-input {
-  max-width: 120px;
-  min-width: 100px;
-}
-
-.level-input :deep(.v-field) {
-  margin: 0 !important;
-  height: 40px !important;
-}
-
-.level-input :deep(.v-field__field) {
-  height: 40px !important;
-  min-height: 40px !important;
-}
-
-.level-input :deep(.v-input) {
-  grid-template-rows: min-content 0 !important;
-  margin: 0 !important;
-}
-
-.level-input :deep(.v-field__input) {
-  padding-top: 8px !important;
-  padding-bottom: 8px !important;
-}
-
-.native-select-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.native-select-label {
-  font-size: 0.75rem;
-  color: rgba(0, 0, 0, 0.6);
-  line-height: 1;
-}
-
-.native-select,
 .table-select {
   width: 100%;
   border: 1px solid #ccc;
@@ -1027,141 +1002,6 @@ onUnmounted(() => {
 .table-select:disabled {
   background-color: #f5f5f5;
   color: rgba(0, 0, 0, 0.38);
-}
-
-.character-image {
-  width: 40px;
-  height: 40px;
-  border-radius: 1px;
-  object-fit: cover;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-/* モバイル対応 */
-@media (max-width: 600px) {
-  .header-section {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-  }
-  
-  .header-actions {
-    flex-shrink: 0;
-  }
-  
-  .controls-main-container {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .controls-container {
-    flex: auto;
-  }
-  
-  .save-controls-container {
-    flex: 1;
-  }
-  
-  .bulk-controls {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  
-  .character-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .character-icon {
-    width: 32px;
-    height: 32px;
-  }
-  
-  .stats-summary {
-    justify-content: center;
-    width: 100%;
-  }
-
-  .save-controls {
-    flex-direction: row;
-    gap: 8px;
-    justify-content: center;
-  }
-  
-  .data-management-controls {
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-  }
-  
-  .data-btn {
-    flex: 1 1 45% !important;
-    min-width: 100px !important;
-  }
-}
-
-/* Vuetify 3 のスタイル調整 */
-:deep(.v-expansion-panel-title) {
-  padding: 12px 16px;
-}
-
-:deep(.v-expansion-panel-text__wrapper) {
-  padding: 12px 16px;
-}
-
-:deep(.v-field) {
-  margin: 0 !important;
-}
-
-:deep(.v-field__field) {
-  padding: 4px 8px !important;
-  min-height: 36px !important;
-}
-
-:deep(.v-input) {
-  grid-template-rows: min-content 0 !important;
-}
-
-:deep(.v-checkbox) {
-  margin: 0 !important;
-}
-
-.data-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.action-btn {
-  flex: 1;
-  min-width: 120px;
-  max-width: 200px;
-}
-
-.backup-file-input {
-  display: none;
-}
-
-@media (max-width: 600px) {
-  .action-btn {
-    flex: 1 1 100%;
-    max-width: none;
-  }
-}
-
-.format-selector {
-  background-color: #f5f5f5;
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.format-info {
-  color: #666;
-  line-height: 1.5;
 }
 
 /* 手動テーブルのスタイル */

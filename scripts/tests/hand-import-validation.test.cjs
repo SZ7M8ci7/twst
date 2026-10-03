@@ -36,13 +36,15 @@ test('JSON and both TSV imports flag out-of-range cards without changing saved s
   const { load, storage } = runtime();
   const handCollectionStore = load('src/store/handCollection.ts').useHandCollectionStore();
   const { parseHandCollectionImport } = load('src/utils/handCollectionImport.ts');
-  const source = read('src/views/HandCollection.vue').split('function importDataText()')[1].split('// フィルターリセット機能')[0];
+  const view = read('src/views/HandCollection.vue');
+  const source = view.slice(view.indexOf('async function importFromText()'), view.indexOf('async function submitAssignedImport()'));
   const dataText = { value: '' }, notices = [];
   const context = { handCollectionStore, parseHandCollectionImport, dataText, importIssues: { value: [] },
-    importAcceptedCount: { value: 0 }, dataModal: { value: false },
-    characters: { value: cards }, closeDataModal() {}, showSnackbar: key => notices.push(key), t: key => key, console };
+    importRows: { value: [] }, importStageRevision: { value: 0 }, saving: { value: false }, importSubmitting: { value: false },
+    parseHandCollectionSetsBackup: load('src/storage/handCollectionStorage.ts').parseHandCollectionSetsBackup,
+    characters: { value: cards }, showSnackbar: key => notices.push(key), t: key => key, console };
   vm.createContext(context);
-  vm.runInContext(compile('function importDataText()' + source), context);
+  vm.runInContext(compile(source), context);
   for (const [rare, max] of [['SSR', 120], ['SR', 90], ['R', 70]]) {
     const card = cards.find(card => card.rare === rare);
     handCollectionStore.updateHandCard(card.name, { level: 42, totsu: 1, isOwned: false });
@@ -54,22 +56,26 @@ test('JSON and both TSV imports flag out-of-range cards without changing saved s
       [card.chara, card.costume, '999', 'unused', 'true', 'true', 'true'].join('\t'),
     ]) {
       dataText.value = value;
-      context.importDataText();
+      const beforeRaw = storage.getItem('twst-hand-collection');
+      await context.importFromText();
       assert.equal(context.importIssues.value[0].cardName, card.name);
       assert.equal(context.importIssues.value[0].value, '999');
       assert.equal(context.importIssues.value[0].max, max);
-      assert.equal(context.dataModal.value, true);
-      assert.equal(context.importAcceptedCount.value, 0);
+      assert.equal(context.importRows.value.length, 0, 'invalid input cannot reach assignment or overwrite confirmation');
+      assert.equal(storage.getItem('twst-hand-collection'), beforeRaw);
       assert.equal(dataText.value, value, 'original input stays available for correction');
       assert.equal(JSON.stringify(handCollectionStore.getHandCard(card.name)), before);
-      await handCollectionStore.saveHandCollectionManually();
-      assert.equal(JSON.parse(storage.getItem('twst-hand-collection')).data[card.name].level, 42);
+      await handCollectionStore.saveHandCollectionManually({ overwriteConfirmed: true });
+      const saved = JSON.parse(storage.getItem('twst-hand-collection'));
+      assert.equal(saved.sets.find(set => set.id === saved.activeSetId).data[card.name].level, 42);
     }
     dataText.value = JSON.stringify({ cards: [{ cardName: card.name, level: max, totsu: 4, isOwned: true }] });
-    context.importDataText();
+    await context.importFromText();
     assert.equal(context.importIssues.value.length, 0);
-    assert.equal(handCollectionStore.getHandCard(card.name).level, max);
-    assert.equal(notices.at(-1), 'handCollection.importSuccess');
+    assert.equal(handCollectionStore.getHandCard(card.name).level, 42, 'valid input only stages until destination confirmation');
+    assert.equal(context.importRows.value[0].data[card.name].level, max);
+    assert.equal(context.importRows.value[0].destination, null);
+    assert.equal(context.importStageRevision.value, handCollectionStore.collectionContextRevision);
   }
 });
 
@@ -108,6 +114,38 @@ test('imports preserve valid entries and report exact invalid levels and limit b
   }
 });
 
+test('legacy JSON versions and numeric strings stay supported without coercing malformed ownership', () => {
+  const {load}=runtime(), parse=load('src/utils/handCollectionImport.ts').parseHandCollectionImport;
+  const card=cards.find(c=>c.rare==='SSR');
+  for(const version of [undefined,1,2,3]) {
+    const value={cards:{[card.name]:{level:'42',totsu:'3',isOwned:false}}};
+    if(version!==undefined)value.format='twst-hand-collection-v'+version;
+    const result=parse(JSON.stringify(value),cards); assert.equal(result.issues.length,0); assert.equal(result.updates[0].values.level,42);
+    assert.equal(result.updates[0].values.totsu,3); assert.equal(result.updates[0].values.isOwned,false);
+  }
+  for(const field of ['isOwned','isM3','isLimitBreak'])for(const value of ['false',0,null,{},[]]) {
+    assert.throws(()=>parse(JSON.stringify({cards:{[card.name]:{level:42,[field]:value}}}),cards),/ownership/);
+  }
+  for(const format of ['twst-hand-collection-v999','other-format',null,3]) {
+    assert.throws(()=>parse(JSON.stringify({format,cards:{[card.name]:{level:42}}}),cards),/format/);
+  }
+  for(const json of ['null','[]','{bad','{"cards":3}','{"cards":[null]}'])assert.throws(()=>parse(json,cards));
+  for(const legacy of [{version:1,data:{[card.name]:{level:42,isOwned:true,isM3:true}}},{[card.name]:{level:42,isOwned:true,isLimitBreak:true}}]) {
+    const result=parse(JSON.stringify(legacy),cards); assert.equal(result.issues.length,0);
+    assert.equal(result.updates[0].values.totsu,legacy.version===1?3:4);
+  }
+});
+
+test('invalid ownership or unknown format cannot stage valid sibling cards or change existing settings', async () => {
+  const {load,storage}=runtime(), store=load('src/store/handCollection.ts').useHandCollectionStore(), parse=load('src/utils/handCollectionImport.ts').parseHandCollectionImport;
+  const [first,second]=cards.filter(c=>c.rare==='SSR');store.updateHandCard(first.name,{level:20,isOwned:true});await store.saveSlot(1,'Before',{overwriteConfirmed:true});
+  const raw=storage.getItem('twst-hand-collection'),before=JSON.stringify(store.handCollection);
+  for(const value of [{cards:[{cardName:first.name,level:30,isOwned:'false'},{cardName:second.name,level:40,isOwned:true}]},
+    {format:'unsupported',cards:[{cardName:first.name,level:30,isOwned:true}]}]) {
+    assert.throws(()=>parse(JSON.stringify(value),cards));assert.equal(storage.getItem('twst-hand-collection'),raw);assert.equal(JSON.stringify(store.handCollection),before);
+  }
+});
+
 test('screenshot review includes invalid levels and blocks applying them without changing the values', () => {
   const { load } = runtime();
   const { computed, ref } = require('vue');
@@ -121,8 +159,10 @@ test('screenshot review includes invalid levels and blocks applying them without
   const primaryRows = ref([{ selected: card.name, maxLevel: 91, level: 42, totsu: 1 }]);
   const levelMode = ref('maximum');
   const context = { computed, primaryRows, levelMode, isValidInputLevel, getImportLevel,
+    groovyStatusByCard: { value: new Map([[card.name, 'present']]) },
     catalog: new Map(cards.map(card => [card.name, card])), busy: { value: false },
-    store: { batchUpdates() { assert.fail('Invalid cards must not be applied'); } },
+    resultContextRevision: 0,
+    store: { collectionContextRevision: 0, batchUpdates() { assert.fail('Invalid cards must not be applied'); } },
     displayLevel: row => getImportLevel(row, levelMode.value), displayTotsu: row => row.totsu, hasDuplicateConflict: () => false };
   vm.createContext(context);
   vm.runInContext(compile(keysSource + reviewFunction + '\n' + applySource), context);
@@ -179,6 +219,7 @@ test('search start displays invalid card names with costumes in every locale and
     const error = { value: '' };
     const cardLabel = name => `${catalog[name].chara} / ${catalog[name].costume}`;
     const context = { input: { value: input }, error, catalog, validateInput, invalidSearchCards, cardLabel,
+      usesSupport: { value: false }, getWorker() { assert.fail('Invalid cards must not start a worker'); },
       additionalBreaksError: { value: '' }, attemptsError: { value: '' }, loadSearchSeedTeams: () => [], savedTeams: [],
       t: (key, args) => { assert.equal(key, 'examSearch.validation.card'); return message.replace('{cards}', args.cards); } };
     vm.createContext(context);
