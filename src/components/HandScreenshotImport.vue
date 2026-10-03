@@ -45,6 +45,8 @@
               </div>
               <p v-if="hasDuplicateConflict(row)" class="card-warning">{{ t('screenshot.duplicateShort') }}</p>
               <p v-if="invalidLevelCardKeys.has(row.selected)" class="card-warning">{{ t('screenshot.invalidLevel', { max: getInputMaxLevel(catalog.get(row.selected)?.rare) }) }}</p>
+              <p v-if="groovyStatusByCard.get(row.selected) === 'absent'" class="card-warning">{{ t('screenshot.groovyWarning') }}</p>
+              <p v-else-if="row.selected && groovyStatusByCard.get(row.selected) !== 'present'" class="card-warning">{{ t('screenshot.groovyUnknown') }}</p>
             </article>
           </div>
           <p v-if="!busy && !visibleRows.some(row=>row.fileIndex===fileIndex)" class="empty-group">{{ rows.some(row=>row.fileIndex===fileIndex) ? t('screenshot.noReview') : t('screenshot.noCards') }}</p>
@@ -115,6 +117,7 @@ import { mergeDetections, type Box, type Detection } from '@/domain/handScreensh
 import { combinedDetections, primaryDetections, uncapSourceFiles } from '@/domain/handScreenshot/supplement';
 import { validateScreenshot } from '@/domain/handScreenshot/input';
 import { applyMaxLevelUncaps } from '@/domain/handScreenshot/metadata';
+import { groovyStatesByCard } from '@/domain/handScreenshot/groovy';
 import { getImportLevel, setImportLevel, type ImportDetection, type ImportLevelMode } from '@/domain/handScreenshot/importLevel';
 import type { ExportPage } from '@/domain/handScreenshot/export';
 import type { ScreenshotSession } from '@/domain/handScreenshot/client';
@@ -171,7 +174,7 @@ function displayTotsu(row: Detection) {
   return card&&!card.totsuConflict?card.totsu:row.totsu;
 }
 function totsuLabel(row: Detection) { const count=displayTotsu(row); return count === undefined ? t('screenshot.uncapsUnknown') : t('screenshot.uncapsValue',{count}); }
-function needsReview(row: ImportDetection) { return !row.selected || !isValidInputLevel(displayLevel(row), catalog.get(row.selected)?.rare, 1) || invalidLevelCardKeys.value.has(row.selected) || displayTotsu(row)===undefined || hasDuplicateConflict(row); }
+function needsReview(row: ImportDetection) { return !row.selected || !isValidInputLevel(displayLevel(row), catalog.get(row.selected)?.rare, 1) || invalidLevelCardKeys.value.has(row.selected) || groovyStatusByCard.value.get(row.selected) !== 'present' || displayTotsu(row)===undefined || hasDuplicateConflict(row); }
 function changeLevel(row: ImportDetection, event: Event) {
   if (busy.value || applied.value) return;
   setImportLevel(row,levelMode.value,(event.target as HTMLInputElement).value);
@@ -229,6 +232,7 @@ let session: ScreenshotSession | undefined;
 let operationId = 0;
 let undoEntries: { key: string; before?: HandCard; after: HandCard }[] = [];
 const primaryRows = computed(()=>primaryDetections(rows.value));
+const groovyStatusByCard = computed(() => groovyStatesByCard(combinedDetections(rows.value)));
 const invalidLevelCardKeys = computed(() => new Set(primaryRows.value.filter(row => {
   const level = getImportLevel(row, levelMode.value);
   return row.selected && level !== undefined && !isValidInputLevel(level, catalog.get(row.selected)?.rare, 1);
@@ -320,6 +324,7 @@ async function recognize(manual?: { box: Box; fileIndex: number }) {
 function cancel() { operationId++; session?.stop(); }
 function apply() {
   if (busy.value || invalidLevelCardKeys.value.size || store.loadFailed || store.hasConflict || store.saving) return;
+  if (applied.value || !merged.value.length) return;
   undoEntries = [];
   store.batchUpdates(() => {
     for (const row of merged.value) {

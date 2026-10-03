@@ -249,10 +249,6 @@
             <v-card-title>{{ $t('handCollection.dataManagement') }}</v-card-title>
             <v-card-text>
               <div class="data-actions mb-4">
-                <v-btn color="primary" @click="copyToClipboard" class="action-btn" size="small">
-                  <v-icon>mdi-content-copy</v-icon>
-                  <span class="ml-2">{{ $t('handCollection.copy') }}</span>
-                </v-btn>
                 <v-btn color="primary" @click="downloadBackupFile" class="action-btn" size="small">
                   <v-icon>mdi-download</v-icon>
                   <span class="ml-2">{{ $t('handCollection.downloadJson') }}</span>
@@ -261,7 +257,7 @@
                   <v-icon>mdi-upload</v-icon>
                   <span class="ml-2">{{ $t('handCollection.loadJson') }}</span>
                 </v-btn>
-                <v-btn color="primary" @click="importFromText" class="action-btn" size="small">
+                <v-btn color="success" @click="importFromText" class="action-btn" size="small">
                   <v-icon>mdi-database-import</v-icon>
                   <span class="ml-2">{{ $t('handCollection.import') }}</span>
                 </v-btn>
@@ -281,14 +277,26 @@
                   </li>
                 </ul>
               </v-alert>
-              <v-textarea
-                v-model="dataText"
-                outlined
-                auto-grow
-                rows="10"
-                class="mt-4"
-                :label="$t('handCollection.dataFormat')"
-              ></v-textarea>
+              <div class="json-editor mt-4">
+                <v-textarea
+                  v-model="dataText"
+                  outlined
+                  auto-grow
+                  rows="10"
+                  max-rows="10"
+                  :label="$t('handCollection.dataFormat')"
+                ></v-textarea>
+                <v-btn
+                  class="json-copy-button"
+                  icon="mdi-content-copy"
+                  size="small"
+                  variant="text"
+                  color="primary"
+                  :aria-label="$t('handCollection.copy')"
+                  :title="$t('handCollection.copy')"
+                  @click="copyToClipboard"
+                />
+              </div>
               <input
                 ref="backupFileInput"
                 type="file"
@@ -781,6 +789,21 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.json-editor {
+  position: relative;
+}
+
+.json-copy-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.json-editor :deep(textarea.v-field__input) {
+  padding-right: 56px;
+}
+
 .page-title {
   font-size: 1.5rem;
   font-weight: 600;

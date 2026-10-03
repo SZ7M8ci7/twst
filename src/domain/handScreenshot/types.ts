@@ -1,3 +1,5 @@
+import type { GroovyStatus } from './groovyRibbon';
+
 export const EXTRACTOR = 'orb-art-catalog-diverse-v5';
 export const DATASET_SOURCE = 'https://twst.wikiru.jp/';
 export interface AssetPart { path: string; sha256: string; bytes: number }
@@ -23,6 +25,8 @@ export interface Detection {
   id: string; fileIndex: number; box: Box; candidates: Candidate[]; confident: boolean;
   selected: string; level?: number; maxLevel?: number; levelConflict?: boolean; thumbnail?: string;
   displayMode?: 'uncaps'; uncapThumbnail?: string;
+  /** Derived only from the visible Groovy ribbon, never the selected artwork. */
+  groovyStatus?: GroovyStatus;
   totsu?: number; totsuEvidence?: 'dots' | 'black-frame' | 'magic3' | 'max-level' | 'unknown' | 'manual';
 }
 
