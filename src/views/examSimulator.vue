@@ -4916,7 +4916,7 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
       if (stats.log) stats.burnDamage += burnDamage;
       if (stats.log) pushLog(stats, () => `${turnIndex + 1}T やけど: ${burnDamage}`);
     }
-    const enemyContinueHeal = applyEnemyContinueHeal(state, enemyHp, enemyMaxHp);
+    const enemyContinueHeal = applyEnemyContinueHeal(state, enemyHp, enemyMaxHp, stats);
     if (enemyContinueHeal > 0) {
       const beforeEnemyHeal = enemyHp;
       enemyHp = Math.min(enemyMaxHp, enemyHp + enemyContinueHeal);
@@ -5763,9 +5763,6 @@ function activatePlayerOpponentDebuffs(
         const success = roll < Math.min(1, Math.max(0, curseRate) / 100);
         if (success) {
           appendState(state, 'enemyCurses', { rate: 100, turns: duration, targetEnemySlotKey });
-          if ((simulationRuntimeCache?.examKind ?? exam.value.kind) === 'ATTACK') {
-            stats.healBlock = Math.max(stats.healBlock, 1);
-          }
           appliedAny = true;
         }
         return;
@@ -6389,15 +6386,24 @@ function applyPlayerContinueHeal(state: SimulationState, currentHp: number, keep
   return { total, details };
 }
 
-function applyEnemyContinueHeal(state: SimulationState, enemyHp: number, enemyMaxHp: number) {
-  if (enemyHp <= 0 || enemyHp >= enemyMaxHp) return 0;
+function recordEnemyHealBlock(stats: SimulationStats) {
+  if ((simulationRuntimeCache?.examKind ?? exam.value.kind) === 'ATTACK') {
+    stats.healBlock = Math.max(stats.healBlock, 1);
+  }
+}
+
+function applyEnemyContinueHeal(state: SimulationState, enemyHp: number, enemyMaxHp: number, stats: SimulationStats) {
+  if (enemyHp <= 0) return 0;
   let total = 0;
   for (const entry of state.enemyContinueHeals) {
-    if (entry.turns <= 0) continue;
-    if (entry.targetEnemySlotKey && isEnemyCursed(state, entry.targetEnemySlotKey)) continue;
+    if (entry.turns <= 0 || entry.amount <= 0) continue;
+    if (isEnemyCursed(state, entry.targetEnemySlotKey)) {
+      recordEnemyHealBlock(stats);
+      continue;
+    }
     total += ceilDamage(entry.amount);
   }
-  return Math.min(total, enemyMaxHp - enemyHp);
+  return Math.min(total, Math.max(0, enemyMaxHp - enemyHp));
 }
 
 function calculateEnemyDamage(
@@ -6533,11 +6539,13 @@ function applyEnemySelfEffects(
       break;
     case 'heal': {
       const healAmount = value;
+      if (healAmount <= 0) return 0;
       const cursedTargets = targetSlotKeys.filter((targetEnemySlotKey) => isEnemyCursed(state, targetEnemySlotKey));
       if (cursedTargets.length) {
+        recordEnemyHealBlock(stats);
         return 0;
       }
-      if (healAmount <= 0 || enemyHp >= enemyMaxHp) {
+      if (enemyHp >= enemyMaxHp) {
         return 0;
       }
       const capped = Math.min(ceilDamage(healAmount), enemyMaxHp - enemyHp);
@@ -6549,7 +6557,10 @@ function applyEnemySelfEffects(
         return 0;
       }
       targetSlotKeys.forEach((targetEnemySlotKey) => {
-        if (isEnemyCursed(state, targetEnemySlotKey)) return;
+        if (isEnemyCursed(state, targetEnemySlotKey)) {
+          recordEnemyHealBlock(stats);
+          return;
+        }
         appendState(state, 'enemyContinueHeals', {
           amount: healAmount,
           turns: duration,
