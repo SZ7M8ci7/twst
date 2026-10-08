@@ -85,7 +85,7 @@ jobs:
     - name: Icon verifier regression tests
       run: python -m unittest discover -s scripts/tests -p 'test_card_icons.py' -v
 
-    # The final step reports icon failures only after available assets deploy.
+    # Absent icons are pending; actual errors are reported after available assets deploy.
     - name: Verify display icons against final catalog
       id: icons
       continue-on-error: true
@@ -111,9 +111,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # Publish available cards, but do not conceal unresolved images as a green run.
-    - name: Fail visibly for unresolved icons
+    # Publish available cards; report actual errors without alerting on pending images.
+    - name: Fail visibly for icon errors
       if: ${{ !cancelled() && steps.icons.outcome == 'failure' }}
       run: |
-        echo '::error::Published catalog includes missing icons. See display-card-icons report.'
+        echo '::error::Published catalog contains invalid icons. See display-card-icons report.'
         exit 1

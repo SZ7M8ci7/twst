@@ -52,13 +52,23 @@ if (process.env.SIMULATOR_WORKFLOW_ROOT) {
 for (const entry of cases) {
   const workflow = yaml.load(fs.readFileSync(path.join(entry.root, '.github/workflows', entry.file), 'utf8'));
   const steps = Object.values(workflow.jobs)[0].steps;
-  test(entry.file + ': unresolved card does not block partial publication and is reported last', () => {
+  test(entry.file + ': genuine image error does not block partial publication and is reported last', () => {
     for (const id of entry.failures) assert.equal(steps.find(s => s.id === id)['continue-on-error'], true);
     const result = simulate(steps, entry.failures);
     for (const name of entry.expected) assert.ok(result.executed.includes(name), name + ' should execute');
     assert.match(result.executed.at(-1), /^Fail visibly/);
     assert.equal(result.failed, true);
     assert.ok(result.executed.some(n => /^Retain/.test(n)), 'report should be retained');
+  });
+  test(entry.file + ': pending-only check exits zero and produces no error/warning step', () => {
+    // HTTP 404 and absent files return zero in the Python integration tests.
+    const result = simulate(steps);
+    for (const name of entry.expected) assert.ok(result.executed.includes(name));
+    assert.equal(result.failed, false);
+    assert.ok(!result.executed.some(name => /^Fail visibly/.test(name)));
+    for (const step of steps.filter(s => result.executed.includes(s.name) && /icon|image/i.test(s.name || ''))) {
+      assert.ok(!/::(?:warning|error)::/.test(step.run || ''), step.name);
+    }
   });
   test(entry.file + ': complete assets finish successfully', () => {
     const result = simulate(steps);

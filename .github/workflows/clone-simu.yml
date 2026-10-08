@@ -41,7 +41,7 @@ jobs:
       working-directory: twst-repo
       run: python -m unittest discover -s scripts/tests -p 'test_card_icons.py' -v
 
-    # Keep icon failures non-blocking until commit and deploy dispatch finish.
+    # Absent icons exit successfully. Real errors are reported after commit/dispatch.
     - name: Verify synchronized card icons
       id: icons
       continue-on-error: true
@@ -85,8 +85,8 @@ jobs:
         path: twst-repo/reports/card-icons.json
         retention-days: 30
 
-    - name: Fail visibly for unresolved icons
+    - name: Fail visibly for icon errors
       if: ${{ !cancelled() && steps.icons.outcome == 'failure' }}
       run: |
-        echo '::error::Synchronized card icons are incomplete. See job summary and artifact.'
+        echo '::error::Synchronized card icons contain errors. See job summary and artifact.'
         exit 1
