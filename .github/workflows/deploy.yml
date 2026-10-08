@@ -82,6 +82,23 @@ jobs:
         if-no-files-found: ignore
         retention-days: 14
       
+    - name: Icon verifier regression tests
+      run: python -m unittest discover -s scripts/tests -p 'test_card_icons.py' -v
+
+    # The final step reports icon failures only after available assets deploy.
+    - name: Verify display icons against final catalog
+      id: icons
+      continue-on-error: true
+      run: python scripts/check_card_icons.py
+
+    - name: Retain display icon report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: display-card-icons
+        path: reports/card-icons.json
+        retention-days: 30
+
     - name: Build
       run: npm run build
       
@@ -93,3 +110,10 @@ jobs:
         npm run deploy-github
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Publish available cards, but do not conceal unresolved images as a green run.
+    - name: Fail visibly for unresolved icons
+      if: ${{ !cancelled() && steps.icons.outcome == 'failure' }}
+      run: |
+        echo '::error::Published catalog includes missing icons. See display-card-icons report.'
+        exit 1

@@ -40,3 +40,6 @@ pnpm-debug.log*
 
 # Temporary execution logs
 *.log
+
+reports/
+__pycache__/

@@ -29,6 +29,25 @@ jobs:
         cp ./simulator-repo/characters_info.json ./twst-repo/src/assets/characters_info.json
 
 
+    - name: Set up icon verification
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install icon verification dependency
+      run: pip install Pillow==11.3.0
+
+    - name: Icon verifier regression tests
+      working-directory: twst-repo
+      run: python -m unittest discover -s scripts/tests -p 'test_card_icons.py' -v
+
+    # Keep icon failures non-blocking until commit and deploy dispatch finish.
+    - name: Verify synchronized card icons
+      id: icons
+      continue-on-error: true
+      working-directory: twst-repo
+      run: python scripts/check_card_icons.py
+
     - name: Commit and push changes to twst repository
       run: |
         cd ./twst-repo
@@ -57,3 +76,17 @@ jobs:
             ref: 'master'
           });
 
+
+    - name: Retain card icon report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: synchronized-card-icons
+        path: twst-repo/reports/card-icons.json
+        retention-days: 30
+
+    - name: Fail visibly for unresolved icons
+      if: ${{ !cancelled() && steps.icons.outcome == 'failure' }}
+      run: |
+        echo '::error::Synchronized card icons are incomplete. See job summary and artifact.'
+        exit 1
