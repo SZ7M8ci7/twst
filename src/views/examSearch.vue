@@ -55,6 +55,7 @@
       </v-btn>
       <v-btn color="primary" class="resource-start" :disabled="busy" data-testid="resource-start" @click="start(180000)">{{ t('examSearch.start') }}</v-btn>
       <v-btn v-if="canResume && !busy" data-testid="resource-resume" @click="resume">{{ t('examSearch.resume') }}</v-btn>
+      <v-btn v-if="canResume && !sessionSaved && !busy" data-testid="resource-save-retry" @click="retrySave">{{ t('examSearch.retrySave') }}</v-btn>
       <v-btn v-if="busy" data-testid="resource-stop" @click="stop">{{ t('examSearch.stop') }}</v-btn>
     </div>
     <v-progress-linear v-if="busy" indeterminate color="primary" />
@@ -113,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import cards from '@/assets/chara.json';
@@ -196,11 +197,15 @@ const requiredCards = ref<string[]>(Array.isArray(input.value.requiredCards) ? [
 const requiredCardSlots = ref(Array.from({ length: 5 }, (_, index) => requiredCards.value[index] ?? ''));
 const characterFilter = ref<string[]>([...(input.value.requiredCharacters ?? [])]);
 const persistedSession = ref<SavedSearchSession | null>(loadSearchSession());
+const sessionSaved = ref(true);
+let lastCheckpoint: SavedSearchSession | null = null;
+let pendingSave: Promise<boolean> | null = null;
+let disposed = false;
 let worker: Worker | null = null, requestId = 0;
 const idleWaiters: Array<(saved:boolean)=>void> = [];
 const continuation = new SearchContinuation(resumeBatch, saved => {
   busy.value=false;
-  idleWaiters.splice(0).forEach(resolve=>resolve(saved));
+  idleWaiters.splice(0).forEach(resolve=>resolve(saved && sessionSaved.value));
 });
 function finishRequest(saved=true) { continuation.finish(saved); }
 const hand = useHandCollectionStore();
@@ -329,6 +334,9 @@ function invalidateActiveSearch() {
   worker?.terminate();
   worker = null;
   requestId++;
+  persistedSession.value = null;
+  lastCheckpoint = null;
+  sessionSaved.value = true;
   error.value = '';
   progress.value = null;
   evaluatedInput.value = null;
@@ -430,15 +438,34 @@ watch(() => hand.ownedCards.map(c => [c.cardName, c.level, c.totsu] as const), o
 if (persistedSession.value && JSON.stringify(persistedSession.value.input) === JSON.stringify(input.value)) {
   evaluatedInput.value = clone(input.value);
   runFingerprint.value = JSON.stringify(input.value);
-  const checkpoint = constrainCheckpoint(input.value, persistedSession.value.checkpoint, catalog);
+  const checkpoint = constrainCheckpoint(input.value, toRaw(persistedSession.value.checkpoint), catalog);
   persistedSession.value.checkpoint = checkpoint;
   progress.value = { phase: 'stopped', generated: checkpoint.generatedCount ?? checkpoint.seen.length, evaluated: checkpoint.evaluatedCount ?? checkpoint.pool.length,
     tasksDone: checkpoint.cursor, tasksTotal: checkpoint.tasksTotal ?? checkpoint.cursor, elapsedMs: checkpoint.elapsed, results: checkpoint.finalists };
 }
+async function persistCheckpoint(session: SavedSearchSession, id: number): Promise<boolean> {
+  sessionSaved.value = false;
+  const saving = saveSearchSession(session);
+  pendingSave = saving;
+  const saved = await saving;
+  if (pendingSave === saving) pendingSave = null;
+  if (disposed || id !== requestId) return saved;
+  sessionSaved.value = saved;
+  if (!saved) error.value = t('examSearch.sessionSaveFailed');
+  else if ([t('examSearch.sessionSaveFailed'), t('examSearch.saveFailed')].includes(error.value)) error.value = '';
+  continuation.saved(saved);
+  return saved;
+}
+function retrySave() {
+  if (busy.value || !lastCheckpoint) return;
+  busy.value = true;
+  continuation.begin(false);
+  return persistCheckpoint(lastCheckpoint, requestId);
+}
 function getWorker() {
   if (worker) return worker;
   worker = new Worker(new URL('../workers/examSearch.worker.ts', import.meta.url), { type: 'module' });
-  worker.onmessage = ({ data }) => {
+  worker.onmessage = async ({ data }) => {
     if (data.id !== requestId) return;
     if (data.diagnostic) console.error('Exam search failed', JSON.stringify(data.diagnostic));
     if (data.error) { error.value = t('examSearch.failure') + ': ' + data.error; finishRequest(false); return; }
@@ -446,10 +473,11 @@ function getWorker() {
       progress.value = data.progress;
     }
     if (data.checkpoint && evaluatedInput.value) {
-      persistedSession.value = { input: clone(evaluatedInput.value), checkpoint: data.checkpoint, catalogVersion: data.catalogVersion, version: ENGINE_VERSION };
-      const saved=saveSearchSession(persistedSession.value,data.serializedSession);
-      if (!saved) error.value = t('examSearch.sessionSaveFailed');
-      continuation.saved(saved);
+      // Pass the plain worker snapshot to IndexedDB, not Vue's reactive proxy.
+      const session = { input: clone(evaluatedInput.value), checkpoint: data.checkpoint, catalogVersion: data.catalogVersion, version: ENGINE_VERSION };
+      persistedSession.value = session;
+      lastCheckpoint = session;
+      await persistCheckpoint(session, data.id);
     }
     if (data.preview) {
       previewScore.value = Number(data.preview.score || 0);
@@ -484,6 +512,8 @@ function start(durationMs: number) {
   worker?.terminate(); worker = null;
   runFingerprint.value = JSON.stringify(input.value);
   persistedSession.value = null;
+  lastCheckpoint = null;
+  sessionSaved.value = true;
   evaluatedInput.value = clone(input.value); progress.value = null; busy.value = true;
   continuation.begin(continuousSearch.value);
   try {
@@ -499,7 +529,9 @@ function resume() {
 function resumeBatch() {
   try {
     getWorker().postMessage({ method: 'resume', id: ++requestId, durationMs: 180000, continuous: continuousSearch.value,
-      input: clone(evaluatedInput.value), checkpoint: persistedSession.value ? clone(persistedSession.value.checkpoint) : undefined, catalogVersion: persistedSession.value?.catalogVersion });
+      // postMessage clones the plain checkpoint losslessly, preserving shared
+      // objects without another expanded JSON copy on the UI thread.
+      input: clone(evaluatedInput.value), checkpoint: persistedSession.value ? toRaw(persistedSession.value.checkpoint) : undefined, catalogVersion: persistedSession.value?.catalogVersion });
   } catch (cause) { requestFailed(cause); }
 }
 function requestFailed(cause: unknown) {
@@ -513,7 +545,7 @@ function stop() {
   } else worker?.postMessage({ method: 'stop', id: requestId });
 }
 async function requestStopAndSave() {
-  if (!busy.value) return true;
+  if (!busy.value) return sessionSaved.value;
   const saved = new Promise<boolean>(resolve => idleWaiters.push(resolve));
   stop();
   return await saved;
@@ -557,7 +589,18 @@ function variantCardSummary(result: SearchResult) {
     }).join(' · ') || t('examSearch.noUpgrade');
 }
 onBeforeRouteLeave(() => requestStopAndSave());
-onBeforeUnmount(() => { continuation.cancel(); worker?.terminate(); });
+function beforeUnload(event: BeforeUnloadEvent) {
+  if (!pendingSave && (sessionSaved.value || !persistedSession.value)) return;
+  event.preventDefault();
+  event.returnValue = '';
+}
+onMounted(() => window.addEventListener('beforeunload', beforeUnload));
+onBeforeUnmount(() => {
+  disposed = true;
+  window.removeEventListener('beforeunload', beforeUnload);
+  continuation.cancel();
+  worker?.terminate();
+});
 </script>
 
 <style scoped>

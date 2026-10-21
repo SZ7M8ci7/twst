@@ -955,6 +955,7 @@
     "saveFailed": "Settings could not be saved. Search continues.",
     "saving": "Saving",
     "sessionSaveFailed": "This search could not be saved. After reloading, you cannot resume from this result.",
+    "retrySave": "Retry saving search",
     "lock": {
       "auto": "Search decides",
       "on": "Always apply",

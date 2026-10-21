@@ -54,7 +54,7 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
       constructor() { workers.push(this); }
       postMessage(message) { this.messages.push(message); }
       terminate() { this.terminated = true; }
-      respond(data) { this.onmessage({ data: { id: this.messages.at(-1).id, ...data } }); }
+      respond(data) { return this.onmessage({ data: { id: this.messages.at(-1).id, ...data } }); }
     },
   };
   function localRequire(id) {
@@ -86,7 +86,7 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
   const source = read('src/views/examSearch.vue').split('<script setup lang="ts">')[1].split('</script>')[0]
     .replaceAll('import.meta.url', JSON.stringify('file:///examSearch.vue'));
   const viewContext = { ...context, exports: {}, require: localRequire };
-  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave, setSupportCandidates, selectPreset, applySharedConditions };'), viewContext));
+  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave, setSupportCandidates, selectPreset, applySharedConditions, sessionSaved, retrySave, preview };'), viewContext));
   function supportPicker(modelValue, includeAllRarities = true) {
     const props = vue.reactive({ modelValue, includeAllRarities, focusRequest: null, disabled: false });
     const mounted = [];
@@ -98,7 +98,7 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
     mounted.forEach(callback => callback());
     return { ...pickerContext.picker, props };
   }
-  return { view: viewContext.view, load, workers, timers, persistence, supportPicker,
+  return { view: viewContext.view, load, workers, timers, persistence, supportPicker, storage,
     flushTimers() { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(callback => callback()); } };
 }
 
@@ -192,15 +192,102 @@ for (const legacy of [false, true]) {
   });
 }
 
+for (const errorName of ['QuotaExceededError', 'SecurityError']) {
+  test(`${errorName} during checkpoint save stops auto continuation but keeps the latest in-memory resume`, async t => {
+    const { view, workers, timers, flushTimers, storage, persistence } = runtime(t, names.slice(0, 5).map(name => handCard(name)));
+    view.start(1000);
+    const worker = workers[0];
+    await worker.respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+    assert.equal(persistence.loadSearchSession().checkpoint.cursor, 1);
+    const setItem = storage.setItem;
+    storage.setItem = (key, value) => {
+      if (key.endsWith('-session')) { const error = new Error(errorName); error.name = errorName; throw error; }
+      return setItem(key, value);
+    };
+    view.continuousSearch.value = true;
+    view.resume();
+    const latest = { ...checkpoint(), cursor: 2 };
+    await worker.respond({ progress: { phase: 'done', results: [], tasksDone: 2 }, checkpoint: latest, catalogVersion: 'test' });
+    assert.equal(view.error.value, 'examSearch.sessionSaveFailed:');
+    assert.equal(view.busy.value, false);
+    assert.equal(view.canResume.value, true);
+    assert.equal(view.progress.value.tasksDone, 2);
+    assert.equal(persistence.loadSearchSession().checkpoint.cursor, 1, 'reload can only recover the older saved checkpoint');
+    assert.equal(timers.size, 0);
+    const requests = worker.messages.length;
+    flushTimers();
+    assert.equal(worker.messages.length, requests, 'failed saves must not restart automatically');
+    assert.equal(await view.requestStopAndSave(), false, 'navigation must not discard the unsaved checkpoint');
+    view.resume();
+    assert.equal(worker.messages.at(-1).checkpoint.cursor, 2, 'explicit resume uses the unsaved checkpoint in memory');
+    await worker.respond({ checkpoint: latest, catalogVersion: 'test' });
+    assert.equal(view.error.value, 'examSearch.sessionSaveFailed:', 'retrying without freeing space repeats the warning');
+    view.preview({ candidate: { cards: [] }, validationBest: { seed: 'preview', score: 1 } });
+    const leavingPreview = view.requestStopAndSave();
+    await worker.respond({ preview: { score: 1, log: [] } });
+    assert.equal(await leavingPreview, false, 'finishing a preview must not mark unsaved results as saved');
+    storage.setItem = setItem;
+    await view.retrySave();
+    assert.equal(view.sessionSaved.value, true);
+    assert.equal(view.error.value, '');
+    assert.equal(persistence.loadSearchSession().checkpoint.cursor, 2);
+    assert.equal(await view.requestStopAndSave(), true);
+  });
+}
+
+for (const stopWhileSaving of [false, true]) {
+  test(`asynchronous save waits for commit before ${stopWhileSaving ? 'navigation' : 'continuing the search'}`, async t => {
+    const { view, workers, timers, persistence } = runtime(t, names.slice(0, 5).map(name => handCard(name)));
+    let release;
+    const originalSave = persistence.saveSearchSession;
+    persistence.saveSearchSession = value => new Promise(resolve => {
+      release = async () => resolve(await originalSave(value));
+    });
+    view.continuousSearch.value = true;
+    view.start(1000);
+    const response = workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 },
+      checkpoint: checkpoint(), catalogVersion: 'test' });
+    assert.equal(view.busy.value, true);
+    assert.equal(view.sessionSaved.value, false);
+    assert.equal(timers.size, 0);
+    let navigationFinished = false;
+    const navigation = stopWhileSaving ? view.requestStopAndSave().then(saved => { navigationFinished = true; return saved; }) : null;
+    await Promise.resolve();
+    assert.equal(navigationFinished, false);
+    await release(); await response;
+    assert.equal(view.sessionSaved.value, true);
+    assert.equal(timers.size, stopWhileSaving ? 0 : 1);
+    if (navigation) assert.equal(await navigation, true);
+  });
+}
+
+test('an old asynchronous save cannot revive invalidated search results', async t => {
+  const { view, workers, timers, persistence } = runtime(t, names.slice(0, 5).map(name => handCard(name)));
+  let release;
+  persistence.saveSearchSession = () => new Promise(resolve => { release = resolve; });
+  view.continuousSearch.value = true;
+  view.start(1000);
+  const response = workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 },
+    checkpoint: checkpoint(), catalogVersion: 'test' });
+  view.hand.updateHandCard(names[0], { level: 81 });
+  await vue.nextTick();
+  release(false); await response;
+  assert.equal(view.busy.value, false);
+  assert.equal(view.progress.value, null);
+  assert.equal(view.error.value, '');
+  assert.equal(view.canResume.value, false);
+  assert.equal(timers.size, 0);
+});
+
 for (const betweenBatches of [false, true]) {
   test(`changing a card to Lv0 ${betweenBatches ? 'between continuous batches' : 'during a search'} clears results and prevents old-roster continuation`, async t => {
     const { view, workers, timers, flushTimers } = runtime(t, names.slice(0, 5).map(name => handCard(name)));
     view.continuousSearch.value = true;
     view.start(1000);
     const worker = workers[0];
-    worker.respond({ progress: { phase: betweenBatches ? 'done' : 'generate', results: [], tasksDone: 1 } });
+    await worker.respond({ progress: { phase: betweenBatches ? 'done' : 'generate', results: [], tasksDone: 1 } });
     if (betweenBatches) {
-      worker.respond({ checkpoint: checkpoint(), catalogVersion: 'test' });
+      await worker.respond({ checkpoint: checkpoint(), catalogVersion: 'test' });
       assert.equal(timers.size, 1);
     }
     const saving = betweenBatches ? null : view.requestStopAndSave();
@@ -215,7 +302,7 @@ for (const betweenBatches of [false, true]) {
     assert.equal(timers.size, 0);
     flushTimers();
     assert.ok(worker.messages.every(message => message.method !== 'resume'));
-    worker.respond({ progress: { phase: 'done', results: [], tasksDone: 2 } });
+    await worker.respond({ progress: { phase: 'done', results: [], tasksDone: 2 } });
     assert.equal(view.progress.value, null, 'late worker responses cannot restore stale results');
   });
 }
@@ -225,7 +312,7 @@ test('changing an excluded card leaves a valid continuous search running', async
   view.continuousSearch.value = true;
   view.start(1000);
   const worker = workers[0];
-  worker.respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  await worker.respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
   view.hand.updateHandCard(names[5], { totsu: 4 });
   await vue.nextTick();
   assert.equal(worker.terminated, false);
@@ -379,7 +466,7 @@ test('extra level cap is validated, saved and sent to the worker without alterin
   assert.equal(workers[0].messages[0].input.additionalLevelCap, 10);
   assert.equal(persistence.loadExamSearch().additionalLevelCap, 10);
   assert.ok(view.hand.ownedCards.every(card => card.level === 80));
-  workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  await workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
   assert.equal(view.canResume.value, true);
   view.input.value.additionalLevelCap = 5;
   await vue.nextTick();

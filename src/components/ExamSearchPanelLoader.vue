@@ -15,6 +15,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, type Component } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { initializeExamSearchStorage } from '@/storage/examSearchStorage';
 
 defineOptions({ inheritAttrs: false });
 const { t } = useI18n();
@@ -26,6 +27,7 @@ let disposed = false;
 async function loadPanel() {
   loadFailed.value = false;
   try {
+    await initializeExamSearchStorage();
     const loaded = await import('@/views/examSearch.vue');
     if (!disposed) panel.value = loaded.default;
   } catch {

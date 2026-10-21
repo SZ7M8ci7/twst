@@ -3,8 +3,7 @@ import { validateInput, candidateSatisfiesConstraints } from '@/domain/examSearc
 import { constrainCheckpoint } from '@/domain/examSearch/requiredCheckpoint';
 import { createParallelCheckpoint, aggregateIslandProgress, chooseIslandCount, mergeIslandResults } from '@/domain/examSearch/islands';
 import type { SearchInput, Candidate, SearchProgress } from '@/domain/examSearch/types';
-import { ENGINE_VERSION, MAX_ISLANDS } from '@/domain/examSearch/types';
-import { serializeSearchSession } from '@/storage/examSearchStorage';
+import { MAX_ISLANDS } from '@/domain/examSearch/types';
 import type { SessionCheckpoint } from '@/domain/examSearch/scheduler';
 import { displayProgress } from '@/domain/examSearch/statistics';
 
@@ -95,9 +94,8 @@ function handleChild(op: Operation, child: Child, data: ChildMessage) {
   op.owners = merged.owners;
   const checkpoint = createParallelCheckpoint(checkpoints, op.baseNonce, op.owners, op.baseElapsed + Date.now() - op.startedAt) as ParallelCheckpoint;
   checkpoint.finalists = merged.results;
-  const serializedSession = serializeSearchSession({ input: op.input, checkpoint, catalogVersion, version: ENGINE_VERSION });
   postAggregate(op, op.stopping ? 'stopped' : 'done');
-  self.postMessage({ id: op.id, checkpoint, catalogVersion, serializedSession });
+  self.postMessage({ id: op.id, checkpoint, catalogVersion });
   terminateChildren(op); operation = null; requestActive = false;
 }
 function startupFailureMessage(child: Child, event: { message?: string }) {

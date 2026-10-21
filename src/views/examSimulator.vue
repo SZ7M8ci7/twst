@@ -791,7 +791,7 @@ import { examPresetDefinitions, type ExamPresetDefinition, type ExamSpecialChall
 import { buildConstrainedEnemyActionDeck } from '@/utils/enemyActionDeck';
 import { chooseObservedPair, chooseFlexiblePlanPair, remainingContinuousHealing, createPairSpend, type BattleObservation, type FlexiblePlanStep } from '@/domain/examSearch/policy';
 import type { SearchInput, Candidate, PolicyKind } from '@/domain/examSearch/types';
-import { loadSearchTransfer, loadExamSearch } from '@/storage/examSearchStorage';
+import { loadSearchTransfer, loadExamSearch, initializeExamSearchStorage } from '@/storage/examSearchStorage';
 import { snapshotExamConditions, type SharedExamConditions } from '@/utils/sharedExamConditions';
 import { loadExamSimulatorDeckImportState, saveDeckSimulatorImportState } from '@/storage/simulatorStorage';
 import {
@@ -2022,7 +2022,8 @@ function restoreInitialExamDeck() {
   } else void restoreDeckFromSimulatorImport();
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await initializeExamSearchStorage();
   savedExamSettings.value = loadSavedExamSimulatorSettings();
   if (router.currentRoute.value.query.tab === 'search' && !router.currentRoute.value.query.resourceSearch) {
     const savedSearch = loadExamSearch();
