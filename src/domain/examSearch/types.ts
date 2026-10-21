@@ -15,6 +15,8 @@ export interface RosterCard {
 }
 export interface SearchCard extends RosterCard {
   originalTotsu: number;
+  /** Allocated friendship training, excluding levels granted by extra limit breaks. */
+  additionalLevels?: number;
   selectedMagic: [MagicSlot, MagicSlot];
   support: boolean;
 }
@@ -30,6 +32,8 @@ export interface SearchInput {
   /** Support exclusions persist across normal/unified preset changes. */
   excludedSupportNames?: string[];
   budget: number;
+  /** Total friendship training to distribute across owned slots. Extra limit breaks are separate. */
+  additionalLevelCap?: number;
   itemsPerLimitBreak: number;
   target: number;
   attempts: number;
@@ -101,5 +105,5 @@ export interface BattleEngine {
   learnCriticalPlan?(seed:string,durationMs:number,cardIndex:number,idealHand?:boolean,magic?:MagicSlot):Promise<[string,string][]|null>;
 }
 export interface BattleTrial { score: number; retired: boolean; finishTurn: number; fitness?: number; log?: string[]; plan?: [string, string][] }
-export const ENGINE_VERSION = 'exam-resource-search-135';
+export const ENGINE_VERSION = 'exam-resource-search-138';
 export const emptySamples = (): Samples => ({ scores: [], retired: 0, turns: 0 });

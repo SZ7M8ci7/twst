@@ -1,6 +1,7 @@
 import type { RosterCard, SearchInput, SearchCard, Candidate, PolicyKind } from '@/domain/examSearch/types';
 import { isM3Unlocked } from '@/utils/totsu';
-import { getInputMaxLevel } from '@/constants/levels';
+import { getInputMaxLevel, getFriendshipLevelBonus, getMaxLevelAtLimitBreak } from '@/constants/levels';
+import { withinLevelBudget } from '@/domain/examSearch/levelAllocation';
 
 export function examUsesSupport(preset: SearchInput['preset']): boolean {
   return preset.title.includes('統一') || (preset.specialChallenges?.length??0)>0;
@@ -43,6 +44,11 @@ export function candidateIncludesRequired(input: SearchInput, candidate: Pick<Ca
   return true;
 }
 
+export function candidateSatisfiesConstraints(input: SearchInput, candidate: Pick<Candidate, 'cards'>,
+  catalog?: Record<string, { chara?: string; rare?: string }>): boolean {
+  return withinLevelBudget(input, candidate.cards, catalog) && candidateIncludesRequired(input, candidate, catalog);
+}
+
 export function challengeVariants(input: Pick<SearchInput, 'preset' | 'challengeLocks' | 'maxRemoved'>): string[][] {
   if (!input.preset.specialChallenges?.length) return [[]];
   const base = (input.preset.specialChallenges ?? []).filter(c => input.challengeLocks[c.id] !== 'off').map(c => c.id);
@@ -60,11 +66,20 @@ export function challengeVariants(input: Pick<SearchInput, 'preset' | 'challenge
   return results;
 }
 
-export function cardVariants(card: RosterCard, rare: string, support = false, targetTotsu = card.totsu): SearchCard[] {
+export function cardVariants(card: RosterCard, rare: string, support = false, targetTotsu = card.totsu, allocatedLevels = 0): SearchCard[] {
   const pairs: [1 | 2 | 3, 1 | 2 | 3][] = isM3Unlocked(rare, targetTotsu) ? [[1, 2], [1, 3], [2, 3]] : [[1, 2]];
-  const level=support?card.level:Math.min(120,card.level+Math.max(0,targetTotsu-card.totsu)*5);
+  const extraLevels = Math.min(allocatedLevels, getFriendshipLevelBonus(rare));
+  // The collection does not store friendship Lv. This is a training allowance,
+  // not an inferred friendship level. Preserve legacy registered levels even
+  // when they exceed the cap for their registered limit-break count.
+  const baseline = support ? card.level : Math.max(card.level, Math.min(
+    getMaxLevelAtLimitBreak(rare, targetTotsu),
+    card.level + Math.max(0, targetTotsu - card.totsu) * 5,
+  ));
+  const additionalLevels = support ? 0 : Math.max(0, Math.min(extraLevels, getMaxLevelAtLimitBreak(rare, targetTotsu) - baseline));
+  const level = baseline + additionalLevels;
   return pairs.map(selectedMagic => ({ ...card, level, magicLevels: [...card.magicLevels], buddyLevels: [...card.buddyLevels],
-    totsu: targetTotsu, originalTotsu: card.totsu, selectedMagic, support }));
+    totsu: targetTotsu, originalTotsu: card.totsu, selectedMagic, support, additionalLevels }));
 }
 
 export function upgradeTargets(card: RosterCard, rare: string, budget: number, itemCost: number): number[] {
@@ -72,8 +87,8 @@ export function upgradeTargets(card: RosterCard, rare: string, budget: number, i
   return [1, 2, 3, 4].filter(t => t > card.totsu && (t - card.totsu) * itemCost <= budget);
 }
 
-export function searchCardVariants(card: RosterCard, rare: string, support = false, targetTotsu = card.totsu): SearchCard[] {
-  return cardVariants(card,rare,support,targetTotsu);
+export function searchCardVariants(card: RosterCard, rare: string, support = false, targetTotsu = card.totsu, allocatedLevels = 0): SearchCard[] {
+  return cardVariants(card,rare,support,targetTotsu,allocatedLevels);
 }
 
 // At most 3^5 loadouts. Include single substitutions too: the separate
@@ -84,13 +99,13 @@ export function jointSpellCandidates(input: SearchInput, parent: Candidate, cata
   for (const card of parent.cards) {
     const original=(card.support?input.supports:input.roster).find(c=>c.name===card.name);
     if(!original)return [];
-    const options=searchCardVariants(original,catalog[card.name].rare,card.support,card.totsu);
+    const options=searchCardVariants(original,catalog[card.name].rare,card.support,card.totsu,card.additionalLevels);
     teams=teams.flatMap(team=>options.map(option=>[...team,option]));
   }
   const hash=(value:string)=>{let h=2166136261;for(let i=0;i<value.length;i++)h=Math.imul(h^value.charCodeAt(i),16777619);return h>>>0;};
   return teams.filter(cards=>cards.some((c,i)=>c.selectedMagic.join(',')!==parent.cards[i].selectedMagic.join(',')))
     .map(cards=>({...parent,cards,preferredPlan:undefined,preferredPlanMode:undefined,
-      id:JSON.stringify([cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy])}))
+      id:JSON.stringify([cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy])}))
     .map(candidate=>({candidate,order:hash(candidate.id)})).sort((a,b)=>a.order-b.order).map(row=>row.candidate);
 }
 
@@ -100,7 +115,7 @@ export function alternatePolicyCandidates(input: SearchInput, parent: Candidate)
       ?['effects-public' as const,'effects-tail' as const,'effects-score' as const,'effects-duo' as const]:['effects-tail' as const,'effects-score' as const])];
   return policies.filter(policy=>policy!==parent.policy).map(policy=>({...parent,policy,
     preferredPlan:undefined,preferredPlanMode:undefined,
-    id:JSON.stringify([parent.cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,policy])}));
+    id:JSON.stringify([parent.cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,policy])}));
 }
 
 export function lowerCostCandidates(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string}>): Candidate[] {
@@ -114,7 +129,7 @@ export function lowerCostCandidates(input: SearchInput, parent: Candidate, catal
     const preferredPlan=legalPlan?parent.preferredPlan:undefined;
     const preferredPlanMode=legalPlan?parent.preferredPlanMode:undefined;
     const cost=upgradeCost(input,cards);
-    const base=[cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy];
+    const base=[cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy];
     const id=JSON.stringify(preferredPlan?[...base,preferredPlan,preferredPlanMode]:base);
     return {...parent,id,cards,cost,preferredPlan,preferredPlanMode};
   });
@@ -134,7 +149,7 @@ export function trainedUpgradeCandidates(input:SearchInput,parent:Candidate,cata
     .map(cards=>{
       const preferredPlan=parent.preferredPlan?.length?parent.preferredPlan:undefined;
       const preferredPlanMode=preferredPlan?parent.preferredPlanMode:undefined;
-      const base=[cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy];
+      const base=[cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy];
       const id=JSON.stringify(preferredPlan?[...base,preferredPlan,preferredPlanMode]:base);
       return {...parent,cards,cost:upgradeCost(input,cards),preferredPlan,preferredPlanMode,id};
     })
@@ -146,7 +161,7 @@ export function trainedUpgradeCandidates(input:SearchInput,parent:Candidate,cata
 // A generator lets callers yield between estimates and honour cancellation.
 export function* allocationCards(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string}>, reduceOnly=false,
   index=0, cards: SearchCard[]=[], cost=0): Generator<SearchCard[]> {
-  if(index===parent.cards.length){yield cards;return;}
+  if(index===parent.cards.length){if(withinLevelBudget(input,cards,catalog))yield cards;return;}
   const slot=parent.cards[index];
   const original=(slot.support?input.supports:input.roster).find(c=>c.name===slot.name);
   if(!original)return;
@@ -155,7 +170,7 @@ export function* allocationCards(input: SearchInput, parent: Candidate, catalog:
   for(const target of targets) {
     const nextCost=cost+(slot.support?0:(target-original.totsu)*input.itemsPerLimitBreak);
     if(nextCost>input.budget)continue;
-    const options=target===slot.totsu?[slot]:searchCardVariants(original,catalog[slot.name].rare,false,target);
+    const options=target===slot.totsu?[slot]:searchCardVariants(original,catalog[slot.name].rare,false,target,slot.additionalLevels);
     for(const option of options)yield* allocationCards(input,parent,catalog,reduceOnly,index+1,[...cards,option],nextCost);
   }
 }
@@ -178,6 +193,8 @@ export function validateInput(input: SearchInput, catalog: Record<string, { rare
   if (new Set(input.roster.map(c => c.name)).size !== input.roster.length) return 'duplicate';
   if (!Number.isInteger(input.budget) || input.budget < 0 || !Number.isInteger(input.itemsPerLimitBreak) || input.itemsPerLimitBreak < 1
     || Math.floor(input.budget / input.itemsPerLimitBreak) > 4) return 'budget';
+  const additionalLevelCap = input.additionalLevelCap ?? 0;
+  if (!Number.isInteger(additionalLevelCap) || additionalLevelCap < 0 || additionalLevelCap > 100) return 'additional-level-cap';
   if (!Number.isFinite(input.target) || input.target < 0 || !Number.isInteger(input.attempts) || input.attempts < 1 || input.attempts > 100000
     || !Number.isFinite(input.tolerance) || input.tolerance < 0 || (input.target === 0 ? input.tolerance !== 0 : input.tolerance >= input.target)
     || !Number.isFinite(input.desiredProbability) || input.desiredProbability <= 0 || input.desiredProbability >= 1) return 'target';

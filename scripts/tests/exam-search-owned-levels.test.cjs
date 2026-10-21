@@ -39,7 +39,8 @@ function checkpoint() {
 function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
   const values = new Map(), cache = new Map(), timers = new Map(), workers = [];
   const storage = { getItem: key => values.get(key) ?? null,
-    setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
+    setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key),
+    get length() { return values.size; }, key: index => [...values.keys()][index] ?? null };
   const window = { localStorage: storage, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     addEventListener() {}, removeEventListener() {} };
   let timerId = 0;
@@ -333,4 +334,225 @@ test('existing support picker usage still defaults to all SSR cards in its origi
   assert.deepEqual(clone(picker.searchSettingsStore.selectedSupportCharacters), []);
   picker.toggleCharacter(names[0]);
   assert.deepEqual(clone(picker.searchSettingsStore.selectedSupportCharacters), [names[0]]);
+});
+
+test('additional trained levels respect rarity, limit breaks and remaining friendship headroom', t => {
+  const { load } = runtime(t, []);
+  const { cardVariants } = load('src/domain/examSearch/variants.ts');
+  const level = (rare, current, totsu, target, extra = 0, support = false) =>
+    cardVariants(rosterCard(names[0], current, totsu), rare, support, target, extra)[0].level;
+  for (const [rare, base, bonus] of [['SSR', 80, 20], ['SR', 60, 10], ['R', 40, 10]]) {
+    for (let totsu = 0; totsu <= 4; totsu++) {
+      assert.equal(level(rare, base + totsu * 5, totsu, totsu, 20), base + totsu * 5 + bonus);
+      assert.equal(level(rare, base + totsu * 5 + bonus - 1, totsu, totsu, 20), base + totsu * 5 + bonus);
+    }
+  }
+  assert.equal(level('SSR', 80, 0, 1, 20), 105);
+  assert.equal(level('SSR', 90, 0, 0, 20), 100, 'existing friendship bonus cannot be added twice');
+  assert.equal(level('SSR', 110, 4, 4, 20), 120);
+  assert.equal(level('SSR', 80, 0, 0, 1), 81, 'card-level increments are not friendship-level increments');
+  assert.equal(level('SSR', 40, 0, 0, 10), 50, 'do not fill the entire available level cap');
+  assert.equal(level('SSR', 80, 0, 1), 85, 'zero preserves the existing limit-break increment');
+  assert.equal(level('SSR', 80, 0, 0), 80);
+  assert.equal(level('SSR', 80, 0, 0, 20, true), 80, 'supports retain their registered training');
+  assert.equal(level('SSR', 120, 0, 1, 20), 120, 'legacy inconsistent registrations are not lowered');
+  const original = rosterCard(names[0]);
+  const unbroken = cardVariants(original, 'SSR', false, 0, 20);
+  assert.deepEqual(clone(unbroken.map(card => card.selectedMagic)), [[1, 2]], 'levels never unlock M3');
+  assert.equal(original.level, 80, 'the hand collection is unchanged');
+});
+
+test('extra level cap is validated, saved and sent to the worker without altering the collection', async t => {
+  const { view, workers, persistence, load } = runtime(t, names.slice(0, 5).map(name => handCard(name)));
+  const { validateInput } = load('src/domain/examSearch/variants.ts');
+  assert.equal(view.input.value.additionalLevelCap ?? 0, 0, 'legacy settings default to no additional levels');
+  for (const value of [-1, 101, 1.5, '', '10', NaN, Infinity]) {
+    view.input.value.additionalLevelCap = value;
+    assert.equal(validateInput(view.input.value, catalog), 'additional-level-cap');
+    view.start(1000);
+    assert.equal(view.error.value, 'examSearch.validation.additional-level-cap:');
+    assert.equal(workers.length, 0);
+  }
+  view.input.value.additionalLevelCap = 10;
+  await vue.nextTick();
+  view.start(1000);
+  assert.equal(workers[0].messages[0].input.additionalLevelCap, 10);
+  assert.equal(persistence.loadExamSearch().additionalLevelCap, 10);
+  assert.ok(view.hand.ownedCards.every(card => card.level === 80));
+  workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  assert.equal(view.canResume.value, true);
+  view.input.value.additionalLevelCap = 5;
+  await vue.nextTick();
+  assert.equal(view.canResume.value, false);
+  assert.equal(view.progress.value, null, 'scores from the old training setting are cleared');
+});
+
+test('saved extra level cap survives restoring a resumable search', t => {
+  const input = searchInput();
+  input.additionalLevelCap = 7;
+  input.roster = names.slice(0, 5).map(name => rosterCard(name));
+  const { view, workers } = runtime(t, names.slice(0, 5).map(name => handCard(name)), input, checkpoint());
+  assert.equal(view.canResume.value, true);
+  view.resume();
+  assert.equal(workers[0].messages[0].input.additionalLevelCap, 7);
+});
+
+for (const unified of [false, true]) {
+  test(`shared extra level budget reaches ${unified ? 'unified' : 'normal'} candidates, refinements and simulator transfers`, async t => {
+    const { load, persistence } = runtime(t, []);
+    const input = searchInput(unified);
+    input.roster = names.slice(0, unified ? 4 : 5).map(name => rosterCard(name, 90, 2));
+    if (unified) input.supports[0].level = 85;
+    input.additionalLevelCap = 10;
+    input.budget = 1;
+    const { buildTasks, generateCandidates, generateNeighbors, crossCandidates } = load('src/domain/examSearch/candidateGenerator.ts');
+    const { jointSpellCandidates, lowerCostCandidates, trainedUpgradeCandidates, upgradeCost } = load('src/domain/examSearch/variants.ts');
+    const { additionalLevelCost } = load('src/domain/examSearch/levelAllocation.ts');
+    const tasks = buildTasks(input, catalog);
+    const baseline = generateCandidates(input, tasks.find(task => task.cost === 0), catalog);
+    const upgraded = generateCandidates(input, tasks.find(task => task.cost === 1), catalog);
+    assert.ok(baseline.length && upgraded.length);
+    const parent = upgraded.find(candidate => candidate.cost === 1 && additionalLevelCost(candidate.cards) === 10);
+    assert.ok(parent);
+    const cheaper = lowerCostCandidates(input, parent, catalog);
+    const spells = jointSpellCandidates(input, parent, catalog);
+    const trained = trainedUpgradeCandidates(input, baseline[0], catalog);
+    assert.ok(cheaper.length && spells.length && trained.length);
+    assert.ok(baseline.some(candidate => candidate.cards.some(card => card.additionalLevels === 10)), 'can allocate all ten levels to one card');
+    assert.ok(baseline.some(candidate => candidate.cards.filter(card => card.additionalLevels === 5).length === 2), 'can split five levels each between two cards');
+    assert.ok(baseline.some(candidate => additionalLevelCost(candidate.cards) === 0), 'also compares no additional training');
+    const neighbors = await generateNeighbors(input, parent, catalog, new Set([parent.id]), () => false);
+    const crossed = crossCandidates(input, parent, baseline[0], catalog, new Set());
+    assert.ok(neighbors.length && crossed.length);
+    for (const candidate of [...baseline, ...upgraded, ...cheaper, ...spells, ...trained, ...neighbors, ...crossed]) {
+      for (const card of candidate.cards) assert.equal(card.level, card.support ? 85 : 90 + (card.totsu - 2) * 5 + (card.additionalLevels ?? 0));
+      assert.ok(candidate.cards.every(card => (card.additionalLevels ?? 0) % 5 === 0), 'every generation and refinement path uses five-level units');
+      assert.ok(additionalLevelCost(candidate.cards) <= 10, 'the whole team shares the ten-level allowance');
+      assert.equal(candidate.cost, upgradeCost(input, candidate.cards), 'level training consumes no limit-break items');
+      assert.ok(candidate.cost <= 1);
+    }
+    assert.ok(spells.every(candidate => additionalLevelCost(candidate.cards) === 10), 'spell changes retain the allocation');
+    assert.ok(cheaper.every(candidate => additionalLevelCost(candidate.cards) === 10), 'reducing limit breaks does not remove separate friendship training');
+    const id = persistence.saveSearchTransfer(input, parent);
+    const transfer = persistence.loadSearchTransfer(id);
+    assert.deepEqual(clone(transfer.candidate.cards), clone(parent.cards));
+    assert.equal(transfer.input.additionalLevelCap, 10);
+  });
+}
+
+function drain(generator) {
+  let step = generator.next();
+  while (!step.done) step = generator.next();
+  return step.value;
+}
+
+test('allocation search finds five-level splits and respects a total budget above twenty', t => {
+  const { load } = runtime(t, []);
+  const { cardVariants } = load('src/domain/examSearch/variants.ts');
+  const { levelAllocationSteps, additionalLevelCost } = load('src/domain/examSearch/levelAllocation.ts');
+  const input = searchInput();
+  input.additionalLevelCap = 15;
+  const parent = { id: 'base', cards: names.slice(0, 5).map(name => cardVariants(rosterCard(name), 'SSR')[0]),
+    challengeIds: [], cost: 0, policy: 'balanced', estimate: 0 };
+  const original = clone(parent);
+  const target = [5, 10, 0, 0, 0];
+  const estimate = cards => -cards.reduce((sum, card, i) => sum + (card.additionalLevels - target[i]) ** 2, 0);
+  const rows = drain(levelAllocationSteps(input, parent, catalog, estimate));
+  assert.ok(rows.some(row => JSON.stringify(row.cards.map(c => c.additionalLevels)) === JSON.stringify(target)));
+  assert.equal(new Set(rows.map(row => row.id)).size, rows.length, 'different level allocations have distinct IDs');
+  assert.deepEqual(clone(parent), original);
+  for (const budget of [25, 100]) {
+    input.additionalLevelCap = budget;
+    const rows = drain(levelAllocationSteps(input, parent, catalog, cards => cards.reduce((sum, c) => sum + c.level, 0)));
+    assert.ok(rows.every(row => additionalLevelCost(row.cards) <= budget));
+    assert.ok(rows.every(row => row.cards.every(card => card.additionalLevels <= 20 && card.level <= 100)));
+    assert.ok(rows.some(row => additionalLevelCost(row.cards) === budget));
+  }
+});
+
+test('a remainder below five stays on one card and refinement preserves learned plans', t => {
+  const { load } = runtime(t, []);
+  const { cardVariants } = load('src/domain/examSearch/variants.ts');
+  const { levelAllocationNeighbors, additionalLevelCost } = load('src/domain/examSearch/levelAllocation.ts');
+  const input = searchInput(); input.additionalLevelCap = 3;
+  const parent = { id: 'base', cards: names.slice(0, 5).map(name => cardVariants(rosterCard(name), 'SSR')[0]),
+    challengeIds: [], cost: 0, policy: 'balanced', estimate: 0,
+    preferredPlan: [['0-M1', '1-M2']], preferredPlanMode: 'turn' };
+  const key = row => row.cards.map(card => card.additionalLevels).join(',');
+  const seen = new Set([key(parent)]), queue = [parent];
+  while (queue.length) for (const row of levelAllocationNeighbors(input, queue.shift(), catalog, () => 0)) {
+    assert.ok(additionalLevelCost(row.cards) <= 3);
+    assert.equal(row.cost, 0);
+    assert.deepEqual(clone(row.preferredPlan), parent.preferredPlan);
+    if (!seen.has(key(row))) { seen.add(key(row)); queue.push(row); }
+  }
+  assert.equal(seen.size, 6, 'only zero and a single three-level remainder on each of five cards are reachable');
+});
+
+test('five-level refinement covers coarse splits without splitting the final remainder', t => {
+  const { load } = runtime(t, []);
+  const { cardVariants } = load('src/domain/examSearch/variants.ts');
+  const { levelAllocationSteps, levelAllocationNeighbors, additionalLevelCost, withinLevelBudget } = load('src/domain/examSearch/levelAllocation.ts');
+  const parent = { id: 'base', cards: names.slice(0, 5).map(name => cardVariants(rosterCard(name), 'SSR')[0]),
+    challengeIds: [], cost: 0, policy: 'balanced', estimate: 0 };
+  for (const budget of [10, 12]) {
+    const input = { ...searchInput(), additionalLevelCap: budget };
+    const key = row => row.cards.map(card => card.additionalLevels).join(',');
+    const seeds = drain(levelAllocationSteps(input, parent, catalog, () => 0));
+    const seen = new Set([key(parent)]), queue = [parent];
+    for (const row of seeds) assert.ok(withinLevelBudget(input, row.cards, catalog));
+    while (queue.length) for (const row of levelAllocationNeighbors(input, queue.shift(), catalog, () => 0)) {
+      const amounts = row.cards.map(card => card.additionalLevels), remainder = amounts.filter(n => n % 5);
+      assert.ok(additionalLevelCost(row.cards) <= budget);
+      assert.ok(remainder.length <= (budget % 5 ? 1 : 0));
+      if (remainder.length) {
+        assert.equal(remainder[0] % 5, 2);
+        assert.equal(additionalLevelCost(row.cards), budget);
+      }
+      if (!seen.has(key(row))) { seen.add(key(row)); queue.push(row); }
+    }
+    assert.ok(seen.has('5,5,0,0,0'));
+    assert.ok(seen.has('10,0,0,0,0'));
+    assert.ok(!seen.has('9,1,0,0,0'));
+    assert.ok(!seen.has('2,2,2,2,2'));
+    if (budget === 10) assert.equal(seen.size, 21);
+    else {
+      assert.ok(seen.has('10,2,0,0,0'));
+      assert.ok(seen.has('5,5,2,0,0'));
+      assert.ok(seen.has('7,5,0,0,0'));
+      assert.ok(seen.has('12,0,0,0,0'));
+      assert.ok(seeds.some(row => additionalLevelCost(row.cards) === 12));
+    }
+  }
+});
+
+test('support and rarity headroom leave unused budget rather than granting illegal levels', t => {
+  const { load } = runtime(t, []);
+  const { cardVariants } = load('src/domain/examSearch/variants.ts');
+  const { levelAllocationSteps, additionalLevelCost } = load('src/domain/examSearch/levelAllocation.ts');
+  const input = searchInput(true); input.additionalLevelCap = 100;
+  const localCatalog = { a: { rare: 'SSR' }, b: { rare: 'SR' }, c: { rare: 'R' }, d: { rare: 'SSR' }, s: { rare: 'SSR' } };
+  const specs = [['a', 99, 0], ['b', 60, 0], ['c', 69, 4], ['d', 120, 4], ['s', 80, 0]];
+  const parent = { id: 'mixed', cards: specs.map(([name, level, totsu]) => cardVariants(rosterCard(name, level, totsu), localCatalog[name].rare, name === 's')[0]),
+    challengeIds: [], cost: 0, policy: 'balanced', estimate: 0 };
+  const rows = drain(levelAllocationSteps(input, parent, localCatalog, cards => cards.reduce((sum, c) => sum + c.level, 0)));
+  assert.ok(rows.every(row => additionalLevelCost(row.cards) <= 12));
+  const max = rows.find(row => additionalLevelCost(row.cards) === 12);
+  assert.ok(max);
+  assert.deepEqual(clone(max.cards.map(card => card.level)), [100, 70, 70, 120, 80]);
+});
+
+test('restored checkpoints discard over-budget and fine-grained allocations', t => {
+  const { load } = runtime(t, []);
+  const { cardVariants } = load('src/domain/examSearch/variants.ts');
+  const { constrainCheckpoint } = load('src/domain/examSearch/requiredCheckpoint.ts');
+  const input = searchInput(); input.additionalLevelCap = 10;
+  const candidate = amount => ({ id: `extra-${amount}`, cards: names.slice(0, 5)
+    .map(name => cardVariants(rosterCard(name), 'SSR', false, 0, amount)[0]) });
+  const valid = { candidate: candidate(0) }, invalid = { candidate: candidate(10) }, fine = { candidate: candidate(2) };
+  const saved = { ...checkpoint(), pool: [valid, invalid, fine], pending: [invalid, fine], finalists: [valid, invalid, fine] };
+  const cleaned = constrainCheckpoint(input, saved, catalog);
+  assert.deepEqual(clone(cleaned.pool), [clone(valid)]);
+  assert.deepEqual(clone(cleaned.finalists), [clone(valid)]);
+  assert.deepEqual(clone(cleaned.pending), []);
 });

@@ -1,5 +1,5 @@
 import cards from '@/assets/chara.json';
-import { validateInput, candidateIncludesRequired } from '@/domain/examSearch/variants';
+import { validateInput, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
 import { constrainCheckpoint } from '@/domain/examSearch/requiredCheckpoint';
 import { createParallelCheckpoint, aggregateIslandProgress, chooseIslandCount, mergeIslandResults } from '@/domain/examSearch/islands';
 import type { SearchInput, Candidate, SearchProgress } from '@/domain/examSearch/types';
@@ -36,7 +36,7 @@ let requestActive = false;
 let childRequest = 0;
 
 function checkpointProgress(checkpoint: SessionCheckpoint, input: SearchInput): SearchProgress {
-  const finalists=checkpoint.finalists.filter(result=>candidateIncludesRequired(input,result.candidate,catalog));
+  const finalists=checkpoint.finalists.filter(result=>candidateSatisfiesConstraints(input,result.candidate,catalog));
   return displayProgress({ phase: 'done', generated: checkpoint.generatedCount ?? checkpoint.seen.length, evaluated: checkpoint.evaluatedCount ?? checkpoint.pool.length,
     tasksDone: checkpoint.cursor, tasksTotal: checkpoint.tasksTotal ?? checkpoint.cursor, elapsedMs: checkpoint.elapsed, results: finalists }, input.target, input.attempts, input.desiredProbability);
 }
@@ -86,12 +86,12 @@ function handleChild(op: Operation, child: Child, data: ChildMessage) {
   const checkpoints = op.checkpoints
     .filter((checkpoint): checkpoint is SessionCheckpoint => !!checkpoint)
     .map(checkpoint => ({ ...checkpoint,
-      pool: checkpoint.pool.filter(result=>candidateIncludesRequired(op.input,result.candidate,catalog)),
-      finalists: checkpoint.finalists.filter(result=>candidateIncludesRequired(op.input,result.candidate,catalog)),
-      pending: checkpoint.pending.filter(result=>candidateIncludesRequired(op.input,result.candidate,catalog)),
+      pool: checkpoint.pool.filter(result=>candidateSatisfiesConstraints(op.input,result.candidate,catalog)),
+      finalists: checkpoint.finalists.filter(result=>candidateSatisfiesConstraints(op.input,result.candidate,catalog)),
+      pending: checkpoint.pending.filter(result=>candidateSatisfiesConstraints(op.input,result.candidate,catalog)),
     }));
   const merged = mergeIslandResults(checkpoints.map(checkpoint => checkpoint.finalists
-    .filter(result=>candidateIncludesRequired(op.input,result.candidate,catalog))), op.owners);
+    .filter(result=>candidateSatisfiesConstraints(op.input,result.candidate,catalog))), op.owners);
   op.owners = merged.owners;
   const checkpoint = createParallelCheckpoint(checkpoints, op.baseNonce, op.owners, op.baseElapsed + Date.now() - op.startedAt) as ParallelCheckpoint;
   checkpoint.finalists = merged.results;
@@ -244,7 +244,7 @@ function resumeSearch(data: Extract<Request,{method:'resume'|'evaluate'}>) {
   }
 }
 function previewSearch(data: Extract<Request,{method:'preview'}>) {
-  if (!candidateIncludesRequired(data.input,data.candidate,catalog)) throw new Error('Candidate does not contain every required card or character.');
+  if (!candidateSatisfiesConstraints(data.input,data.candidate,catalog)) throw new Error('Candidate violates the required cards, characters or additional level budget.');
   const op = makeOperation(data, [], {}, `${Date.now()}:preview`, 1); operation = op; op.required = new Set([0]);
   const child = op.children[0];
   if (!child?.worker) throw new Error('Search island is unavailable.');

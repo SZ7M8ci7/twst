@@ -22,6 +22,7 @@
                     <span v-for="magic in [1, 2, 3]" :key="magic" class="magic-icon" :class="{ selected: card.selectedMagic.includes(magic as 1 | 2 | 3) }">M{{ magic }}</span>
                   </div>
                 </div>
+                <figcaption class="card-level">Lv{{ card.level }}</figcaption>
               </figure>
             </div>
           </td>
@@ -73,6 +74,7 @@ tbody tr:last-child > * { border-bottom: 0; }
 .deck-cell { width: 342px; }
 .extra-cell { font-size: 12px; max-width: 125px; overflow-wrap: anywhere; }
 .extra-cell > span { display: block; }
+.card-level { font-size: 11px; text-align: center; color: #52616d; font-variant-numeric: tabular-nums; }
 .score-cell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; }
 thead .score-cell { font-size: 12px; white-space: normal; }
 .max-cell { font-weight: 700; }

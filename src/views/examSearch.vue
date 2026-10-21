@@ -80,6 +80,7 @@
         <v-card-text>
           <fieldset :disabled="busy" class="search-settings-fields">
             <v-text-field v-model.number="additionalBreaks" type="number" min="0" max="4" step="1" :label="t('examSearch.extraBreaks')" :error-messages="additionalBreaksError" density="compact" variant="outlined" hide-details="auto" />
+            <v-text-field v-model.number="additionalLevelCap" data-testid="additional-level-cap" type="number" min="0" max="100" step="1" :label="t('examSearch.additionalLevelCap')" :error-messages="additionalLevelCapError" density="compact" variant="outlined" hide-details="auto" />
             <v-text-field v-model.number="input.attempts" type="number" min="1" max="100000" step="1" :label="t('examSearch.attempts')" :error-messages="attemptsError" density="compact" variant="outlined" hide-details="auto" />
           </fieldset>
         </v-card-text>
@@ -206,6 +207,9 @@ const hand = useHandCollectionStore();
 const additionalBreaks = computed({ get: () => input.value.budget / input.value.itemsPerLimitBreak, set: n => { input.value.budget = n * input.value.itemsPerLimitBreak; } });
 const additionalBreaksError = computed(() => Number.isInteger(additionalBreaks.value) && additionalBreaks.value >= 0 && additionalBreaks.value <= 4
   ? '' : t('examSearch.validation.additional-breaks'));
+const additionalLevelCap = computed({ get: () => input.value.additionalLevelCap ?? 0, set: n => { input.value.additionalLevelCap = n; } });
+const additionalLevelCapError = computed(() => Number.isInteger(additionalLevelCap.value) && additionalLevelCap.value >= 0 && additionalLevelCap.value <= 100
+  ? '' : t('examSearch.validation.additional-level-cap'));
 const attemptsError = computed(() => Number.isInteger(input.value.attempts) && input.value.attempts >= 1 && input.value.attempts <= 100000
   ? '' : t('examSearch.validation.attempts'));
 const cardLabel = (name: string) => catalog[name] ? `${localizeCharacterName(catalog[name].chara, locale.value)} / ${localizeCostumeName(catalog[name], locale.value)}` : name;
@@ -310,7 +314,7 @@ watch(characterFilter, names => {
   input.value.requiredCharacters = [...names];
   if (!busy.value) invalidateActiveSearch();
 }, { deep: true });
-watch([() => input.value.budget, () => input.value.attempts], () => {
+watch([() => input.value.budget, () => input.value.additionalLevelCap, () => input.value.attempts], () => {
   if (!busy.value) invalidateActiveSearch();
 });
 function toggleCharacterFilter(name: string) {
@@ -458,8 +462,8 @@ function getWorker() {
 }
 function start(durationMs: number) {
   error.value = '';
-  if (additionalBreaksError.value || attemptsError.value) {
-    error.value = additionalBreaksError.value || attemptsError.value;
+  if (additionalBreaksError.value || additionalLevelCapError.value || attemptsError.value) {
+    error.value = additionalBreaksError.value || additionalLevelCapError.value || attemptsError.value;
     return;
   }
   if (usesSupport.value && !input.value.supports.length) {
@@ -544,8 +548,13 @@ function openSimulator(result: SearchResult) {
   } catch { error.value = t('examSearch.saveFailed'); }
 }
 function variantCardSummary(result: SearchResult) {
-  return result.candidate.cards.filter(card => !card.support && card.totsu > card.originalTotsu)
-    .map(card => `${localizeCharacterName(catalog[card.name].chara, locale.value)} +${card.totsu - card.originalTotsu}`).join(' · ') || t('examSearch.noUpgrade');
+  return result.candidate.cards.filter(card => !card.support && (card.totsu > card.originalTotsu || card.additionalLevels))
+    .map(card => {
+      const breaks = card.totsu - card.originalTotsu;
+      const growth = [breaks > 0 ? `+${breaks}${t('common.limitBreak')}` : '',
+        card.additionalLevels ? `Lv+${card.additionalLevels}` : ''].filter(Boolean).join(' / ');
+      return `${localizeCharacterName(catalog[card.name].chara, locale.value)} ${growth}`;
+    }).join(' · ') || t('examSearch.noUpgrade');
 }
 onBeforeRouteLeave(() => requestStopAndSave());
 onBeforeUnmount(() => { continuation.cancel(); worker?.terminate(); });

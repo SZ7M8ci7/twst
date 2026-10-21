@@ -2,7 +2,7 @@ import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandi
 import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
 import { metrics } from '@/domain/examSearch/statistics';
 import * as statistics from '@/domain/examSearch/statistics';
-import { lowerCostCandidates, trainedUpgradeCandidates, jointSpellCandidates, alternatePolicyCandidates, candidateIncludesRequired } from '@/domain/examSearch/variants';
+import { lowerCostCandidates, trainedUpgradeCandidates, jointSpellCandidates, alternatePolicyCandidates, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
 import { importanceUpperQuantile } from '@/domain/examSearch/importance';
 import { diverseFinalists } from '@/domain/examSearch/finalists';
 
@@ -93,7 +93,7 @@ export class SearchSession {
     if (checkpoint) {
       this.cursor = checkpoint.cursor; this.seen = new Set(checkpoint.seen);
       this.generatedCount = checkpoint.generatedCount ?? checkpoint.seen.length;
-      const valid = (result: SearchResult) => candidateIncludesRequired(this.input,result.candidate,this.catalog);
+      const valid = (result: SearchResult) => candidateSatisfiesConstraints(this.input,result.candidate,this.catalog);
       this.pool = checkpoint.pool.filter(valid);
       this.finalists = checkpoint.finalists.filter(valid);
       this.pending = checkpoint.pending.filter(valid); this.round = checkpoint.round;
@@ -464,7 +464,7 @@ export class SearchSession {
             if (candidates.length) emptyMutations = 0;
           }
           if (!candidates) break;
-          for (const candidate of candidates) if (candidateIncludesRequired(this.input,candidate,this.catalog) && !this.seen.has(candidate.id)) {
+          for (const candidate of candidates) if (candidateSatisfiesConstraints(this.input,candidate,this.catalog) && !this.seen.has(candidate.id)) {
             this.remember(candidate.id);
             this.pending.push({ candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES });
           }
@@ -494,7 +494,7 @@ export class SearchSession {
       // round-robin gives each cost band time before deeper contender trials.
       const loadouts=this.diverseParents(2).map(parent=>[...alternatePolicyCandidates(this.input,parent.candidate),
         ...jointSpellCandidates(this.input,parent.candidate,this.catalog)]
-        .filter(candidate=>candidateIncludesRequired(this.input,candidate,this.catalog)&&!this.seen.has(candidate.id)));
+        .filter(candidate=>candidateSatisfiesConstraints(this.input,candidate,this.catalog)&&!this.seen.has(candidate.id)));
       for(let index=0;index<249;index++)for(const options of loadouts) {
         if(this.stopped||performance.now()>=loadoutDeadline)break;
         const candidate=options[index];if(!candidate||this.seen.has(candidate.id))continue;
@@ -562,7 +562,7 @@ export class SearchSession {
           const planModes=this.input.preset.kind==='BASIC'?['flexible','turn','priority'] as const:['turn','priority'] as const;
           for (const preferredPlanMode of planModes) {
           const candidate = { ...parent.candidate, preferredPlan: plan, preferredPlanMode,
-            id: JSON.stringify([parent.candidate.cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),parent.candidate.challengeIds,parent.candidate.policy,plan,preferredPlanMode]) };
+            id: JSON.stringify([parent.candidate.cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.candidate.challengeIds,parent.candidate.policy,plan,preferredPlanMode]) };
           if (this.seen.has(candidate.id)) continue;
           const result: SearchResult = { candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES };
           await this.engine.prepare(this.input,candidate);
@@ -594,7 +594,7 @@ export class SearchSession {
         ...lowerCostCandidates(this.input,parent.candidate,this.catalog),
         ...trainedUpgradeCandidates(this.input,parent.candidate,this.catalog),
       ]) {
-        if (!candidateIncludesRequired(this.input,candidate,this.catalog)) continue;
+        if (!candidateSatisfiesConstraints(this.input,candidate,this.catalog)) continue;
         if(this.stopped||performance.now()>=deadline-durationMs*0.25)break;
         if(this.seen.has(candidate.id))continue;
         const result:SearchResult={candidate,development:emptySamples(),validation:emptySamples(),validationTarget:VALIDATION_SAMPLES};

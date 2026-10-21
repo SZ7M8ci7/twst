@@ -5,11 +5,12 @@ import { criticalRatePowerScale, criticalTailMultiplier } from '@/utils/critical
 import { evasionRateByPower, defenceEvasionValue } from '@/utils/evasionRates';
 import { yieldToHost } from '@/utils/yieldToHost';
 import { searchCardVariants as cardVariants, challengeVariants, upgradeTargets, examUsesSupport, allocationCards, upgradeCost,
-  requiredCardSupportAssignments, requiredOwnedNames, candidateIncludesRequired } from '@/domain/examSearch/variants';
+  requiredCardSupportAssignments, requiredOwnedNames, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
 import type { Candidate, SearchCard, SearchInput, PolicyKind } from '@/domain/examSearch/types';
 import { createCompletionCheck } from '@/domain/examSearch/completion';
 import { diversifyBeam } from '@/domain/examSearch/beam';
 import { maxPairedMean, type PairedEffect, type PairedSpell } from '@/domain/examSearch/pairedMean';
+import { levelAllocationSteps, levelAllocationNeighbors, withinLevelBudget } from '@/domain/examSearch/levelAllocation';
 
 export type Catalog = Record<string, any>;
 function attackScoreEffects(raw:Catalog[string]):ParsedBuff[] {
@@ -708,7 +709,7 @@ function* duoChainSteps(input:SearchInput,task:GenerationTask,catalog:Catalog):G
         if(++work%64===0)yield;
         const team=[...cards,card].sort((a,b)=>Number(a.support)-Number(b.support)||a.name.localeCompare(b.name));
         if(upgradeCost(input,team)>input.budget)continue;
-        const key=JSON.stringify(team.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]));
+        const key=JSON.stringify(team.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]));
         if(!expanded.has(key))expanded.set(key,{cards:team,value:value(team)});
       }
     }
@@ -723,9 +724,9 @@ function* duoChainSteps(input:SearchInput,task:GenerationTask,catalog:Catalog):G
   }
   const challengeIds=[...task.challenges].sort(),policy:PolicyKind=input.preset.kind==='ATTACK'?'effects-duo':'effects-score';
   const finished=beam.filter(cards=>cards.length===5&&cards.filter(c=>!c.support).length===ownCount
-    && candidateIncludesRequired(input,{cards},catalog))
+    && candidateSatisfiesConstraints(input,{cards},catalog))
     .sort((a,b)=>value(b)-value(a)).map(cards=>({cards,challengeIds,policy,cost:upgradeCost(input,cards),estimate:estimate(cards),
-      id:JSON.stringify([cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),challengeIds,policy])}));
+      id:JSON.stringify([cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),challengeIds,policy])}));
   const selected=task.cost>0?costBalanced(finished,8):finished.slice(0,8);
   return selected;
 }
@@ -762,7 +763,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
       :input.preset.kind==='BASIC'?['effects-tail','effects-tail','effects-tail']:['effects-public','effects-tail','effects-duo'];
     const selected=new Map<string,Candidate>(),challengeIds=[...task.challenges].sort();
     for(const [style,{cards,value}] of best) {
-      const policy=policies[style],id=JSON.stringify([cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),challengeIds,policy]);
+      const policy=policies[style],id=JSON.stringify([cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),challengeIds,policy]);
       selected.set(id,{id,cards,challengeIds,cost:task.cost,policy,estimate:value});
     }
     return [...selected.values()];
@@ -1000,20 +1001,34 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
   const policies=[policyCycle[task.style%policyCycle.length]];
   return initial.flatMap(({ cards, value }) => policies.map(policy => {
     const challengeIds = [...task.challenges].sort();
-    const id = JSON.stringify([cards.map(c => [c.name, c.totsu, c.selectedMagic, c.support]), challengeIds, policy]);
+    const id = JSON.stringify([cards.map(c => [c.name, c.level, c.totsu, c.selectedMagic, c.support]), challengeIds, policy]);
     return { id, cards, challengeIds, cost: upgradeCost(input,cards), policy, estimate: value };
   }));
 }
 
+function* generateTrainedSteps(input: SearchInput, task: GenerationTask, catalog: Catalog): Generator<void, Candidate[]> {
+  const candidates = yield* generateSteps(input, task, catalog);
+  if (!(input.additionalLevelCap ?? 0)) return candidates;
+  const estimate = cachedEstimator(input, task, catalog);
+  const allocations: Candidate[][] = [];
+  for (const candidate of candidates) allocations.push(yield* levelAllocationSteps(input, candidate, catalog, estimate));
+  // Interleave compositions rather than spending the whole trial window on
+  // every training variant of the first team.
+  const result = new Map<string, Candidate>();
+  const length = Math.max(0, ...allocations.map(rows => rows.length));
+  for (let i = 0; i < length; i++) for (const rows of allocations) if (rows[i]) result.set(rows[i].id, rows[i]);
+  return [...result.values()];
+}
+
 export function generateCandidates(input: SearchInput, task: GenerationTask, catalog: Catalog): Candidate[] {
-  const steps = generateSteps(input, task, catalog);
+  const steps = generateTrainedSteps(input, task, catalog);
   let next = steps.next();
   while (!next.done) next = steps.next();
-  return next.value.filter(candidate => candidateIncludesRequired(input,candidate,catalog));
+  return next.value.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog));
 }
 
 export async function generateCandidatesAsync(input: SearchInput, task: GenerationTask, catalog: Catalog, stop: () => boolean): Promise<Candidate[] | null> {
-  const steps = generateSteps(input, task, catalog);
+  const steps = generateTrainedSteps(input, task, catalog);
   let lastYield = performance.now();
   let next = steps.next();
   while (!next.done) {
@@ -1024,7 +1039,7 @@ export async function generateCandidatesAsync(input: SearchInput, task: Generati
     if (stop()) return null;
     next = steps.next();
   }
-  return next.value.filter(candidate => candidateIncludesRequired(input,candidate,catalog));
+  return next.value.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog));
 }
 
 // Exchange one owned card with its same-card support copy, then fill the old
@@ -1062,7 +1077,7 @@ async function supportRoleExchangeNeighbors(input: SearchInput, parent: Candidat
         const targets = [replacementRaw.totsu,
           ...upgradeTargets(replacementRaw, catalog[replacementRaw.name].rare, input.budget, input.itemsPerLimitBreak)];
         for (const target of targets) for (const replacement of cardVariants(
-          replacementRaw, catalog[replacementRaw.name].rare, false, target)) for (const support of supportOptions) {
+          replacementRaw, catalog[replacementRaw.name].rare, false, target, promoted.additionalLevels)) for (const support of supportOptions) {
           if (++work % 64 === 0) { await yieldToHost(); if (stop()) return []; }
           const cards = parent.cards.map((card, index) => index === promoteIndex ? support
             : index === supportIndex ? replacement : card);
@@ -1089,7 +1104,7 @@ async function supportRoleExchangeNeighbors(input: SearchInput, parent: Candidat
                   if (!reduction) return card;
                   const original = input.roster.find(raw => raw.name === card.name)!;
                   const target = card.totsu - reduction;
-                  const options = cardVariants(original, catalog[card.name].rare, false, target);
+                  const options = cardVariants(original, catalog[card.name].rare, false, target, card.additionalLevels);
                   return options.find(option => option.selectedMagic.join(',') === card.selectedMagic.join(','))
                     ?? options.find(option => option.selectedMagic.join(',') === '1,2');
                 });
@@ -1123,7 +1138,7 @@ async function supportRoleExchangeNeighbors(input: SearchInput, parent: Candidat
     if (best) selected.push(best.candidate);
     if (bestM2) selected.push(bestM2.candidate);
   }
-  return selected.filter(candidate => candidateIncludesRequired(input,candidate,catalog));
+  return selected.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog));
 }
 
 // Refine decks that actually performed well, rather than ending after the
@@ -1142,7 +1157,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
       if (++count % 64 === 0) { await yieldToHost(); if (stop()) return []; }
       if (!slot.support && parent.cards.some((c, i) => i !== index && !c.support && c.name === raw.name)) continue;
       const targets = slot.support ? [raw.totsu] : [raw.totsu, ...upgradeTargets(raw, catalog[raw.name].rare, input.budget, input.itemsPerLimitBreak)];
-      for (const target of targets) for (const option of cardVariants(raw, catalog[raw.name].rare, slot.support, target)) {
+      for (const target of targets) for (const option of cardVariants(raw, catalog[raw.name].rare, slot.support, target, slot.additionalLevels)) {
         const replacement = parent.cards.map((c, i) => i === index ? option : c);
         const cards = [...replacement.filter(c=>!c.support).sort((a,b)=>a.name.localeCompare(b.name)), ...replacement.filter(c=>c.support)];
         const upgrades = cards.filter(c => !c.support && c.totsu > c.originalTotsu);
@@ -1161,7 +1176,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
                 if (!reduction) return card;
                 const original = input.roster.find(raw => raw.name === card.name)!;
                 const target = card.totsu - reduction;
-                const options = cardVariants(original, catalog[card.name].rare, false, target);
+                const options = cardVariants(original, catalog[card.name].rare, false, target, card.additionalLevels);
                 return options.find(candidate => candidate.selectedMagic.join(',') === card.selectedMagic.join(','))
                   ?? options.find(candidate => candidate.selectedMagic.join(',') === '1,2');
               });
@@ -1186,7 +1201,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
           }
         }
         if (cost > input.budget) continue;
-        const id = JSON.stringify([cards.map(c => [c.name, c.totsu, c.selectedMagic, c.support]), parent.challengeIds, parent.policy]);
+        const id = JSON.stringify([cards.map(c => [c.name, c.level, c.totsu, c.selectedMagic, c.support]), parent.challengeIds, parent.policy]);
         if (seen.has(id) || unique.has(id)) continue;
         unique.add(id);
         proposals.push({ candidate: { ...parent, preferredPlan: undefined, preferredPlanMode: undefined, id, cards, cost, estimate: estimate(cards) },
@@ -1200,6 +1215,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
   // the per-slot three-choice ranking below.
   const selected = await supportRoleExchangeNeighbors(input, parent, catalog, seen, stop, estimate);
   if (stop()) return [];
+  selected.unshift(...levelAllocationNeighbors(input, parent, catalog, estimate).filter(candidate => !seen.has(candidate.id)));
   for (const rows of rebalanced.values()) {
     rows.sort((a,b) => b.candidate.estimate - a.candidate.estimate || a.candidate.id.localeCompare(b.candidate.id));
     const best = rows[0], bestM2 = rows.find(row => row.hasM2 && row.candidate.id !== best.candidate.id);
@@ -1211,7 +1227,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
     // Choose the original-style champion among legal replacements. Otherwise
     // an unrelated card can occupy that protected slot and be discarded only
     // after alternative styles have already displaced the best legal choice.
-    const options=proposals.filter(p=>p.index===index&&candidateIncludesRequired(input,p.candidate,catalog));
+    const options=proposals.filter(p=>p.index===index&&candidateSatisfiesConstraints(input,p.candidate,catalog));
     // Spell alternatives must not consume every mutation slot. A card that
     // only becomes useful after a replacement or upgrade needs a real battle.
     const choices=[options.find(p=>p.spellOnly),
@@ -1233,9 +1249,9 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
   const allocations=new Map<string,Candidate>();
   for(const cards of allocationCards(input,parent,catalog)) {
     if(++count%64===0){await yieldToHost();if(stop())return [];}
-    const id=JSON.stringify([cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy]);
+    const id=JSON.stringify([cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy]);
     if(seen.has(id)||selected.some(c=>c.id===id))continue;
-    const key=JSON.stringify(cards.filter(c=>!c.support).map(c=>[c.name,c.totsu]));
+    const key=JSON.stringify(cards.filter(c=>!c.support).map(c=>[c.name,c.level,c.totsu]));
     const value=estimate(cards);
     if(!allocations.has(key)||value>allocations.get(key)!.estimate)allocations.set(key,{...parent,id,cards,
       cost:upgradeCost(input,cards),estimate:value,preferredPlan:undefined,preferredPlanMode:undefined});
@@ -1267,7 +1283,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
       for(const card of source) {
         if(++count%64===0){await yieldToHost();if(stop())return [];}
         const targets=support?[card.totsu]:[card.totsu,...upgradeTargets(card,catalog[card.name].rare,input.budget,input.itemsPerLimitBreak)];
-        for(const totsu of targets) for(const option of cardVariants(card,catalog[card.name].rare,support,totsu)) {
+        for(const totsu of targets) for(const option of cardVariants(card,catalog[card.name].rare,support,totsu,parent.cards[j].additionalLevels)) {
           const replacement=parent.cards.map((c,index)=>index===i?p.option:index===j?option:c);
           const own=replacement.filter(c=>!c.support).sort((a,b)=>a.name.localeCompare(b.name));
           if(new Set(own.map(c=>c.name)).size!==(examUsesSupport(input.preset)?4:5))continue;
@@ -1275,7 +1291,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
           const cost=upgrades.reduce((sum,c)=>sum+(c.totsu-c.originalTotsu)*input.itemsPerLimitBreak,0);
           if(cost>input.budget)continue;
           const cards=[...own,...replacement.filter(c=>c.support)];
-          const id=JSON.stringify([cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy]);
+          const id=JSON.stringify([cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,parent.policy]);
           if(seen.has(id)||unique.has(id))continue;
           const value=estimate(cards);
           if(!best||value>best.estimate)best={...parent,preferredPlan:undefined,preferredPlanMode:undefined,id,cards,cost,estimate:value};
@@ -1285,7 +1301,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
     if(best){selected.push(best);unique.add(best.id);}
   }
   const returned=new Set<string>();
-  const result=selected.filter(candidate => candidateIncludesRequired(input,candidate,catalog)
+  const result=selected.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog)
     &&!returned.has(candidate.id)&&!!returned.add(candidate.id));
   // The scheduler evaluates this array in order. Append at most two new teams
   // after all original swaps, allocations and linked pairs, so broadening the
@@ -1311,7 +1327,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
 // cannot cross (for example, a new attacker together with its DUO/buddy partner).
 export function crossCandidates(input: SearchInput, a: Candidate, b: Candidate, catalog: Catalog, seen: Set<string>): Candidate[] {
   if (a.challengeIds.join('|') !== b.challengeIds.join('|')) return [];
-  const cardKey=(c:SearchCard)=>[c.name,c.totsu,c.selectedMagic.join(',')].join(':');
+  const cardKey=(c:SearchCard)=>[c.name,c.level,c.totsu,c.selectedMagic.join(',')].join(':');
   const all=[...new Map([...a.cards,...b.cards].filter(c=>!c.support).map(c=>[cardKey(c),c])).values()];
   const supports=[...new Map([...a.cards,...b.cards].filter(c=>c.support).map(c=>[cardKey(c),c])).values()];
   const estimate=cachedEstimator(input,{anchor:'',totsu:0,cost:0,challenges:a.challengeIds,style:0},catalog);
@@ -1329,11 +1345,12 @@ export function crossCandidates(input: SearchInput, a: Candidate, b: Candidate, 
     if(cost>input.budget)continue;
     for(const support of supportAllowed?supports:[null]) for(const policy of new Set([a.policy,b.policy])) {
       const cards=support?[...own,support]:own;
-      const id=JSON.stringify([cards.map(c=>[c.name,c.totsu,c.selectedMagic,c.support]),a.challengeIds,policy]);
+      if (!withinLevelBudget(input, cards, catalog)) continue;
+      const id=JSON.stringify([cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),a.challengeIds,policy]);
       if(seen.has(id)||unique.has(id))continue;
       unique.add(id); results.push({...a,preferredPlan:undefined,id,cards,cost,policy,estimate:estimate(cards)});
     }
   }
-  return results.filter(candidate => candidateIncludesRequired(input,candidate,catalog))
+  return results.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog))
     .sort((a,b)=>b.estimate-a.estimate).slice(0,16);
 }
