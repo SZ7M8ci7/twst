@@ -88,6 +88,64 @@ export interface ExamPresetDefinition {
 
 export const examPresetDefinitions: ExamPresetDefinition[] = [
   {
+    id: '2026/11-1水BS',
+    title: '2026/11-1水BS',
+    kind: 'BASIC',
+    enemyElement: '水',
+    enemyHp: 115000,
+    enemies: [
+      {
+        name: 'アズール',
+        actions: [
+          { name: 'ダメDOWN強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageDown', effectTarget: '相手', effectValue: 5, duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: '被ダメDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+        ],
+      },
+      {
+        name: 'ジャミル',
+        actions: [
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 0, keepInDeckWhenDamageZero: true, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
+    id: '2026/11-1火DF',
+    title: '2026/11-1火DF',
+    kind: 'DEFENCE',
+    enemyElement: '火',
+    enemyHp: 96000,
+    enemies: [
+      {
+        name: 'イデア',
+        actions: [
+          { name: '相手選択やけど弱2連', element: '火', power: '2連撃(弱)', estimatedDamage: 5150, effectKind: 'burn', effectTarget: '相手選択', effectValue: 16, duration: 3 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 6850 },
+          { name: '被ダメDOWN強2連', element: '火', power: '2連撃(強)', estimatedDamage: 6850, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+        ],
+      },
+      {
+        name: 'エペル',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 6250, effectKind: 'damageUp', effectTarget: '自', effectValue: 6, duration: 3 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 10600 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 13950, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+      {
+        name: 'ヴィル',
+        actions: [
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 8500, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 14600 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 19250, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+        ],
+      },
+    ],
+  },
+  {
     id: '2026/10-2全DF',
     title: '2026/10-2全DF',
     kind: 'DEFENCE',
