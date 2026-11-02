@@ -850,6 +850,12 @@
     }
   },
   "examSearch": {
+    "rosterSource": "搜索范围",
+    "favorableEffects": "将概率效果固定为有利于我方",
+    "favorableEffectsHelp": "仅将触发概率低于100%的有效效果固定为有利于我方：我方闪避、暴击、诅咒和冻结成功；我方暗闇MISS以及敌方闪避、暴击和冻结不触发。处于暗闇的敌人会MISS。触发概率为100%的效果，无论敌我均正常触发。手牌顺序、伤害浮动和无需概率判定的效果保持不变。",
+    "favorableEffectsActive": "概率效果：固定为有利于我方",
+    "useHandCollection": "使用持有设置",
+    "allCards": "搜索全部卡牌",
     "continuous": "持续搜索直到手动停止",
     "continuousHelp": "持续寻找新队伍并追加评估优秀候选，定期保存进度。停止后可继续搜索。",
     "clear": "取消选择",

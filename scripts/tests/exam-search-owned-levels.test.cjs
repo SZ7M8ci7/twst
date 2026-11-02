@@ -86,7 +86,7 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
   const source = read('src/views/examSearch.vue').split('<script setup lang="ts">')[1].split('</script>')[0]
     .replaceAll('import.meta.url', JSON.stringify('file:///examSearch.vue'));
   const viewContext = { ...context, exports: {}, require: localRequire };
-  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave, setSupportCandidates, selectPreset, applySharedConditions, sessionSaved, retrySave, preview };'), viewContext));
+  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, useHandCollection, favorableEffects, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave, setSupportCandidates, selectPreset, applySharedConditions, sessionSaved, retrySave, preview };'), viewContext));
   function supportPicker(modelValue, includeAllRarities = true) {
     const props = vue.reactive({ modelValue, includeAllRarities, focusRequest: null, disabled: false });
     const mounted = [];
@@ -106,6 +106,70 @@ test('owned Lv0 cards are excluded while Lv1+ training is preserved', t => {
   const { view } = runtime(t, [handCard(names[0], 0), handCard(names[1], 1),
     { ...handCard(names[2], 95), totsu: 3 }, handCard(names[3], 80, false), handCard('unknown-card', 80)]);
   assert.deepEqual(clone(view.input.value.roster), [rosterCard(names[1], 1), rosterCard(names[2], 95, 3)]);
+});
+
+test('all-card search uses every rarity at maximum training and persists the selected source', async t => {
+  const { view, persistence, workers } = runtime(t, [handCard(names[0], 35), handCard(names[1], 0)]);
+  view.useHandCollection.value = false;
+  await vue.nextTick();
+  const expected = cards.map(card => rosterCard(card.name, card.rare === 'SSR' ? 120 : card.rare === 'SR' ? 90 : 70, 4));
+  assert.deepEqual(clone(view.input.value.roster), expected);
+  assert.equal(view.rosterReady.value, true);
+  assert.equal(persistence.loadExamSearch().useHandCollection, false);
+  view.start(1000);
+  assert.deepEqual(clone(workers[0].messages[0].input.roster), expected);
+  view.useHandCollection.value = true;
+  assert.equal(view.useHandCollection.value, false, 'source cannot change while searching');
+  await workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  assert.equal(view.canResume.value, true);
+  view.hand.updateHandCard(names[0], { level: 42 });
+  await vue.nextTick();
+  assert.equal(view.canResume.value, true, 'hand edits do not invalidate all-card results');
+  assert.deepEqual(clone(view.input.value.roster), expected);
+  view.useHandCollection.value = true;
+  await vue.nextTick();
+  assert.deepEqual(clone(view.input.value.roster), [rosterCard(names[0], 42)]);
+  assert.equal(view.canResume.value, false);
+  assert.equal(view.progress.value, null);
+  assert.equal(persistence.loadExamSearch().useHandCollection, true);
+});
+
+test('all-card sessions restore without depending on collection ownership', t => {
+  const input = searchInput();
+  input.useHandCollection = false;
+  input.roster = cards.map(card => rosterCard(card.name, card.rare === 'SSR' ? 120 : card.rare === 'SR' ? 90 : 70, 4));
+  const { view } = runtime(t, [], input, checkpoint());
+  assert.equal(view.useHandCollection.value, false);
+  assert.equal(view.rosterReady.value, true);
+  assert.equal(view.canResume.value, true);
+  assert.deepEqual(clone(view.input.value.roster), input.roster);
+});
+
+test('favorable effects default off, persist, invalidate old results and reach workers and transfers', async t => {
+  const { view, persistence, workers } = runtime(t, names.slice(0, 5).map(name => handCard(name)));
+  assert.equal(view.favorableEffects.value, false);
+  view.start(1000);
+  await workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  assert.equal(view.canResume.value, true);
+  view.favorableEffects.value = true;
+  await vue.nextTick();
+  assert.equal(view.canResume.value, false);
+  assert.equal(view.progress.value, null);
+  assert.equal(persistence.loadExamSearch().favorableEffects, true);
+  const restored = runtime(t, names.slice(0, 5).map(name => handCard(name)), clone(view.input.value));
+  assert.equal(restored.view.favorableEffects.value, true);
+  view.start(1000);
+  assert.equal(workers.at(-1).messages[0].input.favorableEffects, true);
+  view.favorableEffects.value = false;
+  assert.equal(view.favorableEffects.value, true, 'cannot change the active search conditions');
+  const candidate = { cards: [], challengeIds: [], cost: 0, policy: 'balanced', id: 'test', estimate: 0 };
+  const transferId = persistence.saveSearchTransfer(clone(view.input.value), candidate);
+  assert.equal(persistence.loadSearchTransfer(transferId).input.favorableEffects, true);
+  await workers.at(-1).respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  view.favorableEffects.value = false;
+  await vue.nextTick();
+  assert.equal(view.canResume.value, false);
+  assert.equal(persistence.loadExamSearch().favorableEffects, false);
 });
 
 for (const unified of [false, true]) {

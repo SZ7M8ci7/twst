@@ -118,6 +118,7 @@
       </v-tabs>
 
       <div class="tab-window">
+        <p v-if="activeFlow === 'simulate' && favorableEffects" class="simulation-mode-help" data-testid="simulation-favorable-effects">{{ t('examSearch.favorableEffectsActive') }}</p>
         <section v-if="searchMounted && conditionsReady" v-show="activeFlow === 'search'" class="search-tab">
           <ExamSearchPanel
             ref="searchPanelRef"
@@ -1049,6 +1050,7 @@ interface AutoBestPruneBenchmark {
   finishTurn: number;
 }
 interface AutoBestWorkerSnapshot {
+  favorableEffects?: boolean;
   exam: ExamDefinition;
   enemySlots: EnemySlotDefinition[];
   deck: DeckSlot[];
@@ -1077,6 +1079,7 @@ interface AutoBestWorkerClient {
 
 
 interface ExamSettingsPayload {
+  favorableEffects?: boolean;
   deck: Array<Record<string, any>>;
   turnPlans: TurnPlan[];
   useElementCompatibilityPriority?: boolean;
@@ -1588,6 +1591,7 @@ const turnPlans = ref<TurnPlan[]>(Array.from({ length: 5 }, (_, index) => ({
 })));
 const openedTurnPanels = ref<number[]>([0, 1, 2, 3, 4]);
 const simulationMode = ref<SimulationMode>('normal');
+const favorableEffects = ref(false);
 const normalIterations = ref(10000);
 const autoBestIterations = ref(1000);
 const iterations = computed<number>({
@@ -1621,7 +1625,11 @@ const editingDeckDetailCharacter = ref<any | null>(null);
 const draggingMagicId = ref('');
 const draggingCombo = ref<{ turnIndex: number; comboIndex: number } | null>(null);
 const dragOverComboIndex = ref<number | null>(null);
-const initialTab = router.currentRoute.value.query.tab === 'search' ? 'search' : 'exam';
+function requestedFlow(): SimulatorFlow {
+  const { tab, resourceSearch, importDeck } = router.currentRoute.value.query;
+  return tab === 'search' || (!tab && !resourceSearch && !importDeck) ? 'search' : 'simulate';
+}
+const initialTab = requestedFlow() === 'search' ? 'search' : 'deck';
 const activeTab = ref<ActiveTab>(initialTab);
 const lastManualTab = ref<ManualTab>('deck');
 const activeFlow = computed<SimulatorFlow>({
@@ -1939,7 +1947,7 @@ watch(() => exam.value.enemyElement, () => {
 watch(exam, markEnemyConditionsTouched, { deep: true });
 watch(enemySlots, markEnemyConditionsTouched, { deep: true });
 watch(
-  [exam, enemySlots, deck, turnPlans, selectedSpecialChallengeIds],
+  [exam, enemySlots, deck, turnPlans, selectedSpecialChallengeIds, favorableEffects],
   () => {
     clearResults();
     if (isRunning.value) requestSimulationStop();
@@ -1989,13 +1997,13 @@ watch(activeTab, (tab) => {
   if (tab !== 'plan') cancelMagicPicker();
 });
 watch(activeFlow, (flow) => {
-  const tab = flow === 'search' ? 'search' : undefined;
+  const tab = flow;
   if (router.currentRoute.value.query.tab !== tab) {
     void router.replace({ query: { ...router.currentRoute.value.query, tab } });
   }
 });
-watch(() => router.currentRoute.value.query.tab, (tab) => {
-  const flow = tab === 'search' ? 'search' : 'simulate';
+watch(() => router.currentRoute.value.query.tab, () => {
+  const flow = requestedFlow();
   if (activeFlow.value !== flow) activeFlow.value = flow;
 });
 
@@ -2025,7 +2033,7 @@ function restoreInitialExamDeck() {
 onMounted(async () => {
   await initializeExamSearchStorage();
   savedExamSettings.value = loadSavedExamSimulatorSettings();
-  if (router.currentRoute.value.query.tab === 'search' && !router.currentRoute.value.query.resourceSearch) {
+  if (activeFlow.value === 'search' && !router.currentRoute.value.query.resourceSearch) {
     const savedSearch = loadExamSearch();
     if (savedSearch?.preset?.enemies?.length) {
       applyExamPreset(savedSearch.preset);
@@ -2151,6 +2159,7 @@ function serializeDeckSlotForSettings(slot: DeckSlot) {
 
 function buildExamSettingsPayload(): ExamSettingsPayload {
   return {
+    favorableEffects: favorableEffects.value,
     deck: deck.value.map(serializeDeckSlotForSettings),
     useElementCompatibilityPriority: allTurnElementCompatibilityPriority.value,
     turnPlans: turnPlans.value.map((turn) => ({
@@ -2208,6 +2217,7 @@ function savedSettingIcon(setting: SavedExamSimulatorSettings, index: number) {
 async function applySavedExamSettingsSet(setting: SavedExamSimulatorSettings) {
   const payload = setting.payload as Partial<ExamSettingsPayload> | null;
   if (!payload?.deck && !payload?.turnPlans) return;
+  favorableEffects.value = payload.favorableEffects === true;
 
   const characterStore = useCharacterStore();
   deck.value = await Promise.all(Array.from({ length: 5 }, (_, index) => (
@@ -3928,6 +3938,7 @@ async function searchAutoBestSeedParallel(
 
 async function runAutoBestSimulation(count: number, resultGeneration: number) {
   const snapshotJson = JSON.stringify({
+    favorableEffects: favorableEffects.value,
     exam: exam.value,
     enemySlots: enemySlots.value,
     deck: deck.value,
@@ -4243,6 +4254,7 @@ async function runAutoBestWorkerPartition(
   pruneBenchmark?: AutoBestPruneBenchmark,
 ) {
   if (snapshot) {
+    favorableEffects.value = snapshot.favorableEffects === true;
     exam.value = markRaw(snapshot.exam);
     appliedExamPreset.value = snapshot.presetMetadata ?? null;
     enemySlots.value = markRaw(snapshot.enemySlots);
@@ -4291,6 +4303,7 @@ let resourceInitialRuntime:SimulationRuntimeCache|null|undefined;
 let resourceInitialState:SimulationState|undefined;
 let resourceInitialStats:SimulationStats|undefined;
 async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
+  favorableEffects.value = input.favorableEffects === true;
   resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
   resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
   resourcePreferredPlanMode = candidate.preferredPlanMode ?? 'turn';
@@ -4530,7 +4543,7 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
         const compatibility = getCompatibility(magic.element, target);
         defense += compatibility === 'advantage' ? 1 : compatibility === 'disadvantage' ? -1 : 0;
         const hits = index === knownIndex && knownEnemy ? getEnemyActionRuntimeMeta(knownEnemy).hitCount : 2;
-        defense += Math.min(1, sumRatesForCard(predicted.playerEvasions, parsed.deckIndex) / 100) * hits * 0.6;
+        defense += effectProbability(sumRatesForCard(predicted.playerEvasions, parsed.deckIndex) / 100, true) * hits * 0.6;
         defense += sumDamageTakenDownRatesForCard(predicted.playerDamageTakenDowns, parsed.deckIndex, target) / 100;
         defense += (sumRatesForEnemy(predicted.enemyAttackDowns, targetKey)
           + sumDamageRatesForElementAndEnemy(predicted.enemyDamageDowns, target, targetKey)) / 100;
@@ -4593,9 +4606,9 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
         for(const action of actions) {
           const base=calculateEnemyDamage(action,id,forecastState,()=>1,predictedStats);
           const parsed=parseMagicId(id)!;
-          const evade=Math.min(1,sumRatesForCard(forecastState.playerEvasions,parsed.deckIndex)/100);
-          const blind=Math.min(1,sumRatesForEnemy(forecastState.enemyBlinds,action.slotKey)/100);
-          const critical=Math.min(1,sumRatesForEnemy(forecastState.enemyCriticals,action.slotKey)/100);
+          const evade=effectProbability(sumRatesForCard(forecastState.playerEvasions,parsed.deckIndex)/100,true);
+          const blind=effectProbability(sumRatesForEnemy(forecastState.enemyBlinds,action.slotKey)/100,true);
+          const critical=effectProbability(sumRatesForEnemy(forecastState.enemyCriticals,action.slotKey)/100,false);
           const compatibility=base.defenceCompatibility;
           const amount=base.equalDamage*(compatibility==='advantage'?0.5:compatibility==='disadvantage'?1.5:1)
             *(1-evade)*(1-blind)*(1+critical*(CRITICAL_DAMAGE_MULTIPLIER-1))/Math.max(1,actions.length);
@@ -5759,9 +5772,7 @@ function activatePlayerOpponentDebuffs(
         return;
       }
       if (buff.buffOption === '呪い') {
-        const curseRate = rate;
-        const roll = rng();
-        const success = roll < Math.min(1, Math.max(0, curseRate) / 100);
+        const success = rollEffect(rate, rng, true);
         if (success) {
           appendState(state, 'enemyCurses', { rate: 100, turns: duration, targetEnemySlotKey });
           appliedAny = true;
@@ -5774,7 +5785,7 @@ function activatePlayerOpponentDebuffs(
         return;
       }
       if (buff.buffOption === '凍結') {
-        const success = rollEffect(rate, rng);
+        const success = rollEffect(rate, rng, true);
         if (success) {
           appendState(state, 'enemyFreezes', { rate: 100, turns: duration, targetEnemySlotKey });
           appliedAny = true;
@@ -6053,7 +6064,7 @@ function calculatePlayerDamageBaseFromState(
     atkBuffTotal,
     attackDownRate,
     dmgBuffTotal,
-    criticalChance,
+    criticalChance: effectProbability(criticalChance, true),
     damageTerm,
     rengekiMultiplier,
     reductionValue,
@@ -6214,8 +6225,7 @@ function calculatePlayerDamage(
     return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: false, criticalCount: 0, damageNull: true, transferSnapshot };
   }
   if (blindRate > 0) {
-    const blindRoll = rng();
-    if (blindRoll < blindRate) {
+    if (rollEffect(blindRate * 100, rng, false)) {
       if (stats.log) stats.miss += 1;
       return { damage: 0, compatibility, hitCount, isDuo, evasionCount: 0, blindMiss: true, criticalCount: 0, damageNull: false, transferSnapshot };
     }
@@ -6227,8 +6237,7 @@ function calculatePlayerDamage(
   let damage = 0;
   for (let hit = 0; hit < hitCount; hit += 1) {
     if (evasionRate > 0) {
-      const evasionRoll = rng();
-      const evaded = evasionRoll < evasionRate;
+      const evaded = rollEffect(evasionRate * 100, rng, false);
       if (evaded) {
         evasionCount += 1;
         continue;
@@ -6236,8 +6245,8 @@ function calculatePlayerDamage(
     }
     // Still consume the ordinary roll. Scouting only forces an already
     // possible critical on one chosen card, never on enemies or frozen buffs.
-    const proposal=resourceImportanceWeight===undefined?undefined:criticalProposal(damageBase.criticalChance);
-    const criticalRolled = damageBase.criticalChance > 0 && rollEffect((proposal?.proposal??damageBase.criticalChance) * 100, rng);
+    const proposal=resourceImportanceWeight===undefined||favorableEffects.value?undefined:criticalProposal(damageBase.criticalChance);
+    const criticalRolled = damageBase.criticalChance > 0 && rollEffect((proposal?.proposal??damageBase.criticalChance) * 100, rng, true);
     if(proposal)resourceImportanceWeight!*=proposal.weight(criticalRolled);
     const criticalForced = !criticalRolled&&damageBase.criticalChance>0&&resourceCriticalScoutCard===parsed.deckIndex
       &&(resourceCriticalScoutMagic===undefined||resourceCriticalScoutMagic===parsed.magicSlot);
@@ -6457,8 +6466,7 @@ function calculateEnemyDamage(
   let damage = 0;
   const hitDamages: number[] | null = stats.log ? [] : null;
   if (blindRate > 0) {
-    const blindRoll = rng();
-    if (blindRoll < blindRate) {
+    if (rollEffect(blindRate * 100, rng, true)) {
       if (stats.log) stats.miss += 1;
       return {
         damage: 0,
@@ -6477,8 +6485,7 @@ function calculateEnemyDamage(
   }
   for (let hit = 0; hit < hitCount; hit += 1) {
     if (evasionRate > 0) {
-      const evasionRoll = rng();
-      const evaded = evasionRoll < evasionRate;
+      const evaded = rollEffect(evasionRate * 100, rng, true);
       if (evaded) {
         evasionCount += 1;
         hitDamages?.push(0);
@@ -6486,7 +6493,7 @@ function calculateEnemyDamage(
       }
     }
     const randomFactor = nextDamageFactor(rng);
-    const criticalActive = criticalRate > 0 && rollEffect(criticalRate * 100, rng);
+    const criticalActive = criticalRate > 0 && rollEffect(criticalRate * 100, rng, false);
     const criticalMultiplier = criticalActive ? CRITICAL_DAMAGE_MULTIPLIER : 1;
     const raw = (equalDamage * elementMultiplier * criticalMultiplier / hitCount) * randomFactor;
     const hitDamage = floorAttackDamage(raw);
@@ -6678,8 +6685,7 @@ function applyEnemyAdditionalEffects(
     case 'freeze':
       targetCards.forEach((targetCardIndex) => {
         const rate = value || 100;
-        const roll = rng();
-        const success = roll < Math.min(1, Math.max(0, rate) / 100);
+        const success = rollEffect(rate, rng, false);
         if (success) {
           appendState(state, 'playerFreezes', { cardIndex: targetCardIndex, rate: 100, turns: duration });
         }
@@ -6921,8 +6927,18 @@ function applyPlayerGutsIfNeeded(state: SimulationState, playerHp: number, defen
   return { hp: 1, used: true };
 }
 
-function rollEffect(ratePercent: number, rng: () => number) {
-  return rng() < Math.min(1, Math.max(0, ratePercent) / 100);
+function effectProbability(probability: number, beneficialToPlayer: boolean) {
+  // Guaranteed effects remain guaranteed, even when harmful to the player.
+  if (probability >= 1) return 1;
+  if (favorableEffects.value) return probability > 0 && beneficialToPlayer ? 1 : 0;
+  return Math.min(1, Math.max(0, probability));
+}
+
+function rollEffect(ratePercent: number, rng: () => number, beneficialToPlayer: boolean) {
+  // Keep consuming a roll at each probability check; only override its outcome.
+  const roll = rng();
+  const chance = effectProbability(ratePercent / 100, beneficialToPlayer);
+  return favorableEffects.value ? chance > 0 : roll < chance;
 }
 
 function isPlayerCursed(state: SimulationState, cardIndex: number) {

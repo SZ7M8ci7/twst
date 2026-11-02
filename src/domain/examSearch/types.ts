@@ -21,6 +21,10 @@ export interface SearchCard extends RosterCard {
   support: boolean;
 }
 export interface SearchInput {
+  /** Omitted in legacy saves, which always used the hand collection. */
+  useHandCollection?: boolean;
+  /** Resolve existing chance-based effects in the player's favor. */
+  favorableEffects?: boolean;
   seedTeams?: string[][];
   /** Card catalog names that every generated/evaluated loadout must contain. */
   requiredCards?: string[];
@@ -105,5 +109,5 @@ export interface BattleEngine {
   learnCriticalPlan?(seed:string,durationMs:number,cardIndex:number,idealHand?:boolean,magic?:MagicSlot):Promise<[string,string][]|null>;
 }
 export interface BattleTrial { score: number; retired: boolean; finishTurn: number; fitness?: number; log?: string[]; plan?: [string, string][] }
-export const ENGINE_VERSION = 'exam-resource-search-138';
+export const ENGINE_VERSION = 'exam-resource-search-139';
 export const emptySamples = (): Samples => ({ scores: [], retired: 0, turns: 0 });

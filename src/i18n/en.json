@@ -850,6 +850,12 @@
     }
   },
   "examSearch": {
+    "rosterSource": "Search cards",
+    "favorableEffects": "Resolve chance effects in your favor",
+    "favorableEffectsHelp": "Only active effects with a chance below 100% are fixed in your favor: your evasion, criticals, curse and freeze succeed; your blindness misses and enemy evasion, criticals and freeze do not trigger. Blinded enemies miss. Effects with a 100% chance still trigger normally for both sides. Hand order, damage variance and effects without chance rolls are unchanged.",
+    "favorableEffectsActive": "Chance effects: fixed in your favor",
+    "useHandCollection": "Use my collection",
+    "allCards": "Search all cards",
     "continuous": "Search until stopped",
     "continuousHelp": "Keep finding new teams and evaluating promising candidates. Progress is saved periodically and can be resumed after stopping.",
     "clear": "Remove",

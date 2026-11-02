@@ -5,6 +5,11 @@
     <fieldset :disabled="busy" class="setup">
       <ExamSearchPresetPicker v-if="!embedded" @select="selectPreset" />
       <p v-if="!embedded" class="selected-exam">{{ t('examSearch.exam') }}: <strong>{{ localizeGameText(input.preset.title, locale) }}</strong></p>
+      <div class="roster-source-setting">
+        <div class="selection-label">{{ t('examSearch.rosterSource') }}</div>
+        <v-switch v-model="useHandCollection" data-testid="search-use-hand-collection" color="primary" inset hide-details density="compact" :disabled="busy" :label="t('examSearch.useHandCollection')" />
+        <p class="filter-help">{{ t(useHandCollection ? 'simulator.ownedCardsDescription' : 'simulator.allCardsDescription') }}</p>
+      </div>
       <div class="required-card-setting">
         <div class="selection-label">{{ t('examSearch.cardFilter') }}<span class="optional-label">{{ t('examSearch.optional') }}</span></div>
         <div class="required-card-slots">
@@ -47,6 +52,7 @@
       </v-card>
     </v-dialog>
     <v-alert v-if="error" class="my-3" type="error">{{ error }}</v-alert>
+    <p v-if="favorableEffects" class="filter-help" data-testid="favorable-effects-summary">{{ t('examSearch.favorableEffectsActive') }}</p>
     <v-switch v-model="continuousSearch" data-testid="continuous-search" :disabled="busy" color="primary" hide-details :label="t('examSearch.continuous')" />
     <p v-if="continuousSearch" class="continuous-help">{{ t('examSearch.continuousHelp') }}</p>
     <div class="actions my-4">
@@ -80,6 +86,7 @@
         <v-card-title class="modal-title">{{ t('examSearch.changeConditions') }}</v-card-title>
         <v-card-text>
           <fieldset :disabled="busy" class="search-settings-fields">
+            <v-switch v-model="favorableEffects" data-testid="search-favorable-effects" :disabled="busy" color="primary" inset hide-details :label="t('examSearch.favorableEffects')" />
             <v-text-field v-model.number="additionalBreaks" type="number" min="0" max="4" step="1" :label="t('examSearch.extraBreaks')" :error-messages="additionalBreaksError" density="compact" variant="outlined" hide-details="auto" />
             <v-text-field v-model.number="additionalLevelCap" data-testid="additional-level-cap" type="number" min="0" max="100" step="1" :label="t('examSearch.additionalLevelCap')" :error-messages="additionalLevelCapError" density="compact" variant="outlined" hide-details="auto" />
             <v-text-field v-model.number="input.attempts" type="number" min="1" max="100000" step="1" :label="t('examSearch.attempts')" :error-messages="attemptsError" density="compact" variant="outlined" hide-details="auto" />
@@ -89,6 +96,7 @@
       </v-card>
     </v-dialog>
     <Teleport to="body"><SimCharaModal v-if="cardFilterOpen" data-testid="card-filter-dialog"
+      :catalog-mode="!useHandCollection"
       @select="selectRequiredCard" @close="cardFilterOpen = false" /></Teleport>
     <v-dialog v-model="characterFilterOpen" max-width="640" scrollable class="search-character-dialog" data-testid="character-filter-dialog">
       <v-card class="modal-card character-filter-card">
@@ -133,6 +141,7 @@ import cosmicIcon from '@/assets/img/cosmic.webp';
 import { examPresetDefinitions, type ExamPresetDefinition } from '@/utils/examPresets';
 import { sharedExamConditionsKey, type SharedExamConditions } from '@/utils/sharedExamConditions';
 import { useHandCollectionStore } from '@/store/handCollection';
+import { getInputMaxLevel } from '@/constants/levels';
 import { localizeCharacterName, localizeCostumeName, localizeGameText } from '@/utils/localizedDisplay';
 import { loadExamSearch, saveExamSearch, loadSearchSession, saveSearchSession, saveSearchTransfer, loadSearchSeedTeams, type SavedSearchSession } from '@/storage/examSearchStorage';
 import { validateInput, invalidSearchCards, examUsesSupport } from '@/domain/examSearch/variants';
@@ -209,6 +218,14 @@ const continuation = new SearchContinuation(resumeBatch, saved => {
 });
 function finishRequest(saved=true) { continuation.finish(saved); }
 const hand = useHandCollectionStore();
+const useHandCollection = computed({
+  get: () => input.value.useHandCollection !== false,
+  set: (value: boolean) => { if (!busy.value) input.value.useHandCollection = value; },
+});
+const favorableEffects = computed({
+  get: () => input.value.favorableEffects === true,
+  set: (value: boolean) => { if (!busy.value) input.value.favorableEffects = value; },
+});
 const additionalBreaks = computed({ get: () => input.value.budget / input.value.itemsPerLimitBreak, set: n => { input.value.budget = n * input.value.itemsPerLimitBreak; } });
 const additionalBreaksError = computed(() => Number.isInteger(additionalBreaks.value) && additionalBreaks.value >= 0 && additionalBreaks.value <= 4
   ? '' : t('examSearch.validation.additional-breaks'));
@@ -322,6 +339,11 @@ watch(characterFilter, names => {
 watch([() => input.value.budget, () => input.value.additionalLevelCap, () => input.value.attempts], () => {
   if (!busy.value) invalidateActiveSearch();
 });
+watch(favorableEffects, () => {
+  invalidateActiveSearch();
+  finishRequest();
+  if (!saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');
+});
 function toggleCharacterFilter(name: string) {
   characterFilter.value = characterFilter.value.includes(name)
     ? characterFilter.value.filter(value => value !== name)
@@ -401,7 +423,7 @@ onMounted(() => {
   const selected = presets.find(p => p.id === input.value.preset.id);
   if (selected) emit('select-preset', selected);
 });
-// Collection is the single source of truth. Training skills are assumed maxed.
+// Both roster sources assume maxed magic and buddy skills.
 function maxSkillsCard(name: string, level: number, totsu: number): RosterCard {
   return { name, level, totsu, magicLevels: [10, 10, 10], buddyLevels: [10, 10, 10], allowUpgrade: true };
 }
@@ -425,15 +447,19 @@ type StoredTeam={deckCharacters?: {name?:string}[]};
 const savedTeams=[loadSimulatorWindowState(),loadStoredAutoSaveDeck<StoredTeam>(),...loadStoredSavedDecks<StoredTeam>()]
   .map(team=>team?.deckCharacters?.map(c=>c?.name??'')??[]).filter(team=>team.length===5&&team.every(name=>!!catalog[name]));
 input.value.seedTeams??=savedTeams;
-watch(() => hand.ownedCards.map(c => [c.cardName, c.level, c.totsu] as const), owned => {
-  const roster = owned.filter(([name, level]) => catalog[name] && level >= 1)
-    .map(([name, level, totsu]) => maxSkillsCard(name, level, totsu));
-  if (JSON.stringify(input.value.roster) === JSON.stringify(roster)) return;
+watch([useHandCollection, () => hand.ownedCards.map(c => [c.cardName, c.level, c.totsu] as const)], ([useOwned, owned], [previousUseOwned]) => {
+  const roster = useOwned
+    ? owned.filter(([name, level]) => catalog[name] && level >= 1)
+      .map(([name, level, totsu]) => maxSkillsCard(name, level, totsu))
+    : cards.map(card => maxSkillsCard(card.name, getInputMaxLevel(card.rare), 4));
+  const sourceChanged = previousUseOwned !== undefined && previousUseOwned !== useOwned;
+  if (!sourceChanged && JSON.stringify(input.value.roster) === JSON.stringify(roster)) return;
   input.value.roster = roster;
   // Collection changes can arrive from another tab, including between batches.
   // Discard results and cancel continuation before an old roster can resume.
   invalidateActiveSearch();
   finishRequest();
+  if (sourceChanged && !saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');
 }, { immediate: true });
 if (persistedSession.value && JSON.stringify(persistedSession.value.input) === JSON.stringify(input.value)) {
   evaluatedInput.value = clone(input.value);
@@ -609,6 +635,8 @@ onBeforeUnmount(() => {
 .resource-search.embedded .setup { border: 0; background: transparent; }
 .search-settings-fields { display: grid; gap: 20px; padding-top: 8px; border: 0; }
 .continuous-help { color: #657582; font-size: .85rem; }
+.roster-source-setting { display: grid; justify-items: start; gap: 8px; padding: 12px 0; }
+.roster-source-setting .filter-help { margin: 0; }
 .required-card-setting, .character-setting { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 16px; padding: 12px 0; }
 .selection-label { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
 .optional-label { font-size: .75rem; color: #657582; font-weight: normal; }

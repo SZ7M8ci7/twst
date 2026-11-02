@@ -206,7 +206,7 @@ export class SearchSession {
       .sort((a,b)=>this.upperScore(b)-this.upperScore(a))[0];
   }
   private async importanceScreen(result:SearchResult,deadline:number,total:number) {
-    if(!this.engine.importanceTrial||this.input.preset.kind==='DEFENCE')return;
+    if(!this.engine.importanceTrial||this.input.preset.kind==='DEFENCE'||this.input.favorableEffects)return;
     if(!result.importance)result.importance={n:0,successWeight:0,observations:[],upperScore:0};
     else if(!result.importance.observations&&result.importance.n>0)
       result.importance={n:0,successWeight:0,observations:[],upperScore:0};
@@ -222,7 +222,7 @@ export class SearchSession {
     importance.upperScore=importanceUpperQuantile(importance.observations!,this.importanceProbability());
   }
   private async scout(result:SearchResult,deadline:number,maximumTrials=32) {
-    if(!this.engine.scout||this.input.preset.kind==='DEFENCE')return;
+    if(!this.engine.scout||this.input.preset.kind==='DEFENCE'||this.input.favorableEffects)return;
     result.criticalScout??={attempted:0,score:0};
     const targets=this.engine.scoutTargets?.()??result.candidate.cards.map((_,i)=>i);
     const maximum=targets.length?maximumTrials:0;
