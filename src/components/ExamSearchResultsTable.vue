@@ -75,8 +75,8 @@ tbody tr:last-child > * { border-bottom: 0; }
 .extra-cell { font-size: 12px; max-width: 125px; overflow-wrap: anywhere; }
 .extra-cell > span { display: block; }
 .card-level {
-  position: absolute; right: 2px; bottom: 2px;
-  color: #fff; font-size: 10px; font-weight: 700; line-height: 14px; font-variant-numeric: tabular-nums;
+  position: absolute; right: 0; bottom: 0;
+  color: #fff; font-size: 10px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
   text-shadow: -1px -1px 0 #14202b, 0 -1px 0 #14202b, 1px -1px 0 #14202b,
     -1px 0 0 #14202b, 1px 0 0 #14202b,
     -1px 1px 0 #14202b, 0 1px 0 #14202b, 1px 1px 0 #14202b;
