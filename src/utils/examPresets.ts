@@ -894,6 +894,40 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
     ],
   },
   {
+    id: '第19回統一木DF',
+    title: '第19回統一木DF',
+    kind: 'DEFENCE',
+    enemyElement: '木',
+    enemyHp: 101000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'イデア',
+        actions: [
+          { name: 'ATKUP強単発', element: '木', power: '単発(強)', estimatedDamage: 7774, effectKind: 'atkUp', effectTarget: '自', effectValue: 21.5, duration: 1 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 15202, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 6742, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.375, duration: 3 },
+        ],
+      },
+      {
+        name: 'オルト',
+        actions: [
+          { name: '強2連', element: '木', power: '2連撃(強)', estimatedDamage: 11824 },
+          { name: 'ATKUP強2連', element: '木', power: '2連撃(強)', estimatedDamage: 15608, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 6922, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.375, duration: 3 },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'player-burn-5t-5', rank: 3, label: '味方がやけど(5T/5%)', score: 9500, effects: [{ kind: 'playerBurn', value: 5, duration: 5 }] },
+      { id: 'non-ignihyde-damage-taken-up-3t-10', rank: 2, label: 'イグニ以外に被ダメUP(3T/10%)', score: 2500, effects: [{ kind: 'playerDamageTakenUp', value: 10, duration: 3, dorm: 'イグニハイド', dormMode: 'exclude' }] },
+      { id: 'player-freeze-3t', rank: 2, label: '味方が凍結(3T)', score: 3000, effects: [{ kind: 'playerFreeze', duration: 3 }] },
+      { id: 'player-damage-down-2t-3_75', rank: 1, label: '味方がダメDOWN(2T/3.75%)', score: 300, effects: [{ kind: 'playerDamageDown', value: 3.75, duration: 2 }] },
+      { id: 'player-blind-2t-12_84', rank: 1, label: '味方が暗闇(2T/12.84%)', score: 400, effects: [{ kind: 'playerBlind', value: 12.84, duration: 2 }] },
+      { id: 'enemy-damage-reduction-2t-5', rank: 1, label: '相手が被ダメDOWN(2T/5%)', score: 300, effects: [{ kind: 'enemyDamageReduction', value: 5, duration: 2 }] },
+    ],
+  },
+  {
     id: '第18回統一火DF',
     title: '第18回統一火DF',
     kind: 'DEFENCE',
