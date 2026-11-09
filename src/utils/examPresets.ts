@@ -928,6 +928,48 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
     ],
   },
   {
+    id: '第19回統一無DF',
+    title: '第19回統一無DF',
+    kind: 'DEFENCE',
+    enemyElement: '無',
+    enemyHp: 86000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'アズール',
+        actions: [
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 11385, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ATKUP弱3連', element: '無', power: '3連撃(弱)', estimatedDamage: 11385, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ATKUP強3連', element: '無', power: '3連撃(強)', estimatedDamage: 15180, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1, fixedOrder: 9 },
+        ],
+      },
+      {
+        name: 'ジェイド',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 8181 },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 4752, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 1 },
+          { name: '味方選択ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 10799, effectKind: 'atkUp', effectTarget: '味方選択', effectValue: 32, duration: 1, fixedOrder: 10 },
+        ],
+      },
+      {
+        name: 'フロイド',
+        actions: [
+          { name: '強2連', element: '無', power: '2連撃(強)', estimatedDamage: 6702 },
+          { name: 'ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 8847, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: 'ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 3893, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'enemy-neutral-damage-up-5t-17_4', rank: 3, label: '相手が無属性ダメUP(5T/17.4%)', score: 8500, effects: [{ kind: 'enemyDamageUp', value: 17.4, duration: 5, attribute: '無' }] },
+      { id: 'player-curse-3t', rank: 2, label: '味方が呪い(3T)', score: 3000, effects: [{ kind: 'playerCurse', duration: 3 }] },
+      { id: 'enemy-neutral-damage-up-3t-12_6', rank: 2, label: '相手が無属性ダメUP(3T/12.6%)', score: 2500, effects: [{ kind: 'enemyDamageUp', value: 12.6, duration: 3, attribute: '無' }] },
+      { id: 'player-fire-damage-down-2t-4_25', rank: 1, label: '味方が火ダメDOWN(2T/4.25%)', score: 300, effects: [{ kind: 'playerDamageDown', value: 4.25, duration: 2, attribute: '火' }] },
+      { id: 'player-water-damage-down-2t-4_25', rank: 1, label: '味方が水ダメDOWN(2T/4.25%)', score: 300, effects: [{ kind: 'playerDamageDown', value: 4.25, duration: 2, attribute: '水' }] },
+      { id: 'player-wood-damage-down-2t-4_25', rank: 1, label: '味方が木ダメDOWN(2T/4.25%)', score: 300, effects: [{ kind: 'playerDamageDown', value: 4.25, duration: 2, attribute: '木' }] },
+    ],
+  },
+  {
     id: '第18回統一火DF',
     title: '第18回統一火DF',
     kind: 'DEFENCE',
