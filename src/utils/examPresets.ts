@@ -816,6 +816,40 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
     ],
   },
   {
+    id: '第19回統一火BS',
+    title: '第19回統一火BS',
+    kind: 'BASIC',
+    enemyElement: '火',
+    enemyHp: 110000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'カリム',
+        actions: [
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 11402, effectKind: 'atkUp', effectTarget: '自', effectValue: 33.5, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 8541 },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 4982, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+        ],
+      },
+      {
+        name: 'ジャミル',
+        actions: [
+          { name: '回復5243強2連', element: '火', power: '2連撃(強)', estimatedDamage: 7040, effectKind: 'heal', effectTarget: '自', effectValue: 5243, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 7040 },
+          { name: '強単発', element: '火', power: '単発(強)', estimatedDamage: 3911 },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'enemy-fire-damage-up-5t-17_4', rank: 3, label: '相手が火属性ダメUP(5T/17.4%)', score: 8500, effects: [{ kind: 'enemyDamageUp', value: 17.4, duration: 5, attribute: '火' }] },
+      { id: 'player-damage-taken-up-3t-8_75', rank: 2, label: '味方が被ダメUP(3T/8.75%)', score: 2000, effects: [{ kind: 'playerDamageTakenUp', value: 8.75, duration: 3 }] },
+      { id: 'enemy-atk-up-3t-40', rank: 2, label: '相手がATKUP(3T/40%)', score: 3000, effects: [{ kind: 'enemyAttackUp', value: 40, duration: 3 }] },
+      { id: 'player-atk-down-2t-20', rank: 1, label: '味方がATKDOWN(2T/20%)', score: 500, effects: [{ kind: 'playerAttackDown', value: 20, duration: 2 }] },
+      { id: 'player-damage-down-2t-3_75', rank: 1, label: '味方がダメDOWN(2T/3.75%)', score: 300, effects: [{ kind: 'playerDamageDown', value: 3.75, duration: 2 }] },
+      { id: 'enemy-evasion-2t-9_2', rank: 1, label: '相手が回避(2T/9.2%)', score: 400, effects: [{ kind: 'enemyEvasion', value: 9.2, duration: 2 }] },
+    ],
+  },
+  {
     id: '第18回統一火DF',
     title: '第18回統一火DF',
     kind: 'DEFENCE',
