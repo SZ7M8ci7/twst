@@ -970,6 +970,56 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
     ],
   },
   {
+    id: '第19回統一全ATK',
+    title: '第19回統一全ATK',
+    kind: 'ATTACK',
+    enemyElement: '全',
+    enemyHp: 222000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'マレウス',
+        actions: [
+          { name: '無強2連', element: '無', power: '2連撃(強)', estimatedDamage: 6110 },
+          { name: '無ATKUP強2連', element: '無', power: '2連撃(強)', estimatedDamage: 8065, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '無ダメUP強単発', element: '無', power: '単発(強)', estimatedDamage: 3560, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.375, duration: 3 },
+        ],
+      },
+      {
+        name: 'リリア',
+        actions: [
+          { name: '水強2連', element: '水', power: '2連撃(強)', estimatedDamage: 5029 },
+          { name: '水ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 6638, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '水ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 2944, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.375, duration: 3 },
+        ],
+      },
+      {
+        name: 'シルバー',
+        actions: [
+          { name: '火強2連', element: '火', power: '2連撃(強)', estimatedDamage: 6634 },
+          { name: '火ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 8757, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '火ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 3884, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.375, duration: 3 },
+        ],
+      },
+      {
+        name: 'セベク',
+        actions: [
+          { name: '木強2連', element: '木', power: '2連撃(強)', estimatedDamage: 5431 },
+          { name: '木味方選択ATKUP強単発', element: '木', power: '単発(強)', estimatedDamage: 3983, effectKind: 'atkUp', effectTarget: '味方選択', effectValue: 32, duration: 1 },
+          { name: '木ダメUP強単発', element: '木', power: '単発(強)', estimatedDamage: 3180, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.375, duration: 1 },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'enemy-atk-up-10t-60', rank: 3, label: '相手がATKUP(10T/60%)', score: 8000, effects: [{ kind: 'enemyAttackUp', value: 60, duration: 10 }] },
+      { id: 'player-damage-taken-up-5t-8_75', rank: 2, label: '味方が被ダメUP(5T/8.75%)', score: 2500, effects: [{ kind: 'playerDamageTakenUp', value: 8.75, duration: 5 }] },
+      { id: 'player-freeze-5t', rank: 2, label: '味方が凍結(5T)', score: 3500, effects: [{ kind: 'playerFreeze', duration: 5 }] },
+      { id: 'player-blind-2t-8_59', rank: 1, label: '味方が暗闇(2T/8.59%)', score: 500, effects: [{ kind: 'playerBlind', value: 8.59, duration: 2 }] },
+      { id: 'enemy-atk-up-2t-20', rank: 1, label: '相手がATKUP(2T/20%)', score: 400, effects: [{ kind: 'enemyAttackUp', value: 20, duration: 2 }] },
+      { id: 'enemy-damage-reduction-2t-5', rank: 1, label: '相手が被ダメDOWN(2T/5%)', score: 300, effects: [{ kind: 'enemyDamageReduction', value: 5, duration: 2 }] },
+    ],
+  },
+  {
     id: '第18回統一火DF',
     title: '第18回統一火DF',
     kind: 'DEFENCE',
