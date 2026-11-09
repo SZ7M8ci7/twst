@@ -850,6 +850,50 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
     ],
   },
   {
+    id: '第19回統一水BS',
+    title: '第19回統一水BS',
+    kind: 'BASIC',
+    enemyElement: '水',
+    enemyHp: 112000,
+    difficulty: 1.5,
+    enemies: [
+      {
+        name: 'レオナ',
+        actions: [
+          { name: '相手選択ATKDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7398, effectKind: 'atkDown', effectTarget: '相手選択', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7398 },
+          { name: '強単発', element: '水', power: '単発(強)', estimatedDamage: 4110 },
+        ],
+      },
+      {
+        name: 'ラギー',
+        actions: [
+          { name: '被ダメDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7628, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7628 },
+          { name: '相手選択やけど弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 5721, effectKind: 'burn', effectTarget: '相手選択', effectValue: 16, duration: 3 },
+        ],
+      },
+      {
+        name: 'ジャック',
+        actions: [
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 12493, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 9464 },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 5600, effectKind: 'damageUp', effectTarget: '自', effectValue: 6.5, duration: 3 },
+        ],
+      },
+    ],
+    specialChallenges: [
+      { id: 'player-freeze-5t', rank: 3, label: '味方が凍結(5T)', score: 9000, effects: [{ kind: 'playerFreeze', duration: 5 }] },
+      { id: 'non-savanaclaw-damage-taken-up-3t-10', rank: 2, label: 'サバナ以外に被ダメUP(3T/10%)', score: 2000, effects: [{ kind: 'playerDamageTakenUp', value: 10, duration: 3, dorm: 'サバナクロー', dormMode: 'exclude' }] },
+      // 122魔法中14回MISS。設定確率は未確定のため、実測値を暫定使用。
+      { id: 'player-blind-3t-11_5', rank: 2, label: '味方が暗闇(3T/11.5%)', score: 3000, effects: [{ kind: 'playerBlind', value: 11.5, duration: 3 }] },
+      // 全84発の整合範囲は4.196～4.276%。4.25%は推定値。
+      { id: 'player-wood-damage-down-2t-4_25', rank: 1, label: '味方が木ダメDOWN(2T/4.25%)', score: 300, effects: [{ kind: 'playerDamageDown', value: 4.25, duration: 2, attribute: '木' }] },
+      { id: 'player-burn-2t-5', rank: 1, label: '味方がやけど(2T/5%)', score: 400, effects: [{ kind: 'playerBurn', value: 5, duration: 2 }] },
+      { id: 'enemy-atk-up-2t-20', rank: 1, label: '相手がATKUP(2T/20%)', score: 400, effects: [{ kind: 'enemyAttackUp', value: 20, duration: 2 }] },
+    ],
+  },
+  {
     id: '第18回統一火DF',
     title: '第18回統一火DF',
     kind: 'DEFENCE',
