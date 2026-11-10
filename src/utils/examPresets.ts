@@ -822,21 +822,22 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
     enemyElement: '火',
     enemyHp: 110000,
     difficulty: 1.5,
+    // 基礎ATKから各手のバフ込み等倍火力を計算し、整数に丸めて格納。
     enemies: [
       {
         name: 'カリム',
         actions: [
-          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 11402, effectKind: 'atkUp', effectTarget: '自', effectValue: 33.5, duration: 1 },
-          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 8541 },
-          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 4982, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
+          { name: 'ATKUP強2連', element: '火', power: '2連撃(強)', estimatedDamage: 11398, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 8635 },
+          { name: 'ダメUP強単発', element: '火', power: '単発(強)', estimatedDamage: 5037, effectKind: 'damageUp', effectTarget: '自', effectValue: 5, duration: 3 },
         ],
       },
       {
         name: 'ジャミル',
         actions: [
-          { name: '回復5243強2連', element: '火', power: '2連撃(強)', estimatedDamage: 7040, effectKind: 'heal', effectTarget: '自', effectValue: 5243, duration: 1 },
-          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 7040 },
-          { name: '強単発', element: '火', power: '単発(強)', estimatedDamage: 3911 },
+          { name: '回復5243強2連', element: '火', power: '2連撃(強)', estimatedDamage: 7043, effectKind: 'heal', effectTarget: '自', effectValue: 5243, duration: 1 },
+          { name: '強2連', element: '火', power: '2連撃(強)', estimatedDamage: 7043 },
+          { name: '強単発', element: '火', power: '単発(強)', estimatedDamage: 3913 },
         ],
       },
     ],
@@ -860,34 +861,34 @@ export const examPresetDefinitions: ExamPresetDefinition[] = [
       {
         name: 'レオナ',
         actions: [
-          { name: '相手選択ATKDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7398, effectKind: 'atkDown', effectTarget: '相手選択', effectValue: 32, duration: 1 },
-          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7398 },
-          { name: '強単発', element: '水', power: '単発(強)', estimatedDamage: 4110 },
+          { name: '相手選択ATKDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7394, effectKind: 'atkDown', effectTarget: '相手選択', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7394 },
+          { name: '強単発', element: '水', power: '単発(強)', estimatedDamage: 4108 },
         ],
       },
       {
         name: 'ラギー',
         actions: [
-          { name: '被ダメDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7628, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
-          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7628 },
-          { name: '相手選択やけど弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 5721, effectKind: 'burn', effectTarget: '相手選択', effectValue: 16, duration: 3 },
+          { name: '被ダメDOWN強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7632, effectKind: 'damageTakenDown', effectTarget: '自', effectValue: 22.5, duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 7632 },
+          { name: '相手選択やけど弱2連', element: '水', power: '2連撃(弱)', estimatedDamage: 5724, effectKind: 'burn', effectTarget: '相手選択', effectValue: 16, duration: 3 },
         ],
       },
       {
         name: 'ジャック',
         actions: [
-          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 12493, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
-          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 9464 },
-          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 5600, effectKind: 'damageUp', effectTarget: '自', effectValue: 6.5, duration: 3 },
+          { name: 'ATKUP強2連', element: '水', power: '2連撃(強)', estimatedDamage: 12548, effectKind: 'atkUp', effectTarget: '自', effectValue: 32, duration: 1 },
+          { name: '強2連', element: '水', power: '2連撃(強)', estimatedDamage: 9506 },
+          { name: 'ダメUP強単発', element: '水', power: '単発(強)', estimatedDamage: 5565, effectKind: 'damageUp', effectTarget: '自', effectValue: 5.375, duration: 3 },
         ],
       },
     ],
     specialChallenges: [
       { id: 'player-freeze-5t', rank: 3, label: '味方が凍結(5T)', score: 9000, effects: [{ kind: 'playerFreeze', duration: 5 }] },
       { id: 'non-savanaclaw-damage-taken-up-3t-10', rank: 2, label: 'サバナ以外に被ダメUP(3T/10%)', score: 2000, effects: [{ kind: 'playerDamageTakenUp', value: 10, duration: 3, dorm: 'サバナクロー', dormMode: 'exclude' }] },
-      // 122魔法中14回MISS。設定確率は未確定のため、実測値を暫定使用。
+      // 暗闇の確率は暫定値。
       { id: 'player-blind-3t-11_5', rank: 2, label: '味方が暗闇(3T/11.5%)', score: 3000, effects: [{ kind: 'playerBlind', value: 11.5, duration: 3 }] },
-      // 全84発の整合範囲は4.196～4.276%。4.25%は推定値。
+      // 木ダメDOWNの効果量は推定値。
       { id: 'player-wood-damage-down-2t-4_25', rank: 1, label: '味方が木ダメDOWN(2T/4.25%)', score: 300, effects: [{ kind: 'playerDamageDown', value: 4.25, duration: 2, attribute: '木' }] },
       { id: 'player-burn-2t-5', rank: 1, label: '味方がやけど(2T/5%)', score: 400, effects: [{ kind: 'playerBurn', value: 5, duration: 2 }] },
       { id: 'enemy-atk-up-2t-20', rank: 1, label: '相手がATKUP(2T/20%)', score: 400, effects: [{ kind: 'enemyAttackUp', value: 20, duration: 2 }] },

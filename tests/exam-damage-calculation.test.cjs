@@ -94,7 +94,7 @@ test('ATK DOWN above 100% still offsets UP and only final ATK is clamped', () =>
   assert.equal(f.player().damage, 0);
 });
 
-test('blocked attacks stay zero and recovery/burn rounding remains unchanged', () => {
+test('blocked attacks stay zero and attack/ceiling helpers retain their rounding', () => {
   const f = fixture();
   f.state.enemyDamageNulls.push({ rate: 100, turns: 1 });
   assert.equal(f.player().damage, 0);

@@ -6348,7 +6348,7 @@ function calculatePlayerHeal(magicId: string, state: SimulationState) {
       const level = Math.min(10, Math.max(1, Math.floor(safeNumber(buff.levelOption) || 10)));
       heal += safeNumber(healDict[`回復(${buff.powerOption})${level}`]) * safeNumber(runtime.atk);
     }
-    amount = ceilDamage(heal);
+    amount = floorEffectAmount(heal);
     amountCache?.set(magicId, amount);
   }
   if (amount > 0 && isPlayerCursed(state, parsed.deckIndex)) {
@@ -6368,7 +6368,7 @@ function applyPlayerContinueHeal(state: SimulationState, currentHp: number, keep
     if (entry.turns <= 0) continue;
     const baseCardHp = deckCardHp(entry.cardIndex);
     const rawHeal = baseCardHp * entry.rate;
-    const potentialAmount = ceilDamage(rawHeal);
+    const potentialAmount = floorEffectAmount(rawHeal);
     if (isPlayerCursed(state, entry.cardIndex)) {
       continue;
     }
@@ -7023,13 +7023,16 @@ function removeEnemyPositiveEffects(state: SimulationState, enemySlotKeys?: Arra
 }
 
 function applyBurnDamage(state: SimulationState, currentHp: number) {
-  let total = 0;
+  // 通常やけどと課題やけどは同じカード内で率を合算してから切り捨てる。
+  const ratesByCard = new Map<number, number>();
   state.burns.forEach((burn) => {
-    if (isPlayerImmune(state, burn.cardIndex, 'burn')) return;
-    const baseCardHp = deckCardHp(burn.cardIndex);
-    const raw = baseCardHp * burn.rate / 100;
-    const amount = ceilDamage(raw);
-    total += amount;
+    if (burn.turns <= 0) return;
+    ratesByCard.set(burn.cardIndex, (ratesByCard.get(burn.cardIndex) ?? 0) + burn.rate);
+  });
+  let total = 0;
+  ratesByCard.forEach((rate, cardIndex) => {
+    if (isPlayerImmune(state, cardIndex, 'burn')) return;
+    total += floorEffectAmount(deckCardHp(cardIndex) * rate / 100);
   });
   const capped = total >= currentHp ? Math.max(0, currentHp - 1) : total;
   return capped;
@@ -7418,6 +7421,12 @@ function nextDamageFactor(rng: () => number) {
 
 function floorAttackDamage(value: number) {
   return Math.floor(Math.max(0, value));
+}
+
+function floorEffectAmount(value: number) {
+  const amount = Math.max(0, value);
+  // 整数になるはずの割合計算が浮動小数点誤差でわずかに下回る場合だけ補正。
+  return Math.floor(amount + Number.EPSILON * Math.max(1, amount) * 4);
 }
 
 function ceilDamage(value: number) {
