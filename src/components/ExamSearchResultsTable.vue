@@ -11,7 +11,14 @@
       </tr></thead>
       <tbody>
         <tr v-for="(row, index) in rows" :key="row.result.candidate.id">
-          <th scope="row" class="rank-cell">{{ index + 1 }}</th>
+          <th scope="row" class="rank-cell">
+            <label class="compare-selection" :title="comparedIds?.includes(row.result.candidate.id) ? t('examComparison.removeSelection') : t('examComparison.addSelection')">
+              <input type="checkbox" data-testid="add-comparison" :aria-label="t('examComparison.selectTeam', { number: index + 1 })"
+                :checked="comparedIds?.includes(row.result.candidate.id) ?? false"
+                :disabled="busy || (comparisonFull && !comparedIds?.includes(row.result.candidate.id))" @change="$emit('compare', row.result)" />
+              <span>{{ index + 1 }}</span>
+            </label>
+          </th>
           <td class="deck-cell">
             <div class="result-deck">
               <figure v-for="card in row.result.candidate.cards" :key="`${card.support}:${card.name}`" :title="cardLabel(card.name)">
@@ -54,8 +61,10 @@ defineProps<{
   cardLabel: (name: string) => string;
   upgradeSummary: (result: SearchResult) => string;
   busy: boolean;
+  comparisonFull?: boolean;
+  comparedIds?: string[];
 }>();
-defineEmits<{ (event: 'preview' | 'simulator' | 'variants', result: SearchResult): void }>();
+defineEmits<{ (event: 'preview' | 'simulator' | 'variants' | 'compare', result: SearchResult): void }>();
 const { t } = useI18n();
 const scoreLabel = (score: number | null) => score === null ? '—' : score.toLocaleString();
 function highestScoreLabel(result: SearchResult) {
@@ -71,6 +80,8 @@ th, td { padding: 8px 6px; border-bottom: 1px solid #edf2f6; vertical-align: mid
 thead th { background: #f7fafc; color: #52616d; font-size: 12px; font-weight: 500; }
 tbody tr:last-child > * { border-bottom: 0; }
 .rank-cell { width: 32px; text-align: center; font-size: 12px; color: #657582; }
+.compare-selection { display: grid; justify-items: center; gap: 5px; padding: 5px 0; cursor: pointer; }
+.compare-selection input { width: 16px; height: 16px; accent-color: #1967b3; cursor: pointer; }
 .deck-cell { width: 342px; }
 .extra-cell { font-size: 12px; max-width: 125px; overflow-wrap: anywhere; }
 .extra-cell > span { display: block; }

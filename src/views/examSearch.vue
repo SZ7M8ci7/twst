@@ -2,6 +2,7 @@
   <v-container :class="['resource-search', { embedded }]" data-testid="exam-resource-search">
     <h1 v-if="!embedded">{{ t('examSearch.title') }}</h1>
     <p v-if="!embedded" class="lead">{{ t('examSearch.simple.intro') }}</p>
+    <div class="search-content" data-testid="search-content">
     <fieldset :disabled="busy" class="setup">
       <ExamSearchPresetPicker v-if="!embedded" @select="selectPreset" />
       <p v-if="!embedded" class="selected-exam">{{ t('examSearch.exam') }}: <strong>{{ localizeGameText(input.preset.title, locale) }}</strong></p>
@@ -62,21 +63,32 @@
       <v-btn color="primary" class="resource-start" :disabled="busy" data-testid="resource-start" @click="start(180000)">{{ t('examSearch.start') }}</v-btn>
       <v-btn v-if="canResume && !busy" data-testid="resource-resume" @click="resume">{{ t('examSearch.resume') }}</v-btn>
       <v-btn v-if="canResume && !sessionSaved && !busy" data-testid="resource-save-retry" @click="retrySave">{{ t('examSearch.retrySave') }}</v-btn>
-      <v-btn v-if="busy" data-testid="resource-stop" @click="stop">{{ t('examSearch.stop') }}</v-btn>
+      <v-btn v-if="searchBusy" data-testid="resource-stop" @click="stop">{{ t('examSearch.stop') }}</v-btn>
     </div>
-    <v-progress-linear v-if="busy" indeterminate color="primary" />
-    <p v-if="progress" aria-live="polite">{{ t(`examSearch.phase.${progress.phase}`) }} · {{ t('examSearch.progress', { tasks: progress.tasksDone, total: progress.tasksTotal, count: progress.evaluated, seconds: Math.round(progress.elapsedMs / 1000) }) }}<span v-if="busy && ['done','stopped'].includes(progress.phase)"> · {{ t('examSearch.saving') }}</span></p>
+    <v-progress-linear v-if="searchBusy" indeterminate color="primary" />
+    <p v-if="progress" aria-live="polite">{{ t(`examSearch.phase.${progress.phase}`) }} · {{ t('examSearch.progress', { tasks: progress.tasksDone, total: progress.tasksTotal, count: progress.evaluated, seconds: Math.round(progress.elapsedMs / 1000) }) }}<span v-if="searchBusy && ['done','stopped'].includes(progress.phase)"> · {{ t('examSearch.saving') }}</span></p>
     <p v-if="progress && !busy && !results.length">{{ t('examSearch.noResult') }}</p>
     <p v-else-if="progress && !busy && results.length && !visibleResults.length" class="filter-empty">{{ t('examSearch.filterEmpty') }}</p>
-    <ExamSearchResultsTable v-if="resultGroups.length" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.variants.length }))"
+    </div>
+    <section class="search-results" data-testid="search-results-panel">
+    <v-tabs v-if="progress || comparisonRef?.count" v-model="resultsTab" class="result-tabs" color="primary" density="compact" :aria-label="t('examComparison.resultTabs')">
+      <v-tab value="results" data-testid="search-results-tab">{{ t('examComparison.results') }}</v-tab>
+      <v-tab value="compare" data-testid="comparison-tab">{{ t('examComparison.tab') }}<span v-if="comparisonRef?.count" class="ml-1">({{ comparisonRef.count }})</span></v-tab>
+    </v-tabs>
+    <ExamSearchResultsTable v-if="resultGroups.length" v-show="resultsTab === 'results'" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.variants.length }))"
       :card-images="cardImages" :card-label="cardLabel" :upgrade-summary="variantCardSummary" :busy="busy"
+      :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds" @compare="addComparison"
       @preview="preview" @simulator="openSimulator" @variants="openVariants" />
+    <ExamFormationComparison v-show="resultsTab === 'compare'" ref="comparisonRef" :disabled="searchBusy" :context-key="comparisonContextKey"
+      :card-images="cardImages" :card-label="cardLabel" @busy="comparisonBusy = $event" @select="resultsTab = 'results'" />
+    </section>
     <v-dialog v-model="variantsOpen" max-width="1080" scrollable>
       <v-card class="modal-card variants-card">
         <v-card-title class="modal-title">{{ t('examSearch.variantsTitle') }}</v-card-title>
         <v-card-text>
           <ExamSearchResultsTable :rows="variantRows" :card-images="cardImages" :card-label="cardLabel"
-            :upgrade-summary="variantCardSummary" :busy="busy" @preview="preview" @simulator="openSimulator" />
+            :upgrade-summary="variantCardSummary" :busy="busy" :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds"
+            @compare="addComparison" @preview="preview" @simulator="openSimulator" />
         </v-card-text>
         <v-card-actions><v-spacer /><v-btn @click="variantsOpen = false">{{ t('common.close') }}</v-btn></v-card-actions>
       </v-card>
@@ -131,6 +143,7 @@ import ExamSearchPresetPicker from '@/components/ExamSearchPresetPicker.vue';
 import SimCharaModal from '@/components/SimCharaModal.vue';
 import ExamBattleLog from '@/components/ExamBattleLog.vue';
 import ExamSearchResultsTable from '@/components/ExamSearchResultsTable.vue';
+import ExamFormationComparison from '@/components/ExamFormationComparison.vue';
 import SupportBody from '@/components/SupportBody.vue';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import defaultImg from '@/assets/img/default.webp';
@@ -182,7 +195,16 @@ if (!props.conditions && props.preset && props.preset.id !== input.value.preset.
   input.value.preset = { ...clone(props.preset), difficulty: props.preset.difficulty ?? 1.5 };
   input.value.challengeLocks = {};
 }
-const busy = ref(false), error = ref(''), progress = ref<SearchProgress | null>(null);
+const searchBusy = ref(false), comparisonBusy = ref(false);
+const busy = computed({ get: () => searchBusy.value || comparisonBusy.value, set: value => { searchBusy.value = value; } });
+const error = ref(''), progress = ref<SearchProgress | null>(null);
+const comparisonRef = ref<InstanceType<typeof ExamFormationComparison> | null>(null);
+const resultsTab = ref<'results' | 'compare'>('results');
+const comparisonContextKey = computed(() => JSON.stringify([input.value.preset, input.value.favorableEffects, input.value.challengeLocks]));
+function addComparison(result: SearchResult) {
+  if (busy.value || !evaluatedInput.value) return;
+  comparisonRef.value?.toggle(result, evaluatedInput.value);
+}
 const continuousSearch = ref(false);
 const evaluatedInput = ref<SearchInput | null>(null), runFingerprint = ref('');
 const previewOpen = ref(false), previewGroups = ref<BattleLogGroup[]>([]);
@@ -350,6 +372,7 @@ function toggleCharacterFilter(name: string) {
     : characterFilter.value.length < 5 ? [...characterFilter.value, name] : characterFilter.value;
 }
 function invalidateActiveSearch() {
+  resultsTab.value = 'results';
   // Results and resume state belong to the previous conditions. Leave the saved
   // checkpoint untouched, but remove it from the active view until a new
   // search is started for these conditions.
@@ -571,7 +594,8 @@ function stop() {
   } else worker?.postMessage({ method: 'stop', id: requestId });
 }
 async function requestStopAndSave() {
-  if (!busy.value) return sessionSaved.value;
+  if (comparisonBusy.value) comparisonRef.value?.stop();
+  if (!searchBusy.value) return sessionSaved.value;
   const saved = new Promise<boolean>(resolve => idleWaiters.push(resolve));
   stop();
   return await saved;
@@ -641,9 +665,10 @@ onBeforeUnmount(() => {
 .selection-label { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
 .optional-label { font-size: .75rem; color: #657582; font-weight: normal; }
 .character-picker-open { justify-self: start; }
-.resource-search > .actions { border-top: 1px solid #dde6ed; padding-top: 16px; }
-.resource-search > .actions .resource-start { order: 0; }
-.resource-search > .actions .search-settings-open { order: 2; }
+.search-content > .actions { border-top: 1px solid #dde6ed; padding-top: 16px; }
+.search-content > .actions .resource-start { order: 0; }
+.search-content > .actions .search-settings-open { order: 2; }
+.result-tabs { margin: 12px 0; border-bottom: 1px solid #d9e2ea; }
 .required-card-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 72px)); gap: 10px; }
 .required-card-slot { position: relative; min-width: 0; }
 .required-card-pick { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border: 1px solid #c6d1dc; border-radius: 6px; overflow: hidden; background: white; color: #1976d2; font-size: 24px; }

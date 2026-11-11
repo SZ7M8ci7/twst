@@ -7,13 +7,10 @@ import { importanceUpperQuantile } from '@/domain/examSearch/importance';
 import { diverseFinalists } from '@/domain/examSearch/finalists';
 
 import { yieldToHost as yieldEventLoop } from '@/utils/yieldToHost';
-const VALIDATION_SAMPLES = 2048;
-const DISCOVERY_SAMPLES = 32;
-const MAX_FINALISTS = 8;
+import { DISCOVERY_SAMPLES, VALIDATION_SAMPLES, MAX_FINALISTS, REFINED_VALIDATION_SAMPLES as CONTINUOUS_VALIDATION_SAMPLES } from '@/domain/examSearch/sampling';
 const WIDE_DISCOVERY_SAMPLES = 8;
 const WIDE_SCOUT_SAMPLES = 8;
 const MAX_RECENT_CANDIDATES = 4096;
-const CONTINUOUS_VALIDATION_SAMPLES = 32768;
 export interface SessionCheckpoint {
   cursor: number; seen: string[]; pool: SearchResult[]; finalists: SearchResult[]; pending: SearchResult[];
   round: number; elapsed: number; trialSerial: number; nonce: string;
@@ -155,20 +152,7 @@ export class SearchSession {
     this.round++;
   }
   private quality(result: SearchResult) {
-    if(this.input.target===0) {
-      const auto=this.autoScoreMetrics(result.development);
-      const empirical=auto.empiricalScore??0;
-      const mean=(result.development.fitnessSum??result.development.scores.reduce((a,b)=>a+b,0))/Math.max(1,auto.n);
-      // The empirical reachable quantile is the primary development rank.
-      // Ceiling and mean only break ties; they must not let a rare maximum
-      // outrank a candidate with a better ordinary reach estimate.
-      return empirical+auto.max*1e-6+mean*1e-9;
-    }
-    const m = metrics(result.development, this.input.target, this.input.attempts);
-    const mean = (result.development.fitnessSum ?? result.development.scores.reduce((a, b) => a + b, 0)) / Math.max(1, m.n);
-    // A retry-oriented target can be worthwhile even with a modest average.
-    // Use the observed ceiling to explore; independent validation decides reach.
-    return m.reach * this.input.target + m.max + mean * 0.1;
+    return statistics.searchDevelopmentQuality(result.development, this.input);
   }
   private qualityComparator() {
     // Scores can grow between selection stages. Cache only for this sort so

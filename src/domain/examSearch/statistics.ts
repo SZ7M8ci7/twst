@@ -1,4 +1,17 @@
-import { emptySamples, type AutoScoreMetrics, type SearchResult, type Samples, type SearchProgress, type ScoreDistribution, type ScoreMetrics } from '@/domain/examSearch/types';
+import { emptySamples, type AutoScoreMetrics, type SearchInput, type SearchResult, type Samples, type SearchProgress, type ScoreDistribution, type ScoreMetrics } from '@/domain/examSearch/types';
+
+/** The same development ranking for composition search and fixed-team comparison. */
+export function searchDevelopmentQuality(samples: Samples, input: Pick<SearchInput, 'target' | 'attempts' | 'desiredProbability'>): number {
+  if (input.target === 0) {
+    const auto = autoScoreMetrics(samples, input.attempts, input.desiredProbability);
+    const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, auto.n);
+    // Reachable score first; maximum and mean only break ties.
+    return (auto.empiricalScore ?? 0) + auto.max * 1e-6 + mean * 1e-9;
+  }
+  const m = metrics(samples, input.target, input.attempts);
+  const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, m.n);
+  return m.reach * input.target + m.max + mean * .1;
+}
 
 export function reachProbability(p: number, attempts: number): number {
   return p >= 1 ? 1 : -Math.expm1(attempts * Math.log1p(-Math.max(0, p)));
