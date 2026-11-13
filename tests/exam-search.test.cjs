@@ -2613,13 +2613,21 @@ test('burn-aware exploration keeps ordinary task order and respects known passiv
   input.challengeLocks={burn:'on'};
   input.roster=input.roster.map(c=>({...c,totsu:4}));
   input.supports=input.supports.map(c=>({...c,totsu:4}));
-  input.roster[1]={...input.roster[1],name:Object.values(catalog).find(c=>c.rare==='SSR'&&c.chara!==catalog[input.roster[0].name].chara).name};
+  const immuneRaw=Object.values(catalog).find(c=>c.rare==='SSR'&&[1,2,3].some(i=>String(c['buddy'+i+'s_totsu']).includes('やけど無効')));
+  const immuneSlot=[1,2,3].find(i=>String(immuneRaw['buddy'+i+'s_totsu']).includes('やけど無効'));
+  const partnerRaw=Object.values(catalog).find(c=>c.rare==='SSR'&&c.chara===immuneRaw['buddy'+immuneSlot+'c']);
+  const names=[immuneRaw.name,partnerRaw.name,...Object.values(catalog).filter(c=>c.rare==='SSR'&&![immuneRaw.name,partnerRaw.name].includes(c.name)).slice(0,2).map(c=>c.name)];
+  input.roster=input.roster.map((c,i)=>({...c,name:names[i]}));input.supports=[{...input.supports[0],name:names[0]}];
   const noBurn=clone(input);noBurn.preset.specialChallenges[0].effects=[];
   const baseline=generation.buildTasks(noBurn,catalog),expanded=generation.buildTasks(input,catalog);
   assert.deepEqual(clone(expanded.filter(t=>t.style!==3)),clone(baseline));
   const added=expanded.filter(t=>t.style===3);assert.ok(added.length);
   for(const cost of new Set(added.map(t=>t.cost)))assert.ok(added.filter(t=>t.cost===cost).length<=2);
-  for(const c of generation.generateCandidates(input,added[0],catalog))assert.ok(variants.candidateSatisfiesConstraints(input,c,catalog));
+  const generated=generation.generateCandidates(input,added[0],catalog);assert.ok(generated.length);
+  for(const c of generated){
+    assert.ok(variants.candidateSatisfiesConstraints(input,c,catalog));
+    assert.ok(c.cards.some(card=>catalog[card.name].chara===added[0].requiredCharacters[0]));
+  }
   const data=clone(catalog),[owner,partner]=input.roster;
   for(const entry of [owner,partner])for(const slot of [1,2,3]){
     data[entry.name]['buddy'+slot+'s']='HPUP(小)';data[entry.name]['buddy'+slot+'s_totsu']='HPUP(小)';

@@ -15,3 +15,9 @@ Long plan: the existing17 comparisons (both set1 budgets×current5; original-zer
 Final checks: constraints, allmaximum seed/plan replays, stop/save/resume, full tests/type/build, browserstorage if available. No publication, push or merge.
 
 Initial locked production/dependency hash: `e4772474c38a224860b835e81fa3346d6813d3dd4fdb20af85caaa234dc70ab0`. The focused regression test and vue-tsc passed. Synthetic deterministic fingerprints are identical to baseline for NRC19 fireBS, waterBS, neutralDF and allATK; woodDF has two added tasks (145→147), while the unit regression proves every original task remains in order.
+
+## Development refinement before primary confirmation
+
+The first25 development comparisons averaged +122.725 on currentwoodDF across5 profiles (2 gains/3 losses, original -6.9, original-zero +427.5, provided -161.7, all-owned -25.4, sparse +380.2). Large differences also appeared in unchanged subjects, including original-zero currentATK +6188 and original NRC17allDF -6629; those timing-cutoff differences are not evidence of burn logic improving those subjects. No historical holdout was run for this proposal.
+
+Refine the extra paths to require an available passive burn-immunity buddy, rather than merely cloning the first two ordinary anchors. Rank eligible root/buddy pairs by the existing single-card estimate plus the known avoided base-HP burn and buddy HP contribution. Retain the same limits (two distinct roots per cost, one extra after eight regular tasks), unchanged ordinary ordering, and unchanged styles0/1/2. Do not add work for roots with no available immunity buddy. Re-run the same25 development cases with tag burn-development-v2 and fresh nonce nrc19-burn-dev-v2 before deciding whether to run primary confirmation.

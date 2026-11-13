@@ -239,20 +239,54 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
     }
   }
   if (input.preset.kind === 'DEFENCE' && challenges.some(ids => challengeBurnRates(input, ids).length)) {
-    const burning = new Set(challenges.filter(ids => challengeBurnRates(input, ids).length));
-    const extra = new Map<number, GenerationTask[]>();
+    const own = new Set(input.roster.map(card => catalog[card.name].chara));
+    const all = new Set([...own, ...(supportAllowed ? input.supports.map(card => catalog[card.name].chara) : [])]);
+    const burnBySet = new Map(challenges.map(ids => [ids, challengeBurnRates(input, ids)]));
+    const ranked = new Map<number, { task: GenerationTask; value: number; root: string }[]>();
+    const seen = new Set<string>();
     for (const task of output) {
-      if (!burning.has(task.challenges)) continue;
-      const lane = extra.get(task.cost) ?? [];
-      if (lane.length >= 2 || lane.some(row => row.anchor === task.anchor && row.supportAnchor === task.supportAnchor)) continue;
-      lane.push({ ...task, style: 3 }); extra.set(task.cost, lane);
+      if (task.requiredCharacters || task.seedTeam) continue;
+      const rates = burnBySet.get(task.challenges) ?? [];
+      if (!rates.length) continue;
+      const support = !!task.supportAnchor, name = task.supportAnchor ?? task.anchor;
+      const original = (support ? input.supports : input.roster).find(card => card.name === name)!;
+      const totsu = support ? original.totsu : task.totsu;
+      const key = JSON.stringify([name, totsu, support, task.challenges]);
+      if (seen.has(key)) continue; seen.add(key);
+      const raw = catalog[name];
+      const immuneBuddies = ([1, 2, 3] as const).flatMap(index => {
+        const partner = raw['buddy' + index + 'c'];
+        const status = getBuddyStatusForCharacter(raw, index, { totsu, isActive: true });
+        return status.includes('やけど無効') && (support ? own : all).has(partner) ? [{ index, partner, status }] : [];
+      });
+      if (!immuneBuddies.length) continue;
+      const variants = cardVariants(original, raw.rare, support, totsu);
+      if (!variants.length) continue;
+      const hp = Math.ceil(recalculateHP(raw, variants[0].level, totsu === 4));
+      const avoided = rates.reduce((sum, rate) => sum + Math.floor(hp * rate / 100), 0);
+      const estimate = cachedEstimator(input, { ...task, style: 0 }, catalog);
+      const base = Math.max(...variants.map(card => estimate([card])));
+      for (const { index, partner, status } of immuneBuddies) {
+        const value = base + avoided + hp * getBuddyStatusSummary(status, original.buddyLevels[index - 1]).hpRate;
+        const lane = ranked.get(task.cost) ?? [];
+        lane.push({ task: { ...task, style: 3, requiredCharacters: [partner] }, value, root: key });
+        ranked.set(task.cost, lane);
+      }
+      yield;
     }
-    const lanes = [...extra.entries()].sort(([a], [b]) => a - b).map(([, lane]) => lane);
+    const lanes = [...ranked.entries()].sort(([a], [b]) => a - b).map(([, rows]) => {
+      rows.sort((a, b) => b.value - a.value || a.root.localeCompare(b.root));
+      const roots = new Set<string>();
+      return rows.filter(row => {
+        if (roots.has(row.root)) return false;
+        roots.add(row.root); return true;
+      }).slice(0, 2).map(row => row.task);
+    });
     const additions = [0, 1].flatMap(index => lanes.flatMap(lane => lane[index] ? [lane[index]] : []));
     if (additions.length) {
       const regular = [...output]; output.length = 0;
-      // Add a bounded burn-aware path without replacing the usual estimates
-      // or changing the relative order of any existing construction tasks.
+      // Require a real available immunity buddy in these few extra paths.
+      // Keep every ordinary task, its relative order and all cost bands.
       for (let index = 0; index < Math.max(regular.length, additions.length * 8); index++) {
         if (regular[index]) output.push(regular[index]);
         if (index % 8 === 7 && additions[Math.floor(index / 8)]) output.push(additions[Math.floor(index / 8)]);

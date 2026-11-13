@@ -26,7 +26,7 @@ for before in sorted(artifacts.glob('*-before')):
         count += 1
     files += [(p, str(p.relative_to(root))) for p in before.glob('plan-*.json')]
     runs[before.name[:-7]] = count
-for pattern in ['*-summary.json', '*-integrity.json', '*-report.json', '*-plan.json', '*.log']:
+for pattern in ['*-summary.json', '*-integrity.json', '*-report.json', '*-plan.json', '*-fingerprint-*.json', '*.log']:
     files += [(p, str(p.relative_to(root))) for p in artifacts.glob(pattern)]
 metadata = {'schema': 1, 'privateInputIncluded': True, 'branch': branch, 'head': head, 'baseline': baseline,
     'createdUtc': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'completedPairs': runs,
