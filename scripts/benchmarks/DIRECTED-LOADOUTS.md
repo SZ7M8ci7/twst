@@ -15,3 +15,9 @@ Conversation records from the lost run suggested a current-cohort gain in both s
 Re-execution: full185 paired cases,30 seconds, nonce nrc19-directed-primary-v1, four processes. Then fresh180-second checks with nonce nrc19-directed-long-v1: both set1 budgets × NRC19 current5, original-zero × the fixed six historical tuning subjects, and original × NRC17 allDF (17 pairs). Extend material primary regressions if necessary. Current535-support supplement: both set1 budgets × current5,30 seconds, separate aggregation. All audits1024 ordinary trials. Do not fold supplements or development runs into the70/30 primary mean.
 
 A private recovery snapshot preserves the exact source bundle, profile manifest and matched completed case reports in Library. It excludes interrupted checkpoints so a restarted comparison cannot silently mix interrupted time budgets. The final public review artifact will exclude personal input and full private case reports.
+
+## Frozen long confirmation extension after the complete primary matrix
+
+The rerun primary185 completed with current E(max30) +585.403 points, historical -48.400, fixed70/30 +395.262 (+0.830% normalized). Historical loss is small but must be reported. Current all-owned/allATK declined7010.518 points (-15.656%); sparse/allATK had the largest gain8732.772 points. Append these two cases to the already fixed17 long cases. `directed-long-confirmation-plan.json` therefore contains19 cases, with the original17 in unchanged order. Run180 seconds with the already fixed fresh nonce, four processes; no production code or parameters are changed after reading the confirmation scores. Primary results remain the only70/30 aggregate.
+
+A second environment restart retained167 complete primary pairs. Interrupted unmatched cases/checkpoints were quarantined, and both versions of the remaining18 pairs were measured from scratch with their original arguments. All185 passed the independent audit integrity checks afterward.
