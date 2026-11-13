@@ -2,7 +2,7 @@
 
 This branch now tests **burn-aware auxiliary construction** (`BURN-AWARE.md`). Directed joint spell refinement was rejected after its current535-support long regression; `DIRECTED-REPORT.md` retains its complete224-pair evidence. The earlier observation-speed proposal was also rejected (`NRC19-REPORT.md`). The burn-aware proposal is not adopted pending measurement. Nothing has been published or merged.
 
-The command examples below reproduce the rejected directed proposal. For the current proposal use the tags, nonces and plans fixed in `BURN-AWARE.md`.
+The examples below run the current proposal. The rejected directed proposal remains on `codex/nrc19-directed-loadouts` at47d3a0ee; do not reuse its result tags with this source.
 
 Use `PROTOCOL.md` as the fixed decision protocol. Run from the checkout root. The production baseline is commit `8d68abb6`; the historical subject list comes from `7350e969` and the fixed support/catalog identities from `8dda02ba` (518 cards). Node dependencies must be installed in each checkout. No browser or DOM is required for the real simulation engine.
 
@@ -20,17 +20,17 @@ node scripts/benchmarks/make-profiles.cjs current-sets.json provided-v3.json art
 
 ```sh
 for shard in 0 1 2 3; do
-  node scripts/benchmarks/paired.mjs --before=../twst-nrc19-baseline --after=. --cases=all --tag=directed-primary --nonce=nrc19-directed-primary-v1 --shard=$shard/4 > artifacts/nrc19/directed-primary-$shard.log 2>&1 &
+  node scripts/benchmarks/paired.mjs --before=../twst-nrc19-baseline --after=. --cases=all --tag=burn-primary --nonce=nrc19-burn-primary-v1 --shard=$shard/4 > artifacts/nrc19/burn-primary-$shard.log 2>&1 &
 done
 wait
-node scripts/benchmarks/summarize.mjs artifacts/nrc19/directed-primary-before artifacts/nrc19/directed-primary-after artifacts/nrc19/directed-primary-summary.json
+node scripts/benchmarks/summarize.mjs artifacts/nrc19/burn-primary-before artifacts/nrc19/burn-primary-after artifacts/nrc19/burn-primary-summary.json
 ```
 
 Check every shard log and require `complete185: true` in the summary. A partial progress summary is not an adoption result. Completed cases can be resumed with identical arguments. Input/nonce/source mismatches abort instead of silently accepting stale files. Source fingerprints include src, build adapters, Vite configuration and the dependency lock; card and preset fingerprints must agree between versions. Keep an entire run directory together with its plan and checkpoints.
 
 Each version runs a 30-second search, freezes the top three distinct published compositions using the production ranking, then evaluates each with 1,024 fresh ordinary trials. The primary metric is rank one's empirical expected maximum over 30 attempts. Audit scores never select or train candidates. Candidate-specific seeds make the same candidate's audit identical between versions. Every audited candidate is checked for ownership, support role, required characters, training, challenge locks and budget. The maximum audit result is replayed both by seed and explicit plan. Wall-clock bounds allow timing noise and cannot prove that every individual user search improves.
 
-Use `--time-ms=180000 --nonce=nrc19-directed-long-v1 --plan=scripts/benchmarks/directed-long-confirmation-plan.json --tag=directed-long` for the fixed19 long comparisons (the original17: both set1 budgets × current5, original-zero × historical tuning6, original × NRC17 allDF; plus all-owned and sparse NRC19 allATK for the primary extremes). Use four shards as above. Use `--supports=current --profiles=original,original-zero --cases=current --tag=directed-current-support --nonce=nrc19-directed-current-support-v1` for the separate current-535 support check. Do not mix these extra runs into the70/30 primary weighting.
+Use `--time-ms=180000 --nonce=nrc19-burn-long-v1 --plan=scripts/benchmarks/burn-long-plan.json --tag=burn-long` for the fixed20 long comparisons (the original17: both set1 budgets × current5, original-zero × historical tuning6, original × NRC17 allDF; plus provided/all-owned/sparse NRC19 woodDF). Use four shards as above. Use `--supports=current --profiles=original,original-zero --cases=current --tag=burn-current-support --nonce=nrc19-burn-current-support-v1` for the separate current-535 support check. Do not mix these extra runs into the70/30 primary weighting.
 
 ## Checks and diagnostics
 
@@ -53,4 +53,6 @@ The repository already contains all five NRC19 subjects and 30 challenges. The [
 
 ## Recoverable private measurements
 
-`python3 scripts/benchmarks/recovery-snapshot.py` bundles the clean committed source, private profiles and only matched completed case reports. Save this archive to the same private Library item after each group of completed cases. It contains personal hand data; it is separate from the public source/review deliverable. On recovery, restore the recorded branch and profiles, then rerun the identical tag/nonce/shard arguments. Interrupted pairs are rerun on both versions; do not resume their partial time budgets. `status-pairs.py TAG` reports completion without exposing holdout score outcomes during the fixed-code confirmation run. `verify-paired.mjs output.json TAG...` validates complete plans, independent1024-trial audits, maximum replay, constraints and common-candidate equality. `lifecycle.mjs directed-lifecycle` preserves separate lifecycle evidence.
+`python3 scripts/benchmarks/recovery-snapshot.py` bundles the clean committed source, private profiles and only matched completed case reports. Save this archive to the same private Library item after each group of completed cases. It contains personal hand data; it is separate from the public source/review deliverable. On recovery, restore the recorded branch and profiles, then rerun the identical tag/nonce/shard arguments. Interrupted pairs are rerun on both versions; do not resume their partial time budgets. `status-pairs.py TAG` reports completion without exposing holdout score outcomes during the fixed-code confirmation run. `verify-paired.mjs output.json TAG...` validates complete plans, independent1024-trial audits, maximum replay, constraints and common-candidate equality. `lifecycle.mjs burn-lifecycle` preserves separate lifecycle evidence.
+
+The current535 support supplement also runs the same entire10 cases at180 seconds with `--time-ms=180000 --tag=burn-current-support-long --nonce=nrc19-burn-current-support-long-v1`. Do not replace or mix the30-second result.
