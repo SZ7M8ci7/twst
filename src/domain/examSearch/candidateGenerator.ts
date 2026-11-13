@@ -1020,6 +1020,31 @@ function* generateTrainedSteps(input: SearchInput, task: GenerationTask, catalog
   return [...result.values()];
 }
 
+/** Prioritize a few joint spell choices; ordinary battles still select winners. */
+export async function prioritizeSpellCandidates(input: SearchInput, candidates: Candidate[], catalog: Catalog,
+  stop: () => boolean): Promise<Candidate[]> {
+  if (!candidates.length) return [];
+  const priorities: Candidate[] = [];
+  for (const style of [0, 1, 2]) {
+    const estimate = cachedEstimator(input, { anchor: '', totsu: 0, cost: 0,
+      challenges: candidates[0].challengeIds, style }, catalog);
+    let best: Candidate | undefined, bestValue = -Infinity;
+    for (let index = 0; index < candidates.length; index++) {
+      if (index % 8 === 0) {
+        await yieldToHost();
+        if (stop()) return [...priorities, ...candidates.filter(candidate => !priorities.includes(candidate))];
+      }
+      const candidate = candidates[index];
+      if (priorities.includes(candidate)) continue;
+      const value = estimate(candidate.cards);
+      if (value > bestValue) { best = candidate; bestValue = value; }
+    }
+    if (best) priorities.push(best);
+  }
+  // Keep the former hash-ordered exploration after the three directed choices.
+  return [...priorities, ...candidates.filter(candidate => !priorities.includes(candidate))];
+}
+
 export function generateCandidates(input: SearchInput, task: GenerationTask, catalog: Catalog): Candidate[] {
   const steps = generateTrainedSteps(input, task, catalog);
   let next = steps.next();

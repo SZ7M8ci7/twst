@@ -1002,7 +1002,6 @@ interface SimulationRuntimeCache {
   playerEffectPlans: Map<string, Array<{ buff: ParsedBuff; duration: number; targets: number[] }>>;
   continueHealPlans: Map<string, Array<{ rate: number; duration: number; targets: number[]; powerOption: string; levelOption: number }>>;
   playerHealAmounts: Map<string, number>;
-  observationMagicMeta: Map<string, { text: string; hp: number }>;
   playerDamageResult: Record<string, any>;
   enemyDamageResult: Record<string, any>;
   emptyHitDamages: number[];
@@ -3690,7 +3689,6 @@ function createSimulationRuntimeCache(): SimulationRuntimeCache {
     playerEffectPlans: new Map(),
     continueHealPlans: new Map(),
     playerHealAmounts: new Map(),
-    observationMagicMeta: new Map(),
     playerDamageResult: {},
     enemyDamageResult: {},
     emptyHitDamages: [],
@@ -4469,25 +4467,19 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
   });
   const publicTargets = publicEnemyAt.map(action=>action??{slotKey:'resource-unrevealed'} as RuntimeEnemyAction);
   // Only this public enemy slot is available to the policy, never the enemy deck.
-  // The public state does not change while selecting a finisher. Evaluate
-  // each remaining spell once; retain the original strict comparison/ties.
-  let finisher = '', finisherStrength = 0;
-  for (const id of unusedMagic) {
-    const magic = magicById(id);
-    let strength = 0;
-    if (magic) {
-      if (!effectAware) strength = safeNumber(buildRuntimeCharacter(magic.deckIndex)?.atk) * magicHitCount(magic.power);
-      else {
-        const parsed = parseMagicId(id)!;
-        const duo = unusedMagic.some(other => isDuoActiveForPair(id, other));
-        const target = exam.value.enemyElement === '全' ? '無' : exam.value.enemyElement;
-        const base = calculatePlayerDamageBaseFromState(state, id, parsed.deckIndex, parsed.magicSlot, target, 0, duo);
-        strength = (base?.damage ?? 0) * (tailAware ? criticalTailMultiplier(base?.criticalChance ?? 0,
-          duo ? 3 : magicHitCount(magic.power), resourcePerAttemptProbability, CRITICAL_DAMAGE_MULTIPLIER) : 1);
-      }
-    }
-    if (strength > finisherStrength) { finisher = id; finisherStrength = strength; }
-  }
+  const finisher = unusedMagic.reduce((best, id) => {
+    const magic = magicById(id), current = magicById(best);
+    const strength = (m: any, magicId: string) => {
+      if (!m) return 0;
+      if (!effectAware) return safeNumber(buildRuntimeCharacter(m.deckIndex)?.atk) * magicHitCount(m.power);
+      const parsed = parseMagicId(magicId)!;
+      const duo = unusedMagic.some(other => isDuoActiveForPair(magicId, other));
+      const target = exam.value.enemyElement === '全' ? '無' : exam.value.enemyElement;
+      const base=calculatePlayerDamageBaseFromState(state, magicId, parsed.deckIndex, parsed.magicSlot, target, 0, duo);
+      return (base?.damage??0)*(tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(m.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER):1);
+    };
+    return strength(magic, id) > strength(current, best) ? id : best;
+  }, '');
   const finisherPartners = unusedMagic.filter(id => isDuoActiveForPair(finisher, id));
   const pairs = enumerateVisiblePlayerPairs(visible).map(ids => {
     // Evaluate the chosen cards' public effects before estimating their attacks.
@@ -4541,19 +4533,11 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
       damage += d;
       if (index === 0) firstDamage = d;
       duo += Number(activeDuo && parsed.magicSlot === 2);
-      // Static spell text/training belongs to the per-candidate runtime, not
-      // to a random battle. State-dependent immunity/healing still runs above.
-      const metaKey = `${id}|${ids[1 - index]}|${effectAware}`;
-      let observationMeta = simulationRuntimeCache?.observationMagicMeta.get(metaKey);
-      if (!observationMeta) {
-        const slot = deck.value[parsed.deckIndex];
-        const effects = effectAware ? getPlayerEffectPlans(id, ids[1 - index], parsed).map(plan => plan.buff.buffOption).join(' ')
-          : slot.magicEffects[parsed.magicSlot];
-        observationMeta = { text: `${effects} ${slot.magicHeals[parsed.magicSlot]}`, hp: slot.customHp };
-        simulationRuntimeCache?.observationMagicMeta.set(metaKey, observationMeta);
-      }
-      const { text } = observationMeta;
-      if (!effectAware && text.includes('回復') && !isPlayerCursed(predicted, parsed.deckIndex)) heal += observationMeta.hp * 0.15;
+      const slot = deck.value[parsed.deckIndex];
+      const effects = effectAware ? getPlayerEffectPlans(id, ids[1 - index], parsed).map(plan => plan.buff.buffOption).join(' ')
+        : slot.magicEffects[parsed.magicSlot];
+      const text = `${effects} ${slot.magicHeals[parsed.magicSlot]}`;
+      if (!effectAware && text.includes('回復') && !isPlayerCursed(predicted, parsed.deckIndex)) heal += slot.customHp * 0.15;
       if (/解除|無効/.test(text)) utility++;
       if (effectAware) {
         const compatibility = getCompatibility(magic.element, target);

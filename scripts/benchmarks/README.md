@@ -1,6 +1,6 @@
 # NRC19 paired search benchmark
 
-This branch retains an **unadopted experimental observation-speed change** for review. The 30-second score comparison improved, but the NRC19 180-second means declined for both set1 budgets. Read `NRC19-REPORT.md` before considering the prototype for release. Nothing has been published or merged.
+This branch tests **directed joint spell refinement** (`DIRECTED-LOADOUTS.md`). The earlier observation-speed proposal was rejected and is reverted here; its saved evidence remains in `NRC19-REPORT.md` and the November13 Library review bundle. The new proposal is not adopted pending fresh complete measurements after cloud recovery. Nothing has been published or merged.
 
 Use `PROTOCOL.md` as the fixed decision protocol. Run from the checkout root. The production baseline is commit `8d68abb6`; the historical subject list comes from `7350e969` and the fixed support/catalog identities from `8dda02ba` (518 cards). Node dependencies must be installed in each checkout. No browser or DOM is required for the real simulation engine.
 

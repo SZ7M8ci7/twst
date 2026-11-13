@@ -34,7 +34,10 @@ try{
  const current=before.presets.filter(p=>p.id.startsWith('第19回')).map(p=>p.id),suite=args.get('cases')||'current';
  const ids=suite==='current'?current:suite==='development'?[...current,...tuning]:suite==='holdout'?historical.filter(x=>!tuning.includes(x)):suite==='historical'?historical:suite==='all'?[...current,...historical]:suite.split(',');
  const names=(args.get('profiles')||Object.keys(profiles.profiles).join(',')).split(',');
- const planned=names.flatMap(profile=>ids.map(id=>({profile,id})));
+ const planned=args.has('plan')?JSON.parse(fs.readFileSync(args.get('plan'),'utf8')):names.flatMap(profile=>ids.map(id=>({profile,id})));
+ assert.ok(Array.isArray(planned)&&planned.length>0,'Empty case plan');
+ assert.equal(new Set(planned.map(row=>JSON.stringify([row.profile,row.id]))).size,planned.length,'Duplicate planned cases');
+ for(const row of planned){assert.ok(profiles.profiles[row.profile],row.profile);assert.ok(before.presets.some(p=>p.id===row.id),row.id);}
  fs.writeFileSync(path.join(before.outputDir,`plan-${shard}.json`),JSON.stringify({profilesHash:digest(profiles),planned,durationMs,auditTrials,nonceBase,shard,count,supportMode,sourceHash:before.sourceHash,afterSourceHash:after?.sourceHash,catalogHash:before.catalogHash,presetsHash:before.presetsHash},null,2));
  for(const [i,{profile,id}] of planned.entries()){
   if(i%count!==shard)continue;

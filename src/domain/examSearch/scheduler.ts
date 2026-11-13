@@ -1,4 +1,4 @@
-import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
+import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, prioritizeSpellCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
 import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
 import { metrics } from '@/domain/examSearch/statistics';
 import * as statistics from '@/domain/examSearch/statistics';
@@ -476,9 +476,16 @@ export class SearchSession {
       }
       // Cross multiple spell substitutions on measured compositions. A bounded
       // round-robin gives each cost band time before deeper contender trials.
-      const loadouts=this.diverseParents(2).map(parent=>[...alternatePolicyCandidates(this.input,parent.candidate),
-        ...jointSpellCandidates(this.input,parent.candidate,this.catalog)]
-        .filter(candidate=>candidateSatisfiesConstraints(this.input,candidate,this.catalog)&&!this.seen.has(candidate.id)));
+      const loadouts = [];
+      for (const parent of this.diverseParents(2)) {
+        if (this.stopped || performance.now() >= loadoutDeadline) break;
+        const spells = jointSpellCandidates(this.input, parent.candidate, this.catalog)
+          .filter(candidate => candidateSatisfiesConstraints(this.input, candidate, this.catalog) && !this.seen.has(candidate.id));
+        const directed = await prioritizeSpellCandidates(this.input, spells, this.catalog,
+          () => this.stopped || performance.now() >= loadoutDeadline);
+        loadouts.push([...alternatePolicyCandidates(this.input, parent.candidate), ...directed]
+          .filter(candidate => candidateSatisfiesConstraints(this.input, candidate, this.catalog) && !this.seen.has(candidate.id)));
+      }
       for(let index=0;index<249;index++)for(const options of loadouts) {
         if(this.stopped||performance.now()>=loadoutDeadline)break;
         const candidate=options[index];if(!candidate||this.seen.has(candidate.id))continue;

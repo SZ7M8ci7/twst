@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createServer} from 'vite';
+const outputPrefix=process.argv[2]||'lifecycle';
 const fixture=JSON.parse(fs.readFileSync('scripts/tests/fixtures/exam-observation-equivalence.json','utf8')).rows[0];
 const server=await createServer({plugins:[{name:'no-scan',configResolved(c){c.optimizeDeps.noDiscovery=true;c.optimizeDeps.include=[];}}],server:{middlewareMode:true,hmr:false,watch:null},appType:'custom'});
 try{
@@ -13,7 +14,7 @@ try{
  session=new SearchSession(input,catalog,stoppingEngine,'lifecycle-v1');
  await session.run(10000,()=>{});
  const stopped=session.checkpoint();assert.ok(trials>=40);assert.ok(stopped.trialSerial>0);
- const filename='artifacts/nrc19/lifecycle-checkpoint.json';fs.writeFileSync(filename,JSON.stringify(stopped));
+ const filename=`artifacts/nrc19/${outputPrefix}-checkpoint.json`;fs.writeFileSync(filename,JSON.stringify(stopped));
  const saved=JSON.parse(fs.readFileSync(filename,'utf8'));assert.deepEqual(saved,JSON.parse(JSON.stringify(stopped)));
  const resumedEngine=createResourceBattleHost();let resumedOrdinaryTrials=0;
  const countedEngine={...resumedEngine,trial(...args){resumedOrdinaryTrials++;return resumedEngine.trial(...args);}};
@@ -29,5 +30,5 @@ try{
  const replays=[];
  for(const row of continued.finalists){const best=row.validationBest??row.developmentBest;if(!best)continue;await resumedEngine.prepare(input,row.candidate);const result=resumedEngine.trial(best.seed,row.candidate.policy,true);assert.equal(result.score,best.score);assert.equal(resumedEngine.replay(best.seed,result.plan,true).score,best.score);replays.push(best.score);}
  assert.ok(replays.length);const report={stoppedAfterTrials:trials,resumedOrdinaryTrials,savedValidation,resumedValidation,savedTrials:saved.trialSerial,resumedTrials:continued.trialSerial,savedEvaluated:saved.evaluatedCount,resumedEvaluated:continued.evaluatedCount,noncePreserved:true,finalists:continued.finalists.length,replayedScores:replays,browserStorageTested:false};
- fs.writeFileSync('artifacts/nrc19/lifecycle-report.json',JSON.stringify(report,null,2));console.log(report);
+ fs.writeFileSync(`artifacts/nrc19/${outputPrefix}-report.json`,JSON.stringify(report,null,2));console.log(report);
 }finally{await server.close();}
