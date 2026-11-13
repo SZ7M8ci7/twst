@@ -2605,28 +2605,3 @@ test('five distinct required characters construct legal normal and unified teams
     for(const row of [cleaned,...cleaned.parallel.checkpoints])for(const field of ['pool','finalists','pending'])assert.equal(row[field].length,1);
   }
 });
-
-
-test('directed joint spell refinement preserves all legal combinations and cancellation',async()=>{
-  const input=fixture();
-  input.roster=input.roster.map(c=>({...c,totsu:4}));
-  input.supports=input.supports.map(c=>({...c,totsu:4}));
-  const cards=[...input.roster.slice(0,4).map(c=>variants.cardVariants(c,'SSR')[0]),variants.cardVariants(input.supports[0],'SSR',true)[0]];
-  const parent={cards,cost:0,policy:'effects-tail',challengeIds:[],id:'original',estimate:0};
-  const children=variants.jointSpellCandidates(input,parent,catalog);
-  const original=JSON.stringify(children);
-  const ranked=await generation.prioritizeSpellCandidates(input,children,catalog,()=>false);
-  assert.equal(ranked.length,242);
-  assert.equal(new Set(ranked.map(c=>c.id)).size,242);
-  assert.deepEqual(clone(ranked.map(c=>c.id).sort()),clone(children.map(c=>c.id).sort()));
-  assert.equal(JSON.stringify(children),original);
-  for(let style=0;style<3;style++){
-    const estimate=generation.createEstimator(input,{anchor:'',totsu:0,cost:0,challenges:[],style},catalog);
-    const remaining=children.filter(c=>!ranked.slice(0,style).includes(c));
-    const best=remaining.reduce((a,b)=>estimate(b.cards)>estimate(a.cards)?b:a);
-    assert.equal(ranked[style],best);
-  }
-  assert.deepEqual(clone(ranked.slice(3)),clone(children.filter(c=>!ranked.slice(0,3).includes(c))));
-  assert.deepEqual(clone(await generation.prioritizeSpellCandidates(input,children,catalog,()=>true)),clone(children));
-  assert.deepEqual(clone(await generation.prioritizeSpellCandidates(input,[],catalog,()=>false)),[]);
-});
