@@ -220,7 +220,7 @@ test('search start displays invalid card names with costumes in every locale and
     const cardLabel = name => `${catalog[name].chara} / ${catalog[name].costume}`;
     const context = { input: { value: input }, error, catalog, validateInput, invalidSearchCards, cardLabel,
       usesSupport: { value: false }, getWorker() { assert.fail('Invalid cards must not start a worker'); },
-      additionalBreaksError: { value: '' }, attemptsError: { value: '' }, loadSearchSeedTeams: () => [], savedTeams: [],
+      additionalBreaksError: { value: '' }, additionalLevelCapError: { value: '' }, attemptsError: { value: '' }, loadSearchSeedTeams: () => [], savedTeams: [],
       t: (key, args) => { assert.equal(key, 'examSearch.validation.card'); return message.replace('{cards}', args.cards); } };
     vm.createContext(context);
     vm.runInContext(compile(`function start(durationMs: number)${source}`), context);
