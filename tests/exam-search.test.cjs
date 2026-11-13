@@ -2628,6 +2628,9 @@ test('burn-aware exploration keeps ordinary task order and respects known passiv
     assert.ok(variants.candidateSatisfiesConstraints(input,c,catalog));
     assert.ok(c.cards.some(card=>catalog[card.name].chara===added[0].requiredCharacters[0]));
   }
+  const fixed={...clone(input),requiredCards:input.roster.map(card=>card.name)};
+  assert.equal(generation.generateCandidates(fixed,{...added[0],requiredCharacters:['missing-immunity-buddy']},catalog).length,0,
+    'an auxiliary immunity buddy is mandatory even when all owned slots were already fixed');
   const data=clone(catalog),[owner,partner]=input.roster;
   for(const entry of [owner,partner])for(const slot of [1,2,3]){
     data[entry.name]['buddy'+slot+'s']='HPUP(小)';data[entry.name]['buddy'+slot+'s_totsu']='HPUP(小)';
