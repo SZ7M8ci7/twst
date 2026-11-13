@@ -44,13 +44,14 @@ try{
   assert.ok(input.roster.length);assert.equal(before.modules.validateInput(input,before.modules.catalog),null);
   const nonce=`${nonceBase}:${profile}:${id}`;
   for(const c of after?(i%2?[after,before]:[before,after]):[before]){
-   const existing=fs.readdirSync(c.outputDir).filter(f=>f.startsWith('case-')).map(f=>JSON.parse(fs.readFileSync(path.join(c.outputDir,f),'utf8'))).find(r=>r.profile===profile&&r.caseId===id);
+   const existing=fs.readdirSync(c.outputDir).filter(f=>f.startsWith('case-')&&f.endsWith('.json')).map(f=>JSON.parse(fs.readFileSync(path.join(c.outputDir,f),'utf8'))).find(r=>r.profile===profile&&r.caseId===id);
    if(existing){assert.equal(digest(existing.input),digest(input));assert.equal(existing.sourceHash,c.sourceHash);assert.equal(existing.nonce,nonce);assert.equal(existing.durationMs,durationMs);assert.equal(existing.auditTrials,auditTrials);continue;}
    assert.deepEqual(c.presets.find(p=>p.id===id),before.presets.find(p=>p.id===id));
    const report=await runHistoryCase({input:structuredClone(input),preset,entry:{score:null},profile,tag:c.tag,outputDir:c.outputDir,durationMs,auditTrials,nonce,sourceHash:c.sourceHash,modules:c.modules});
    report.sourceHash=c.sourceHash;report.catalogHash=c.catalogHash;report.presetsHash=c.presetsHash;report.supportMode=supportMode;report.inputHash=digest(input);report.profileManifestHash=digest(profiles);
    for(const row of report.topCandidates)assert.ok(c.modules.candidateSatisfiesConstraints(input,row.candidate,c.modules.catalog));
-   fs.writeFileSync(path.join(c.outputDir,report.checkpoint.replace('checkpoint-','case-')),JSON.stringify(report,null,2));
+   const reportPath=path.join(c.outputDir,report.checkpoint.replace('checkpoint-','case-'));
+   const temporary=reportPath+'.'+process.pid+'.pending';fs.writeFileSync(temporary,JSON.stringify(report,null,2));fs.renameSync(temporary,reportPath);
    console.log(JSON.stringify({version:c.tag,profile,id,evaluated:report.evaluated,top:report.topCandidates.map(r=>({rank:r.rank,max:r.validation1024.max,p95:r.validation1024.p95,expected30:r.validation1024.expectedMaxOfAttempts,winRate:r.validation1024.winRate}))}));
   }
  }

@@ -43,3 +43,5 @@ Browser tests require a runnable Playwright Chromium (`PLAYWRIGHT_MODULE`, `CHRO
 ## Combat-data limitations
 
 The repository already contains all five NRC19 subjects and 30 challenges. The [Gamerch table](https://gamerch.com/twst/967279) has a confirmed fire-BS star-three typo: the [game screenshot](https://assets.st-note.com/img/1794239229-2UFur3tjEiQ4bo1eKsy80mkc.jpg) says enemy **fire** damage UP for five turns, matching the existing code. The neutral-DF star-one target differs between that table and the code; no readable game image established a correction, so the current player attribute-down behavior is retained. Existing estimated water-BS blind and wood damage-down magnitudes remain unverified. Both search versions use identical combat data; this comparison is not new validation of those game magnitudes.
+
+`FOLLOWUP.md` records the additional long checks fixed after the primary matrix, before those added measurements. `node scripts/benchmarks/lifecycle.mjs` checks real-engine stop, checkpoint file persistence, resumed validation and maximum replay without claiming browser storage coverage.
