@@ -28,6 +28,7 @@ for before in sorted(artifacts.glob('*-before')):
     runs[before.name[:-7]] = count
 for pattern in ['*-summary.json', '*-integrity.json', '*-report.json', '*-plan.json', '*-fingerprint-*.json', '*.log']:
     files += [(p, str(p.relative_to(root))) for p in artifacts.glob(pattern)]
+files = list({name: (path, name) for path, name in files}.values())
 metadata = {'schema': 1, 'privateInputIncluded': True, 'branch': branch, 'head': head, 'baseline': baseline,
     'createdUtc': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'completedPairs': runs,
     'note': 'Only matched completed pairs are recoverable. Rerun interrupted pairs from scratch on BOTH versions. Checkpoints are deliberately excluded.',
