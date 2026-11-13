@@ -1,4 +1,4 @@
-# Directed joint spell proposal — frozen, not adopted yet
+# Directed joint spell proposal — rejected after complete confirmation
 
 Baseline remains 8d68abb6. The rejected observation-speed prototype is reverted. Combat data, the five specified hand profiles, all-ON challenges, historical518 supports, 70/30 weights and independent rank-one E(max30) auditing remain fixed by PROTOCOL.md.
 
@@ -25,3 +25,7 @@ A second environment restart retained167 complete primary pairs. Interrupted unm
 ## Frozen current-support long extension
 
 The complete current535-support30-second supplement is -126.051 points across10 set1 cases: budget3 +31.259, budget0 -283.361. Before any further measurements, extend the ENTIRE same10-case set (both budgets × all current5 subjects) to180 seconds, four processes, nonce `nrc19-directed-current-support-long-v1`, tag `directed-current-support-long`. This is a separate practical confirmation, not an extra weight or replacement for the short supplement. No production code changes or audit-driven candidate selection. Report the negative30-second result even if the long result improves.
+
+## Decision
+
+Rejected: the entire current535-support180-second extension averaged -2035.469 points (budget3 -4155.773, budget0 +84.836); budget3 allATK declined20410.589 points. All224 paired cases passed integrity checks. Preserve public upside ranking and the precommitted rank1 E(max30) adoption criterion; neither audit-selected top3 replacement nor retrospective metric changes are permitted.
