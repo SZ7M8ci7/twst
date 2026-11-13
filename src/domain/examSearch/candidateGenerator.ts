@@ -18,6 +18,19 @@ function attackScoreEffects(raw:Catalog[string]):ParsedBuff[] {
     &&['self','allySelected','allyAll'].includes(b.targetType??'self'));
 }
 export interface GenerationTask { anchor: string; totsu: number; cost: number; challenges: string[]; style: number; supportFirst?: boolean; supportAnchor?: string; seedTeam?: string[]; requiredCharacters?: string[]; requiredCards?: string[]; requiredSupport?: string; duoChain?: boolean }
+// Only the explicit, team-wide challenge rate is known here. Timed magic
+// immunity and scoped/unspecified effects remain the battle engine's job.
+function challengeBurnRates(input: SearchInput, challengeIds: string[]): number[] {
+  if (input.preset.kind !== 'DEFENCE') return [];
+  const effects = (input.preset.specialChallenges ?? []).filter(c => challengeIds.includes(c.id))
+    .flatMap(c => c.effects).filter(effect => effect.kind === 'playerBurn'
+      && !effect.dorm && !effect.dormMode && !effect.attribute
+      && Number.isFinite(effect.value) && Number(effect.value) > 0
+      && Number.isInteger(effect.duration) && Number(effect.duration) > 0);
+  if (!effects.length) return [];
+  return Array.from({ length: 5 }, (_, turn) => effects.reduce((sum, effect) =>
+    sum + (Number(effect.duration) > turn ? Number(effect.value) : 0), 0));
+}
 const estimatorCache=new WeakMap<SearchInput,WeakMap<Catalog,Map<string,ReturnType<typeof createEstimator>>>>();
 function cachedEstimator(input:SearchInput,task:GenerationTask,catalog:Catalog) {
   let byCatalog=estimatorCache.get(input);
@@ -225,6 +238,27 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
       if(i%12===7&&upgradeChains[Math.floor(i/12)])output.push(upgradeChains[Math.floor(i/12)]);
     }
   }
+  if (input.preset.kind === 'DEFENCE' && challenges.some(ids => challengeBurnRates(input, ids).length)) {
+    const burning = new Set(challenges.filter(ids => challengeBurnRates(input, ids).length));
+    const extra = new Map<number, GenerationTask[]>();
+    for (const task of output) {
+      if (!burning.has(task.challenges)) continue;
+      const lane = extra.get(task.cost) ?? [];
+      if (lane.length >= 2 || lane.some(row => row.anchor === task.anchor && row.supportAnchor === task.supportAnchor)) continue;
+      lane.push({ ...task, style: 3 }); extra.set(task.cost, lane);
+    }
+    const lanes = [...extra.entries()].sort(([a], [b]) => a - b).map(([, lane]) => lane);
+    const additions = [0, 1].flatMap(index => lanes.flatMap(lane => lane[index] ? [lane[index]] : []));
+    if (additions.length) {
+      const regular = [...output]; output.length = 0;
+      // Add a bounded burn-aware path without replacing the usual estimates
+      // or changing the relative order of any existing construction tasks.
+      for (let index = 0; index < Math.max(regular.length, additions.length * 8); index++) {
+        if (regular[index]) output.push(regular[index]);
+        if (index % 8 === 7 && additions[Math.floor(index / 8)]) output.push(additions[Math.floor(index / 8)]);
+      }
+    }
+  }
   const seeds:GenerationTask[]=[];
   const uniqueTeams=new Set<string>();
   for(const team of input.seedTeams??[]) {
@@ -380,6 +414,10 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
   },0)/Math.max(1,publicActions.length);
   const effects = input.preset.specialChallenges?.filter(c => task.challenges.includes(c.id)).flatMap(c => c.effects) ?? [];
   const curse = effects.some(e => e.kind === 'playerCurse'), freeze = effects.some(e => e.kind === 'playerFreeze');
+  const burnRates = task.style === 3 ? challengeBurnRates(input, task.challenges) : [];
+  // A five-turn exposure is a secondary construction heuristic, not a battle
+  // prediction. Real trials check early finishes, cleanses and nonlethal caps.
+  const burnLoss = (baseHp: number) => burnRates.reduce((sum, rate) => sum + Math.floor(Math.ceil(baseHp) * rate / 100), 0);
   const enemyEffects = new Set(input.preset.enemies.flatMap(e=>e.actions.map(a=>a.effectKind)));
   const blind = effects.some(e=>e.kind==='playerBlind') || enemyEffects.has('blind');
   const parsedEffects = new Map<string,ParsedBuff[]>();
@@ -513,7 +551,7 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
     || (freeze || enemyEffects.has('freeze')) && /凍結無効/.test(text)
     || blind && /暗闇無効/.test(text)
     || /デバフ解除/.test(text) && (curse || freeze || blind);
-  const cache = new Map<string, { raw: any; atk: number; hp: number; magic: { base: number; duo: boolean; utility: number; heal: number; cure: boolean }[]; buddies: { name: string; utility: number; hpRate: number; atkRate: number; curseImmune: boolean; critical:number }[] }>();
+  const cache = new Map<string, { raw: any; atk: number; hp: number; magic: { base: number; duo: boolean; utility: number; heal: number; cure: boolean }[]; buddies: { name: string; utility: number; hpRate: number; atkRate: number; curseImmune: boolean; burnImmune: boolean; critical:number }[] }>();
   return (cards: SearchCard[]): number => {
     const names = new Set(cards.map(c => catalog[c.name].chara));
     const allyCure=input.preset.kind==='DEFENCE'&&curse&&cards.some(c=>buffsFor(c).some(b=>
@@ -561,13 +599,14 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
           const status = getBuddyStatusForCharacter({ ...raw, totsu: c.totsu }, i, { totsu: c.totsu, isActive: true });
           const summary = getBuddyStatusSummary(status, c.buddyLevels[i-1]);
           return { name: raw['buddy'+i+'c'], utility: usefulImmunity(status) && input.preset.kind!=='DEFENCE' ? 7000 : 0,
-            hpRate: summary.hpRate, atkRate: summary.atkRate + summary.damageRate, curseImmune:status.includes('呪い無効'),
+            hpRate: summary.hpRate, atkRate: summary.atkRate + summary.damageRate, curseImmune:status.includes('呪い無効'), burnImmune:burnRates.length > 0 && status.includes('やけど無効'),
             critical:(criticalRatePowerScale[status.match(/クリティカル\(([^)]+)\)/)?.[1]??'']??0)/100 };
         });
         feature = { raw, atk, hp, magic, buddies }; cache.set(key, feature);
       }
       let damage = 0, utility = 0, hpRate = 0, atkRate = 0, duos = 0;
       const ownCure=feature.magic.some(m=>m.cure)||feature.buddies.some(b=>b.curseImmune&&names.has(b.name));
+      const burnImmune = burnRates.length > 0 && feature.buddies.some(b => b.burnImmune && names.has(b.name));
       if(allyCure&&!ownCure)externalHealing.push(feature.magic.reduce((sum,m)=>sum+m.heal*.5,0));
       for (const m of feature.magic) {
         const duo = m.duo && names.has(feature.raw.duo);
@@ -587,6 +626,7 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
           // potential; a completed team gets no speculative buddy stats.
           const unboosted=damage/(1+atkRate),peak=Math.max(...feature.magic.map(m=>m.base));
           const contribution=input.preset.kind==='DEFENCE'?feature.hp*b.hpRate+unboosted*b.atkRate*.25
+            + (burnRates.length && b.burnImmune && !burnImmune ? burnLoss(feature.hp) : 0)
             :feature.hp*b.hpRate*.15+unboosted*b.atkRate*(input.preset.kind==='BASIC'&&task.style!==1?.35:1)
               +(input.preset.kind==='BASIC'?peak*(b.atkRate+criticalTailMultiplier(b.critical,3,requiredPerAttempt)-1)*(task.style===1?.5:1.8):0);
           missingBuddyValue.set(b.name,(missingBuddyValue.get(b.name)??0)+contribution);
@@ -596,6 +636,7 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
         : damage*(input.preset.kind==='BASIC'&&task.style!==1?0.35:input.preset.kind==='ATTACK'?0.3:1) + hp*0.15 + utility + (input.preset.kind === 'BASIC' ? duos*3000 : 0);
       if (task.style===1) score += utility;
       if (task.style===2) score += feature.hp*0.4;
+      if (burnRates.length && !burnImmune) score -= burnLoss(feature.hp);
     }
     score += [...missingBuddyValue.values()].sort((a,b)=>b-a).slice(0,5-cards.length).reduce((sum,value)=>sum+value,0)*.5;
     if(input.preset.kind==='DEFENCE') {

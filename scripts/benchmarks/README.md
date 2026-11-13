@@ -1,6 +1,8 @@
 # NRC19 paired search benchmark
 
-This branch tests **directed joint spell refinement** (`DIRECTED-LOADOUTS.md`). The earlier observation-speed proposal was rejected and is reverted here; its saved evidence remains in `NRC19-REPORT.md` and the November13 Library review bundle. The new proposal is not adopted pending fresh complete measurements after cloud recovery. Nothing has been published or merged.
+This branch now tests **burn-aware auxiliary construction** (`BURN-AWARE.md`). Directed joint spell refinement was rejected after its current535-support long regression; `DIRECTED-REPORT.md` retains its complete224-pair evidence. The earlier observation-speed proposal was also rejected (`NRC19-REPORT.md`). The burn-aware proposal is not adopted pending measurement. Nothing has been published or merged.
+
+The command examples below reproduce the rejected directed proposal. For the current proposal use the tags, nonces and plans fixed in `BURN-AWARE.md`.
 
 Use `PROTOCOL.md` as the fixed decision protocol. Run from the checkout root. The production baseline is commit `8d68abb6`; the historical subject list comes from `7350e969` and the fixed support/catalog identities from `8dda02ba` (518 cards). Node dependencies must be installed in each checkout. No browser or DOM is required for the real simulation engine.
 

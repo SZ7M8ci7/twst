@@ -2605,3 +2605,37 @@ test('five distinct required characters construct legal normal and unified teams
     for(const row of [cleaned,...cleaned.parallel.checkpoints])for(const field of ['pool','finalists','pending'])assert.equal(row[field].length,1);
   }
 });
+
+
+test('burn-aware exploration keeps ordinary task order and respects known passive immunity',()=>{
+  const input=fixture(); input.preset.kind='DEFENCE';
+  input.preset.specialChallenges=[{id:'burn',rank:3,score:1,label:'known burn',effects:[{kind:'playerBurn',value:5,duration:5}]}];
+  input.challengeLocks={burn:'on'};
+  input.roster=input.roster.map(c=>({...c,totsu:4}));
+  input.supports=input.supports.map(c=>({...c,totsu:4}));
+  input.roster[1]={...input.roster[1],name:Object.values(catalog).find(c=>c.rare==='SSR'&&c.chara!==catalog[input.roster[0].name].chara).name};
+  const noBurn=clone(input);noBurn.preset.specialChallenges[0].effects=[];
+  const baseline=generation.buildTasks(noBurn,catalog),expanded=generation.buildTasks(input,catalog);
+  assert.deepEqual(clone(expanded.filter(t=>t.style!==3)),clone(baseline));
+  const added=expanded.filter(t=>t.style===3);assert.ok(added.length);
+  for(const cost of new Set(added.map(t=>t.cost)))assert.ok(added.filter(t=>t.cost===cost).length<=2);
+  for(const c of generation.generateCandidates(input,added[0],catalog))assert.ok(variants.candidateSatisfiesConstraints(input,c,catalog));
+  const data=clone(catalog),[owner,partner]=input.roster;
+  for(const entry of [owner,partner])for(const slot of [1,2,3]){
+    data[entry.name]['buddy'+slot+'s']='HPUP(小)';data[entry.name]['buddy'+slot+'s_totsu']='HPUP(小)';
+  }
+  data[owner.name].buddy1c=data[partner.name].chara;
+  data[owner.name].buddy1s_totsu='HPUP(中)&やけど無効';
+  const own=variants.cardVariants(owner,data[owner.name].rare)[0],other=variants.cardVariants(partner,data[partner.name].rare)[0];
+  const estimate=(i,style,cards)=>generation.createEstimator(i,{anchor:'',totsu:0,cost:0,challenges:['burn'],style},data)(cards);
+  const {recalculateHP}=load('src/utils/calculations.ts');
+  const loss=c=>5*Math.floor(Math.ceil(recalculateHP(data[c.name],c.level,c.totsu===4))*.05);
+  assert.ok(Math.abs(estimate(input,0,[own])-estimate(input,3,[own])-loss(own))<1e-7);
+  assert.ok(Math.abs(estimate(input,0,[own,other])-estimate(input,3,[own,other])-loss(other))<1e-7,'buddy HP must not enlarge base burn damage');
+  for(const style of [0,1,2])assert.equal(estimate(input,style,[own,other]),estimate(noBurn,style,[own,other]));
+  for(const effect of [{kind:'playerBurn',duration:5},{kind:'playerBurn',value:5,duration:5,dorm:'イグニハイド'}]){
+    const unknown=clone(input);unknown.preset.specialChallenges[0].effects=[effect];
+    assert.equal(estimate(unknown,3,[own]),estimate(unknown,0,[own]));
+    assert.ok(generation.buildTasks(unknown,data).every(t=>t.style!==3));
+  }
+});
