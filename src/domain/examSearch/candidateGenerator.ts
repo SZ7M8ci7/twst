@@ -436,7 +436,46 @@ function advantage(a: string, b: string): number {
   return ({ 火: '木', 木: '水', 水: '火' } as Record<string, string>)[a] === b ? 1.5 : 0.5;
 }
 
+function createBurnAwareEstimator(input: SearchInput, task: GenerationTask, catalog: Catalog): (cards: SearchCard[]) => number {
+  const ordinary = cachedEstimator(input, { ...task, style: 0 }, catalog);
+  const rates = challengeBurnRates(input, task.challenges);
+  if (!rates.length) return ordinary;
+  const owned = new Set(input.roster.map(card => catalog[card.name].chara));
+  const borrowed = new Set(input.supports.map(card => catalog[card.name].chara));
+  const features = new Map<string, { loss: number; buddies: string[] }>();
+  return (cards: SearchCard[]): number => {
+    const names = new Set(cards.map(card => catalog[card.name].chara));
+    const canBorrow = examUsesSupport(input.preset) && !cards.some(card => card.support);
+    const potential = new Map<string, number>();
+    let loss = 0, recoverable = 0;
+    for (const card of cards) {
+      const key = JSON.stringify([card.name, card.level, card.totsu]);
+      let feature = features.get(key);
+      if (!feature) {
+        const raw = catalog[card.name], hp = Math.ceil(recalculateHP(raw, card.level, card.totsu === 4));
+        feature = { loss: rates.reduce((sum, rate) => sum + Math.floor(hp * rate / 100), 0),
+          buddies: ([1, 2, 3] as const).filter(index => getBuddyStatusForCharacter(raw, index,
+            { totsu: card.totsu, isActive: true }).includes('やけど無効')).map(index => raw['buddy' + index + 'c']) };
+        features.set(key, feature);
+      }
+      if (feature.buddies.some(name => names.has(name))) continue;
+      loss += feature.loss;
+      if (cards.length >= 2 && cards.length < 5) {
+        const available = feature.buddies.filter(name => owned.has(name) || canBorrow && borrowed.has(name));
+        if (available.length) recoverable += feature.loss;
+        for (const name of available) potential.set(name, (potential.get(name) ?? 0) + feature.loss);
+      }
+    }
+    // This secondary five-turn estimate leaves early finishes, timed cures
+    // and nonlethal caps to real battles. Never credit more recoverable HP.
+    const completion = Math.min(recoverable, [...potential.values()].sort((a, b) => b - a)
+      .slice(0, 5 - cards.length).reduce((sum, value) => sum + value, 0)) * .5;
+    return ordinary(cards) - loss + completion;
+  };
+}
+
 export function createEstimator(input: SearchInput, task: GenerationTask, catalog: Catalog) {
+  if (task.style === 3) return createBurnAwareEstimator(input, task, catalog);
   const ownCharacters=new Set(input.roster.map(c=>catalog[c.name].chara));
   const supportCharacters=new Set(input.supports.map(c=>catalog[c.name].chara));
   const requiredPerAttempt = -Math.expm1(Math.log1p(-input.desiredProbability) / input.attempts);
@@ -448,10 +487,6 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
   },0)/Math.max(1,publicActions.length);
   const effects = input.preset.specialChallenges?.filter(c => task.challenges.includes(c.id)).flatMap(c => c.effects) ?? [];
   const curse = effects.some(e => e.kind === 'playerCurse'), freeze = effects.some(e => e.kind === 'playerFreeze');
-  const burnRates = task.style === 3 ? challengeBurnRates(input, task.challenges) : [];
-  // A five-turn exposure is a secondary construction heuristic, not a battle
-  // prediction. Real trials check early finishes, cleanses and nonlethal caps.
-  const burnLoss = (baseHp: number) => burnRates.reduce((sum, rate) => sum + Math.floor(Math.ceil(baseHp) * rate / 100), 0);
   const enemyEffects = new Set(input.preset.enemies.flatMap(e=>e.actions.map(a=>a.effectKind)));
   const blind = effects.some(e=>e.kind==='playerBlind') || enemyEffects.has('blind');
   const parsedEffects = new Map<string,ParsedBuff[]>();
@@ -585,7 +620,7 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
     || (freeze || enemyEffects.has('freeze')) && /凍結無効/.test(text)
     || blind && /暗闇無効/.test(text)
     || /デバフ解除/.test(text) && (curse || freeze || blind);
-  const cache = new Map<string, { raw: any; atk: number; hp: number; magic: { base: number; duo: boolean; utility: number; heal: number; cure: boolean }[]; buddies: { name: string; utility: number; hpRate: number; atkRate: number; curseImmune: boolean; burnImmune: boolean; critical:number }[] }>();
+  const cache = new Map<string, { raw: any; atk: number; hp: number; magic: { base: number; duo: boolean; utility: number; heal: number; cure: boolean }[]; buddies: { name: string; utility: number; hpRate: number; atkRate: number; curseImmune: boolean; critical:number }[] }>();
   return (cards: SearchCard[]): number => {
     const names = new Set(cards.map(c => catalog[c.name].chara));
     const allyCure=input.preset.kind==='DEFENCE'&&curse&&cards.some(c=>buffsFor(c).some(b=>
@@ -633,14 +668,13 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
           const status = getBuddyStatusForCharacter({ ...raw, totsu: c.totsu }, i, { totsu: c.totsu, isActive: true });
           const summary = getBuddyStatusSummary(status, c.buddyLevels[i-1]);
           return { name: raw['buddy'+i+'c'], utility: usefulImmunity(status) && input.preset.kind!=='DEFENCE' ? 7000 : 0,
-            hpRate: summary.hpRate, atkRate: summary.atkRate + summary.damageRate, curseImmune:status.includes('呪い無効'), burnImmune:burnRates.length > 0 && status.includes('やけど無効'),
+            hpRate: summary.hpRate, atkRate: summary.atkRate + summary.damageRate, curseImmune:status.includes('呪い無効'),
             critical:(criticalRatePowerScale[status.match(/クリティカル\(([^)]+)\)/)?.[1]??'']??0)/100 };
         });
         feature = { raw, atk, hp, magic, buddies }; cache.set(key, feature);
       }
       let damage = 0, utility = 0, hpRate = 0, atkRate = 0, duos = 0;
       const ownCure=feature.magic.some(m=>m.cure)||feature.buddies.some(b=>b.curseImmune&&names.has(b.name));
-      const burnImmune = burnRates.length > 0 && feature.buddies.some(b => b.burnImmune && names.has(b.name));
       if(allyCure&&!ownCure)externalHealing.push(feature.magic.reduce((sum,m)=>sum+m.heal*.5,0));
       for (const m of feature.magic) {
         const duo = m.duo && names.has(feature.raw.duo);
@@ -660,7 +694,6 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
           // potential; a completed team gets no speculative buddy stats.
           const unboosted=damage/(1+atkRate),peak=Math.max(...feature.magic.map(m=>m.base));
           const contribution=input.preset.kind==='DEFENCE'?feature.hp*b.hpRate+unboosted*b.atkRate*.25
-            + (burnRates.length && b.burnImmune && !burnImmune ? burnLoss(feature.hp) : 0)
             :feature.hp*b.hpRate*.15+unboosted*b.atkRate*(input.preset.kind==='BASIC'&&task.style!==1?.35:1)
               +(input.preset.kind==='BASIC'?peak*(b.atkRate+criticalTailMultiplier(b.critical,3,requiredPerAttempt)-1)*(task.style===1?.5:1.8):0);
           missingBuddyValue.set(b.name,(missingBuddyValue.get(b.name)??0)+contribution);
@@ -670,7 +703,6 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
         : damage*(input.preset.kind==='BASIC'&&task.style!==1?0.35:input.preset.kind==='ATTACK'?0.3:1) + hp*0.15 + utility + (input.preset.kind === 'BASIC' ? duos*3000 : 0);
       if (task.style===1) score += utility;
       if (task.style===2) score += feature.hp*0.4;
-      if (burnRates.length && !burnImmune) score -= burnLoss(feature.hp);
     }
     score += [...missingBuddyValue.values()].sort((a,b)=>b-a).slice(0,5-cards.length).reduce((sum,value)=>sum+value,0)*.5;
     if(input.preset.kind==='DEFENCE') {
@@ -845,7 +877,9 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
   }
   const anchor = input.roster.find(c => c.name === task.anchor)!;
   const requiredNames=task.requiredCards ? [...new Set(task.requiredCards)] : [...new Set(input.requiredCards ?? [])];
-  const requiredCharacters=[...new Set(input.requiredCharacters ?? [])];
+  const constructionInput = task.style === 3 ? { ...input, requiredCharacters:
+    [...new Set([...(input.requiredCharacters ?? []), ...(task.requiredCharacters ?? [])])] } : input;
+  const requiredCharacters=[...new Set(constructionInput.requiredCharacters ?? [])];
   const inferredSupport=requiredNames.length&&!task.requiredSupport
     ? requiredCardSupportAssignments(input)[0] : undefined;
   const requiredSupport=task.requiredSupport ?? inferredSupport;
@@ -921,7 +955,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
     }
     if(!beam.length && !requiredOwned.length) beam=cardVariants(anchor,catalog[anchor.name].rare,false,task.totsu).map(c=>[c]);
   }
-  const canCompleteCharacters = createCompletionCheck(input, catalog, options, supportOptions, requiredNames);
+  const canCompleteCharacters = createCompletionCheck(constructionInput, catalog, options, supportOptions, requiredNames);
   if (canCompleteCharacters) beam = beam.filter(canCompleteCharacters);
   if (!beam.length) return [];
   const selectBeam=(choices:{cards:SearchCard[];value:number}[],depth:number)=>{

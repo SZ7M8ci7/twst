@@ -23,3 +23,13 @@ The first25 development comparisons averaged +122.725 on currentwoodDF across5 p
 Refine the extra paths to require an available passive burn-immunity buddy, rather than merely cloning the first two ordinary anchors. Rank eligible root/buddy pairs by the existing single-card estimate plus the known avoided base-HP burn and buddy HP contribution. Retain the same limits (two distinct roots per cost, one extra after eight regular tasks), unchanged ordinary ordering, and unchanged styles0/1/2. Do not add work for roots with no available immunity buddy. Re-run the same25 development cases with tag burn-development-v2 and fresh nonce nrc19-burn-dev-v2 before deciding whether to run primary confirmation.
 
 Second development source hash: `5de18bf833105aa80e93e5cdc1187bbab1ca85a9dd63b50b54b513b48120f73f`. Unit and type checks pass. All five dorm-only synthetic fingerprints now match baseline because that synthetic roster has no available enhanced burn-immunity pair; the focused unit uses an available immunity pair and asserts nonempty legal candidates containing the required buddy. These synthetic checks are not adoption scores.
+
+Third development source hash: `2ffa4bc460b7404bf2eab173a03dc9c047588ba301a8277f1afdb1bf9ca88152`.
+
+## Third development refinement
+
+The second25-case development run averaged +110.297 on currentwoodDF: original -148.0, original-zero -77.7, provided +479.7, all-owned +276.6, sparse +20.9. Its unchanged subjects also showed large timing-cutoff differences and are not causal evidence of burn improvements.
+
+Code review found that ordinary task.requiredCharacters is a lower-priority construction hint, so the extra immunity partner could be omitted when user constraints filled slots. Style3 now merges that partner with the user required-character set for completion and final construction checks; all user constraints remain mandatory. A focused regression covers an impossible partner with all owned slots fixed. The burn estimate is isolated in a style3 wrapper; the entire ordinary estimator body is restored exactly to baseline. An explicit return type resolves the wrapper/cache inference cycle. Focused test and type checks pass; all five dorm-only synthetic fingerprints equal baseline.
+
+Before further measurement, fix a five-profile currentwoodDF-only development comparison: burn-focused-plan.json, tag burn-development-v3, nonce nrc19-burn-dev-v3,30seconds,4processes, unchanged1024 audit and historical518 supports. This avoids repeatedly scoring unaffected subjects while refining. Full185/long/current-support confirmation remains required for adoption.
