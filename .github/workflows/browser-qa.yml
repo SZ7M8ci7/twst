@@ -24,6 +24,7 @@ jobs:
       - run: |
           git worktree add --detach target 2ea835980091457bdaaaca7e90638c2e2f19ca19
           if [ "${{ matrix.source }}" = T1 ]; then git -C target apply ../bench-public/patches/T1.patch; fi
+      - run: cp bench-public/browser-diagnostic/* target/scripts/tests/
       - working-directory: target
         run: |
           npm ci --ignore-scripts
@@ -31,7 +32,9 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Storage tests in Chromium
         working-directory: target
-        run: node --test scripts/tests/exam-search-storage-browser.test.cjs 2>&1 | tee storage-tests.tap
+        run: |
+          set -o pipefail
+          node --test scripts/tests/exam-search-storage-browser.test.cjs 2>&1 | tee storage-tests.tap
       - name: Build and real worker stop-save-reload-resume
         if: always()
         working-directory: target
@@ -45,7 +48,7 @@ jobs:
         with:
           name: browser-${{ matrix.source }}
           path: |
-            target/artifacts/exam-search-storage-*.json
+            target/artifacts/exam-search-storage-*
             target/preview.log
             target/storage-tests.tap
           retention-days: 14
