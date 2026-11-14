@@ -1,0 +1,33 @@
+name: T1 frozen rare candidate independent audit
+on:
+  push:
+    branches: [codex/t1-fixed-audit-20261114]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: |
+          git worktree add --detach baseline 2ea835980091457bdaaaca7e90638c2e2f19ca19
+          git worktree add --detach candidate 2ea835980091457bdaaaca7e90638c2e2f19ca19
+          git -C candidate apply ../bench-public/patches/T1.patch
+          ln -s ../node_modules baseline/node_modules
+          ln -s ../node_modules candidate/node_modules
+          node bench-public/audit-fixed.mjs baseline
+          node bench-public/audit-fixed.mjs candidate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: T1-fixed-32768
+          path: artifacts/fixed-*.json
+          retention-days: 14
