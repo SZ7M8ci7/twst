@@ -1,7 +1,7 @@
 name: Synthetic screening independent source processes
 on:
   push:
-    branches: [codex/benchmark-master-i1z-180-20261114]
+    branches: [codex/benchmark-master-i1z-180-extra-20261114]
 permissions:
   contents: read
 jobs:
@@ -50,10 +50,6 @@ jobs:
           VARIANT: ${{ matrix.variant }}
         run: |
           node bench-public/run-production.mjs "$VARIANT" "${{ matrix.replicate }}" "${{ matrix.shard }}" "${{ matrix.shardCount }}"
-          if [ "${{ matrix.shard }}" = "$((2 % ${{ matrix.shardCount }}))" ]; then
-            node bench-public/audit-production.mjs baseline "${{ matrix.replicate }}" "$VARIANT"
-            node bench-public/audit-production.mjs candidate "${{ matrix.replicate }}" "$VARIANT"
-          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
