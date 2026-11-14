@@ -299,14 +299,23 @@ export class SearchSession {
       // Keep rare-tail exploration in spare slots without changing its samples.
       const role=(this.partition.islandIndex+this.round)%2;
       const champions=role===0?[expected,weighted,scout,peak]:[expected,scout,weighted,peak];
-      // Protect the explicit champion roles before diversifying spare slots.
-      // A scout or weighted winner may be a useful spell/plan of the same team.
-      const priority=[...new Set(champions.filter((result):result is SearchResult=>!!result))].slice(0,slots);
-      const bandSelected=[...priority,...diverseFinalists(band,slots-priority.length,
-        [...retained,...selected,...priority].filter(result=>result.candidate.cost===cost))];
+      // Without training, preserve the existing explicit champion roles.
+      const training = (this.input.additionalLevelCap ?? 0) > 0;
+      const preferred = [...new Set(champions.filter((result):result is SearchResult=>!!result))];
+      // Preserve each cost band's expected-best champion (or validated winner). With training enabled,
+      // use spare slots for new teams before more level variants of champions.
+      const hasRetainedWinner=retained.some(result=>result.candidate.cost===cost);
+      const priority=preferred.slice(0,training ? (hasRetainedWinner ? 0 : Math.min(1,slots)) : slots);
+      const existing=[...retained,...selected,...priority];
+      const bandSelected=[...priority,...diverseFinalists(training ? [...preferred,...band] : band,slots-priority.length,
+        training ? existing : existing.filter(result=>result.candidate.cost===cost), training)];
       selected.push(...bandSelected);
     }
-    for(const result of sorted)if(selected.length<MAX_FINALISTS-retained.length&&!retainedIds.has(result.candidate.id)&&!selected.some(r=>r.candidate.id===result.candidate.id))selected.push(result);
+    if ((this.input.additionalLevelCap ?? 0) > 0) {
+      selected.push(...diverseFinalists(sorted, MAX_FINALISTS-retained.length-selected.length, [...retained,...selected], true));
+    } else {
+      for(const result of sorted)if(selected.length<MAX_FINALISTS-retained.length&&!retainedIds.has(result.candidate.id)&&!selected.some(r=>r.candidate.id===result.candidate.id))selected.push(result);
+    }
     this.finalists=[...retained,...selected.slice(0,MAX_FINALISTS-retained.length).map(r=>({...r,validation:emptySamples(),validationBest:undefined,validationTarget:VALIDATION_SAMPLES}))];
     this.round++;
   }

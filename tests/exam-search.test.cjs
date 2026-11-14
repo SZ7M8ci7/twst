@@ -2803,3 +2803,50 @@ test('training comparison keeps at most two representatives per upgrade allocati
   assert.ok(source.includes('showAllTrainingVariants.value ? group.allVariants : group.variants'));
   assert.match(source,/function openVariants[\s\S]*?showAllTrainingVariants\.value = false;/);
 });
+
+test('training validation spare slots prefer unseen teams before second level variants',()=>{
+ const {diverseFinalists}=load('src/domain/examSearch/finalists.ts');
+ const row=(id,name,level)=>({candidate:{id,cards:[{name,support:false,level}],challengeIds:[]}});
+ const ranked=[row('a1','a',100),row('a2','a',101),row('b1','b',100),row('b2','b',101),row('c1','c',100),row('c2','c',101)];
+ assert.deepEqual(Array.from(diverseFinalists(ranked,3,[],true),r=>r.candidate.id),['a1','b1','c1']);
+ assert.deepEqual(Array.from(diverseFinalists(ranked,3),r=>r.candidate.id),['a1','a2','b1'],'existing no-training selection stays unchanged');
+ assert.deepEqual(Array.from(diverseFinalists(ranked,3,[ranked[0]],true),r=>r.candidate.id),['b1','c1','a2']);
+ assert.equal(diverseFinalists(ranked,8,[],true).length,6,'remaining capacity still admits useful variants');
+ assert.equal(diverseFinalists(ranked,0,[],true).length,0);
+ const supportVariant={candidate:{...ranked[1].candidate,cards:[{name:'a',support:true,level:100}]}};
+ assert.deepEqual(Array.from(diverseFinalists([ranked[0],supportVariant,ranked[2]],2,[],true),r=>r.candidate.id),['a1','a2'],'support roles remain distinct compositions');
+ const challenges=[ranked[0],{candidate:{...ranked[1].candidate,challengeIds:['optional']}},ranked[2]];
+ assert.deepEqual(Array.from(diverseFinalists(challenges,2,[],true),r=>r.candidate.id),['a1','b1'],'challenge-only variants do not count as new visible teams');
+});
+
+test('training finalist selection preserves strongest and retained winners while widening spare teams',()=>{
+ const input=fixture();input.budget=0;input.additionalLevelCap=20;
+ const row=(id,name,score)=>({candidate:{id,cost:0,cards:[{name,support:false,level:100}],challengeIds:[],policy:'effects-tail'},development:{scores:Array(32).fill(score)},validation:{scores:[]},validationTarget:2048});
+ const rows=Array.from({length:6},(_,team)=>Array.from({length:3},(_,variant)=>row(`${team}-${variant}`,`team-${team}`,50000-team*100-variant))).flat();
+ const legacy=new SearchSession({...input,additionalLevelCap:0},catalog,{},'no-training-finalists');legacy.pool=rows;legacy.selectFinalists();
+ assert.deepEqual(Array.from(legacy.checkpoint().finalists,r=>r.candidate.id),['0-0','0-1','1-0','1-1','2-0','2-1','3-0','3-1'],'zero training keeps the pre-change scheduler selection');
+ const session=new SearchSession(input,catalog,{},'training-finalists');session.pool=rows;
+ session.selectFinalists();const first=session.checkpoint().finalists;
+ assert.equal(first.length,8);assert.equal(first[0].candidate.id,'0-0');
+ assert.equal(new Set(first.map(r=>r.candidate.cards[0].name)).size,6);
+ const winner=structuredClone(first[0]);winner.validation.scores=Array(2048).fill(60000);
+ session.finalists=[winner];session.selectFinalists();
+ assert.equal(session.checkpoint().finalists[0],winner,'completed winner keeps its validation and replay identity');
+ assert.equal(session.checkpoint().finalists.length,8);
+ assert.equal(new Set(session.checkpoint().finalists.map(r=>r.candidate.cards[0].name)).size,6);
+});
+
+test('training cost bands keep their leading candidate without letting level variants fill both slots',()=>{
+ const input=fixture();input.budget=3;input.additionalLevelCap=20;
+ const row=(id,name,cost,score,scout=0)=>({candidate:{id,cost,cards:[{name,support:false,level:100}],challengeIds:[],policy:'effects-tail'},development:{scores:Array(32).fill(score)},criticalScout:{attempted:32,score:scout},validation:{scores:[]},validationTarget:2048});
+ const session=new SearchSession(input,catalog,{},'training-bands');
+ session.pool=Array.from({length:4},(_,cost)=>[row(`best-${cost}`,'same-team',cost,50000),row(`variant-${cost}`,'same-team',cost,49999,70000),row(`other-${cost}`,`other-team-${cost}`,cost,49000)]).flat();
+ session.selectFinalists();const rows=session.checkpoint().finalists;
+ assert.equal(rows.length,8);assert.equal(new Set(rows.map(r=>r.candidate.cards[0].name)).size,5);
+ for(let cost=0;cost<4;cost++)assert.ok(rows.some(r=>r.candidate.id===`best-${cost}`));
+ assert.equal(new Set(rows.map(r=>r.candidate.id)).size,8);
+ session.finalists=rows.filter(r=>r.candidate.id.startsWith('best-')).map(r=>({...r,validation:{scores:Array(2048).fill(60000)}}));
+ session.selectFinalists();const resumed=session.checkpoint().finalists;
+ assert.equal(resumed.length,8);assert.equal(new Set(resumed.map(r=>r.candidate.cards[0].name)).size,5,'retained same-team cost winners do not consume all challenger slots with level variants');
+ for(let cost=0;cost<4;cost++)assert.ok(resumed.some(r=>r.candidate.id===`best-${cost}`));
+});
