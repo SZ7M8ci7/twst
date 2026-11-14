@@ -5,13 +5,16 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('search UI exposes expected-best results without an obsolete target-mode switch', () => {
+test('search UI preserves the original score columns without unsolicited explanations', () => {
   const view = read('src/views/examSearch.vue');
   const table = read('src/components/ExamSearchResultsTable.vue');
   assert.doesNotMatch(view, /input(?:\.value)?\.(?:target|tolerance)|auto-mode/);
   assert.doesNotMatch(table, /autoMode/);
-  assert.match(table, /resultExpectedBestScore\(row\.result, attempts\)/);
-  assert.match(view, /evaluatedInput\?\.attempts \?\? input\.attempts/);
+  assert.doesNotMatch(table, /expectedBest|expected-cell|Math\.round/);
+  assert.match(table, /examSearch.table.highest/);
+  assert.match(table, /examSearch.table.p95/);
+  assert.doesNotMatch(view, /expected-best-explanation|expectedBestExplanation/);
+  assert.match(view, /rankedResults\(progress.value\?\.results \?\? \[\], evaluatedInput.value.attempts/);
 });
 
 test('obsolete target-setting translations are absent while comparison score curves remain', () => {
@@ -22,7 +25,8 @@ test('obsolete target-setting translations are absent while comparison score cur
     }
     assert.equal(text.examSearch.validation.target, undefined);
     assert.ok(text.examSearch.attempts);
-    assert.ok(text.examSearch.table.expectedBest);
+    assert.equal(text.examSearch.table.expectedBest, undefined);
+    assert.equal(text.examSearch.expectedBestExplanation, undefined);
     assert.ok(text.examComparison.reach);
   }
 });

@@ -1,11 +1,10 @@
 <template>
   <div class="results-table-wrap">
-    <table class="results-table automatic">
+    <table class="results-table">
       <thead><tr>
         <th scope="col" class="rank-cell">#</th>
         <th scope="col" class="deck-cell">{{ t('examSearch.table.deck') }}</th>
         <th scope="col" class="extra-cell">{{ t('examSearch.table.extra') }}</th>
-        <th scope="col" class="score-cell expected-cell">{{ t('examSearch.table.expectedBest', { count: attempts }) }}</th>
         <th scope="col" class="score-cell max-cell">{{ t('examSearch.table.highest') }}</th>
         <th scope="col" class="score-cell p95-cell">{{ t('examSearch.table.p95') }}</th>
         <th scope="col" class="actions-cell">{{ t('examSearch.table.actions') }}</th>
@@ -38,7 +37,6 @@
             <button v-if="row.variantCount" type="button" class="variants-button" :disabled="busy" aria-haspopup="dialog" :aria-label="t('examSearch.compareVariantsFor', { rank: index + 1, count: row.variantCount })" @click="$emit('variants', row.result)"><span class="variant-summary">{{ upgradeSummary(row.result) }}<span class="variant-arrow"> ▾</span></span><span class="variant-count">{{ t('examSearch.compareVariants', { count: row.variantCount }) }}</span></button>
             <span v-else>{{ upgradeSummary(row.result) }}</span>
           </td>
-          <td class="score-cell expected-cell" data-testid="expected-best-score">{{ scoreLabel(resultExpectedBestScore(row.result, attempts)) }}</td>
           <td class="score-cell max-cell">{{ highestScoreLabel(row.result) }}</td>
           <td class="score-cell p95-cell">{{ scoreLabel(resultScoreDistribution(row.result).p95) }}</td>
           <td class="actions-cell">
@@ -54,11 +52,10 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
 import type { SearchResult } from '@/domain/examSearch/types';
-import { resultExpectedBestScore, resultScoreDistribution } from '@/domain/examSearch/statistics';
+import { resultScoreDistribution } from '@/domain/examSearch/statistics';
 import defaultImg from '@/assets/img/default.webp';
 
-withDefaults(defineProps<{
-  attempts?: number;
+defineProps<{
   rows: { result: SearchResult; variantCount?: number }[];
   cardImages: Record<string, string>;
   cardLabel: (name: string) => string;
@@ -66,10 +63,10 @@ withDefaults(defineProps<{
   busy: boolean;
   comparisonFull?: boolean;
   comparedIds?: string[];
-}>(), { attempts: 30 });
+}>();
 defineEmits<{ (event: 'preview' | 'simulator' | 'variants' | 'compare', result: SearchResult): void }>();
 const { t } = useI18n();
-const scoreLabel = (score: number | null) => score === null ? '—' : Math.round(score).toLocaleString();
+const scoreLabel = (score: number | null) => score === null ? '—' : score.toLocaleString();
 function highestScoreLabel(result: SearchResult) {
   const scores = resultScoreDistribution(result);
   return scoreLabel(scores.n > 0 ? scores.max : null);
@@ -98,7 +95,6 @@ tbody tr:last-child > * { border-bottom: 0; }
 .score-cell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; }
 thead .score-cell { font-size: 12px; white-space: normal; }
 .max-cell { font-weight: 700; }
-.expected-cell { font-weight: 700; color: #174f83; }
 .actions-cell { width: 154px; }
 .actions-cell .v-btn { display: flex; width: 100%; min-height: 30px; height: auto; padding: 5px 6px; font-size: 12px; letter-spacing: 0; }
 .actions-cell :deep(.v-btn__content) { white-space: normal; text-align: center; }
@@ -116,7 +112,7 @@ figure { margin: 0; min-width: 0; border: 1px solid #ccd8e2; border-radius: 5px;
 .variant-arrow { display: none; }
 .variants-button:focus-visible { outline: 2px solid #1768a7; outline-offset: 2px; }
 .variants-button:disabled { opacity: .5; }
-@container (max-width: 940px) {
+@container (max-width: 780px) {
   .results-table, thead, tbody { display: block; }
   tr { display: grid; grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
   thead { position: sticky; top: 0; z-index: 1; background: #f7fafc; }
@@ -129,11 +125,6 @@ figure { margin: 0; min-width: 0; border: 1px solid #ccd8e2; border-radius: 5px;
   .p95-cell { grid-column: 4; grid-row: 2; }
   .actions-cell { grid-column: 2 / 5; grid-row: 3; display: flex; justify-content: flex-end; gap: 4px; padding-top: 0; }
   thead .actions-cell { display: none; }
-  .automatic .extra-cell { grid-column: 2 / 5; grid-row: 2; }
-  .automatic .expected-cell { grid-column: 2; grid-row: 3; }
-  .automatic .max-cell { grid-column: 3; grid-row: 3; }
-  .automatic .p95-cell { grid-column: 4; grid-row: 3; }
-  .automatic .actions-cell { grid-row: 4; }
   .actions-cell .v-btn { width: auto; min-height: 34px; }
   .result-deck { max-width: 380px; }
   thead .score-cell { font-size: 11px; }
