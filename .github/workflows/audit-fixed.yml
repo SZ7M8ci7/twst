@@ -1,7 +1,7 @@
 name: T1 frozen rare candidate independent audit
 on:
   push:
-    branches: [codex/t1-fixed-audit-20261114]
+    branches: [codex/t1-fixed-audit-reps01-20261114]
 permissions:
   contents: read
 jobs:
@@ -23,11 +23,13 @@ jobs:
           git -C candidate apply ../bench-public/patches/T1.patch
           ln -s ../node_modules baseline/node_modules
           ln -s ../node_modules candidate/node_modules
-          node bench-public/audit-fixed.mjs baseline
-          node bench-public/audit-fixed.mjs candidate
+          node bench-public/audit-fixed-reps.mjs baseline 0
+          node bench-public/audit-fixed-reps.mjs candidate 0
+          node bench-public/audit-fixed-reps.mjs baseline 1
+          node bench-public/audit-fixed-reps.mjs candidate 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: T1-fixed-32768
+          name: T1-fixed-reps01-32768
           path: artifacts/fixed-*.json
           retention-days: 14
