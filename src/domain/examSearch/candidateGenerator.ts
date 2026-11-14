@@ -244,6 +244,7 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
     const burnBySet = new Map(challenges.map(ids => [ids, challengeBurnRates(input, ids)]));
     const ranked = new Map<number, { task: GenerationTask; value: number; root: string }[]>();
     const seen = new Set<string>();
+    const partners = new Map<string, SearchCard[]>();
     for (const task of output) {
       if (task.requiredCharacters || task.seedTeam) continue;
       const rates = burnBySet.get(task.challenges) ?? [];
@@ -262,14 +263,24 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
       if (!immuneBuddies.length) continue;
       const variants = cardVariants(original, raw.rare, support, totsu);
       if (!variants.length) continue;
-      const hp = Math.ceil(recalculateHP(raw, variants[0].level, totsu === 4));
-      const avoided = rates.reduce((sum, rate) => sum + Math.floor(hp * rate / 100), 0);
-      const estimate = cachedEstimator(input, { ...task, style: 0 }, catalog);
-      const base = Math.max(...variants.map(card => estimate([card])));
-      for (const { index, partner, status } of immuneBuddies) {
-        const value = base + avoided + hp * getBuddyStatusSummary(status, original.buddyLevels[index - 1]).hpRate;
+      const estimate = cachedEstimator(input, { ...task, style: 3 }, catalog);
+      for (const { partner } of immuneBuddies) {
+        const partnerKey = JSON.stringify([partner, support]);
+        if (!partners.has(partnerKey)) partners.set(partnerKey,
+          [...input.roster.filter(card => catalog[card.name].chara === partner)
+            .flatMap(card => cardVariants(card, catalog[card.name].rare, false)),
+          ...(!support && supportAllowed ? input.supports.filter(card => catalog[card.name].chara === partner)
+            .flatMap(card => cardVariants(card, catalog[card.name].rare, true)) : [])]);
+        let value = -Infinity;
+        for (const card of variants) for (const buddy of partners.get(partnerKey)!) {
+          if (!card.support && !buddy.support && card.name === buddy.name) continue;
+          value = Math.max(value, estimate([card, buddy]));
+        }
+        if (!Number.isFinite(value)) continue;
         const lane = ranked.get(task.cost) ?? [];
-        lane.push({ task: { ...task, style: 3, requiredCharacters: [partner] }, value, root: key });
+        // Borrowing the same immunity owner is not a second distinct pair.
+        const root = JSON.stringify([name, partner, task.challenges]);
+        lane.push({ task: { ...task, style: 3, requiredCharacters: [partner] }, value, root });
         ranked.set(task.cost, lane);
       }
       yield;
