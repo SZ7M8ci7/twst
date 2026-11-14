@@ -1,0 +1,57 @@
+name: Current-master N2 zero-level-first independent small screening
+on:
+  push:
+    branches: [codex/benchmark-N2-current-20261114]
+permissions:
+  contents: read
+jobs:
+  screening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - {"variant": "N2", "replicate": 0, "shard": 0, "shardCount": 1}
+          - {"variant": "N2", "replicate": 1, "shard": 0, "shardCount": 1}
+          - {"variant": "N2", "replicate": 2, "shard": 0, "shardCount": 1}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Prepare independent baseline and variant
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          git worktree add --detach baseline ba08481a26f079b830bfcb29e1067da4c0897cf1
+          git worktree add --detach candidate ba08481a26f079b830bfcb29e1067da4c0897cf1
+          git -C candidate apply ../bench-public/patches/N2.patch
+          echo "Variant applied: $VARIANT"
+          ln -s ../node_modules baseline/node_modules
+          ln -s ../node_modules candidate/node_modules
+          (cd candidate && node --test tests/exam-search.test.cjs && ../node_modules/.bin/tsc --noEmit)
+          node bench-public/generate.mjs
+          mkdir -p artifacts
+          node -e 'console.log(JSON.stringify({runner:process.env.RUNNER_NAME,hostname:require("os").hostname(),cpus:require("os").cpus().length,start:new Date().toISOString()}))' > artifacts/runner.json
+      - name: Paired 4-case ABBA score screening
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          node bench-public/run-production.mjs "$VARIANT" "${{ matrix.replicate }}" "${{ matrix.shard }}" "${{ matrix.shardCount }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paired-${{ matrix.variant }}-rep${{ matrix.replicate }}-shard${{ matrix.shard }}
+          path: |
+            artifacts/runner.json
+            artifacts/fixed-*.json
+            artifacts/nrc19/**/case-*.json
+            artifacts/nrc19/**/checkpoint-*.json
+            artifacts/nrc19/**/plan-*.json
+          retention-days: 14

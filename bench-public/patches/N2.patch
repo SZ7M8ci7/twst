@@ -1,0 +1,76 @@
+From a3429f09e6f8ce215de3bda98d2085dccb1ebee8 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 15 Nov 2026 08:44:12 +0900
+Subject: [PATCH] experiment: observe existing untrained BASIC reference first
+
+---
+ src/domain/examSearch/levelAllocation.ts |  3 ++
+ tests/exam-search.test.cjs               | 41 ++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
+
+diff --git a/src/domain/examSearch/levelAllocation.ts b/src/domain/examSearch/levelAllocation.ts
+index d7978068..6fec4890 100644
+--- a/src/domain/examSearch/levelAllocation.ts
++++ b/src/domain/examSearch/levelAllocation.ts
+@@ -111,6 +111,9 @@ export function* levelAllocationSteps(input: SearchInput, parent: Candidate, cat
+   const partial = champions[Math.floor((champions.length - 1) / 2)];
+   const options = [...completed.sort(rank).slice(0, 2), ...balanced.sort(rank).slice(0, 2), ...concentrated,
+     even, partial, ...champions.sort(rank).slice(0, 2), base, parent].filter((row): row is Candidate => !!row);
++  // BASIC can lose score by finishing too early: observe the existing
++  // untrained reference before the same remaining allocation candidates.
++  if (input.preset.kind === 'BASIC') options.unshift(base);
+   return [...new Map(options.filter(row => withinLevelBudget(input, row.cards, catalog)).map(row => [row.id, row])).values()];
+ }
+ 
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index 9de42b35..13befe9a 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2850,3 +2850,44 @@ test('training cost bands keep their leading candidate without letting level var
+  assert.equal(resumed.length,8);assert.equal(new Set(resumed.map(r=>r.candidate.cards[0].name)).size,5,'retained same-team cost winners do not consume all challenger slots with level variants');
+  for(let cost=0;cost<4;cost++)assert.ok(resumed.some(r=>r.candidate.id===`best-${cost}`));
+ });
++
++function n2Allocations(kind,cap,withPlan=false,level=80){
++ const levels=load('src/domain/examSearch/levelAllocation.ts'),input=fixture();input.additionalLevelCap=cap;input.budget=0;
++ for(const card of [...input.roster,...input.supports])card.level=level;
++ const name=input.roster[0].name;
++ const base=generation.generateCandidates({...input,additionalLevelCap:0},{anchor:name,totsu:0,cost:0,challenges:[],style:0},catalog)[0];
++ input.preset={...input.preset,kind};
++ const parent=withPlan?{...base,preferredPlan:[['0-M'+base.cards[0].selectedMagic[0],'1-M'+base.cards[1].selectedMagic[0]]],preferredPlanMode:'turn'}:base;
++ const iterator=levels.levelAllocationSteps(input,parent,catalog,cards=>cards.reduce((sum,card)=>sum+card.level,0));let step;
++ do{step=iterator.next()}while(!step.done);
++ return {input,parent,rows:step.value,levels};
++}
++test('N2 BASIC cap20 moves only existing zero-level reference to front, preserving IDs and budgets',()=>{
++ const before=n2Allocations('ATTACK',20),after=n2Allocations('BASIC',20),zero=row=>after.levels.additionalLevelCost(row.cards)===0;
++ assert.ok(before.rows.findIndex(zero)>0);assert.ok(zero(after.rows[0]));
++ assert.deepEqual(clone(after.rows.map(r=>r.id).sort()),clone(before.rows.map(r=>r.id).sort()));
++ assert.deepEqual(clone(after.rows.filter(r=>!zero(r))),clone(before.rows.filter(r=>!zero(r))));
++ assert.ok(after.rows.every(row=>variants.candidateSatisfiesConstraints(after.input,row,catalog)));
++ assert.ok(after.rows.every(row=>after.levels.additionalLevelCost(row.cards)<=20&&row.cards.filter(c=>c.support).every(c=>!c.additionalLevels)));
++});
++test('N2 cap0 remains exact parent and non-BASIC order remains unchanged',()=>{
++ for(const kind of ['BASIC','ATTACK','DEFENCE']){const data=n2Allocations(kind,0);assert.equal(data.rows.length,1);assert.equal(data.rows[0],data.parent);}
++ assert.deepEqual(clone(n2Allocations('ATTACK',20).rows),clone(n2Allocations('DEFENCE',20).rows));
++});
++test('N2 reordering preserves learned plan and plan mode on every training candidate',()=>{
++ const before=n2Allocations('ATTACK',20,true),after=n2Allocations('BASIC',20,true);
++ const original=new Map(before.rows.map(row=>[row.id,row]));
++ for(const row of after.rows){assert.deepEqual(clone(row),clone(original.get(row.id)));assert.deepEqual(clone(row.preferredPlan),clone(after.parent.preferredPlan));assert.equal(row.preferredPlanMode,'turn');}
++});
++
++test('N2 remainder and short-headroom boundaries only move existing zero allocation',()=>{
++ for(const [cap,level] of [[7,80],[7,98],[20,98],[20,100]]){
++  const before=n2Allocations('ATTACK',cap,false,level),after=n2Allocations('BASIC',cap,false,level);
++  const zero=row=>after.levels.additionalLevelCost(row.cards)===0;
++  assert.ok(zero(after.rows[0]));
++  assert.deepEqual(clone(after.rows.map(r=>r.id).sort()),clone(before.rows.map(r=>r.id).sort()));
++  assert.deepEqual(clone(after.rows.filter(r=>!zero(r))),clone(before.rows.filter(r=>!zero(r))));
++  const prior=new Map(before.rows.map(r=>[r.id,r]));for(const row of after.rows)assert.deepEqual(clone(row),clone(prior.get(row.id)));
++  assert.ok(after.rows.every(r=>variants.candidateSatisfiesConstraints(after.input,r,catalog)));
++ }
++});
+-- 
+2.52.0
+
