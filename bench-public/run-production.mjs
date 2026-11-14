@@ -12,7 +12,7 @@ for(let i=0;i<plan.length;i++){
  const order=(seed+i)%2?['candidate','baseline']:['baseline','candidate'];
  for(const source of order){
   console.log(JSON.stringify({phase:'isolated-start',variant,source,seed,caseIndex:i,time:new Date().toISOString()}));
-  const result=spawnSync(process.execPath,['scripts/benchmarks/paired-production.mjs',`--before=${source}`,'--single=true','--inputs=bench-public/profiles.generated.json','--plan=bench-public/plan-wave4.json',`--case-index=${i}`,'--time-ms=30000','--audit=1024','--supports=current',`--nonce=actions-product-ranked-confirm2-seed${seed}`,`--tag=${variant}-seed${seed}-${source}`,'--isolation=separate-source-process'],{stdio:'inherit',env:process.env});
+  const result=spawnSync(process.execPath,['scripts/benchmarks/paired-production.mjs',`--before=${source}`,'--single=true','--inputs=bench-public/profiles.generated.json','--plan=bench-public/plan-wave4.json',`--case-index=${i}`,'--time-ms=30000','--audit=1024','--supports=current',`--nonce=actions-master-I1Z-direct-holdout-seed${seed}`,`--tag=${variant}-seed${seed}-${source}`,'--isolation=separate-source-process'],{stdio:'inherit',env:process.env});
   if(result.status!==0)throw new Error(`Child failed: ${variant}/${source}/${seed}/${i}: ${result.status}`);
  }
 }

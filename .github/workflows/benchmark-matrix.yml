@@ -1,7 +1,7 @@
 name: Synthetic screening independent source processes
 on:
   push:
-    branches: [codex/benchmark-b1-ranked-20261114]
+    branches: [codex/benchmark-master-i1z-direct-20261114]
 permissions:
   contents: read
 jobs:
@@ -13,9 +13,15 @@ jobs:
       max-parallel: 20
       matrix:
         include:
-          - {"variant": "B1", "replicate": 0, "shard": 0, "shardCount": 1}
-          - {"variant": "B1", "replicate": 1, "shard": 0, "shardCount": 1}
-          - {"variant": "B1", "replicate": 2, "shard": 0, "shardCount": 1}
+          - {"variant": "I1Z", "replicate": 0, "shard": 0, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 0, "shard": 1, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 0, "shard": 2, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 1, "shard": 0, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 1, "shard": 1, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 1, "shard": 2, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 2, "shard": 0, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 2, "shard": 1, "shardCount": 3}
+          - {"variant": "I1Z", "replicate": 2, "shard": 2, "shardCount": 3}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,7 +37,6 @@ jobs:
         run: |
           git worktree add --detach baseline 2ea835980091457bdaaaca7e90638c2e2f19ca19
           git worktree add --detach candidate 2ea835980091457bdaaaca7e90638c2e2f19ca19
-          git -C baseline apply ../bench-public/patches/T1.patch
           git -C candidate apply "../bench-public/patches/$VARIANT.patch"
           echo "Variant applied: $VARIANT"
           ln -s ../node_modules baseline/node_modules
