@@ -74,6 +74,30 @@ function saveJson(file, value) {
     if (auditOnly && !previous) throw new Error(`Missing checkpoint for audit-only: ${profile}/${caseId}`);
     const engine = createResourceBattleHost();
     const session = new SearchSession(input, catalog, engine, nonce, previous);
+    // Observer only: the source-specific helper decides whether to call this optional method.
+    const tailInvocations = [];
+    const tailSnapshot = () => {
+      const c = session.checkpoint();
+      return { elapsed: c.elapsed, generated: c.generatedCount, evaluated: c.evaluatedCount,
+        trialSerial: c.trialSerial, diagnostics: c.tailValidation ? {...c.tailValidation} : null,
+        finalists: c.finalists.map(r => ({id:r.candidate.id,n:r.validation.scores.length,
+          target:r.validationTarget,complete:r.validation.scores.length>=r.validationTarget,
+          best:r.validationBest ? {...r.validationBest} : null})) };
+    };
+    if (typeof session.runValidationTail === 'function') {
+      const originalTail = session.runValidationTail.bind(session);
+      session.runValidationTail = async (budget, publish) => {
+        const observedStart = performance.now();
+        const invocation = {budgetMs:budget, before:tailSnapshot(), snapshots:[]};
+        tailInvocations.push(invocation);
+        try { return await originalTail(budget, p => {
+          invocation.snapshots.push({phase:p.phase,elapsedMs:p.elapsedMs,...tailSnapshot()});
+          publish(p);
+        }); } finally {
+          invocation.after=tailSnapshot(); invocation.observedWallMs=performance.now()-observedStart;
+        }
+      };
+    }
     const priorElapsed = Number(previous?.elapsed ?? 0);
     const remainingMs = Math.max(0, durationMs - priorElapsed);
     let progress = { phase: 'stopped', generated: previous?.seen?.length ?? 0, evaluated: previous?.evaluatedCount ?? 0,
@@ -95,6 +119,7 @@ function saveJson(file, value) {
       }, { allowRepeat: !validationOnly, minimumRemainingMs: 15_000 });
       runPasses=runResult.passes;
     }
+    const actualSearchWallMs=performance.now()-started;
     const searchCpu=process.cpuUsage(cpuStart);
     const checkpoint = { ...session.checkpoint(), elapsed: Math.max(session.checkpoint().elapsed, progress.elapsedMs) };
     const allResults = [...new Map([...checkpoint.pool, ...checkpoint.finalists]
@@ -160,7 +185,7 @@ function saveJson(file, value) {
       scope:validationOnly?'validation-only':'search',validationTrials:checkpoint.finalists.reduce((sum,row)=>sum+row.validation.scores.length,0),
       validationFinalists:checkpoint.finalists.map(row=>({id:row.candidate.id,samples:row.validation.scores.length,target:row.validationTarget,complete:row.validation.scores.length>=row.validationTarget})),
       preset: { id: preset.id, title: preset.title, kind: preset.kind, enemyElement: preset.enemyElement }, referenceScore: entry.score, nonce,
-      durationMs, elapsedMs, searchElapsedMs: checkpoint.elapsed, searchCpuMicros: searchCpu, candidateCount: allResults.length, cpuSession: true, browserIslands: 0, storage: 'none', auditTrials,
+      durationMs, elapsedMs, actualSearchWallMs, tailDiagnostics:checkpoint.tailValidation??null, tailInvocations, searchElapsedMs: checkpoint.elapsed, searchCpuMicros: searchCpu, candidateCount: allResults.length, cpuSession: true, browserIslands: 0, storage: 'none', auditTrials,
       selection: checkpoint.finalists.length ? 'displayed-finalists' : 'development-fallback',
       generated: progress.generated, evaluated: progress.evaluated, tasksDone: progress.tasksDone, tasksTotal: progress.tasksTotal,
       checkpointSource: previous ? checkpointFile : null, checkpoint: checkpointFile, noReferenceSeeds: !input.seedTeams,

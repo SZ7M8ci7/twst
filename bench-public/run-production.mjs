@@ -1,18 +1,12 @@
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
-const variant=process.argv[2];
-if(!['I1Z','F1','B1','P1'].includes(variant))throw new Error('Unknown variant');
-const plan=JSON.parse(fs.readFileSync('bench-public/plan-180.json'));
-const seed=Number(process.argv[3]);
-if(!Number.isInteger(seed)||seed<0||seed>2)throw new Error("Invalid replicate");
-const shard=Number(process.argv[4]),shardCount=Number(process.argv[5]);
-if(!Number.isInteger(shard)||shard<0||shard>=shardCount)throw new Error("Invalid shard");
-for(let i=0;i<plan.length;i++){
- if(i%shardCount!==shard)continue;
- const order=(seed+i)%2?['candidate','baseline']:['baseline','candidate'];
- for(const source of order){
-  console.log(JSON.stringify({phase:'isolated-start',variant,source,seed,caseIndex:i,time:new Date().toISOString()}));
-  const result=spawnSync(process.execPath,['scripts/benchmarks/paired-production.mjs',`--before=${source}`,'--single=true','--inputs=bench-public/profiles.generated.json','--plan=bench-public/plan-180.json',`--case-index=${i}`,'--time-ms=180000','--audit=1024','--supports=current',`--nonce=actions-master-I1Z-180-holdout-seed${seed}`,`--tag=${variant}-seed${seed}-${source}`,'--isolation=separate-source-process'],{stdio:'inherit',env:process.env});
-  if(result.status!==0)throw new Error(`Child failed: ${variant}/${source}/${seed}/${i}: ${result.status}`);
- }
+const [variant,mode,repArg,indexArg]=process.argv.slice(2),rep=Number(repArg),index=Number(indexArg);
+if(variant!=='V2'||!['long','short'].includes(mode))throw new Error('Invalid variant/mode');
+const planPath=`bench-public/plan-V2-${mode}.json`,plan=JSON.parse(fs.readFileSync(planPath));
+if(!Number.isInteger(index)||index<0||index>=plan.length||!Number.isInteger(rep)||rep<0||rep>(mode==='long'?2:0))throw new Error('Invalid case/replicate');
+const order=(rep+index)%2?['candidate','baseline']:['baseline','candidate'];
+for(const source of order){
+ console.log(JSON.stringify({phase:'isolated-start',variant,mode,source,rep,caseIndex:index,time:new Date().toISOString()}));
+ const result=spawnSync(process.execPath,['scripts/benchmarks/paired-production.mjs',`--before=${source}`,'--single=true','--inputs=bench-public/profiles.generated.json',`--plan=${planPath}`,`--case-index=${index}`,`--time-ms=${mode==='long'?180000:30000}`,'--audit=1024','--supports=current',`--nonce=actions-V2-tail-${mode}-20261114-seed${rep}`,`--tag=${variant}-${mode}-seed${rep}-${source}`,'--isolation=separate-source-process'],{stdio:'inherit',env:process.env});
+ if(result.status!==0)throw new Error(`Child failed: ${variant}/${mode}/${source}/${rep}/${index}: ${result.status}`);
 }

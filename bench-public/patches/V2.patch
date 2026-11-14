@@ -1,0 +1,337 @@
+From 2b4fc67474635f0d5940c5b873bf957e3f033717 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 15 Nov 2026 08:18:36 +0900
+Subject: [PATCH] experiment: use idle search tail for atomic ordinary
+ validation cohorts
+
+---
+ src/domain/examSearch/scheduler.ts      |  63 ++++++++++++++-
+ src/workers/examSearchIslandRuntime.ts  |   4 +-
+ src/workers/examSearchRun.ts            |  22 +++++-
+ tests/exam-search-tail-runtime.test.cjs |  29 +++++++
+ tests/exam-search.test.cjs              | 101 ++++++++++++++++++++++++
+ 5 files changed, 213 insertions(+), 6 deletions(-)
+ create mode 100644 tests/exam-search-tail-runtime.test.cjs
+
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..0ae3d530 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -10,7 +10,9 @@ import { DISCOVERY_SAMPLES, VALIDATION_SAMPLES, MAX_FINALISTS, REFINED_VALIDATIO
+ const WIDE_DISCOVERY_SAMPLES = 8;
+ const WIDE_SCOUT_SAMPLES = 8;
+ const MAX_RECENT_CANDIDATES = 4096;
++export interface TailValidationDiagnostics { attempted: number; committed: number; discarded: number; cohortRounds: number }
+ export interface SessionCheckpoint {
++  tailValidation?: TailValidationDiagnostics;
+   cursor: number; seen: string[]; pool: SearchResult[]; finalists: SearchResult[]; pending: SearchResult[];
+   round: number; elapsed: number; trialSerial: number; nonce: string;
+   evaluatedCount?: number; tasksTotal?: number;
+@@ -83,6 +85,7 @@ export class SearchSession {
+   private trialSerial = 0;
+   private evaluatedCount = 0;
+   private mutationRound = 0;
++  private tailValidation: TailValidationDiagnostics = { attempted: 0, committed: 0, discarded: 0, cohortRounds: 0 };
+   private partition: TaskPartition;
+   constructor(readonly input: SearchInput, private catalog: Catalog, private engine: BattleEngine, private nonce: string, checkpoint?: SessionCheckpoint, partition?: TaskPartition) {
+     this.partition = validateTaskPartition(checkpoint?.partition ?? partition);
+@@ -97,12 +100,13 @@ export class SearchSession {
+       this.evaluatedCount = checkpoint.evaluatedCount ?? checkpoint.pool.length;
+       this.mutationRound = checkpoint.mutationRound ?? 0;
+       this.knownTasksTotal = checkpoint.tasksTotal ?? 0;
++      this.tailValidation = { ...this.tailValidation, ...checkpoint.tailValidation };
+     }
+   }
+   checkpoint(): SessionCheckpoint {
+     return { cursor: this.cursor, seen: [...this.seen], pool: this.pool, finalists: this.finalists, pending: this.pending,
+       round: this.round, elapsed: this.elapsed, trialSerial: this.trialSerial, nonce: this.nonce, evaluatedCount: this.evaluatedCount, tasksTotal: this.knownTasksTotal, mutationRound: this.mutationRound,
+-      partition: this.partition, generatedCount: this.generatedCount };
++      partition: this.partition, generatedCount: this.generatedCount, tailValidation: { ...this.tailValidation } };
+   }
+   private remember(id: string) {
+     if (!this.seen.has(id)) { this.seen.add(id); this.generatedCount++; }
+@@ -310,6 +314,63 @@ export class SearchSession {
+     this.finalists=[...retained,...selected.slice(0,MAX_FINALISTS-retained.length).map(r=>({...r,validation:emptySamples(),validationBest:undefined,validationTarget:VALIDATION_SAMPLES}))];
+     this.round++;
+   }
++  /** Spend only otherwise unused sub-pass time; never expose a partial cohort. */
++  async runValidationTail(durationMs: number, publish: (progress: SearchProgress) => void) {
++    const start = performance.now(), deadline = start + Math.max(0, durationMs);
++    const report = (phase: SearchProgress['phase']) => publish({ phase, generated: this.generatedCount,
++      evaluated: this.evaluatedCount, tasksDone: this.cursor, tasksTotal: this.knownTasksTotal,
++      elapsedMs: this.elapsed + performance.now() - start, results: this.finalists });
++    let uncommitted = 0, lastReport = start;
++    try {
++      if (this.finalists.length && this.finalists.every(r => r.validation.scores.length >= r.validationTarget)) {
++        while (!this.stopped && performance.now() < deadline) {
++          const eligible = this.finalists.filter(r => r.validation.scores.length + 64 <= CONTINUOUS_VALIDATION_SAMPLES);
++          if (!eligible.length) break;
++          const staged: { result: SearchResult; samples: Samples; best: SearchResult['validationBest'] }[] = [];
++          for (const result of eligible) {
++            if (this.stopped || performance.now() >= deadline) break;
++            await this.engine.prepare(this.input, result.candidate);
++            const samples = emptySamples();
++            let best = result.validationBest;
++            for (let i = 0; i < 64 && !this.stopped && performance.now() < deadline; i++) {
++              // Consume serials even for discarded cohorts, so stop/restore never
++              // retries an already attempted seed. Normal validation is unchanged.
++              const seed = `${this.nonce}:validation:tail:${this.trialSerial++}:${result.candidate.id}`;
++              this.tailValidation.attempted++; uncommitted++;
++              const trial = this.engine.trial(seed, result.candidate.policy);
++              samples.scores.push(trial.score); samples.retired += Number(trial.retired); samples.turns += trial.finishTurn;
++              if (!best || trial.score > best.score) best = { seed, score: trial.score };
++              if ((i + 1) % 16 === 0) {
++                await yieldEventLoop();
++                if (performance.now() - lastReport >= 150) {
++                  report('validate'); lastReport = performance.now();
++                }
++              }
++            }
++            if (samples.scores.length !== 64) break;
++            staged.push({ result, samples, best });
++          }
++          if (this.stopped || performance.now() >= deadline || staged.length !== eligible.length) break;
++          // One synchronous transaction: every published finalist remains complete.
++          for (const { result, samples, best } of staged) {
++            result.validation.scores.push(...samples.scores);
++            result.validation.retired += samples.retired; result.validation.turns += samples.turns;
++            result.validationBest = best; result.validationTarget = result.validation.scores.length;
++          }
++          this.tailValidation.committed += uncommitted; this.tailValidation.cohortRounds++; uncommitted = 0;
++          report('validate');
++        }
++      }
++    } finally {
++      this.tailValidation.discarded += uncommitted;
++      // Account for unsuccessful cohorts too, including exception/cancellation work.
++      const spent = performance.now() - start;
++      this.elapsed += spent;
++    }
++    publish({ phase: this.stopped ? 'stopped' : 'done', generated: this.generatedCount,
++      evaluated: this.evaluatedCount, tasksDone: this.cursor, tasksTotal: this.knownTasksTotal,
++      elapsedMs: this.elapsed, results: this.finalists });
++  }
+   async run(durationMs: number, publish: (progress: SearchProgress) => void, continuous = false) {
+     this.stopped = false;
+     this.continuous = continuous;
+diff --git a/src/workers/examSearchIslandRuntime.ts b/src/workers/examSearchIslandRuntime.ts
+index 0ec2967c..d1426326 100644
+--- a/src/workers/examSearchIslandRuntime.ts
++++ b/src/workers/examSearchIslandRuntime.ts
+@@ -53,7 +53,9 @@ export function createIslandRuntime(emit: (message: IslandMessage) => void) {
+       if (data.method === 'evaluate') session.refineValidation(data.candidateId ?? '');
+       const deadline = data.deadline ?? Date.now() + Math.max(0, Math.min(180000, data.durationMs));
+       const runner = { run: (duration: number, publish: Parameters<SearchSession['run']>[1]) =>
+-        session!.run(duration, publish, data.method !== 'evaluate' && data.continuous === true) };
++        session!.run(duration, publish, data.method !== 'evaluate' && data.continuous === true),
++        ...(data.method === 'evaluate' ? {} : { runValidationTail: (duration: number, publish: Parameters<SearchSession['run']>[1]) =>
++          session!.runValidationTail(duration, publish) }) };
+       await runSessionWithinBudget(runner, deadline, progress => emit({ id: data.id, island: data.island,
+         progress: displayProgress(progress, session!.input.attempts, session!.input.desiredProbability) }), {
+         allowRepeat: data.method === 'start' || data.method === 'resume',
+diff --git a/src/workers/examSearchRun.ts b/src/workers/examSearchRun.ts
+index 2417236c..2c1171ca 100644
+--- a/src/workers/examSearchRun.ts
++++ b/src/workers/examSearchRun.ts
+@@ -1,6 +1,7 @@
+ import type { SearchProgress } from '@/domain/examSearch/types';
+ 
+ export interface SessionRunner {
++  runValidationTail?(durationMs: number, publish: (progress: SearchProgress) => void): Promise<void>;
+   run(durationMs: number, publish: (progress: SearchProgress) => void): Promise<void>;
+ }
+ 
+@@ -35,15 +36,28 @@ export async function runSessionWithinBudget(
+   let pendingTerminal: SearchProgress | undefined;
+   let previousTerminal: { generated: number; evaluated: number } | undefined;
+ 
++  const finish = async (terminal: SearchProgress) => {
++    const remaining = Math.max(0, deadline - now());
++    let final = terminal;
++    if (allowRepeat && terminal.phase === 'done' && !shouldStop() && remaining > 0
++      && remaining < minimumRemainingMs && session.runValidationTail) {
++      await session.runValidationTail(remaining, progress => {
++        if (progress.phase === 'done' || progress.phase === 'stopped') final = progress;
++        else publish(progress);
++      });
++    }
++    publish(final);
++  };
++
+   while (passes < maxPasses) {
+     const remaining = Math.max(0, deadline - now());
+     if (!remaining || shouldStop()) {
+-      if (pendingTerminal) publish(pendingTerminal);
++      if (pendingTerminal) await finish(pendingTerminal);
+       break;
+     }
+     if (pendingTerminal) {
+       if (remaining < minimumRemainingMs) {
+-        publish(pendingTerminal);
++        await finish(pendingTerminal);
+         break;
+       }
+       pendingTerminal = undefined;
+@@ -67,13 +81,13 @@ export async function runSessionWithinBudget(
+       pendingTerminal = terminal;
+       publish({ ...terminal, phase: 'generate' });
+       if (shouldStop() || deadline - now() < minimumRemainingMs) {
+-        publish(pendingTerminal);
++        await finish(pendingTerminal);
+         pendingTerminal = undefined;
+         break;
+       }
+       continue;
+     }
+-    if (terminal) publish(terminal);
++    if (terminal) await finish(terminal);
+     break;
+   }
+   return { passes };
+diff --git a/tests/exam-search-tail-runtime.test.cjs b/tests/exam-search-tail-runtime.test.cjs
+new file mode 100644
+index 00000000..9755b110
+--- /dev/null
++++ b/tests/exam-search-tail-runtime.test.cjs
+@@ -0,0 +1,29 @@
++const {test}=require('node:test');
++const assert=require('node:assert/strict');
++const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
++test('V2 actual island wrapper routes start/resume tail but excludes manual evaluate',async()=>{
++  const calls=[],messages=[];
++  class Session{
++    constructor(input){this.input=input;}
++    async run(_d,p,continuous){calls.push(['run',continuous]);p({phase:'done'});}
++    async runValidationTail(_d,p){calls.push(['tail']);p({phase:'done'});}
++    refineValidation(id){calls.push(['refine',id]);}
++    checkpoint(){return {finalists:[]};} stop(){}
++  }
++  const module={exports:{}};
++  const deps={
++    '@/assets/chara.json':[], '@/workers/resourceBattleHost':{createResourceBattleHost:()=>({})},
++    '@/domain/examSearch/scheduler':{SearchSession:Session}, '@/domain/examSearch/variants':{validateInput:()=>null},
++    '@/domain/examSearch/statistics':{displayProgress:p=>p},
++    './examSearchRun':{runSessionWithinBudget:async(r,_d,p,o)=>{await r.run(100,p);if(o.allowRepeat){assert.equal(typeof r.runValidationTail,'function');await r.runValidationTail(10,p);}else assert.equal(r.runValidationTail,undefined);}},
++  };
++  const source=fs.readFileSync(path.join(__dirname,'../src/workers/examSearchIslandRuntime.ts'),'utf8');
++  const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021,esModuleInterop:true}}).outputText;
++  vm.runInNewContext(code,{module,exports:module.exports,require:id=>{assert.ok(id in deps,`unexpected dependency ${id}`);return deps[id];},Date,Error});
++  const runtime=module.exports.createIslandRuntime(m=>messages.push(m)),input={attempts:30,desiredProbability:.8};
++  await runtime.handle({method:'start',id:1,island:0,islandCount:1,input,nonce:'v2',durationMs:100});
++  await runtime.handle({method:'resume',id:2,island:0,durationMs:100,continuous:true});
++  await runtime.handle({method:'evaluate',id:3,island:0,durationMs:100,candidateId:'selected',continuous:true});
++  assert.ok(messages.every(m=>!m.error));
++  assert.deepEqual(calls,[['run',false],['tail'],['run',true],['tail'],['refine','selected'],['run',false]]);
++});
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..b9ff4f2d 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,104 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++function v2Rows() {
++  const input=fixture(),candidate=generation.generateCandidates(input,generation.buildTasks(input,catalog)[0],catalog)[0];
++  const make=(id,n=2048)=>({candidate:{...clone(candidate),id},development:{scores:[10],retired:0,turns:1},
++    validation:{scores:Array(n).fill(10),retired:0,turns:n},validationTarget:n,validationBest:{seed:`old-${id}`,score:10}});
++  return {input,rows:[make('v2-a'),make('v2-b')],make};
++}
++test('V2 tail commits a full ordinary cohort atomically without generating candidates',async()=>{
++  const {input,rows}=v2Rows(),seeds=[],published=[];
++  const engine={prepare:async()=>{},trial:seed=>{seeds.push(seed);return {score:20,retired:false,finishTurn:2};}};
++  const session=new SearchSession(input,catalog,engine,'v2');session.finalists=rows;
++  await session.runValidationTail(1000,p=>{published.push(clone(p));if(p.phase==='validate')session.stop();});
++  assert.equal(seeds.length,128);assert.equal(new Set(seeds).size,128);
++  assert.ok(seeds.every(s=>s.startsWith('v2:validation:tail:')));
++  for(const row of rows){assert.equal(row.validation.scores.length,2112);assert.equal(row.validationTarget,2112);assert.equal(row.validationBest.score,20);assert.equal(row.validation.turns,2176);}
++  assert.ok(published.every(p=>p.results.every(r=>r.validation.scores.length>=r.validationTarget)));
++  const cp=session.checkpoint();assert.equal(cp.evaluatedCount,0);assert.equal(cp.generatedCount,0);assert.equal(cp.pool.length,0);
++  assert.deepEqual(clone(cp.tailValidation),{attempted:128,committed:128,discarded:0,cohortRounds:1});
++  assert.equal(published.at(-1).phase,'stopped');assert.equal(published.at(-1).elapsedMs,cp.elapsed);
++});
++test('V2 stop discards every partial-cohort score and best but consumes seeds across restore',async()=>{
++  const {input,rows}=v2Rows(),seeds=[];let session;
++  const engine={prepare:async()=>{},trial:seed=>{seeds.push(seed);if(seeds.length===70)session.stop();return {score:999,retired:true,finishTurn:3};}};
++  session=new SearchSession(input,catalog,engine,'v2-stop');session.finalists=rows;
++  const before=clone(rows);await session.runValidationTail(1000,()=>{});
++  assert.deepEqual(clone(rows),before);assert.equal(session.checkpoint().trialSerial,70);
++  assert.deepEqual(clone(session.checkpoint().tailValidation),{attempted:70,committed:0,discarded:70,cohortRounds:0});
++  const storage=load('src/storage/examSearchStorage.ts'),{ENGINE_VERSION}=load('src/domain/examSearch/types.ts');
++  const saved={input,checkpoint:clone(session.checkpoint()),version:ENGINE_VERSION,catalogVersion:'V2-test'};
++  assert.equal(await storage.saveSearchSession(saved,storage.serializeSearchSession(saved)),true);
++  const loaded=storage.loadSearchSession();assert.deepEqual(clone(loaded.checkpoint),saved.checkpoint);
++  const restored=new SearchSession(input,catalog,{prepare:async()=>{},trial:seed=>{seeds.push(seed);return {score:20,retired:false,finishTurn:1};}},'ignored',loaded.checkpoint);
++  await restored.runValidationTail(1000,p=>{if(p.phase==='validate')restored.stop();});
++  assert.equal(new Set(seeds).size,seeds.length);assert.equal(restored.checkpoint().trialSerial,198);
++  assert.equal(restored.checkpoint().tailValidation.discarded,70);
++  assert.ok(restored.checkpoint().elapsed>=session.checkpoint().elapsed);
++  assert.ok(restored.checkpoint().finalists.every(r=>r.validation.scores.length===2112&&r.validationBest.score===20));
++});
++test('V2 deadline discards staged work and does not leak its best replay',async()=>{
++  const {input,rows}=v2Rows();let prepares=0;
++  const session=new SearchSession(input,catalog,{prepare:async()=>{if(++prepares===2)await new Promise(r=>setTimeout(r,150));},trial:()=>({score:999,retired:false,finishTurn:2})},'v2-deadline');session.finalists=rows;
++  const before=clone(rows);await session.runValidationTail(100,()=>{});
++  assert.deepEqual(clone(rows),before);
++  const cp=session.checkpoint();assert.equal(cp.tailValidation.committed,0);assert.ok(cp.tailValidation.discarded>0);assert.ok(cp.elapsed>=100);
++});
++test('V2 refuses incomplete finalists and preserves capped or manually enlarged targets',async()=>{
++  const {input,rows,make}=v2Rows();let trials=0;
++  const engine={prepare:async()=>{},trial:()=>{trials++;return {score:1,retired:false,finishTurn:1};}};
++  const incomplete=new SearchSession(input,catalog,engine,'v2-incomplete');rows[1].validationTarget++;incomplete.finalists=rows;
++  await incomplete.runValidationTail(10,()=>{});assert.equal(trials,0);
++  const session=new SearchSession(input,catalog,engine,'v2-cap');session.finalists=[make('small',32704),make('large',131072)];const large=clone(session.finalists[1]);
++  await session.runValidationTail(1000,()=>{});
++  assert.equal(trials,64);assert.equal(session.finalists[0].validationTarget,32768);assert.equal(session.finalists[0].validation.scores.length,32768);
++  assert.deepEqual(clone(session.finalists[1]),large);assert.equal(session.checkpoint().tailValidation.cohortRounds,1);
++});
++test('V2 budget helper uses only sub-pass search tail and publishes one terminal',async()=>{
++  for(const mode of ['tail','evaluate','stopped','large']){
++    let now=0,tailCalls=0;const phases=[];
++    const runner={run:async(_d,p)=>{now+=mode==='large'?1000:6000;p(runProgress(mode==='stopped'?'stopped':'done'));},
++      runValidationTail:async(d,p)=>{tailCalls++;assert.equal(d,14000);p(runProgress('validate'));now+=d;p({...runProgress('done'),elapsedMs:now});}};
++    await runSessionWithinBudget(runner,20000,p=>phases.push(p.phase),{now:()=>now,allowRepeat:mode!=='evaluate'});
++    assert.equal(tailCalls,mode==='tail'?1:0);assert.equal(phases.filter(p=>p==='done'||p==='stopped').length,1);
++  }
++});
++test('V2 short tail after continuation callback does not expose intermediate done',async()=>{
++  let now=0,calls=0,tailCalls=0;const phases=[];
++  const runner={run:async(_d,p)=>{calls++;now+=1000;p(runProgress('done'));},runValidationTail:async(d,p)=>{tailCalls++;assert.equal(d,10000);p(runProgress('done'));}};
++  await runSessionWithinBudget(runner,50000,p=>{phases.push(p.phase);if(p.phase==='generate')now=40000;},{now:()=>now,allowRepeat:true});
++  assert.equal(calls,1);assert.equal(tailCalls,1);assert.deepEqual(phases,['generate','done']);
++});
++
++
++test('V2 heartbeat permits stop without exposing partial samples or targets',async()=>{
++  const {input,rows}=v2Rows();let heartbeat=false;
++  const session=new SearchSession(input,catalog,{prepare:async()=>{await new Promise(r=>setTimeout(r,160));},trial:()=>({score:999,retired:false,finishTurn:2})},'v2-heartbeat');
++  session.finalists=rows;const before=clone(rows);
++  await session.runValidationTail(1000,p=>{if(p.phase==='validate'){heartbeat=true;assert.deepEqual(clone(p.results),before);session.stop();}});
++  assert.ok(heartbeat);assert.deepEqual(clone(rows),before);assert.equal(session.checkpoint().tailValidation.committed,0);
++  assert.equal(session.checkpoint().tailValidation.discarded,16);
++});
++
++test('V2 trial exceptions discard the whole pending cohort and retain elapsed diagnostics',async()=>{
++  const {input,rows}=v2Rows();let calls=0;
++  const session=new SearchSession(input,catalog,{prepare:async()=>{},trial:()=>{if(++calls===70)throw Error('engine failed');return {score:999,retired:false,finishTurn:1};}},'v2-error');
++  session.finalists=rows;const before=clone(rows);
++  await assert.rejects(session.runValidationTail(1000,()=>{}),/engine failed/);
++  const cp=session.checkpoint();assert.deepEqual(clone(rows),before);assert.equal(cp.trialSerial,70);
++  assert.deepEqual(clone(cp.tailValidation),{attempted:70,committed:0,discarded:70,cohortRounds:0});assert.ok(cp.elapsed>0);
++});
++test('V2 compressed storage preserves counters and old checkpoints default to zero tail work',async()=>{
++  const {input,make}=v2Rows(),storage=load('src/storage/examSearchStorage.ts'),{ENGINE_VERSION}=load('src/domain/examSearch/types.ts');
++  const session=new SearchSession(input,catalog,{},'v2-storage');session.finalists=[make('large',131072)];session.trialSerial=981;
++  session.tailValidation={attempted:192,committed:128,discarded:64,cohortRounds:1};
++  const value={input,checkpoint:clone(session.checkpoint()),version:ENGINE_VERSION,catalogVersion:'v2'};
++  const raw=storage.serializeSearchSession(value);assert.equal(JSON.parse(raw).checkpointEncoding,'lz-utf16-v1');
++  assert.equal(await storage.saveSearchSession(value,raw),true);
++  const loaded=storage.loadSearchSession();assert.deepEqual(clone(loaded.checkpoint),value.checkpoint);
++  const restored=new SearchSession(input,catalog,{},'ignored',loaded.checkpoint);assert.equal(restored.checkpoint().trialSerial,981);assert.deepEqual(clone(restored.checkpoint().tailValidation),value.checkpoint.tailValidation);
++  delete loaded.checkpoint.tailValidation;
++  const legacy=new SearchSession(input,catalog,{},'ignored',loaded.checkpoint);assert.deepEqual(clone(legacy.checkpoint().tailValidation),{attempted:0,committed:0,discarded:0,cohortRounds:0});
++});
+-- 
+2.52.0
+
