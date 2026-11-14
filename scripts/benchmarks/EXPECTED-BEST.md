@@ -21,3 +21,9 @@ Restore the original peak/weighted/scout/quality parent priority for refinement.
 Re-run the same25 development cases with tag expected-development-v2 and fresh nonce nrc19-expected-dev-v2 before primary confirmation. The first result is retained and is not called an improvement.
 
 Development2 source hash: `23245ff6b603b8ab69ba8426db50decf9acc34f888f334e14e81990d6301d80b`. Full357tests pass (1unrelated supplied-screenshot test skipped); type/build and stop/save/resume/max replay pass on this source.
+
+## Locked confirmation decision
+
+Development2 completed25/25 with valid independent1024 audits, constraints and maximum replays. Set1 current10 mean +87.987; historical tuning12 mean +3386.304. Original/zero currentneutralDF improved +610.6/+226.0; no individual development regression exceeded5%. Other-profile currentwoodDF was all-owned +225.0, provided -218.2, sparse -207.4. These are development findings, not adoption.
+
+Freeze source23245ff6b603b8ab69ba8426db50decf9acc34f888f334e14e81990d6301d80b and proceed to the complete185-case primary matrix exactly as predeclared. Do not use the26 historical confirmation subjects to retune this source. Extend the fixed20-case long plan before primary scores with original NRC18 waterATK (development +33041.3), yielding expected-long-plan.json21cases. This guards the unusually large development outlier. Further material primary regressions/largest uncovered gain still require extension. The10-case current535 supplements remain required at both30/180seconds.
