@@ -31,8 +31,9 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Storage tests in Chromium
         working-directory: target
-        run: node --test scripts/tests/exam-search-storage-browser.test.cjs
+        run: node --test scripts/tests/exam-search-storage-browser.test.cjs 2>&1 | tee storage-tests.tap
       - name: Build and real worker stop-save-reload-resume
+        if: always()
         working-directory: target
         run: |
           npm run build
@@ -46,4 +47,5 @@ jobs:
           path: |
             target/artifacts/exam-search-storage-*.json
             target/preview.log
+            target/storage-tests.tap
           retention-days: 14
