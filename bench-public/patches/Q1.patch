@@ -1,0 +1,105 @@
+From 15bc3f7be6a97a7ca152ee43f29d9f1ca7d8d0cf Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 15 Nov 2026 06:59:43 +0900
+Subject: [PATCH] experiment: protect one ordinary-positive finalist quality
+ slot globally
+
+---
+ src/domain/examSearch/scheduler.ts | 13 +++++++-
+ tests/exam-search.test.cjs         | 52 ++++++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+), 1 deletion(-)
+
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..c991b4de 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -287,7 +287,7 @@ export class SearchSession {
+           ||conservative(bm.empiricalScore)-conservative(am.empiricalScore)||bm.max-am.max;
+       }).slice(0,1));
+     const retainedIds=new Set(retained.map(r=>r.candidate.id)),selected:SearchResult[]=[];
+-    for(const cost of this.finalistCostOrder(costs, MAX_FINALISTS-retained.length)){
++    const bands=this.finalistCostOrder(costs, MAX_FINALISTS-retained.length).map(cost=>{
+       const band=sorted.filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id));
+       const expected=band[0],weighted=this.weightedChampion(band);
+       const scout=band.filter(r=>(r.criticalScout?.score??0)>0).sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
+@@ -302,6 +302,17 @@ export class SearchSession {
+       // Protect the explicit champion roles before diversifying spare slots.
+       // A scout or weighted winner may be a useful spell/plan of the same team.
+       const priority=[...new Set(champions.filter((result):result is SearchResult=>!!result))].slice(0,slots);
++      return {cost,band,slots,priority};
++    });
++    // Protect at most one ordinary-positive quality candidate globally, using
++    // only an existing spare slot in its band. Retained/champion slots stay intact.
++    const priorityIds=new Set(bands.flatMap(band=>band.priority.map(result=>result.candidate.id)));
++    const qualitySpare=sorted.find(result=>!retainedIds.has(result.candidate.id)
++      && !priorityIds.has(result.candidate.id)
++      && result.development.scores.some(score=>Number.isFinite(score)&&score>0)
++      && bands.some(band=>band.cost===result.candidate.cost&&band.priority.length<band.slots));
++    for(const {cost,band,slots,priority} of bands){
++      if(qualitySpare?.candidate.cost===cost)priority.push(qualitySpare);
+       const bandSelected=[...priority,...diverseFinalists(band,slots-priority.length,
+         [...retained,...selected,...priority].filter(result=>result.candidate.cost===cost))];
+       selected.push(...bandSelected);
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..c428c298 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,55 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++function q1Row(id,cost,score,card=id){
++  return {candidate:{id,cost,cards:[{name:card,support:false}],challengeIds:[],policy:'effects-tail'},
++    development:{scores:Array(32).fill(score)},validation:{scores:[]},validationTarget:2048};
++}
++function q1Fixture(){
++  const session=new SearchSession(fixture(),catalog,{},'quality-spare');
++  session.finalists=[0,1].map(cost=>({...q1Row(`q1-retained-${cost}`,cost,40000,`q1-team-${cost}`),
++    validation:{scores:Array(2048).fill(40000)},validationBest:{score:40000,seed:'unchanged',turn:4}}));
++  session.pool=[0,1].flatMap(cost=>[
++    q1Row(`q1-leader-${cost}`,cost,55000,`q1-team-${cost}`),
++    q1Row(`q1-quality-${cost}`,cost,50000+cost*1000,`q1-team-${cost}`),
++    ...[0,1,2,3].map(i=>q1Row(`q1-diverse-${cost}-${i}`,cost,45000-i*1000))]);
++  return session;
++}
++test('Q1 protects only the globally best ordinary-positive spare across cost bands',()=>{
++  const session=q1Fixture(),prior=clone(session.finalists),samples=clone(session.pool);
++  session.selectFinalists();
++  const rows=session.checkpoint().finalists,ids=rows.map(r=>r.candidate.id);
++  assert.equal(rows.length,8);assert.equal(new Set(ids).size,8);
++  assert.ok(ids.includes('q1-quality-1'),'higher-quality same-composition candidate gets the exception');
++  assert.ok(!ids.includes('q1-quality-0'),'no second protected quality slot in another cost band');
++  for(const cost of [0,1]){
++    assert.equal(rows.filter(r=>r.candidate.cost===cost).length,4,'existing cost allocation unchanged');
++    assert.ok(ids.includes(`q1-leader-${cost}`));
++    assert.deepEqual(clone(rows.find(r=>r.candidate.id===`q1-retained-${cost}`)),prior[cost]);
++  }
++  assert.ok(rows.filter(r=>!r.candidate.id.startsWith('q1-retained')).every(r=>r.validationTarget===2048&&r.validation.scores.length===0));
++  assert.deepEqual(clone(session.pool),samples,'development observations remain ordinary and untouched');
++});
++test('Q1 never promotes all-failure candidates as its quality exception',()=>{
++  const session=q1Fixture();
++  for(const r of session.pool.filter(r=>r.candidate.id.startsWith('q1-quality'))){r.development.scores.fill(0);r.development.fitness=Array(32).fill(1e12);}
++  session.selectFinalists();
++  assert.ok(session.checkpoint().finalists.every(r=>!r.candidate.id.startsWith('q1-quality')));
++});
++test('Q1 cannot displace champion roles when each band has no spare slots',()=>{
++  const session=new SearchSession(fixture(),catalog,{},'q1-no-spare');
++  session.pool=[0,1,2,3].flatMap(cost=>{
++    const leader=q1Row(`q1-full-leader-${cost}`,cost,55000),scout=q1Row(`q1-full-scout-${cost}`,cost,45000);
++    scout.criticalScout={attempted:32,score:90000};
++    return [leader,scout,q1Row(`q1-full-quality-${cost}`,cost,54000)];
++  });
++  session.selectFinalists();
++  const rows=session.checkpoint().finalists;
++  assert.equal(rows.length,8);
++  for(const cost of [0,1,2,3]){
++    assert.ok(rows.some(r=>r.candidate.id===`q1-full-leader-${cost}`));
++    assert.ok(rows.some(r=>r.candidate.id===`q1-full-scout-${cost}`));
++    assert.ok(!rows.some(r=>r.candidate.id===`q1-full-quality-${cost}`));
++  }
++});
+-- 
+2.52.0
+
