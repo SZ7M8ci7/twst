@@ -1,0 +1,36 @@
+diff --git a/src/domain/examSearch/statistics.ts b/src/domain/examSearch/statistics.ts
+index fbd83a05..1fdc6d66 100644
+--- a/src/domain/examSearch/statistics.ts
++++ b/src/domain/examSearch/statistics.ts
+@@ -42,15 +42,30 @@ export function expectedBestScore(samples: Samples, attempts: number): number {
+   if (!samples.scores.length || !Number.isInteger(attempts) || attempts < 1) return 0;
+   return expectedBestFromSorted(samples.scores.length, sortedPositiveScores(samples), attempts);
+ }
++// Pure numeric CDF values only: never retain mutable Samples or score arrays.
++const cdfPowerCaches = new Map<string, Map<number, number>>();
+ function expectedBestFromSorted(n: number, positive: number[], attempts: number): number {
+   if (!n || !Number.isInteger(attempts) || attempts < 1) return 0;
+   // Descending positive scores share the sort used by the display summaries.
+   // Zero/invalid outcomes still contribute to n and the chance of failing.
++  let powers:Map<number,number>|undefined;
++  if(n<=4096){
++    const key=`${n}:${attempts}`;
++    powers=cdfPowerCaches.get(key);
++    if(!powers){
++      if(cdfPowerCaches.size>=8)cdfPowerCaches.delete(cdfPowerCaches.keys().next().value!);
++      powers=new Map<number,number>();cdfPowerCaches.set(key,powers);
++    }
++  }
++  const power=(index:number)=>{
++    const cached=powers?.get(index);if(cached!==undefined)return cached;
++    const value=Math.pow((n-index)/n,attempts);powers?.set(index,value);return value;
++  };
+   let sum = 0, index = 0;
+   while (index < positive.length) {
+     const start = index, score = positive[index];
+     do index++; while (index < positive.length && positive[index] === score);
+-    sum += score * (Math.pow((n - start) / n, attempts) - Math.pow((n - index) / n, attempts));
++    sum += score * (power(start) - power(index));
+   }
+   return sum;
+ }

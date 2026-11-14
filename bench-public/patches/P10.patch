@@ -1,0 +1,20 @@
+diff --git a/src/domain/examSearch/beam.ts b/src/domain/examSearch/beam.ts
+index 271eb743..e760b5da 100644
+--- a/src/domain/examSearch/beam.ts
++++ b/src/domain/examSearch/beam.ts
+@@ -30,8 +30,13 @@ export function diversifyBeam<T extends ScoredTeam>(ranked: T[], preferred: T[],
+     if (!selectedCards.has(row.cards)) { selectedCards.add(row.cards); selected.push(row); }
+   }
+   if (!requiredCharacters.length) return selected;
+-  const coverage = (row: T) => requiredCharacters.reduce((mask, chara, index) =>
+-    mask | (row.cards.some(card => catalog[card.name]?.chara === chara) ? 1 << index : 0), 0);
++  const coverageCache=new WeakMap<SearchCard[],number>();
++  const coverage = (row: T) => {
++    const cached=coverageCache.get(row.cards);if(cached!==undefined)return cached;
++    const mask=requiredCharacters.reduce((mask,chara,index)=>
++      mask|(row.cards.some(card=>catalog[card.name]?.chara===chara)?1<<index:0),0);
++    coverageCache.set(row.cards,mask);return mask;
++  };
+   const protectedCount = Math.max(1, width - 4), protectedRows = selected.slice(0, protectedCount);
+   const covered = new Set(protectedRows.map(coverage)), alternatives: T[] = [];
+   for (const row of ranked) {

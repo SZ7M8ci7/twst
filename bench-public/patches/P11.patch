@@ -1,0 +1,20 @@
+diff --git a/src/domain/examSearch/candidateGenerator.ts b/src/domain/examSearch/candidateGenerator.ts
+index a87c2c86..1b3dd948 100644
+--- a/src/domain/examSearch/candidateGenerator.ts
++++ b/src/domain/examSearch/candidateGenerator.ts
+@@ -383,9 +383,14 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
+   const enemyEffects = new Set(input.preset.enemies.flatMap(e=>e.actions.map(a=>a.effectKind)));
+   const blind = effects.some(e=>e.kind==='playerBlind') || enemyEffects.has('blind');
+   const parsedEffects = new Map<string,ParsedBuff[]>();
++  const selectedEffects=new Map<string,Map<string,ParsedBuff[]>>();
+   const buffsFor=(c:SearchCard)=>{
+     if(!parsedEffects.has(c.name))parsedEffects.set(c.name,parseMagicBuffsFromEtc(catalog[c.name]));
+-    return parsedEffects.get(c.name)!.filter(b=>c.selectedMagic.includes(Number(b.magicOption.slice(1)) as 1|2|3));
++    let selected=selectedEffects.get(c.name);
++    if(!selected){selected=new Map<string,ParsedBuff[]>();selectedEffects.set(c.name,selected);}
++    const key=JSON.stringify(c.selectedMagic),cached=selected.get(key);if(cached)return cached;
++    const buffs=parsedEffects.get(c.name)!.filter(b=>c.selectedMagic.includes(Number(b.magicOption.slice(1)) as 1|2|3));
++    selected.set(key,buffs);return buffs;
+   };
+   const pairedEffectFor=(buff:ParsedBuff,c:SearchCard):PairedEffect|undefined=>{
+     const target=buff.targetType??(buff.isSelf?'self':'self');

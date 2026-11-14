@@ -155,7 +155,7 @@ function saveJson(file, value) {
     const elapsedMs = performance.now() - started;
     const report = { schema: 'exam-search-generalization-v1', engineVersion: ENGINE_VERSION, tag, profile, caseId,
       scope:validationOnly?'validation-only':'search',validationTrials:checkpoint.finalists.reduce((sum,row)=>sum+row.validation.scores.length,0),
-      validationFinalists:checkpoint.finalists.map(row=>({id:row.candidate.id,samples:row.validation.scores.length})),
+      validationFinalists:checkpoint.finalists.map(row=>({id:row.candidate.id,samples:row.validation.scores.length,target:row.validationTarget,complete:row.validation.scores.length>=row.validationTarget})),
       preset: { id: preset.id, title: preset.title, kind: preset.kind, enemyElement: preset.enemyElement }, referenceScore: entry.score, nonce,
       durationMs, elapsedMs, searchElapsedMs: checkpoint.elapsed, searchCpuMicros: searchCpu, candidateCount: allResults.length, cpuSession: true, browserIslands: 0, storage: 'none', auditTrials,
       selection: checkpoint.finalists.length ? 'displayed-finalists' : 'development-fallback',

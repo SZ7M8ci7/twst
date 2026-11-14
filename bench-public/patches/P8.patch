@@ -1,0 +1,23 @@
+diff --git a/src/domain/examSearch/statistics.ts b/src/domain/examSearch/statistics.ts
+index fbd83a05..6ad24a6f 100644
+--- a/src/domain/examSearch/statistics.ts
++++ b/src/domain/examSearch/statistics.ts
+@@ -79,6 +79,7 @@ function autoScoreFromSorted(samples: Samples, attempts: number, desired: number
+   const max=positive[0] ?? 0;
+   let empiricalScore:number|null=null, conservativeScore:number|null=null;
+   if(n && Number.isInteger(attempts) && attempts>0 && Number.isFinite(desired) && desired>0 && desired<1 && Number.isFinite(z) && z>0) {
++    const z2=z*z, denominator=1+z2/n;
+     let index=0, successes=0;
+     while(index<positive.length) {
+       const threshold=positive[index];
+@@ -86,7 +87,9 @@ function autoScoreFromSorted(samples: Samples, attempts: number, desired: number
+       successes=index;
+       const p=successes/n;
+       if(empiricalScore===null && reachProbability(p,attempts)>=desired) empiricalScore=threshold;
+-      const lower=interval(successes,n,z)[0];
++      const middle=(p+z2/(2*n))/denominator;
++      const half=z*Math.sqrt(p*(1-p)/n+z2/(4*n*n))/denominator;
++      const lower=Math.max(0,middle-half);
+       if(conservativeScore===null && reachProbability(lower,attempts)>=desired) conservativeScore=threshold;
+       if(empiricalScore!==null && conservativeScore!==null) break;
+     }

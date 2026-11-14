@@ -1,0 +1,26 @@
+diff --git a/src/domain/examSearch/finalists.ts b/src/domain/examSearch/finalists.ts
+index a169b4e1..b4c80bde 100644
+--- a/src/domain/examSearch/finalists.ts
++++ b/src/domain/examSearch/finalists.ts
+@@ -10,13 +10,19 @@ export function diverseFinalists(preferred: (SearchResult | undefined)[], width:
+   retained: SearchResult[] = []): SearchResult[] {
+   const selected: SearchResult[] = [], used = new Set(retained.map(row=>row.candidate.id));
+   const counts = new Map<string,number>();
++  // Keys are stable only within this synchronous selection operation.
++  const keyCache=new Map<SearchResult,string>();
++  const keyOf=(row:SearchResult)=>{
++    const cached=keyCache.get(row);if(cached!==undefined)return cached;
++    const key=compositionKey(row);keyCache.set(row,key);return key;
++  };
+   for (const row of retained) {
+-    const key = compositionKey(row); counts.set(key,(counts.get(key)??0)+1);
++    const key = keyOf(row); counts.set(key,(counts.get(key)??0)+1);
+   }
+   for (const limit of [2,Infinity]) for (const row of preferred) {
+     if (selected.length >= width) return selected;
+     if (!row || used.has(row.candidate.id)) continue;
+-    const key = compositionKey(row), count = counts.get(key)??0;
++    const key = keyOf(row), count = counts.get(key)??0;
+     if (count >= limit) continue;
+     selected.push(row); used.add(row.candidate.id); counts.set(key,count+1);
+   }

@@ -1,0 +1,141 @@
+diff --git a/src/domain/examSearch/candidateGenerator.ts b/src/domain/examSearch/candidateGenerator.ts
+index a87c2c86..0db145a0 100644
+--- a/src/domain/examSearch/candidateGenerator.ts
++++ b/src/domain/examSearch/candidateGenerator.ts
+@@ -1,3 +1,4 @@
++import { generationExperiments2 } from '@/domain/examSearch/generationExperiments2';
+ import { atkbuffDict, dmgbuffDict, healDict, healContinueDict, magicDict, recalculateATK, recalculateHP } from '@/utils/calculations';
+ import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
+ import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
+@@ -77,7 +78,14 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
+         for(const entry of roster)for(const option of cardVariants(entry,catalog[entry.name].rare,support)) {
+           const name=catalog[entry.name].chara,group=byCharacter.get(name)??[];
+           group.push({card:option,value:estimate([option])});
+-          group.sort((a,b)=>b.value-a.value);group.length=Math.min(2,group.length);byCharacter.set(name,group);
++          group.sort((a,b)=>b.value-a.value);
++          if(generationExperiments2.distinctPartnerCostumes) {
++            const names=new Set<string>();
++            for(let i=0;i<group.length;i++) {
++              if(names.has(group[i].card.name)){group.splice(i,1);i--;}else names.add(group[i].card.name);
++            }
++          }
++          group.length=Math.min(2,group.length);byCharacter.set(name,group);
+         }
+       }
+       partnerPools.set(key,[...byCharacter.values()].flatMap(group=>group.map(entry=>entry.card)));
+@@ -169,11 +177,12 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
+     }
+     const ownNames=new Set([...ownGroups.values()].flatMap(group=>group.map(c=>c.name)));
+     const partners=input.roster.filter(c=>ownNames.has(c.name)).sort((a,b)=>a.name.localeCompare(b.name)).flatMap(c=>cardVariants(c,catalog[c.name].rare));
++    const partnerSolo=generationExperiments2.marginalSupportRank?new Map(partners.map(card=>[card,estimate([card])])):undefined;
+     const supportPaths:{task:GenerationTask;value:number}[]=[];
+     for(const support of input.supports) {
+       let best:SearchCard|undefined,value=-Infinity,count=0;
+       for(const option of cardVariants(support,catalog[support.name].rare,true))for(const own of partners) {
+-        const pairValue=estimate([own,option]);
++        const pairValue=estimate([own,option])-(partnerSolo?.get(own)??0);
+         if(pairValue>value){best=own;value=pairValue;}
+         if(++count%128===0)yield;
+       }
+@@ -630,7 +639,7 @@ function* duoChainSteps(input:SearchInput,task:GenerationTask,catalog:Catalog):G
+   let work=0;
+   const registeredOptions=[...input.roster.flatMap(c=>cardVariants(c,catalog[c.name].rare)),
+     ...(supportAllowed?input.supports.flatMap(c=>cardVariants(c,catalog[c.name].rare,true)):[])]
+-    .filter(c=>c.selectedMagic.includes(2)&&c.magicLevels[1]>=5);
++    .filter(c=>generationExperiments2.nonDuoBridge&&!c.selectedMagic.includes(2)||c.selectedMagic.includes(2)&&c.magicLevels[1]>=5);
+   let options=registeredOptions;
+   if(task.cost>0&&!support) {
+     const remaining=input.budget-task.cost;
+@@ -646,7 +655,7 @@ function* duoChainSteps(input:SearchInput,task:GenerationTask,catalog:Catalog):G
+       for(const target of upgradeTargets(raw,catalog[raw.name].rare,remaining,input.itemsPerLimitBreak)) {
+         if(++work%64===0)yield;
+         const variants=cardVariants(raw,catalog[raw.name].rare,false,target)
+-          .filter(c=>c.selectedMagic.includes(2)&&c.magicLevels[1]>=5);
++          .filter(c=>generationExperiments2.nonDuoBridge&&!c.selectedMagic.includes(2)||c.selectedMagic.includes(2)&&c.magicLevels[1]>=5);
+         if(!variants.length)continue;
+         const card=variants[0],cost=upgradeCost(input,[card]);
+         if(cost<=0||cost>remaining)continue;
+@@ -670,15 +679,15 @@ function* duoChainSteps(input:SearchInput,task:GenerationTask,catalog:Catalog):G
+     }
+     options=[...registeredOptions,...selectedStates.flatMap(card=>cardVariants(
+       input.roster.find(raw=>raw.name===card.name)!,catalog[card.name].rare,false,card.totsu)
+-      .filter(c=>c.selectedMagic.includes(2)&&c.magicLevels[1]>=5))];
++      .filter(c=>generationExperiments2.nonDuoBridge&&!c.selectedMagic.includes(2)||c.selectedMagic.includes(2)&&c.magicLevels[1]>=5))];
+   }
+   let beam=cardVariants(root,catalog[name].rare,support,support?root.totsu:task.totsu)
+     .filter(c=>c.selectedMagic.includes(2)&&c.magicLevels[1]>=5).map(c=>[c]);
+   const canComplete = createCompletionCheck(input, catalog, options.filter(card => !card.support), options.filter(card => card.support), task.requiredCards ?? input.requiredCards);
+   if (canComplete) beam = beam.filter(canComplete);
+-  const missing=(cards:SearchCard[])=>[...new Set(cards.filter(c=>!cards.some(other=>other!==c&&catalog[other.name].chara===catalog[c.name].duo))
++  const missing=(cards:SearchCard[])=>[...new Set(cards.filter(c=>(!generationExperiments2.nonDuoBridge||c.selectedMagic.includes(2))&&!cards.some(other=>other!==c&&catalog[other.name].chara===catalog[c.name].duo))
+     .map(c=>catalog[c.name].duo).filter(Boolean))].sort();
+-  const value=(cards:SearchCard[])=>estimate(cards)+cards.filter(c=>cards.some(other=>other!==c&&catalog[other.name].chara===catalog[c.name].duo)).length*10000;
++  const value=(cards:SearchCard[])=>estimate(cards)+cards.filter(c=>(!generationExperiments2.nonDuoBridge||c.selectedMagic.includes(2))&&cards.some(other=>other!==c&&catalog[other.name].chara===catalog[c.name].duo)).length*10000;
+   const costBalanced=<T extends {cards:SearchCard[]}>(rows:T[],limit:number):T[]=>{
+     const buckets=new Map<number,T[]>();
+     for(const row of rows) {
+@@ -704,7 +713,8 @@ function* duoChainSteps(input:SearchInput,task:GenerationTask,catalog:Catalog):G
+         :cards.filter(other=>!other.support).length<ownCount&&!cards.some(other=>!other.support&&other.name===c.name))
+         &&!(depth===4&&supportAllowed&&!cards.some(other=>other.support)&&!c.support))
+         .filter(card => !canComplete || canComplete([...cards, card]));
+-      const linked=legal.filter(c=>wants.includes(catalog[c.name].chara));
++      const linked=legal.filter(c=>wants.includes(catalog[c.name].chara)
++        ||generationExperiments2.incomingDuoChain&&c.selectedMagic.includes(2)&&cards.some(other=>catalog[other.name].chara===catalog[c.name].duo));
+       for(const card of linked.length?linked:legal) {
+         if(++work%64===0)yield;
+         const team=[...cards,card].sort((a,b)=>Number(a.support)-Number(b.support)||a.name.localeCompare(b.name));
+@@ -851,7 +861,21 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+   if (!beam.length) return [];
+   const selectBeam=(choices:{cards:SearchCard[];value:number}[],depth:number)=>{
+     const width=fixedSupport?8:12;
+-    const finish=(preferred:typeof choices)=>diversifyBeam(choices,preferred,width,requiredCharacters,catalog).map(row=>row.cards);
++    const finish=(preferred:typeof choices)=>{
++      const selected=diversifyBeam(choices,preferred,width,requiredCharacters,catalog);
++      if(!generationExperiments2.pendingDuoCoverage||input.preset.kind==='DEFENCE'||depth>=ownCount-1||requiredCharacters.length) return selected.map(row=>row.cards);
++      const signature=(cards:SearchCard[])=>JSON.stringify([...new Set(cards.filter(c=>c.selectedMagic.includes(2)&&c.magicLevels[1]>=5
++        &&!cards.some(other=>other!==c&&catalog[other.name].chara===catalog[c.name].duo))
++        .map(c=>catalog[c.name].duo).filter(Boolean))].sort());
++      const result=selected.slice(0,Math.max(1,width-4)),used=new Set(result.map(r=>r.cards)),covered=new Set(result.map(r=>signature(r.cards)));
++      for(const row of choices) {
++        if(result.length>=width)break;
++        const key=signature(row.cards);if(covered.has(key)||used.has(row.cards))continue;
++        covered.add(key);used.add(row.cards);result.push(row);
++      }
++      for(const row of selected)if(result.length<width&&!used.has(row.cards)){used.add(row.cards);result.push(row);}
++      return result.map(row=>row.cards);
++    };
+     if(task.seedTeam)return choices.slice(0,width).map(c=>c.cards);
+     if(fixedSupport||task.style!==2||choices.length<=width)return finish(choices.slice(0,width));
+     const hash=(cards:SearchCard[])=>{
+@@ -951,12 +975,10 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+     finished.sort((a, b) => b.value - a.value);
+     // Keep distinct teams, rather than spending both places on the same five
+     // cards with a different spell. Spell substitutions remain in refinement.
+-    const composition = requiredNames.length
+-      ? cards.map(c => `${c.name}:${c.totsu}`).join('|')
+-      : cards.map(c => c.name).join('|');
+-    const signature=(row:{cards:SearchCard[]})=>requiredNames.length
+-      ? row.cards.map(c=>`${c.name}:${c.totsu}`).join('|')
+-      : row.cards.map(c=>c.name).join('|');
++    const signature=(row:{cards:SearchCard[]})=>generationExperiments2.roleAwareFinished
++      ? JSON.stringify(row.cards.map(c=>[c.name,c.level,c.totsu,c.support]).sort((a,b)=>String(a).localeCompare(String(b))))
++      : requiredNames.length ? row.cards.map(c=>`${c.name}:${c.totsu}`).join('|') : row.cards.map(c=>c.name).join('|');
++    const composition=signature({cards});
+     const duplicate = finished.findIndex((e,i) => i > 0 && signature(e) === composition
+       && finished.slice(0,i).some(previous=>signature(previous) === composition));
+     if (duplicate >= 0) finished.splice(duplicate,1);
+diff --git a/src/domain/examSearch/generationExperiments2.ts b/src/domain/examSearch/generationExperiments2.ts
+new file mode 100644
+index 00000000..750275fb
+--- /dev/null
++++ b/src/domain/examSearch/generationExperiments2.ts
+@@ -0,0 +1,9 @@
++/** Isolated second-wave hypotheses; disabled by default. */
++export const generationExperiments2 = {
++  incomingDuoChain: true,
++  pendingDuoCoverage: false,
++  roleAwareFinished: false,
++  distinctPartnerCostumes: false,
++  nonDuoBridge: false,
++  marginalSupportRank: false,
++};
