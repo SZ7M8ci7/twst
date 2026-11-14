@@ -1,0 +1,158 @@
+From 0abc563c3a29fdb7071b7425bdf04de2c0c81f1a Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 15 Nov 2026 07:44:42 +0900
+Subject: [PATCH] experiment: pair ordinary development scenarios without
+ reusing learned-plan seeds
+
+---
+ src/domain/examSearch/scheduler.ts | 18 ++++++++----
+ tests/exam-search.test.cjs         | 46 ++++++++++++++++++++++++++----
+ 2 files changed, 54 insertions(+), 10 deletions(-)
+
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..2febda2e 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -150,6 +150,14 @@ export class SearchSession {
+     result.validationTarget=result.validationTarget<32768?32768:131072;
+     this.round++;
+   }
++  private nextDevelopmentSeed(result: SearchResult) {
++    const serial = this.trialSerial++;
++    // Explicit plans may have been fitted to another candidate's development
++    // seed. Keep their observations independent from the shared scenario bank.
++    if (result.candidate.preferredPlan?.length)
++      return `${this.nonce}:development:${serial}`;
++    return `${this.nonce}:development:paired-ordinary-v1:${result.development.scores.length}`;
++  }
+   private quality(result: SearchResult) {
+     return statistics.searchDevelopmentQuality(result.development, this.input);
+   }
+@@ -372,7 +380,7 @@ export class SearchSession {
+         await this.scout(result,discoveryEnd,discoveryScoutSamples);
+         await this.importanceScreen(result,discoveryEnd,16);
+         while (result.development.scores.length < discoverySamples && !this.stopped && performance.now() < discoveryEnd) {
+-          const seed=`${this.nonce}:development:${this.trialSerial++}`;
++          const seed=this.nextDevelopmentSeed(result);
+           const trial = this.engine.trial(seed, result.candidate.policy);
+           if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+@@ -400,7 +408,7 @@ export class SearchSession {
+         await this.scout(result,loadoutDeadline,8);
+         await this.importanceScreen(result,loadoutDeadline,16);
+         for(let i=0;i<16&&!this.stopped&&performance.now()<loadoutDeadline;i++) {
+-          const seed=`${this.nonce}:development:${this.trialSerial++}`;
++          const seed=this.nextDevelopmentSeed(result);
+           const trial=this.engine.trial(seed,candidate.policy);
+           if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+@@ -421,7 +429,7 @@ export class SearchSession {
+         if (wideInitialScreen) await this.scout(result,contenderDeadline,32);
+         await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+32));
+         for(let i=0;i<32 && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
+-          const seed=`${this.nonce}:development:${this.trialSerial++}`;
++          const seed=this.nextDevelopmentSeed(result);
+           const trial=this.engine.trial(seed,result.candidate.policy);
+           if(!result.developmentBest || trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+@@ -466,7 +474,7 @@ export class SearchSession {
+           await this.scout(result,planDeadline,8);
+           await this.importanceScreen(result,planDeadline,32);
+           for (let i=0;i<64 && !this.stopped && performance.now()<planDeadline;i++) {
+-            const seed=`${this.nonce}:development:${this.trialSerial++}`;
++            const seed=this.nextDevelopmentSeed(result);
+             const trial = this.engine.trial(seed,candidate.policy);
+             if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+             result.development.scores.push(trial.score);
+@@ -499,7 +507,7 @@ export class SearchSession {
+         await this.scout(result,deadline-durationMs*0.25,8);
+         await this.importanceScreen(result,deadline-durationMs*0.25,32);
+         for(let i=0;i<64&&!this.stopped&&performance.now()<deadline-durationMs*0.25;i++) {
+-          const seed=`${this.nonce}:development:${this.trialSerial++}`;
++          const seed=this.nextDevelopmentSeed(result);
+           const trial=this.engine.trial(seed,candidate.policy);
+           if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..a35799ab 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -1258,14 +1258,20 @@ test('checkpoint history is bounded on continuous resume but retained on manual
+ 
+ test('scheduler stops, resumes and uses independent development/validation seeds', async () => {
+   const input = fixture(); input.budget = 0;
+-  const seeds = [], snapshots = [];
+-  const engine = { prepare: async () => {}, trial: seed => { seeds.push(seed); if(seeds.length===8)setImmediate(()=>session.stop()); return { score: 45000, retired: false, finishTurn: 5 }; } };
++  const seeds = [], snapshots = [], candidateSeeds=[];let activeCandidate;
++  const engine = { prepare: async (_input,candidate) => {activeCandidate=candidate.id;}, trial: seed => { candidateSeeds.push(`${activeCandidate}|${seed}`);seeds.push(seed); if(seeds.length===8)setImmediate(()=>session.stop()); return { score: 45000, retired: false, finishTurn: 5 }; } };
+   const session = new SearchSession(input, catalog, engine, 'test');
+   await session.run(1500, p => snapshots.push(clone(p)));
+   assert.equal(snapshots.at(-1).phase, 'stopped');
+   await session.run(2500, p => snapshots.push(clone(p)));
+   assert.equal(snapshots.at(-1).phase, 'done');
+-  assert.equal(new Set(seeds).size, seeds.length);
++  // O1 intentionally pairs ordinary scenarios across candidates, never repeats
++  // an observation within a candidate or crosses into validation scenarios.
++  assert.equal(new Set(candidateSeeds).size,candidateSeeds.length);
++  const validationSeeds=seeds.filter(seed=>seed.includes(':validation:'));
++  assert.equal(new Set(validationSeeds).size,validationSeeds.length);
++  const developmentSeeds=new Set(seeds.filter(seed=>seed.includes(':development:')));
++  assert.ok(validationSeeds.every(seed=>!developmentSeeds.has(seed)));
+   assert.ok(seeds.some(s => s.includes(':development:')));
+   assert.ok(seeds.some(s => s.includes(':validation:')));
+   for (const r of snapshots.at(-1).results) {
+@@ -1281,7 +1287,8 @@ test('scheduler stops, resumes and uses independent development/validation seeds
+   const restored = new SearchSession(input, catalog, engine, 'ignored', checkpoint);
+   assert.equal(restored.checkpoint().tasksTotal,checkpoint.tasksTotal,'restoring validation retains the known task count before rebuilding tasks');
+   await restored.run(300, () => {});
+-  assert.equal(new Set(seeds).size, seeds.length, 'restored sessions must not reuse trial seeds');
++  assert.equal(new Set(candidateSeeds).size, candidateSeeds.length, 'restored sessions must not repeat a candidate observation');
++  assert.equal(new Set(seeds.filter(s=>s.includes(':validation:'))).size,seeds.filter(s=>s.includes(':validation:')).length);
+   const before=clone(restored.checkpoint()),chosen=before.finalists[0];
+   restored.refineValidation(chosen.candidate.id);
+   const fresh=restored.checkpoint().finalists.find(r=>r.candidate.id===chosen.candidate.id);
+@@ -1289,7 +1296,7 @@ test('scheduler stops, resumes and uses independent development/validation seeds
+   assert.equal(fresh.validation.scores.length,0);
+   assert.deepEqual(clone(fresh.candidate),chosen.candidate,'confirmation must keep the chosen team and plan fixed');
+   await restored.run(300,()=>{});
+-  assert.equal(new Set(seeds).size,seeds.length,'confirmation uses a fresh holdout');
++  assert.equal(new Set(seeds.filter(s=>s.includes(':validation:'))).size,seeds.filter(s=>s.includes(':validation:')).length,'confirmation uses a fresh holdout');
+ });
+ 
+ test('hypothetical critical scouts never enter measured samples or reported best scores',async()=>{
+@@ -2709,3 +2716,32 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++
++test('O1 pairs ordinary scenario indices without reusing explicit-plan training seeds',()=>{
++  const session=new SearchSession(fixture(),catalog,{},'o1-scenarios');
++  const row=(id,scores=[],plan)=>({candidate:{id,preferredPlan:plan},development:{scores}});
++  const a=row('a'),b=row('b'),planned=row('p',[],[['0-M1','1-M1']]);
++  assert.equal(session.nextDevelopmentSeed(a),'o1-scenarios:development:paired-ordinary-v1:0');
++  assert.equal(session.nextDevelopmentSeed(b),'o1-scenarios:development:paired-ordinary-v1:0');
++  assert.equal(session.nextDevelopmentSeed(planned),'o1-scenarios:development:2');
++  a.development.scores.push(123);
++  assert.equal(session.nextDevelopmentSeed(a),'o1-scenarios:development:paired-ordinary-v1:1');
++  assert.equal(session.trialSerial,4);
++  const other=new SearchSession(fixture(),catalog,{},'o1-other-island');
++  assert.notEqual(other.nextDevelopmentSeed(b),'o1-scenarios:development:paired-ordinary-v1:0');
++});
++test('O1 checkpoint resume keeps next scenario and serial without replaying observed prefix',()=>{
++  const session=new SearchSession(fixture(),catalog,{},'o1-resume');
++  const candidate=generation.generateCandidates(fixture(),generation.buildTasks(fixture(),catalog)[0],catalog)[0];
++  const result={candidate,development:{scores:[0,12,0]},validation:{scores:[]},validationTarget:2048};
++  session.pool=[result];
++  session.nextDevelopmentSeed(result);
++  const checkpoint=clone(session.checkpoint());
++  const restored=new SearchSession(fixture(),catalog,{},'unused',checkpoint);
++  const restoredResult=restored.checkpoint().pool[0];
++  assert.deepEqual(clone(restoredResult.development.scores),[0,12,0]);
++  assert.notEqual(restoredResult,result);
++  assert.equal(restored.nextDevelopmentSeed(restoredResult),'o1-resume:development:paired-ordinary-v1:3');
++  assert.equal(restored.nextDevelopmentSeed({...result,candidate:{id:'p',preferredPlan:[['0-M1','1-M1']]}}),'o1-resume:development:2');
++});
+-- 
+2.52.0
+

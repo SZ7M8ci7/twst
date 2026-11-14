@@ -1,7 +1,7 @@
-name: Synthetic screening independent source processes
+name: Next-wave T1 fixed-base independent synthetic screening
 on:
   push:
-    branches: [codex/benchmark-master-i1z-180-20261114]
+    branches: [codex/benchmark-O1-screen-20261114]
 permissions:
   contents: read
 jobs:
@@ -10,18 +10,15 @@ jobs:
     timeout-minutes: 40
     strategy:
       fail-fast: false
-      max-parallel: 20
+      max-parallel: 6
       matrix:
         include:
-          - {"variant": "I1Z", "replicate": 0, "shard": 0, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 0, "shard": 1, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 0, "shard": 2, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 1, "shard": 0, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 1, "shard": 1, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 1, "shard": 2, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 2, "shard": 0, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 2, "shard": 1, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 2, "shard": 2, "shardCount": 3}
+          - {"variant": "O1", "replicate": 0, "shard": 0, "shardCount": 2}
+          - {"variant": "O1", "replicate": 0, "shard": 1, "shardCount": 2}
+          - {"variant": "O1", "replicate": 1, "shard": 0, "shardCount": 2}
+          - {"variant": "O1", "replicate": 1, "shard": 1, "shardCount": 2}
+          - {"variant": "O1", "replicate": 2, "shard": 0, "shardCount": 2}
+          - {"variant": "O1", "replicate": 2, "shard": 1, "shardCount": 2}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +34,8 @@ jobs:
         run: |
           git worktree add --detach baseline 2ea835980091457bdaaaca7e90638c2e2f19ca19
           git worktree add --detach candidate 2ea835980091457bdaaaca7e90638c2e2f19ca19
+          git -C baseline apply "../bench-public/patches/T1.patch"
+          git -C candidate apply "../bench-public/patches/T1.patch"
           git -C candidate apply "../bench-public/patches/$VARIANT.patch"
           echo "Variant applied: $VARIANT"
           ln -s ../node_modules baseline/node_modules
@@ -50,7 +49,7 @@ jobs:
           VARIANT: ${{ matrix.variant }}
         run: |
           node bench-public/run-production.mjs "$VARIANT" "${{ matrix.replicate }}" "${{ matrix.shard }}" "${{ matrix.shardCount }}"
-          if [ "${{ matrix.shard }}" = "$((2 % ${{ matrix.shardCount }}))" ]; then
+          if [ "${{ matrix.shard }}" = "0" ]; then
             node bench-public/audit-production.mjs baseline "${{ matrix.replicate }}" "$VARIANT"
             node bench-public/audit-production.mjs candidate "${{ matrix.replicate }}" "$VARIANT"
           fi

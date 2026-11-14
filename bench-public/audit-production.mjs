@@ -12,10 +12,10 @@ const server=await createServer({root,configFile:path.join(root,'vite.config.mts
 try{
  const {createResourceBattleHost}=await server.ssrLoadModule('/src/workers/resourceBattleHost.ts');
  const engine=createResourceBattleHost();await engine.prepare(report.input,report.candidate);
- const n=32768,scores=[],nonce=`master-I1Z-180-public-fixed-${variant}-rep${rep}-v1`;let wins=0,max=0,sum=0;
+ const n=32768,scores=[],nonce=`O1-nextwave-20261114-public-fixed-${variant}-rep${rep}-v1`;let wins=0,max=0,sum=0;
  for(let i=0;i<n;i++){const result=engine.trial(`${nonce}:${i}`,report.candidate.policy);const s=result.score;scores.push(s);wins+=Number(s>0);sum+=s;max=Math.max(max,s);}
  const sortedScores=[...scores].sort((a,b)=>a-b);
  const expected30=sortedScores.reduce((acc,s,i)=>acc+s*(Math.pow((i+1)/n,30)-Math.pow(i/n,30)),0);
- const result={source,rep,variant,caseId:report.caseId,profile:report.profile,selection:'Frozen top1 from I1/T1 holdout screening, not reselected',n,wins,winRate:wins/n,mean:sum/n,max,expected30,nonce,sourceHash:report.sourceHash,candidate:report.candidate,scores};
+ const result={source,rep,variant,caseId:report.caseId,profile:report.profile,selection:'Frozen top1 from next-wave/T1 independent screening, not reselected',n,wins,winRate:wins/n,mean:sum/n,max,expected30,nonce,sourceHash:report.sourceHash,candidate:report.candidate,scores};
  fs.mkdirSync('artifacts',{recursive:true});fs.writeFileSync(`artifacts/fixed-rep${rep}-${source}.json`,JSON.stringify(result));console.log(JSON.stringify({...result,scores:undefined,candidate:undefined}));
 }finally{await server.close();}
