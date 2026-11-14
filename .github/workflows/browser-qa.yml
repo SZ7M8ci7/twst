@@ -1,0 +1,49 @@
+name: Baseline and T1 real browser storage and resume QA
+on:
+  push:
+    branches: [codex/browser-t1-qa-20261114]
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        source: [baseline,T1]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          git worktree add --detach target 2ea835980091457bdaaaca7e90638c2e2f19ca19
+          if [ "${{ matrix.source }}" = T1 ]; then git -C target apply ../bench-public/patches/T1.patch; fi
+      - working-directory: target
+        run: |
+          npm ci --ignore-scripts
+          npm install --no-save --ignore-scripts playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Storage tests in Chromium
+        working-directory: target
+        run: node --test scripts/tests/exam-search-storage-browser.test.cjs
+      - name: Build and real worker stop-save-reload-resume
+        working-directory: target
+        run: |
+          npm run build
+          npx vite preview --host 127.0.0.1 --port 4173 > preview.log 2>&1 &
+          for n in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/twst/ >/dev/null && break || sleep 1; done
+          TEST_URL='http://127.0.0.1:4173/twst/exam-simulator?tab=search' node scripts/tests/exam-search-storage-resume-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-${{ matrix.source }}
+          path: |
+            target/artifacts/exam-search-storage-*.json
+            target/preview.log
+          retention-days: 14
