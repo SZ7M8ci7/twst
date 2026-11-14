@@ -154,10 +154,29 @@ index 1d43fc45..0f7ebac2 100644
      scout: (seed, policy, cardIndex, idealHand, magic) => simulator.scoutResourceCritical(seed,policy,cardIndex,idealHand,magic),
      scoutTargets: () => simulator.resourceCriticalTargets(),
 diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
-index a497895c..80c7ca0c 100644
+index a497895c..7de6f565 100644
 --- a/tests/exam-search.test.cjs
 +++ b/tests/exam-search.test.cjs
-@@ -2709,3 +2709,33 @@ test('invalid active search settings return translated non-legacy validation cod
+@@ -2063,10 +2063,16 @@ test('weighted critical likelihood preserves a reachable tail over an implausibl
+   const session=new SearchSession(input,catalog,{},'weighted-selection');
+   const row=(id,cost,score,ceiling,successWeight)=>({candidate:{id,cost,cards:[{name:id}],challengeIds:[],policy:'effects-tail'},
+     development:{scores:Array(32).fill(score)},criticalScout:{attempted:32,score:ceiling},
+-    importance:{n:512,successWeight,upperScore:score},validation:{scores:[]},validationTarget:2048});
++    importance:{n:512,successWeight,observations:Array.from({length:512},()=>({score,weight:1})),upperScore:score},validation:{scores:[]},validationTarget:2048});
+   const before=Array(32).fill(47000);
+   const tail=row('reachable-tail',0,47000,52000,2);tail.importance.upperScore=52000;tail.development.scores=[...before];
+-  session.pool=[row('peak',0,49000,49000,0),row('impossible-ceiling',0,48000,999999,.001),tail];
++  // Real observations, not the obsolete quantile cache, establish which tail
++  // has useful expected-best mass. Legacy successWeight remains irrelevant.
++  tail.importance.observations=[...Array.from({length:50},()=>({score:52000,weight:1})),
++    ...Array.from({length:462},()=>({score:47000,weight:1}))];
++  const forced=row('impossible-ceiling',0,48000,999999,.001);
++  forced.importance.observations[0]={score:999999,weight:.001};
++  session.pool=[row('peak',0,49000,49000,0),forced,tail];
+   for(const cost of [1,2,3])for(let i=0;i<2;i++)session.pool.push(row('other-'+cost+'-'+i,cost,49000,49000,0));
+   assert.ok(session.diverseParents(3).some(r=>r.candidate.id==='reachable-tail'));
+   session.selectFinalists();
+@@ -2709,3 +2715,33 @@ test('invalid active search settings return translated non-legacy validation cod
      assert.equal(text.examSearch.validation.target,undefined);
    }
  });
