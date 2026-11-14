@@ -1,17 +1,12 @@
 import { emptySamples, type AutoScoreMetrics, type SearchInput, type SearchResult, type Samples, type SearchProgress, type ScoreDistribution, type ScoreMetrics } from '@/domain/examSearch/types';
 
 /** The same development ranking for composition search and fixed-team comparison. */
-export function searchDevelopmentQuality(samples: Samples, input: Pick<SearchInput, 'target' | 'attempts' | 'desiredProbability'>): number {
-  if (input.target === 0) {
-    const auto = autoScoreMetrics(samples, input.attempts, input.desiredProbability);
-    const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, auto.n);
-    // Ordinary outcomes, including failed attempts, determine the objective.
-    // Near-win fitness only guides candidates with no positive ordinary score.
-    return auto.expectedBestScore || mean * 1e-9;
-  }
-  const m = metrics(samples, input.target, input.attempts);
-  const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, m.n);
-  return m.reach * input.target + m.max + mean * .1;
+export function searchDevelopmentQuality(samples: Samples, input: Pick<SearchInput, 'attempts' | 'desiredProbability'>): number {
+  const auto = autoScoreMetrics(samples, input.attempts, input.desiredProbability);
+  const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, auto.n);
+  // Ordinary outcomes, including failed attempts, determine the objective.
+  // Near-win fitness only guides candidates with no positive ordinary score.
+  return auto.expectedBestScore || mean * 1e-9;
 }
 
 export function reachProbability(p: number, attempts: number): number {
@@ -30,6 +25,7 @@ export function interval(successes: number, n: number, z = 3.5): [number, number
   const half = z * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / denominator;
   return [Math.max(0, middle - half), Math.min(1, middle + half)];
 }
+/** Standalone threshold diagnostics for historical benchmark reports, not search ranking. */
 export function metrics(samples: Samples, target: number, attempts: number):ScoreMetrics {
   const n = samples.scores.length;
   const successes = samples.scores.filter(s => s >= target).length;
@@ -98,10 +94,6 @@ function autoScoreFromSorted(samples: Samples, attempts: number, desired: number
   return {n,retired:Number.isFinite(samples.retired)?samples.retired:0,
     expectedBestScore:n?expectedBestFromSorted(n,positive,attempts):null,empiricalScore,conservativeScore,max};
 }
-export function resultMetrics(result:SearchResult,target:number,attempts:number):ScoreMetrics {
-  const summary=result.validationSummary;
-  return summary?.target===target&&summary.attempts===attempts?summary.metrics:metrics(result.validation,target,attempts);
-}
 export function resultAutoScore(result:SearchResult, attempts:number, desired:number):AutoScoreMetrics {
   const cached=result.validationSummary?.auto;
   if(cached && cached.attempts===attempts && cached.desiredProbability===desired) return cached.metrics;
@@ -120,19 +112,19 @@ export function resultScoreDistribution(result:SearchResult):ScoreDistribution {
   if(legacy)return {n:legacy.n,max:normalizedScore(legacy.max),p95:null};
   return scoreDistribution(result.validation);
 }
-export function displayProgress(progress:SearchProgress,target:number,attempts:number,desiredProbability=0.05):SearchProgress {
+export function displayProgress(progress:SearchProgress,attempts:number,desiredProbability=0.05):SearchProgress {
   return {...progress,results:progress.results.map(result=>{
-    // Each progress packet needs both summaries. Sort the growing validation
-    // batch once so frequent UI updates leave more time for battle trials.
-    const positive=target===0?sortedPositiveScores(result.validation):undefined;
-    const auto=positive?(result.validation.scores.length
+    // Sort once for both summaries. Checkpoints, unlike display packets,
+    // retain their trial arrays and can always recompute the current objective.
+    const positive=sortedPositiveScores(result.validation);
+    const auto=result.validation.scores.length
       ? autoScoreFromSorted(result.validation,attempts,desiredProbability,3.5,positive)
-      : resultAutoScore(result,attempts,desiredProbability)):undefined;
-    const scoreDistribution=positive && result.validation.scores.length
+      : resultAutoScore(result,attempts,desiredProbability);
+    const scoreDistribution=result.validation.scores.length
       ? distributionFromSorted(result.validation.scores.length,positive) : resultScoreDistribution(result);
     return {candidate:result.candidate,development:emptySamples(),validation:{...result.validation,scores:[]},validationTarget:result.validationTarget,
-      validationBest:result.validationBest,validationSummary:{target,attempts,scoreDistribution,metrics:auto?{n:auto.n,successes:0,p:0,reach:0,low:0,high:0,max:auto.max}:metrics(result.validation,target,attempts),
-        ...(auto?{auto:{attempts,desiredProbability,metrics:auto}}:{})}};
+      validationBest:result.validationBest,validationSummary:{attempts,scoreDistribution,
+        auto:{attempts,desiredProbability,metrics:auto}}};
   })};
 }
 function compareNullableDescending(a:number|null,b:number|null):number {
@@ -154,32 +146,14 @@ export function compareAutoResults(a:SearchResult,b:SearchResult,attempts:number
   const am=resultAutoScore(a,attempts,desired),bm=resultAutoScore(b,attempts,desired);
   return compareAutoMetricValues(am,bm,a,b);
 }
-export function rankedResults(results: SearchResult[], target: number, attempts: number, desired: number): SearchResult[] {
-  if(target===0) return results.map(result=>({result,metrics:resultAutoScore(result,attempts,desired)}))
+export function rankedResults(results: SearchResult[], attempts: number, desired: number): SearchResult[] {
+  return results.map(result=>({result,metrics:resultAutoScore(result,attempts,desired)}))
     .sort((a,b)=>compareAutoMetricValues(a.metrics,b.metrics,a.result,b.result)||a.result.candidate.cost-b.result.candidate.cost)
     .map(row=>row.result);
-  return [...results].sort((a, b) => {
-    const am = resultMetrics(a, target, attempts), bm = resultMetrics(b, target, attempts);
-    const ac = am.n >= a.validationTarget && am.low >= desired;
-    const bc = bm.n >= b.validationTarget && bm.low >= desired;
-    // Always retain the no-upgrade baseline; cost is primary, never a tiny max-score gain.
-    return Number(b.candidate.cost === 0) - Number(a.candidate.cost === 0)
-      || Number(bc) - Number(ac) || a.candidate.cost - b.candidate.cost || bm.reach - am.reach || bm.max - am.max;
-  });
 }
 
-export function compactResults(results: SearchResult[], target:number, attempts:number, desired:number):SearchResult[] {
-  if(target===0) {
-    const rows=results.map(result=>({result,metrics:resultAutoScore(result,attempts,desired)}));
-    return [...new Set(rows.map(r=>r.result.candidate.cost))].sort((a,b)=>a-b).map(cost=>
-      rows.filter(row=>row.result.candidate.cost===cost).sort((a,b)=>compareAutoMetricValues(a.metrics,b.metrics,a.result,b.result))[0].result);
-  }
-  const rows=results.map(result=>({result,metrics:resultMetrics(result,target,attempts)}));
+export function compactResults(results: SearchResult[], attempts:number, desired:number):SearchResult[] {
+  const rows=results.map(result=>({result,metrics:resultAutoScore(result,attempts,desired)}));
   return [...new Set(rows.map(r=>r.result.candidate.cost))].sort((a,b)=>a-b).map(cost=>
-    rows.filter(r=>r.result.candidate.cost===cost).sort((a,b)=>{
-      const qualified=(r:typeof a)=>r.metrics.n>=r.result.validationTarget&&r.metrics.low>=desired;
-      // Maximize the critical ceiling among teams satisfying the user's reach
-      // condition. If none is confirmed, still expose the highest observed one.
-      return Number(qualified(b))-Number(qualified(a))||b.metrics.max-a.metrics.max||b.metrics.reach-a.metrics.reach;
-    })[0].result);
+    rows.filter(row=>row.result.candidate.cost===cost).sort((a,b)=>compareAutoMetricValues(a.metrics,b.metrics,a.result,b.result))[0].result);
 }

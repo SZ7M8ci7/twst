@@ -136,7 +136,7 @@ export async function runComparison(request: ComparisonRequest, catalog: Catalog
     }
     const candidate = rankedResults(finalists.map(finalist => ({ candidate: finalist.candidate,
       development: emptySamples(), validation: finalist.samples, validationTarget: VALIDATION_SAMPLES })),
-      input.target, input.attempts, input.desiredProbability)[0].candidate;
+      input.attempts, input.desiredProbability)[0].candidate;
     await engine.prepare(input, candidate);
     const result: ComparisonResult = { id: entry.id, candidate, samples: emptySamples(), searched: candidates.length };
     for (let n = 0; n < evaluationSamples; n++) {

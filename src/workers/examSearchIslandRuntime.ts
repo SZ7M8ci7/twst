@@ -55,7 +55,7 @@ export function createIslandRuntime(emit: (message: IslandMessage) => void) {
       const runner = { run: (duration: number, publish: Parameters<SearchSession['run']>[1]) =>
         session!.run(duration, publish, data.method !== 'evaluate' && data.continuous === true) };
       await runSessionWithinBudget(runner, deadline, progress => emit({ id: data.id, island: data.island,
-        progress: displayProgress(progress, session!.input.target, session!.input.attempts, session!.input.desiredProbability) }), {
+        progress: displayProgress(progress, session!.input.attempts, session!.input.desiredProbability) }), {
         allowRepeat: data.method === 'start' || data.method === 'resume',
         shouldStop: () => stopRequested,
       });

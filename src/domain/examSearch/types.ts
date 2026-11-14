@@ -39,10 +39,8 @@ export interface SearchInput {
   /** Total friendship training to distribute across owned slots. Extra limit breaks are separate. */
   additionalLevelCap?: number;
   itemsPerLimitBreak: number;
-  target: number;
   attempts: number;
   desiredProbability: number;
-  tolerance: number;
   challengeLocks: Record<string, 'on' | 'off' | 'auto'>;
   maxRemoved: 1 | 2;
 }
@@ -73,12 +71,12 @@ export interface SearchResult {
   // Hypothetical exploration only. Never include these scores in Samples.
   criticalScout?: { attempted: number; score: number; cardIndex?: number; magic?: MagicSlot; idealHand?: boolean; seed?:string; plan?: [string,string][] };
   // Importance sampling is development-only, never an ordinary sample count.
-  importance?: { n:number; successWeight:number; observations?: WeightedObservation[]; upperScore:number };
+  importance?: { n:number; observations?: WeightedObservation[]; upperScore:number };
   validation: Samples;
   validationTarget: number;
   validationBest?: { seed: string; score: number };
   // Display packets omit large trial arrays. Checkpoints always retain them.
-  validationSummary?: { target:number; attempts:number; metrics:ScoreMetrics; scoreDistribution?: ScoreDistribution; auto?: { attempts:number; desiredProbability:number; metrics:AutoScoreMetrics } };
+  validationSummary?: { /** Read-only compatibility with old display packets. */ target?:number; attempts:number; metrics?:ScoreMetrics; scoreDistribution?: ScoreDistribution; auto?: { attempts:number; desiredProbability:number; metrics:AutoScoreMetrics } };
 }
 export interface ScoreMetrics { n:number; successes:number; p:number; reach:number; low:number; high:number; max:number }
 export interface ScoreDistribution { n:number; max:number; p95:number|null }

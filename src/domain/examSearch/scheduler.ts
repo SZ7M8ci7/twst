@@ -1,6 +1,5 @@
 import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
 import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
-import { metrics } from '@/domain/examSearch/statistics';
 import * as statistics from '@/domain/examSearch/statistics';
 import { lowerCostCandidates, trainedUpgradeCandidates, jointSpellCandidates, alternatePolicyCandidates, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
 import { importanceUpperQuantile } from '@/domain/examSearch/importance';
@@ -167,9 +166,6 @@ export class SearchSession {
     };
     return (a: SearchResult, b: SearchResult) => qualityOf(b) - qualityOf(a);
   }
-  private tailLikelihood(result:SearchResult) {
-    return result.importance?.n?result.importance.successWeight/result.importance.n:0;
-  }
   private upperScore(result:SearchResult) {
     return result.importance?.upperScore??0;
   }
@@ -179,28 +175,21 @@ export class SearchSession {
   private importanceProbability() {
     return -Math.expm1(Math.log1p(-this.input.desiredProbability) / this.input.attempts);
   }
-  private weightedChampion(results:SearchResult[],target:number) {
-    if(this.input.target===0)return results.filter(r=>this.upperScore(r)>0)
-      .sort((a,b)=>this.upperScore(b)-this.upperScore(a))[0];
-    const weighted=results.filter(r=>this.tailLikelihood(r)>0)
-      .sort((a,b)=>this.tailLikelihood(b)-this.tailLikelihood(a)||this.upperScore(b)-this.upperScore(a))[0];
-    if(weighted)return weighted;
-    if(results.some(r=>r.development.scores.some(score=>score>=target)))return undefined;
+  private weightedChampion(results:SearchResult[]) {
     return results.filter(r=>this.upperScore(r)>0)
       .sort((a,b)=>this.upperScore(b)-this.upperScore(a))[0];
   }
   private async importanceScreen(result:SearchResult,deadline:number,total:number) {
     if(!this.engine.importanceTrial||this.input.preset.kind==='DEFENCE'||this.input.favorableEffects)return;
-    if(!result.importance)result.importance={n:0,successWeight:0,observations:[],upperScore:0};
+    if(!result.importance)result.importance={n:0,observations:[],upperScore:0};
     else if(!result.importance.observations&&result.importance.n>0)
-      result.importance={n:0,successWeight:0,observations:[],upperScore:0};
+      result.importance={n:0,observations:[],upperScore:0};
     else { result.importance.observations??=[];result.importance.upperScore??=0; }
     const importance=result.importance;
     while(importance.n<total&&!this.stopped&&performance.now()<deadline) {
       const trial=this.engine.importanceTrial(`${this.nonce}:importance-development:${this.trialSerial++}`,result.candidate.policy);
       importance.n++;
       importance.observations!.push({score:trial.score,weight:trial.weight});
-      if(this.input.target>0&&trial.score>=this.input.target)importance.successWeight+=trial.weight;
       if(importance.n%8===0)await yieldEventLoop();
     }
     importance.upperScore=importanceUpperQuantile(importance.observations!,this.importanceProbability());
@@ -234,7 +223,7 @@ export class SearchSession {
       const best=ceilings.find(r=>r.candidate.cost===cost),quality=sorted.find(r=>r.candidate.cost===cost);
       const scout=sorted.filter(r=>r.candidate.cost===cost&&(r.criticalScout?.score??0)>0)
         .sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
-      const weighted=this.weightedChampion(sorted.filter(r=>r.candidate.cost===cost),this.input.target);
+      const weighted=this.weightedChampion(sorted.filter(r=>r.candidate.cost===cost));
       // Keep the existing high-ceiling exploration paths. Automatic quality
       // now measures expected best, but should not replace the peak parents.
       const champions=[...new Set([best,weighted,scout,quality].filter((r):r is SearchResult=>!!r))];
@@ -276,80 +265,6 @@ export class SearchSession {
     return [...costs.slice(offset), ...costs.slice(0, offset)];
   }
   private selectFinalists() {
-    if(this.input.target===0){this.selectAutoFinalists();return;}
-    const sorted = [...this.pool].sort(this.qualityComparator());
-    const costs = [...new Set(sorted.map(r => r.candidate.cost))].sort((a, b) => a - b);
-    // Continue searching without discarding the strongest already evaluated
-    // option in each item band. Keep its fixed holdout unchanged; it is never
-    // used to learn a new plan or appended to a different candidate's samples.
-    const retained=costs.flatMap(cost=>this.finalists.filter(r=>r.candidate.cost===cost&&r.validation.scores.length>=r.validationTarget)
-      .sort((a,b)=>{
-        const am=metrics(a.validation,this.input.target,this.input.attempts),bm=metrics(b.validation,this.input.target,this.input.attempts);
-        return bm.low-am.low||bm.reach-am.reach||bm.max-am.max;
-      }).slice(0,1));
-    const retainedIds=new Set(retained.map(r=>r.candidate.id));
-    const selected: SearchResult[] = [];
-    for (const cost of this.finalistCostOrder(costs, MAX_FINALISTS-retained.length)) {
-      const compositions = new Set<string>();
-      const peak=(result:SearchResult)=>result.development.scores.reduce((max,score)=>Math.max(max,score),0);
-      const ceiling=[...sorted].filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id)).sort((a,b)=>
-        peak(b)-peak(a))[0];
-      const quality=sorted.find(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id));
-      const band=sorted.filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id));
-      const weighted=this.weightedChampion(band,this.input.target);
-      // A positive importance tail remains useful even when its estimated
-      // upper score is below the measured development peak.  Keep the
-      // positive-weight candidate as an explicit finalist slot; the old
-      // unseen-tail rule is retained as the fallback when no positive tail is
-      // available.
-      const positiveWeighted=weighted&&this.tailLikelihood(weighted)>0?weighted:undefined;
-      const forcedScout=band.filter(r=>(r.criticalScout?.score??0)>=this.input.target)
-        .sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
-      const measuredPeak=band.reduce((max,result)=>Math.max(max,peak(result)),0);
-      const unseenTail=quality&&!this.pool.some(r=>r.candidate.cost===cost&&r.development.scores.some(score=>score>=this.input.target))
-        ?weighted&&weighted!==ceiling&&this.upperScore(weighted)>=measuredPeak?weighted:forcedScout:undefined;
-      // Different spells or plans on the same five cards can trade peak score
-      // for reach probability. Preserve both champions before diversifying names.
-      // If ordinary screening has never reached the target in this band, do
-      // not require another lucky critical draw before validating its template.
-      // Keep the measured peak as well; only the fresh holdout is reported.
-      const hasRetained=retained.some(r=>r.candidate.cost===cost);
-      const priorities=positiveWeighted
-        ? (hasRetained
-          ? [positiveWeighted,ceiling,unseenTail,quality]
-          : [ceiling,positiveWeighted,unseenTail,quality])
-        : (unseenTail&&hasRetained?[unseenTail,ceiling,quality]:[ceiling,unseenTail??quality]);
-      const slots=Math.max(1,Math.floor((MAX_FINALISTS-retained.length)/costs.length));
-      const bandSelected:SearchResult[]=[];
-      const addPriority=(result:SearchResult|undefined)=>{
-        if(!result||bandSelected.length>=slots||retainedIds.has(result.candidate.id)
-          ||bandSelected.some(r=>r.candidate.id===result.candidate.id)
-          ||selected.some(r=>r.candidate.id===result.candidate.id))return;
-        const key=result.candidate.cards.map(c=>c.name).join('|');
-        compositions.add(key);bandSelected.push(result);
-      };
-      const addFallback=(result:SearchResult|undefined)=>{
-        if(!result||bandSelected.length>=slots||retainedIds.has(result.candidate.id)
-          ||bandSelected.some(r=>r.candidate.id===result.candidate.id)
-          ||selected.some(r=>r.candidate.id===result.candidate.id))return;
-        const key=result.candidate.cards.map(c=>c.name).join('|');
-        if(compositions.has(key))return;
-        compositions.add(key);bandSelected.push(result);
-      };
-      priorities.forEach(result=>addPriority(result));
-      for(const result of sorted) {
-        if(bandSelected.length>=slots)break;
-        if(result.candidate.cost===cost)addFallback(result);
-      }
-      selected.push(...bandSelected);
-    }
-    for (const r of sorted) if (selected.length < MAX_FINALISTS-retained.length && !retainedIds.has(r.candidate.id)
-      && !selected.some(selectedResult=>selectedResult.candidate.id===r.candidate.id)) selected.push(r);
-    // Every newly selected candidate gets a fresh, independent fixed batch.
-    this.finalists = [...retained,...selected.slice(0, MAX_FINALISTS-retained.length).map(r => ({ ...r, validation: emptySamples(), validationBest: undefined, validationTarget: VALIDATION_SAMPLES }))];
-    this.round++;
-  }
-  private selectAutoFinalists() {
     const qualityCache=new Map<SearchResult,number>();
     const qualityOf=(result:SearchResult)=>{
       const cached=qualityCache.get(result);if(cached!==undefined)return cached;
@@ -374,7 +289,7 @@ export class SearchSession {
     const retainedIds=new Set(retained.map(r=>r.candidate.id)),selected:SearchResult[]=[];
     for(const cost of this.finalistCostOrder(costs, MAX_FINALISTS-retained.length)){
       const band=sorted.filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id));
-      const expected=band[0],weighted=this.weightedChampion(band,0);
+      const expected=band[0],weighted=this.weightedChampion(band);
       const scout=band.filter(r=>(r.criticalScout?.score??0)>0).sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
       const peak=[...band].sort((a,b)=>{
         const am=a.development.scores.reduce((x,y)=>Math.max(x,y),0),bm=b.development.scores.reduce((x,y)=>Math.max(x,y),0);return bm-am;

@@ -1,11 +1,11 @@
 <template>
   <div class="results-table-wrap">
-    <table class="results-table" :class="{ automatic: autoMode }">
+    <table class="results-table automatic">
       <thead><tr>
         <th scope="col" class="rank-cell">#</th>
         <th scope="col" class="deck-cell">{{ t('examSearch.table.deck') }}</th>
         <th scope="col" class="extra-cell">{{ t('examSearch.table.extra') }}</th>
-        <th v-if="autoMode" scope="col" class="score-cell expected-cell">{{ t('examSearch.table.expectedBest', { count: attempts }) }}</th>
+        <th scope="col" class="score-cell expected-cell">{{ t('examSearch.table.expectedBest', { count: attempts }) }}</th>
         <th scope="col" class="score-cell max-cell">{{ t('examSearch.table.highest') }}</th>
         <th scope="col" class="score-cell p95-cell">{{ t('examSearch.table.p95') }}</th>
         <th scope="col" class="actions-cell">{{ t('examSearch.table.actions') }}</th>
@@ -38,7 +38,7 @@
             <button v-if="row.variantCount" type="button" class="variants-button" :disabled="busy" aria-haspopup="dialog" :aria-label="t('examSearch.compareVariantsFor', { rank: index + 1, count: row.variantCount })" @click="$emit('variants', row.result)"><span class="variant-summary">{{ upgradeSummary(row.result) }}<span class="variant-arrow"> ▾</span></span><span class="variant-count">{{ t('examSearch.compareVariants', { count: row.variantCount }) }}</span></button>
             <span v-else>{{ upgradeSummary(row.result) }}</span>
           </td>
-          <td v-if="autoMode" class="score-cell expected-cell" data-testid="expected-best-score">{{ scoreLabel(resultExpectedBestScore(row.result, attempts)) }}</td>
+          <td class="score-cell expected-cell" data-testid="expected-best-score">{{ scoreLabel(resultExpectedBestScore(row.result, attempts)) }}</td>
           <td class="score-cell max-cell">{{ highestScoreLabel(row.result) }}</td>
           <td class="score-cell p95-cell">{{ scoreLabel(resultScoreDistribution(row.result).p95) }}</td>
           <td class="actions-cell">
@@ -59,7 +59,6 @@ import defaultImg from '@/assets/img/default.webp';
 
 withDefaults(defineProps<{
   attempts?: number;
-  autoMode?: boolean;
   rows: { result: SearchResult; variantCount?: number }[];
   cardImages: Record<string, string>;
   cardLabel: (name: string) => string;
@@ -67,7 +66,7 @@ withDefaults(defineProps<{
   busy: boolean;
   comparisonFull?: boolean;
   comparedIds?: string[];
-}>(), { attempts: 30, autoMode: true });
+}>(), { attempts: 30 });
 defineEmits<{ (event: 'preview' | 'simulator' | 'variants' | 'compare', result: SearchResult): void }>();
 const { t } = useI18n();
 const scoreLabel = (score: number | null) => score === null ? '—' : Math.round(score).toLocaleString();

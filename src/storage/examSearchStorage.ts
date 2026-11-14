@@ -38,19 +38,25 @@ function validRecord(value: StoredSession | undefined): value is StoredSession {
 }
 const transferStorageKey = (id: string) => `${KEY}-transfer-${id}`;
 const transferKeyPrefix = `${KEY}-transfer-`;
+// Legacy fields are accepted on disk but must never reintroduce a removed mode.
+// Do not mutate the stored record: setup revision matching uses the raw bytes.
+function currentInput(value: SearchInput & { target?: unknown; tolerance?: unknown }): SearchInput {
+  const { target: _target, tolerance: _tolerance, ...input } = value;
+  return input;
+}
 export function loadExamSearch(): SearchInput | null {
   try {
     const raw = localValue(KEY);
     const latest = readStoredRecord();
     // The checkpoint owns a complete input snapshot even if the smaller setup
     // write failed. A later explicit setup save has a different revision.
-    if (latest && latest.setupAtSave === raw) return JSON.parse(JSON.stringify(latest.session.input));
+    if (latest && latest.setupAtSave === raw) return currentInput(JSON.parse(JSON.stringify(latest.session.input)));
     const value = JSON.parse(raw ?? 'null');
     if (!value || !value.preset?.id || !value.challengeLocks || !Array.isArray(value.roster) || !Array.isArray(value.supports)) return null;
     if ([...value.roster, ...value.supports].some(c => !c?.name || !Array.isArray(c.magicLevels) || c.magicLevels.length !== 3 || !Array.isArray(c.buddyLevels) || c.buddyLevels.length !== 3)) return null;
     const { setupVersion, setupRevision: _revision, ...input } = value;
     if (setupVersion !== 2) input.desiredProbability = 0.05;
-    return input;
+    return currentInput(input);
   } catch { return null; }
 }
 export function saveSearchTransfer(input: SearchInput, candidate: Candidate, best?: { seed: string; score: number }): string {
@@ -79,15 +85,15 @@ export function loadSearchTransfer(id: string): { input: SearchInput; candidate:
         localStorage.removeItem(key);
         return null;
       }
-      return value;
+      return { ...value, input: currentInput(value.input) };
     }
     // Keep links created by the previous same-tab implementation readable.
     const legacy = JSON.parse(sessionStorage.getItem(`${KEY}-transfer`) ?? 'null');
-    return legacy?.id === id ? legacy : null;
+    return legacy?.id === id ? { ...legacy, input: currentInput(legacy.input) } : null;
   } catch { return null; }
 }
 export function saveExamSearch(input: SearchInput): boolean {
-  try { localStorage.setItem(KEY, JSON.stringify({ ...input, setupVersion: 2, setupRevision: `${Date.now()}-${Math.random()}` })); return true; } catch { return false; }
+  try { localStorage.setItem(KEY, JSON.stringify({ ...currentInput(input), setupVersion: 2, setupRevision: `${Date.now()}-${Math.random()}` })); return true; } catch { return false; }
 }
 export function serializeSearchSession(value: SavedSearchSession): string {
   const checkpoint=JSON.stringify(value.checkpoint);
@@ -176,7 +182,13 @@ export function loadSearchSession(): SavedSearchSession | null {
     const value = readStoredRecord()?.session;
     if (value?.version !== ENGINE_VERSION || !['seen', 'pool', 'pending', 'finalists'].every(key =>
       Array.isArray(value?.checkpoint?.[key as keyof SessionCheckpoint]))) return null;
-    return typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+    // Old explicit-target checkpoints contain samples selected for a different
+    // objective. Keep their seed-team recovery, but never resume that search.
+    const legacyTarget = (value.input as SearchInput & { target?: unknown }).target;
+    if (legacyTarget !== undefined && legacyTarget !== 0) return null;
+    const restored = typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+    restored.input = currentInput(restored.input);
+    return restored;
   } catch { return null; }
 }
 // Card names remain useful after an engine update; old scores, training and

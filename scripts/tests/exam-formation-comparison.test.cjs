@@ -29,7 +29,7 @@ function entry(id = 'a') {
 function request(entries = [entry(), entry('b')]) {
   return { entries, nonce: 'test', input: {
     preset: { kind: 'BASIC', specialChallenges: [{ id: 'challenge' }] }, roster: clone(entries[0].candidate.cards), supports: [], budget: 1, additionalLevelCap: 5,
-    target: 0, attempts: 30, desiredProbability: .05, itemsPerLimitBreak: 1, challengeLocks: { challenge: 'on' }, maxRemoved: 1,
+    attempts: 30, desiredProbability: .05, itemsPerLimitBreak: 1, challengeLocks: { challenge: 'on' }, maxRemoved: 1,
   } };
 }
 test('temporary training is isolated and losing M3 removes an illegal learned plan', () => {
@@ -86,14 +86,15 @@ test('comparison defaults to 10000 trials and error bounds depend on the chosen 
   assert.ok(comparisonCdfError(n, 6) > comparisonCdfError(n, 2));
   assert.equal(comparisonCdfError(0, 6), 1);
 });
-test('re-search inherits the source objective and shared challenges, then evaluates equal fresh seed sets', async () => {
+test('re-search uses expected best despite a legacy target and shares fresh evaluation seed sets', async () => {
   const req = request();
   req.input.target = 100;
   req.entries[1].candidate.challengeIds = ['legacy-variation'];
   const before = clone(req), complete = [], evaluationSeeds = [[], []];
   let active, team = -1;
   const engine = { prepare: async (_input, candidate) => { active = candidate; }, trial(seed, policy) {
-    // A rare very high score must lose to a reliably attained target.
+    // Over 30 attempts, the 1/8 high score wins expected best over a constant 150.
+    // The legacy target is ignored and cannot switch to target-hit probability.
     if (seed.includes(':evaluation:')) {
       evaluationSeeds[team].push(seed);
       const n = Number(seed.split(':').at(-1));
@@ -103,7 +104,7 @@ test('re-search inherits the source objective and shared challenges, then evalua
   } };
   await runComparison(req, catalog, engine, p => { team = p.index; }, r => complete.push(clone(r)));
   assert.equal(complete.length, 2);
-  assert.ok(complete.every(r => r.candidate.policy === 'reserve'));
+  assert.ok(complete.every(r => r.candidate.policy !== 'reserve'));
   assert.ok(complete.every(r => r.samples.scores.length === COMPARISON_EVALUATION_SAMPLES && r.samples.retired === COMPARISON_EVALUATION_SAMPLES / 4));
   assert.deepEqual(evaluationSeeds[0], evaluationSeeds[1]);
   assert.ok(evaluationSeeds[0].every(seed => seed.includes(':evaluation:')));

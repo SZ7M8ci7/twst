@@ -37,7 +37,7 @@ let childRequest = 0;
 function checkpointProgress(checkpoint: SessionCheckpoint, input: SearchInput): SearchProgress {
   const finalists=checkpoint.finalists.filter(result=>candidateSatisfiesConstraints(input,result.candidate,catalog));
   return displayProgress({ phase: 'done', generated: checkpoint.generatedCount ?? checkpoint.seen.length, evaluated: checkpoint.evaluatedCount ?? checkpoint.pool.length,
-    tasksDone: checkpoint.cursor, tasksTotal: checkpoint.tasksTotal ?? checkpoint.cursor, elapsedMs: checkpoint.elapsed, results: finalists }, input.target, input.attempts, input.desiredProbability);
+    tasksDone: checkpoint.cursor, tasksTotal: checkpoint.tasksTotal ?? checkpoint.cursor, elapsedMs: checkpoint.elapsed, results: finalists }, input.attempts, input.desiredProbability);
 }
 function postAggregate(op: Operation, finalPhase?: 'done' | 'stopped') {
   const merged = aggregateIslandProgress(op.progresses, op.owners);

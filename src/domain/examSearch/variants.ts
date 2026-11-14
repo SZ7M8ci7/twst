@@ -195,9 +195,8 @@ export function validateInput(input: SearchInput, catalog: Record<string, { rare
     || Math.floor(input.budget / input.itemsPerLimitBreak) > 4) return 'budget';
   const additionalLevelCap = input.additionalLevelCap ?? 0;
   if (!Number.isInteger(additionalLevelCap) || additionalLevelCap < 0 || additionalLevelCap > 100) return 'additional-level-cap';
-  if (!Number.isFinite(input.target) || input.target < 0 || !Number.isInteger(input.attempts) || input.attempts < 1 || input.attempts > 100000
-    || !Number.isFinite(input.tolerance) || input.tolerance < 0 || (input.target === 0 ? input.tolerance !== 0 : input.tolerance >= input.target)
-    || !Number.isFinite(input.desiredProbability) || input.desiredProbability <= 0 || input.desiredProbability >= 1) return 'target';
+  if (!Number.isInteger(input.attempts) || input.attempts < 1 || input.attempts > 100000) return 'attempts';
+  if (!Number.isFinite(input.desiredProbability) || input.desiredProbability <= 0 || input.desiredProbability >= 1) return 'probability';
   if (!Number.isFinite(input.preset.enemyHp) || input.preset.enemyHp <= 0 || !Number.isFinite(input.preset.difficulty) || input.preset.difficulty! <= 0) return 'exam';
   if (invalidSearchCards(input, catalog).length) return 'card';
   if (input.requiredCards !== undefined) {

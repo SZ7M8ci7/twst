@@ -34,12 +34,12 @@ export async function main(args:string[]) {
   for(const id of requested){
     const caseId=[id,profile,mode,duration,nonce].join('|');if(completed.has(caseId))continue;
     const preset=examPresetDefinitions.find(p=>p.id===id);if(!preset)throw Error('Missing preset '+id);
-    const input={preset,roster:[],supports:[],budget:0,additionalLevelCap:0,itemsPerLimitBreak:1,target:0,attempts:30,desiredProbability:.05,tolerance:0,challengeLocks:Object.fromEntries((preset.specialChallenges??[]).map(c=>[c.id,mode==='auto'?'auto':mode])),maxRemoved:2,...profiles[profile]()} as SearchInput;
+    const input={preset,roster:[],supports:[],budget:0,additionalLevelCap:0,itemsPerLimitBreak:1,attempts:30,desiredProbability:.05,challengeLocks:Object.fromEntries((preset.specialChallenges??[]).map(c=>[c.id,mode==='auto'?'auto':mode])),maxRemoved:2,...profiles[profile]()} as SearchInput;
     const issue=validateInput(input,catalog);if(issue)throw Error(caseId+': '+issue);
     const session=new SearchSession(input,catalog,engine,`benchmark:${nonce}:${id}:search`);
     const started=performance.now();await session.run(Number(duration),()=>{});
     const elapsed=performance.now()-started,checkpoint=session.checkpoint();
-    const selected=rankedResults(checkpoint.finalists,input.target,input.attempts,input.desiredProbability)[0];
+    const selected=rankedResults(checkpoint.finalists,input.attempts,input.desiredProbability)[0];
     if(!selected)throw Error('No finalist: '+caseId);
     if(!candidateSatisfiesConstraints(input,selected.candidate,catalog))throw Error('Illegal candidate');
     await engine.prepare(input,selected.candidate);

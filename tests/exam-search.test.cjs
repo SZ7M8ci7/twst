@@ -671,7 +671,7 @@ function fixture() {
   const preset = clone(examPresetDefinitions.find(p => p.specialChallenges?.length));
   preset.difficulty = 1.5;
   return { preset, roster: names.slice(0, 4).map(card), supports: [card(names[0])], budget: 3, itemsPerLimitBreak: 1,
-    target: 45000, attempts: 30, desiredProbability: .8, tolerance: 500, challengeLocks: {}, maxRemoved: 1 };
+    attempts: 30, desiredProbability: .8, challengeLocks: {}, maxRemoved: 1 };
 }
 test('challenge sets preserve locks and allow no special challenges', () => {
   const input = fixture(), ids = input.preset.specialChallenges.map(c => c.id);
@@ -732,9 +732,9 @@ test('probability includes zero-score attempts and keeps uncertain intervals', (
 test('equivalent results prefer fewer items, and incomplete samples are not certified', () => {
   const base = { development: { scores: [50000] }, validation: { scores: Array(512).fill(50000) }, validationTarget: 512 };
   const result = cost => ({ ...base, candidate: { cost } });
-  assert.deepEqual(clone(stats.rankedResults([result(3), result(1), result(0)], 45000, 30, .8).map(r => r.candidate.cost)), [0, 1, 3]);
+  assert.deepEqual(clone(stats.rankedResults([result(3), result(1), result(0)],30, .8).map(r => r.candidate.cost)), [0, 1, 3]);
   const incomplete = { ...result(1), validation: { scores: [50000] } };
-  assert.equal(stats.rankedResults([incomplete, result(3)], 45000, 30, .8)[0].candidate.cost, 3);
+  assert.equal(stats.rankedResults([incomplete, result(3)],30, .8)[0].candidate.cost, 3);
 });
 test('new M3 can enter the generated team directly without incremental success', () => {
   const input = fixture(), custom = clone(catalog), anchor = input.roster[0];
@@ -1364,7 +1364,7 @@ test('plan learning can reuse a successful development replay without learning f
 });
 
 test('an initially winless near-win survives pruning and receives additional independent development draws',async()=>{
-  const input=fixture();input.budget=0;input.target=50000;
+  const input=fixture();input.budget=0;
   const base=generation.generateCandidates(input,generation.buildTasks(input,catalog)[0],catalog)[0];
   const sample=(score,fitness)=>({scores:Array(64).fill(score),fitnessSum:fitness*64,retired:score?0:64,turns:256});
   const result=(id,score,fitness)=>({candidate:{...clone(base),id},development:sample(score,fitness),validation:{scores:[],retired:0,turns:0},validationTarget:2048});
@@ -1771,7 +1771,7 @@ test('every available support has a forced baseline path without buying owned up
 
 test('critical-tail ceilings survive alongside higher-frequency teams in every cost band',()=>{
   const input=fixture(),session=new SearchSession(input,catalog,{},'ceiling-test');
-  const row=(id,cost,scores)=>({candidate:{id,cost,cards:[{name:id}],policy:'effects-tail'},development:{scores},validation:{scores:[]},validationTarget:2048});
+  const row=(id,cost,scores)=>({candidate:{id,cost,cards:[{name:id}],challengeIds:[],policy:'effects-tail'},development:{scores},validation:{scores:[]},validationTarget:2048});
   const reliable=row('reliable',1,Array(64).fill(48000)),rare=row('rare',1,[60000,...Array(63).fill(0)]);
   // Two policies on the same composition must not eliminate one another.
   reliable.candidate.cards=rare.candidate.cards;
@@ -1785,35 +1785,35 @@ test('critical-tail ceilings survive alongside higher-frequency teams in every c
 });
 
 
-test('compact results maximize score within the requested reach condition in each cost band',()=>{
+test('compact results maximize expected best score in each cost band',()=>{
   const row=(id,cost,successes,max)=>({candidate:{id,cost},validationTarget:2048,
     validation:{scores:[max,...Array(successes-1).fill(51000),...Array(2048-successes).fill(0)]}});
   const lucky=row('rare',1,1,60000),qualified=row('qualified',1,100,55000),consistent=row('consistent',1,200,53000);
   const baseline=row('baseline',0,1,52000);
-  assert.deepEqual(clone(stats.compactResults([lucky,consistent,qualified,baseline],50000,30,.05).map(r=>r.candidate.id)),['baseline','qualified']);
-  assert.equal(stats.compactResults([lucky],50000,30,.05)[0].candidate.id,'rare');
+  assert.deepEqual(clone(stats.compactResults([lucky,consistent,qualified,baseline],30,.05).map(r=>r.candidate.id)),['baseline','consistent']);
+  assert.equal(stats.compactResults([lucky],30,.05)[0].candidate.id,'rare');
 });
 
-test('display packets preserve measured probabilities and ranking without transporting trial arrays or hypothetical scores',()=>{
+test('display packets preserve measured expected scores and ranking without transporting trial arrays or hypothetical scores',()=>{
   const rows=[0,1].map(cost=>({candidate:{id:'display-'+cost,cost,cards:[]},validationTarget:32768,
     development:{scores:Array(512).fill(90000),retired:0,turns:2048},
     criticalScout:{attempted:8,score:999999,idealHand:true},
     validation:{scores:Array.from({length:32768},(_,index)=>index%(cost?2:4)?49000:52000),retired:0,turns:131072},
     validationBest:{seed:'measured-best-'+cost,score:52000}}));
   const progress={phase:'validate',generated:2,evaluated:2,tasksDone:2,tasksTotal:2,elapsedMs:1000,results:rows};
-  const packet=stats.displayProgress(progress,50000,30);
+  const packet=stats.displayProgress(progress,30);
   assert.ok(JSON.stringify(packet).length<2000,'progress size is independent of the number of stored trials');
   for(const [index,row] of packet.results.entries()) {
     assert.equal(row.validation.scores.length,0);assert.equal(row.development.scores.length,0);
     assert.equal(row.criticalScout,undefined);
-    assert.deepEqual(clone(stats.resultMetrics(row,50000,30)),clone(stats.metrics(rows[index].validation,50000,30)));
+    assert.deepEqual(clone(stats.resultAutoScore(row,30,.05)),clone(stats.autoScoreMetrics(rows[index].validation,30,.05)));
     assert.deepEqual(clone(row.validationBest),rows[index].validationBest);
     assert.equal(rows[index].validation.scores.length,32768,'display conversion must not mutate the checkpoint');
   }
-  assert.deepEqual(clone(stats.rankedResults(packet.results,50000,30,.05).map(r=>r.candidate.id)),
-    clone(stats.rankedResults(rows,50000,30,.05).map(r=>r.candidate.id)));
-  assert.deepEqual(clone(stats.compactResults(packet.results,50000,30,.05).map(r=>r.candidate.id)),
-    clone(stats.compactResults(rows,50000,30,.05).map(r=>r.candidate.id)));
+  assert.deepEqual(clone(stats.rankedResults(packet.results,30,.05).map(r=>r.candidate.id)),
+    clone(stats.rankedResults(rows,30,.05).map(r=>r.candidate.id)));
+  assert.deepEqual(clone(stats.compactResults(packet.results,30,.05).map(r=>r.candidate.id)),
+    clone(stats.compactResults(rows,30,.05).map(r=>r.candidate.id)));
 });
 
 test('score distribution keeps the observed maximum separate from the nearest-rank 95th percentile',()=>{
@@ -1826,7 +1826,7 @@ test('score distribution keeps the observed maximum separate from the nearest-ra
 test('display packets retain score distribution and legacy summaries provide max without inventing p95',()=>{
   const samples={scores:[1000,...Array(19).fill(0)],retired:19,turns:20};
   const source={candidate:{id:'distribution',cost:0},validation:samples,validationTarget:20};
-  const displayed=stats.displayProgress({results:[source]},50000,30).results[0];
+  const displayed=stats.displayProgress({results:[source]},30).results[0];
   assert.deepEqual(clone(displayed.validationSummary.scoreDistribution),{n:20,max:1000,p95:0});
   assert.deepEqual(clone(stats.resultScoreDistribution(displayed)),{n:20,max:1000,p95:0});
   const legacy={validation:{scores:[]},validationSummary:{target:50000,attempts:30,metrics:{n:20,successes:0,p:0,reach:0,low:0,high:0,max:777}}};
@@ -1834,14 +1834,14 @@ test('display packets retain score distribution and legacy summaries provide max
 });
 
 test('an unobserved critical template reaches ordinary validation without displacing the measured peak',()=>{
-  const input=fixture();input.target=50000;
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'unobserved-template');
-  const row=(id,score,ceiling)=>({candidate:{id,cost:0,cards:[{name:id}],policy:'effects-tail'},
+  const row=(id,score,ceiling)=>({candidate:{id,cost:0,cards:[{name:id}],challengeIds:[],policy:'effects-tail'},
     development:{scores:Array(64).fill(score)},criticalScout:ceiling?{attempted:8,score:ceiling,idealHand:true}:undefined,
     validation:{scores:[]},validationTarget:2048});
   session.pool=[row('measured-peak',49000),row('ordinary-runner-up',48900),row('template',47000,55000)];
   // Fill the other bands so each band has the normal two finalist slots.
-  for(const cost of [1,2,3])session.pool.push({...row('other-'+cost,49000),candidate:{id:'other-'+cost,cost,cards:[{name:'other-'+cost}]}});
+  for(const cost of [1,2,3])session.pool.push({...row('other-'+cost,49000),candidate:{id:'other-'+cost,cost,challengeIds:[],cards:[{name:'other-'+cost}]}});
   session.selectFinalists();
   const selected=session.checkpoint().finalists;
   assert.ok(selected.some(r=>r.candidate.id==='measured-peak'));
@@ -1849,12 +1849,12 @@ test('an unobserved critical template reaches ordinary validation without displa
   assert.ok(selected.every(r=>r.validation.scores.length===0));
   assert.ok(selected.every(r=>!r.validationBest));
   session.finalists=[0,1,2,3].map(cost=>({...row('retained-'+cost,48000),
-    candidate:{id:'retained-'+cost,cost,cards:[{name:'retained-'+cost}]},
+    candidate:{id:'retained-'+cost,cost,challengeIds:[],cards:[{name:'retained-'+cost}]},
     validation:{scores:Array(2048).fill(48000)},validationTarget:2048}));
   session.selectFinalists();
   assert.ok(session.checkpoint().finalists.some(r=>r.candidate.id==='retained-0'));
-  assert.ok(session.checkpoint().finalists.some(r=>r.candidate.id==='template'),
-    'a continuation must use its one remaining slot to test the new template');
+  assert.ok(session.checkpoint().finalists.some(r=>r.candidate.id==='measured-peak'),
+    'a continuation gives its one remaining slot to the expected-best leader');
 });
 
 test('flexible plans reorder visible preparation pairs while protecting buff timing and the finisher',()=>{
@@ -2059,9 +2059,9 @@ test('host yielding resolves concurrent requests in order on the message-channel
 });
 
 test('weighted critical likelihood preserves a reachable tail over an implausible forced ceiling',()=>{
-  const input=fixture();input.target=50000;
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'weighted-selection');
-  const row=(id,cost,score,ceiling,successWeight)=>({candidate:{id,cost,cards:[{name:id}],policy:'effects-tail'},
+  const row=(id,cost,score,ceiling,successWeight)=>({candidate:{id,cost,cards:[{name:id}],challengeIds:[],policy:'effects-tail'},
     development:{scores:Array(32).fill(score)},criticalScout:{attempted:32,score:ceiling},
     importance:{n:512,successWeight,upperScore:score},validation:{scores:[]},validationTarget:2048});
   const before=Array(32).fill(47000);
@@ -2076,14 +2076,14 @@ test('weighted critical likelihood preserves a reachable tail over an implausibl
   assert.ok(!selected.some(r=>r.candidate.id==='impossible-ceiling'));
   assert.deepEqual(tail.development.scores,before);
   assert.ok(selected.every(r=>r.validation.scores.length===0));
-  const packet=stats.displayProgress({results:selected},50000,30);
+  const packet=stats.displayProgress({results:selected},30);
   assert.ok(packet.results.every(r=>r.importance===undefined),'proposal rates cannot be displayed as measured probabilities');
 });
 
-test('importance upper tails retain a reachable score before any ordinary trial reaches target',()=>{
-  const input=fixture();input.target=50000;
+test('importance upper tails remain eligible before ordinary trials observe their peak',()=>{
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'weighted-upper-score');
-  const row=(id,score,upperScore,scout=0)=>({candidate:{id,cost:0,cards:[{name:id}],policy:'effects-tail'},
+  const row=(id,score,upperScore,scout=0)=>({candidate:{id,cost:0,cards:[{name:id}],challengeIds:[],policy:'effects-tail'},
     development:{scores:Array(32).fill(score)},criticalScout:{attempted:32,score:scout},
     importance:{n:32,successWeight:0,upperScore},validation:{scores:[]},validationTarget:2048});
   const ordinary=row('ordinary',49000,49000),weighted=row('weighted-tail',48000,52000),forced=row('forced-scout',47000,47000,60000);
@@ -2094,14 +2094,14 @@ test('importance upper tails retain a reachable score before any ordinary trial 
   const selected=session.checkpoint().finalists;
   assert.ok(selected.some(r=>r.candidate.id==='weighted-tail'));
   assert.deepEqual(ordinary.development.scores,before);
-  const packet=stats.displayProgress({results:selected},50000,30);
+  const packet=stats.displayProgress({results:selected},30);
   assert.ok(packet.results.every(r=>r.importance===undefined),'weighted upper scores are internal ranking data');
 });
 
-test('positive weighted tails retain a second finalist below the measured ceiling',()=>{
-  const input=fixture();input.target=50000;
+test('legacy success weights do not override expected-best finalist selection',()=>{
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'weighted-positive-finalist');
-  const row=(id,cost,score,upperScore,successWeight,cardName=id,preferredPlan)=>({candidate:{id,cost,cards:[{name:cardName}],policy:'effects-tail',preferredPlan},
+  const row=(id,cost,score,upperScore,successWeight,cardName=id,preferredPlan)=>({candidate:{id,cost,cards:[{name:cardName}],challengeIds:[],policy:'effects-tail',preferredPlan},
     development:{scores:Array(32).fill(score)},importance:{n:512,successWeight,observations:[],upperScore},
     validation:{scores:[]},validationTarget:2048});
   const bands=Array.from({length:4},(_,cost)=>[
@@ -2113,16 +2113,21 @@ test('positive weighted tails retain a second finalist below the measured ceilin
   session.pool=bands.flat();
   session.selectFinalists();
   const selected=session.checkpoint().finalists;
-  for(const [,tail] of bands)assert.ok(selected.some(result=>result.candidate.id===tail.candidate.id),
-    'each positive weighted tail must survive even below its measured peak');
+  for(const [peak] of bands)assert.ok(selected.some(result=>result.candidate.id===peak.candidate.id),
+    'expected-best leaders must survive in every cost band');
+  const withoutLegacy=new SearchSession(input,catalog,{},'without-legacy-weights');
+  withoutLegacy.pool=clone(session.pool);
+  withoutLegacy.pool.forEach(result=>{delete result.importance.successWeight;});
+  withoutLegacy.selectFinalists();
+  assert.deepEqual(selected.map(r=>r.candidate.id),withoutLegacy.checkpoint().finalists.map(r=>r.candidate.id));
   assert.ok(selected.some(result=>result.candidate.id===ceiling.candidate.id));
   assert.ok(selected.every(result=>result.validation.scores.length===0));
 });
 
-test('positive weighted tails get the new slot beside every retained cost band',()=>{
-  const input=fixture();input.target=50000;
+test('expected-best leaders get the new slot beside every retained cost band',()=>{
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'weighted-retained-slot');
-  const row=(id,cost,score,upperScore=score,successWeight=0)=>({candidate:{id,cost,cards:[{name:id}],policy:'effects-tail'},
+  const row=(id,cost,score,upperScore=score,successWeight=0)=>({candidate:{id,cost,cards:[{name:id}],challengeIds:[],policy:'effects-tail'},
     development:{scores:Array(32).fill(score)},importance:{n:64,successWeight,observations:[],upperScore},
     validation:{scores:[]},validationTarget:2048});
   const retained=Array.from({length:4},(_,cost)=>({...row(`retained-${cost}`,cost,48000),
@@ -2135,7 +2140,7 @@ test('positive weighted tails get the new slot beside every retained cost band',
   session.pool=[...positive,...ceiling];
   session.selectFinalists();
   const selected=session.checkpoint().finalists;
-  for(const result of positive)assert.ok(selected.some(candidate=>candidate.candidate.id===result.candidate.id));
+  for(const result of ceiling)assert.ok(selected.some(candidate=>candidate.candidate.id===result.candidate.id));
   retained.forEach((result,index)=>{
     const kept=selected.find(candidate=>candidate.candidate.id===result.candidate.id);
     assert.deepEqual(clone(kept.validation),retainedBefore[index].validation);
@@ -2143,10 +2148,10 @@ test('positive weighted tails get the new slot beside every retained cost band',
   });
 });
 
-test('without a positive weighted tail finalist fallback remains unchanged',()=>{
-  const input=fixture();input.target=50000;
+test('importance upper scores remain eligible in spare finalist slots',()=>{
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'weighted-no-positive');
-  const row=(id,score,upperScore)=>({candidate:{id,cost:0,cards:[{name:id}],policy:'effects-tail'},
+  const row=(id,score,upperScore)=>({candidate:{id,cost:0,cards:[{name:id}],challengeIds:[],policy:'effects-tail'},
     development:{scores:Array(32).fill(score)},importance:{n:64,successWeight:0,observations:[],upperScore},
     validation:{scores:[]},validationTarget:2048});
   session.pool=[row('measured',48000,48000),row('upper-fallback',47000,52000)];
@@ -2155,9 +2160,9 @@ test('without a positive weighted tail finalist fallback remains unchanged',()=>
 });
 
 test('finalist selection deduplicates separate objects with the same candidate ID',()=>{
-  const input=fixture();input.target=50000;
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'weighted-duplicate-id');
-  const row=(id,name,score)=>({candidate:{id,cost:0,cards:[{name}],policy:'effects-tail'},
+  const row=(id,name,score)=>({candidate:{id,cost:0,cards:[{name}],challengeIds:[],policy:'effects-tail'},
     development:{scores:Array(32).fill(score)},validation:{scores:[]},validationTarget:2048});
   session.pool=[row('duplicate','first-copy',52000),row('duplicate','second-copy',51000),row('distinct','other',50000)];
   session.selectFinalists();
@@ -2165,10 +2170,10 @@ test('finalist selection deduplicates separate objects with the same candidate I
 });
 
 test('finalist selection handles restored large development batches without spread limits',()=>{
-  const input=fixture();input.target=50000;
+  const input=fixture();
   const session=new SearchSession(input,catalog,{},'large-development-batch');
   const scores=Array(200000).fill(49000);
-  session.pool=[{candidate:{id:'large-batch',cost:0,cards:[{name:'large-batch'}],policy:'effects-tail'},
+  session.pool=[{candidate:{id:'large-batch',cost:0,cards:[{name:'large-batch'}],challengeIds:[],policy:'effects-tail'},
     development:{scores},validation:{scores:[]},validationTarget:2048}];
   session.selectFinalists();
   assert.equal(session.checkpoint().finalists[0].candidate.id,'large-batch');
@@ -2185,7 +2190,7 @@ test('importance screening rebuilds legacy summaries without touching validation
     development:{scores:[]},importance:{n:2,successWeight:5},validation,validationTarget:2048};
   await session.importanceScreen(result,performance.now()+1000,2);
   assert.equal(result.importance.n,2);
-  assert.equal(result.importance.successWeight,0);
+  assert.equal(result.importance.successWeight,undefined);
   assert.equal(result.importance.observations.length,2);
   assert.ok(result.importance.upperScore>0);
   assert.deepEqual(result.validation,validation);
@@ -2627,24 +2632,24 @@ test('automatic results and compact packets prioritize expected best over rare u
     validation:{scores,retired:0,turns:0},validationTarget:500});
   const rare=row('rare',0,[...Array(10).fill(80000),...Array(490).fill(0)]),steady=row('steady',2,Array(500).fill(45000));
   assert.ok(stats.autoScoreMetrics(rare.validation,30,.05).conservativeScore>45000,'fixture exposes the former tail-first ordering');
-  assert.ok(stats.searchDevelopmentQuality(steady.development,{target:0,attempts:30,desiredProbability:.05})>
-    stats.searchDevelopmentQuality(rare.development,{target:0,attempts:30,desiredProbability:.05}));
-  assert.deepEqual(clone(stats.rankedResults([rare,steady],0,30,.05).map(r=>r.candidate.id)),['steady','rare']);
+  assert.ok(stats.searchDevelopmentQuality(steady.development,{attempts:30,desiredProbability:.05})>
+    stats.searchDevelopmentQuality(rare.development,{attempts:30,desiredProbability:.05}));
+  assert.deepEqual(clone(stats.rankedResults([rare,steady],30,.05).map(r=>r.candidate.id)),['steady','rare']);
   const cheap={...steady,candidate:{...steady.candidate,id:'cheap',cost:0}};
-  assert.deepEqual(clone(stats.rankedResults([steady,cheap],0,30,.05).map(r=>r.candidate.id)),['cheap','steady']);
-  assert.deepEqual(clone(stats.compactResults([rare,cheap,steady],0,30,.05).map(r=>r.candidate.id)),['cheap','steady']);
+  assert.deepEqual(clone(stats.rankedResults([steady,cheap],30,.05).map(r=>r.candidate.id)),['cheap','steady']);
+  assert.deepEqual(clone(stats.compactResults([rare,cheap,steady],30,.05).map(r=>r.candidate.id)),['cheap','steady']);
   const raw={phase:'done',generated:2,evaluated:2,tasksDone:2,tasksTotal:2,elapsedMs:1,results:[rare,steady]};
-  const packet=stats.displayProgress(raw,0,30,.05);
+  const packet=stats.displayProgress(raw,30,.05);
   assert.ok(packet.results.every(r=>r.validation.scores.length===0));
-  assert.deepEqual(clone(stats.rankedResults(packet.results,0,30,.05).map(r=>r.candidate.id)),['steady','rare']);
+  assert.deepEqual(clone(stats.rankedResults(packet.results,30,.05).map(r=>r.candidate.id)),['steady','rare']);
   assert.equal(stats.resultExpectedBestScore(packet.results[1],30),45000);
   assert.equal(stats.resultExpectedBestScore(packet.results[1],1),null,'a summary cannot be reused for a different attempt count');
-  assert.deepEqual(clone(stats.displayProgress(packet,0,30,.05)),clone(packet));
+  assert.deepEqual(clone(stats.displayProgress(packet,30,.05)),clone(packet));
   assert.equal(rare.validation.scores.length,500,'display packets must not mutate resumable samples');
 });
 
 test('automatic refinement preserves peak paths and finalists keep expected-best champions',()=>{
-  const input=fixture();input.target=0;input.attempts=30;
+  const input=fixture();input.attempts=30;
   const session=new SearchSession(input,catalog,{},'expected-champions');
   const row=(id,cost,scores)=>({candidate:{id,cost,cards:[{name:id,selectedMagic:[1,2]}],challengeIds:[],policy:'effects'},
     development:{scores,retired:0,turns:0},validation:{scores:[],retired:0,turns:0},validationTarget:500});
@@ -2656,4 +2661,51 @@ test('automatic refinement preserves peak paths and finalists keep expected-best
   stable.validation=stable.development;tail.validation=tail.development;
   session.finalists=[tail,stable];session.selectFinalists();
   assert.ok(session.checkpoint().finalists.some(r=>r.candidate.id==='retained-stable'&&r.validation.scores.length===500));
+});
+
+
+test('legacy automatic settings and session normalize to the same current input',()=>{
+  const storage=load('src/storage/examSearchStorage.ts');
+  const key='twst-exam-resource-search-v1',input={...fixture(),target:0,tolerance:500};
+  const version=load('src/domain/examSearch/types.ts').ENGINE_VERSION;
+  localStorage.setItem(key,JSON.stringify({...input,setupVersion:2}));
+  localStorage.setItem(key+'-session',JSON.stringify({input,version,catalogVersion:'test',checkpoint:{seen:[],pool:[],pending:[],finalists:[]}}));
+  try {
+    const setup=clone(storage.loadExamSearch()),session=clone(storage.loadSearchSession());
+    assert.ok(session);
+    assert.deepEqual(setup,session.input);
+    assert.equal(Object.hasOwn(setup,'target'),false);
+    assert.equal(Object.hasOwn(setup,'tolerance'),false);
+    assert.equal(setup.attempts,input.attempts);
+  } finally {storedValues.delete(key);storedValues.delete(key+'-session');}
+});
+
+test('legacy nonzero target checkpoints cannot resume but retain reusable team seeds',()=>{
+  const storage=load('src/storage/examSearchStorage.ts');
+  const key='twst-exam-resource-search-v1-session',input=fixture();input.target=45000;
+  const names=['a','b','c','d','e'];
+  const version=load('src/domain/examSearch/types.ts').ENGINE_VERSION;
+  localStorage.setItem(key,JSON.stringify({input,version,catalogVersion:'test',checkpoint:{seen:[],pool:[],pending:[],finalists:[{candidate:{cards:names.map(name=>({name}))}}]}}));
+  try {
+    assert.equal(storage.loadSearchSession(),null);
+    assert.deepEqual(clone(storage.loadSearchSeedTeams(input.preset.id)),[names]);
+  } finally {storedValues.delete(key);}
+});
+
+
+test('invalid active search settings return translated non-legacy validation codes',()=>{
+  for(const attempts of [0,-1,1.5,100001,NaN,Infinity]) {
+    const input=fixture();input.attempts=attempts;
+    assert.equal(variants.validateInput(input,catalog),'attempts');
+  }
+  for(const probability of [0,-1,1,NaN,Infinity]) {
+    const input=fixture();input.desiredProbability=probability;
+    assert.equal(variants.validateInput(input,catalog),'probability');
+  }
+  for(const language of ['ja','en','zh-CN']) {
+    const text=JSON.parse(fs.readFileSync(path.join(root,`src/i18n/${language}.json`),'utf8'));
+    assert.ok(text.examSearch.validation.attempts);
+    assert.ok(text.examSearch.validation.probability);
+    assert.equal(text.examSearch.validation.target,undefined);
+  }
 });

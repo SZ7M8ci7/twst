@@ -75,8 +75,8 @@
       <v-tab value="results" data-testid="search-results-tab">{{ t('examComparison.results') }}</v-tab>
       <v-tab value="compare" data-testid="comparison-tab">{{ t('examComparison.tab') }}<span v-if="comparisonRef?.count" class="ml-1">({{ comparisonRef.count }})</span></v-tab>
     </v-tabs>
-    <p v-if="resultGroups.length && resultsTab === 'results' && (evaluatedInput?.target ?? input.target) === 0" class="filter-help" data-testid="expected-best-explanation">{{ t('examSearch.expectedBestExplanation', { count: evaluatedInput?.attempts ?? input.attempts }) }}</p>
-    <ExamSearchResultsTable :attempts="evaluatedInput?.attempts ?? input.attempts" :auto-mode="(evaluatedInput?.target ?? input.target) === 0" v-if="resultGroups.length" v-show="resultsTab === 'results'" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.variants.length }))"
+    <p v-if="resultGroups.length && resultsTab === 'results'" class="filter-help" data-testid="expected-best-explanation">{{ t('examSearch.expectedBestExplanation', { count: evaluatedInput?.attempts ?? input.attempts }) }}</p>
+    <ExamSearchResultsTable :attempts="evaluatedInput?.attempts ?? input.attempts" v-if="resultGroups.length" v-show="resultsTab === 'results'" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.variants.length }))"
       :card-images="cardImages" :card-label="cardLabel" :upgrade-summary="variantCardSummary" :busy="busy"
       :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds" @compare="addComparison"
       @preview="preview" @simulator="openSimulator" @variants="openVariants" />
@@ -87,7 +87,7 @@
       <v-card class="modal-card variants-card">
         <v-card-title class="modal-title">{{ t('examSearch.variantsTitle') }}</v-card-title>
         <v-card-text>
-          <ExamSearchResultsTable :attempts="evaluatedInput?.attempts ?? input.attempts" :auto-mode="(evaluatedInput?.target ?? input.target) === 0" :rows="variantRows" :card-images="cardImages" :card-label="cardLabel"
+          <ExamSearchResultsTable :attempts="evaluatedInput?.attempts ?? input.attempts" :rows="variantRows" :card-images="cardImages" :card-label="cardLabel"
             :upgrade-summary="variantCardSummary" :busy="busy" :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds"
             @compare="addComparison" @preview="preview" @simulator="openSimulator" />
         </v-card-text>
@@ -186,11 +186,9 @@ const validSaved = !!savedPreset
   && Array.isArray(saved?.supports);
 const input = ref<SearchInput>(validSaved && saved ? saved : {
   preset: { ...clone(initialPreset), difficulty: initialPreset.difficulty ?? 1.5 }, roster: [], supports: [], budget: 0,
-  itemsPerLimitBreak: 1, target: 0, attempts: 30, desiredProbability: 0.05, tolerance: 0, challengeLocks: {}, maxRemoved: 1,
+  itemsPerLimitBreak: 1, attempts: 30, desiredProbability: 0.05, challengeLocks: {}, maxRemoved: 1,
 });
-// Search is score-driven; legacy target settings no longer control new searches.
-input.value.target = 0;
-input.value.tolerance = 0;
+// The upper-tail diagnostic uses a fixed probability; attempts remain configurable.
 input.value.desiredProbability = 0.05;
 if (!props.conditions && props.preset && props.preset.id !== input.value.preset.id) {
   input.value.preset = { ...clone(props.preset), difficulty: props.preset.difficulty ?? 1.5 };
@@ -265,7 +263,7 @@ const characterChoices = computed(() => characterOptions.value.map(name => ({
   iconName: charactersInfo.find(character => character.name_ja === name)?.name_en ?? name,
 })));
 const visibleCharacterOptions = characterChoices;
-const results = computed(() => evaluatedInput.value ? rankedResults(progress.value?.results ?? [], evaluatedInput.value.target, evaluatedInput.value.attempts, evaluatedInput.value.desiredProbability) : []);
+const results = computed(() => evaluatedInput.value ? rankedResults(progress.value?.results ?? [], evaluatedInput.value.attempts, evaluatedInput.value.desiredProbability) : []);
 const visibleResults = results;
 type ResultGroup = { primary: SearchResult; variants: SearchResult[] };
 const deckKey = (result: SearchResult) => result.candidate.cards
