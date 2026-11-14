@@ -50,7 +50,7 @@ function constraintCheck(input, candidate, catalog, profile) {
 
 export async function runHistoryCase({input,preset,entry,profile,tag,outputDir,durationMs,auditTrials,nonce,auditOnly=false,
   validationOnly=false,startingCheckpoint,sourceHash,modules}) {
-  const {createResourceBattleHost,SearchSession,runSessionWithinBudget,metrics,scoreDistribution,autoScoreMetrics,compareAutoResults,searchDevelopmentQuality,ENGINE_VERSION,catalog}=modules;
+  const {createResourceBattleHost,SearchSession,runSessionWithinBudget,metrics,scoreDistribution,autoScoreMetrics,compareAutoResults,searchDevelopmentQuality,ENGINE_VERSION,catalog,displayProgress,rankedResults}=modules;
   const caseId=preset.id;
 function saveJson(file, value) {
   const target = path.isAbsolute(file) ? file : path.join(outputDir, file);
@@ -102,15 +102,15 @@ function saveJson(file, value) {
     const finalistIds = new Set(checkpoint.finalists.map(result => result.candidate.id));
     if (!checkpoint.finalists.length) throw new Error(`No published finalists: ${profile}/${caseId}`);
     const resultSource = checkpoint.finalists;
+    const productPacket=displayProgress({...progress,results:resultSource},input.attempts,input.desiredProbability);
+    const productOrder=rankedResults(productPacket.results,input.attempts,input.desiredProbability).map(r=>r.candidate.id);
     const ranked = resultSource.map(result => {
       const developmentMetrics = autoScoreMetrics(result.development, input.attempts, input.desiredProbability);
       return { result, developmentMetrics,
         publishedMetrics: autoScoreMetrics(result.validation,input.attempts,input.desiredProbability),
         publishedDistribution: scoreDistribution(result.validation), finalist: finalistIds.has(result.candidate.id),
         rankingScore: searchDevelopmentQuality(result.development, input) };
-    }).sort((a, b) => compareAutoResults(a.result,b.result,input.attempts,input.desiredProbability)
-      || b.rankingScore - a.rankingScore || Number(b.finalist) - Number(a.finalist)
-      || a.result.candidate.cost - b.result.candidate.cost || a.result.candidate.id.localeCompare(b.result.candidate.id));
+    }).sort((a,b)=>productOrder.indexOf(a.result.candidate.id)-productOrder.indexOf(b.result.candidate.id));
     const top = [];
     const seenDecks = new Set();
     for (const row of ranked) {
@@ -156,7 +156,7 @@ function saveJson(file, value) {
     }
     const constraints = audited.map(row => ({ rank: row.rank, ...constraintCheck(input, row.candidate, catalog, profile) }));
     const elapsedMs = performance.now() - started;
-    const report = { harnessHash, minimumRemainingMs:15000, runPasses, schedulerRound:checkpoint.round, mutationRound:checkpoint.mutationRound, harnessMode:'single-island-supplement-not-full-browser-equivalence', schema: 'exam-search-generalization-v1', engineVersion: ENGINE_VERSION, tag, profile, caseId,
+    const report = { rankingMethod:"actual displayProgress + rankedResults single-checkpoint", productTop1Id:productOrder[0], harnessHash, minimumRemainingMs:15000, runPasses, schedulerRound:checkpoint.round, mutationRound:checkpoint.mutationRound, harnessMode:'single-island-supplement-not-full-browser-equivalence', schema: 'exam-search-generalization-v1', engineVersion: ENGINE_VERSION, tag, profile, caseId,
       scope:validationOnly?'validation-only':'search',validationTrials:checkpoint.finalists.reduce((sum,row)=>sum+row.validation.scores.length,0),
       validationFinalists:checkpoint.finalists.map(row=>({id:row.candidate.id,samples:row.validation.scores.length,target:row.validationTarget,complete:row.validation.scores.length>=row.validationTarget})),
       preset: { id: preset.id, title: preset.title, kind: preset.kind, enemyElement: preset.enemyElement }, referenceScore: entry.score, nonce,

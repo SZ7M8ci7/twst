@@ -1,0 +1,178 @@
+diff --git a/src/domain/examSearch/coverage.ts b/src/domain/examSearch/coverage.ts
+new file mode 100644
+index 00000000..eaddafeb
+--- /dev/null
++++ b/src/domain/examSearch/coverage.ts
+@@ -0,0 +1,36 @@
++import type { SearchResult } from '@/domain/examSearch/types';
++
++export interface ContenderSlot { result: SearchResult; ordinaryOnly: boolean }
++function hasPositive(result: SearchResult): boolean {
++  return result.development.scores.some(score => Number.isFinite(score) && score > 0);
++}
++function stableHash(value: string): number {
++  let hash = 2166136261;
++  for (let i=0;i<value.length;i++) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
++  return hash >>> 0;
++}
++
++/** Reserve at most one existing slot per cost for unresolved pool coverage.
++ * No extra slots, proxy fitness, audit scores or importance pseudo-counts.
++ * Recompute once per batch so ordinary observations rotate the queue.
++ */
++export function coverageContenderSlots(contenders: SearchResult[], pool: SearchResult[]): ContenderSlot[] {
++  const costs = [...new Set(contenders.map(result => result.candidate.cost))];
++  const slots = new Map<SearchResult, ContenderSlot>();
++  for (const cost of costs) {
++    const band = contenders.filter(result => result.candidate.cost === cost);
++    for (const result of band) slots.set(result, {result, ordinaryOnly:false});
++    // Keep the first three established roles and every observed ordinary winner.
++    if (band.length < 4 || hasPositive(band[band.length-1])) continue;
++    const replaced = band[band.length-1];
++    const protectedIds = new Set(band.slice(0,-1).map(result => result.candidate.id));
++    const available = pool.filter(result => result.candidate.cost === cost
++      && !protectedIds.has(result.candidate.id) && !hasPositive(result)
++      && result.development.scores.length < 512);
++    available.sort((a,b) => a.development.scores.length-b.development.scores.length
++      || stableHash(a.candidate.id)-stableHash(b.candidate.id)
++      || (a.candidate.id < b.candidate.id ? -1 : a.candidate.id > b.candidate.id ? 1 : 0));
++    if (available.length) slots.set(replaced, {result:available[0], ordinaryOnly:true});
++  }
++  return contenders.map(result => slots.get(result)!);
++}
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..56118dfb 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -1,3 +1,4 @@
++import { coverageContenderSlots } from '@/domain/examSearch/coverage';
+ import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
+ import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
+ import * as statistics from '@/domain/examSearch/statistics';
+@@ -414,12 +415,14 @@ export class SearchSession {
+       // Give promising compositions in every resource band equal extra batches
+       // before fitting plans. These remain development data, never holdout data.
+       const contenders = this.contenders();
+-      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const result of contenders) {
++      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const {result,ordinaryOnly} of coverageContenderSlots(contenders,this.pool)) {
+         if(this.stopped || performance.now()>=contenderDeadline) break;
+         if(result.development.scores.length>=512) continue;
+         await this.engine.prepare(this.input,result.candidate);
+-        if (wideInitialScreen) await this.scout(result,contenderDeadline,32);
+-        await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+32));
++        if (!ordinaryOnly) {
++          if (wideInitialScreen) await this.scout(result,contenderDeadline,32);
++          await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+32));
++        }
+         for(let i=0;i<32 && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial=this.engine.trial(seed,result.candidate.policy);
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index d4a8a872..b06339dd 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -763,7 +763,7 @@
+ 
+ <script setup lang="ts">
+ import { yieldToHost } from '@/utils/yieldToHost';
+-import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
++import { computed, markRaw, toRaw, nextTick, onMounted, ref, watch } from 'vue';
+ import ExamSearchPanel from '@/components/ExamSearchPanelLoader.vue';
+ import { useI18n } from 'vue-i18n';
+ import { useRouter } from 'vue-router';
+@@ -4302,7 +4302,7 @@ let resourcePairSpend:ReturnType<typeof createPairSpend>|undefined;
+ let resourceInitialRuntime:SimulationRuntimeCache|null|undefined;
+ let resourceInitialState:SimulationState|undefined;
+ let resourceInitialStats:SimulationStats|undefined;
+-async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
++async function prepareResourceCandidate(input: SearchInput, candidate: Candidate, immutableDeck = false) {
+   favorableEffects.value = input.favorableEffects === true;
+   resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
+   resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
+@@ -4348,6 +4348,8 @@ async function prepareResourceCandidate(input: SearchInput, candidate: Candidate
+       &&getBuddyStatusForCharacter(raw,buddyIndex,{totsu:slot.totsu,isActive:true}).includes('クリティカル'))scoutTargets.add(index);
+   }
+   resourceCriticalScoutTargets=[...scoutTargets].sort((a,b)=>a-b);
++  // Prepared resource candidates are immutable until the next prepare call.
++  if (immutableDeck) deck.value = markRaw([...toRaw(deck.value)]);
+   // Let reactive derived values invalidate before constructing the per-deck cache.
+   await nextTick();
+   simulationRuntimeCache = createSimulationRuntimeCache();
+diff --git a/src/workers/resourceBattleHost.ts b/src/workers/resourceBattleHost.ts
+index 1d43fc45..0f7ebac2 100644
+--- a/src/workers/resourceBattleHost.ts
++++ b/src/workers/resourceBattleHost.ts
+@@ -24,7 +24,7 @@ export function createResourceBattleHost(): BattleEngine {
+   app.use(createI18n({ legacy: false, locale: 'ja', messages: { ja } }));
+   app.provide(routerKey, { currentRoute: { value: { query: {} } } } as any);
+   const simulator = app.mount(node()) as any;
+-  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate),
++  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate, true),
+     trial: (seed, policy, log) => simulator.runResourceTrial(seed, policy, log),
+     scout: (seed, policy, cardIndex, idealHand, magic) => simulator.scoutResourceCritical(seed,policy,cardIndex,idealHand,magic),
+     scoutTargets: () => simulator.resourceCriticalTargets(),
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..55a2d6d5 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,60 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++const {coverageContenderSlots}=load('src/domain/examSearch/coverage.ts');
++function coverageRow(id,n=32,cost=4,positive=false) {
++  return {candidate:{id,cost},development:{scores:Array(n).fill(positive?100:0),retired:n,turns:n,fitnessSum:999999},
++    importance:{n:9999,observations:[]},validation:{scores:[],retired:0,turns:0}};
++}
++test('F1 keeps first three contenders and covers an unresolved candidate outside contenders',()=>{
++  const base=['a','b','c','d'].map(id=>coverageRow(id,128));
++  const fresh=coverageRow('fresh',16),otherCost=coverageRow('otherCost',0,0),winner=coverageRow('winner',1,4,true);
++  const pool=[...base,fresh,otherCost,winner];
++  const before=JSON.stringify(pool),slots=coverageContenderSlots(base,pool);
++  assert.equal(slots.length,base.length);
++  for(let i=0;i<3;i++){assert.equal(slots[i].result,base[i]);assert.equal(slots[i].ordinaryOnly,false);}
++  assert.equal(slots[3].result,fresh);assert.equal(slots[3].ordinaryOnly,true);
++  assert.equal(JSON.stringify(pool),before);
++});
++test('F1 preserves every positive original contender and does not add slots to small bands',()=>{
++  const base=['a','b','c','d'].map(id=>coverageRow(id,32,4,true));
++  const fresh=coverageRow('fresh',0);
++  for(const band of [base,base.slice(0,3),[]]) {
++    const slots=coverageContenderSlots(band,[...band,fresh]);
++    assert.equal(slots.length,band.length);
++    slots.forEach((slot,i)=>{assert.equal(slot.result,band[i]);assert.equal(slot.ordinaryOnly,false);});
++  }
++});
++test('F1 recomputes ordinary counts every batch and ignores fitness or importance counts',()=>{
++  const base=['a','b','c','d'].map(id=>coverageRow(id,128));
++  const x=coverageRow('x',0),y=coverageRow('y',16);
++  x.development.fitnessSum=-9999;x.importance.n=1e9;
++  y.development.fitnessSum=1e20;
++  const pool=[...base,x,y];
++  assert.equal(coverageContenderSlots(base,pool)[3].result,x);
++  x.development.scores.push(...Array(32).fill(0));
++  assert.equal(coverageContenderSlots(base,pool)[3].result,y);
++  y.development.scores.push(1);
++  assert.equal(coverageContenderSlots(base,pool)[3].result,x);
++});
++test('F1 strata preserve total slots, use deterministic tie order and reject capped candidates',()=>{
++  const base=[0,1,4].flatMap(cost=>['a','b','c','d'].map(id=>coverageRow(`${cost}${id}`,128,cost)));
++  const extra=[0,1,4].flatMap(cost=>['x','y'].map(id=>coverageRow(`${cost}${id}`,0,cost)));
++  const capped=coverageRow('capped',512,4);
++  const first=coverageContenderSlots(base,[...base,...extra,capped]);
++  const reverse=coverageContenderSlots(base,[...extra,...base,capped].reverse());
++  assert.equal(first.length,12);
++  first.forEach((slot,i)=>{
++    assert.equal(slot.result.candidate.cost,base[i].candidate.cost);
++    assert.equal(slot.result,reverse[i].result);
++    assert.equal(slot.ordinaryOnly,i%4===3);
++    assert.notEqual(slot.result,capped);
++  });
++  assert.equal(new Set(first.map(slot=>slot.result.candidate.id)).size,12);
++});
++test('F1 falls back unchanged when no eligible unresolved candidate remains',()=>{
++  const base=['a','b','c','d'].map(id=>coverageRow(id,512));
++  const slots=coverageContenderSlots(base,base);
++  slots.forEach((slot,i)=>{assert.equal(slot.result,base[i]);assert.equal(slot.ordinaryOnly,false);});
++});

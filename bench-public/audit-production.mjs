@@ -12,7 +12,7 @@ const server=await createServer({root,configFile:path.join(root,'vite.config.mts
 try{
  const {createResourceBattleHost}=await server.ssrLoadModule('/src/workers/resourceBattleHost.ts');
  const engine=createResourceBattleHost();await engine.prepare(report.input,report.candidate);
- const n=32768,scores=[],nonce=`production-threshold-public-fixed-${variant}-rep${rep}-v1`;let wins=0,max=0,sum=0;
+ const n=32768,scores=[],nonce=`product-ranked-confirm2-public-fixed-${variant}-rep${rep}-v1`;let wins=0,max=0,sum=0;
  for(let i=0;i<n;i++){const result=engine.trial(`${nonce}:${i}`,report.candidate.policy);const s=result.score;scores.push(s);wins+=Number(s>0);sum+=s;max=Math.max(max,s);}
  const sortedScores=[...scores].sort((a,b)=>a-b);
  const expected30=sortedScores.reduce((acc,s,i)=>acc+s*(Math.pow((i+1)/n,30)-Math.pow(i/n,30)),0);
