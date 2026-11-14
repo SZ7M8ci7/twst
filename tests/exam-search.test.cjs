@@ -2643,13 +2643,13 @@ test('automatic results and compact packets prioritize expected best over rare u
   assert.equal(rare.validation.scores.length,500,'display packets must not mutate resumable samples');
 });
 
-test('automatic parent and finalist selection keep expected-best champions in every cost band',()=>{
+test('automatic refinement preserves peak paths and finalists keep expected-best champions',()=>{
   const input=fixture();input.target=0;input.attempts=30;
   const session=new SearchSession(input,catalog,{},'expected-champions');
   const row=(id,cost,scores)=>({candidate:{id,cost,cards:[{name:id,selectedMagic:[1,2]}],challengeIds:[],policy:'effects'},
     development:{scores,retired:0,turns:0},validation:{scores:[],retired:0,turns:0},validationTarget:500});
   session.pool=[0,1,2,3].flatMap(cost=>[row('rare-'+cost,cost,[80000,...Array(63).fill(0)]),row('steady-'+cost,cost,Array(64).fill(45000))]);
-  for(const cost of [0,1,2,3])assert.equal(session.diverseParents(2).find(r=>r.candidate.cost===cost).candidate.id,'steady-'+cost);
+  for(const cost of [0,1,2,3])assert.deepEqual(clone(session.diverseParents(2).filter(r=>r.candidate.cost===cost).map(r=>r.candidate.id)),['rare-'+cost,'steady-'+cost]);
   session.selectFinalists();
   for(const cost of [0,1,2,3])assert.ok(session.checkpoint().finalists.some(r=>r.candidate.id==='steady-'+cost));
   const stable=row('retained-stable',0,Array(500).fill(45000)),tail=row('retained-tail',0,[...Array(10).fill(80000),...Array(490).fill(0)]);

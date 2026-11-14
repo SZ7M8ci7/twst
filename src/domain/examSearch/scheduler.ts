@@ -235,8 +235,9 @@ export class SearchSession {
       const scout=sorted.filter(r=>r.candidate.cost===cost&&(r.criticalScout?.score??0)>0)
         .sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
       const weighted=this.weightedChampion(sorted.filter(r=>r.candidate.cost===cost),this.input.target);
-      const priorities=this.input.target===0?[quality,best,weighted,scout]:[best,weighted,scout,quality];
-      const champions=[...new Set(priorities.filter((r):r is SearchResult=>!!r))];
+      // Keep the existing high-ceiling exploration paths. Automatic quality
+      // now measures expected best, but should not replace the peak parents.
+      const champions=[...new Set([best,weighted,scout,quality].filter((r):r is SearchResult=>!!r))];
       const seen=new Set(champions.map(r=>JSON.stringify(r.candidate.cards.map(c=>c.name))));
       return [...champions,...sorted.filter(r=>r.candidate.cost===cost).filter(r=>{
         const key=JSON.stringify(r.candidate.cards.map(c=>c.name));
