@@ -1,0 +1,25 @@
+diff --git a/src/domain/examSearch/policy.ts b/src/domain/examSearch/policy.ts
+index f8ecb274..42d8dc71 100644
+--- a/src/domain/examSearch/policy.ts
++++ b/src/domain/examSearch/policy.ts
+@@ -3,15 +3,17 @@ import type { PolicyKind } from '@/domain/examSearch/types';
+ function createPairingTable(spells:readonly string[],pairValue:(a:string,b:string)=>number) {
+   const index=new Map(spells.map((id,i)=>[id,i])),size=spells.length;
+   const scores=spells.map(a=>spells.map(b=>pairValue(a,b)));
+-  const memo=new Map<string,number>();
++  const memo=new Map<number,Map<number,number>>();
+   const best=(mask:number,pairs:number):number=>{
+     if(!mask||pairs<=0)return 0;
+-    const key=`${mask}:${pairs}`,cached=memo.get(key);if(cached!==undefined)return cached;
++    let byMask=memo.get(pairs);
++    const cached=byMask?.get(mask);if(cached!==undefined)return cached;
++    if(!byMask){byMask=new Map<number,number>();memo.set(pairs,byMask);}
+     let first=0;while(!(mask&(1<<first)))first++;
+     const rest=mask&~(1<<first);let value=best(rest,pairs);
+     for(let other=first+1;other<size;other++)if(rest&(1<<other))
+       value=Math.max(value,scores[first][other]+best(rest&~(1<<other),pairs-1));
+-    memo.set(key,value);return value;
++    byMask.set(mask,value);return value;
+   };
+   return { index, best };
+ }

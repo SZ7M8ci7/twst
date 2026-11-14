@@ -1,0 +1,92 @@
+diff --git a/src/domain/examSearch/candidateGenerator.ts b/src/domain/examSearch/candidateGenerator.ts
+index a87c2c86..0356ced6 100644
+--- a/src/domain/examSearch/candidateGenerator.ts
++++ b/src/domain/examSearch/candidateGenerator.ts
+@@ -1,3 +1,4 @@
++import { generationExperiments } from '@/domain/examSearch/generationExperiments';
+ import { atkbuffDict, dmgbuffDict, healDict, healContinueDict, magicDict, recalculateATK, recalculateHP } from '@/utils/calculations';
+ import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
+ import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
+@@ -850,7 +851,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+   if (canCompleteCharacters) beam = beam.filter(canCompleteCharacters);
+   if (!beam.length) return [];
+   const selectBeam=(choices:{cards:SearchCard[];value:number}[],depth:number)=>{
+-    const width=fixedSupport?8:12;
++    const width=(fixedSupport?8:12)+(generationExperiments.earlyBeam&&depth<2?4:0);
+     const finish=(preferred:typeof choices)=>diversifyBeam(choices,preferred,width,requiredCharacters,catalog).map(row=>row.cards);
+     if(task.seedTeam)return choices.slice(0,width).map(c=>c.cards);
+     if(fixedSupport||task.style!==2||choices.length<=width)return finish(choices.slice(0,width));
+@@ -862,8 +863,9 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+     };
+     // Keep the leading eight branches and four reproducibly varied alternatives
+     // near the front. A missing buddy may make a later addition transformative.
+-    const alternatives=choices.slice(8,120).map(choice=>({...choice,priority:hash(choice.cards)})).sort((a,b)=>a.priority-b.priority).slice(0,4);
+-    return finish([...choices.slice(0,8),...alternatives]);
++    const leading=generationExperiments.diverseEight?4:8;
++    const alternatives=choices.slice(leading,120).map(choice=>({...choice,priority:hash(choice.cards)})).sort((a,b)=>a.priority-b.priority).slice(0,generationExperiments.diverseEight?8:4);
++    return finish([...choices.slice(0,leading),...alternatives]);
+   };
+   const shortlist=(choices:SearchCard[])=>{
+     if(task.seedTeam||new Set(choices.map(c=>c.name)).size<=96)return choices;
+@@ -874,12 +876,13 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+       const group=groups.get(character)!;
+       group.set(card.name,Math.max(group.get(card.name)??-Infinity,...beam.map(partial=>estimate([...partial,card]))));
+     }
+-    const names=new Set([...groups.values()].flatMap(group=>[...group].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,3).map(([name])=>name)));
++    const names=new Set([...groups.values()].flatMap(group=>[...group].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,generationExperiments.shortlistFour?4:generationExperiments.shortlistTwo?2:3).map(([name])=>name)));
+     return choices.filter(c=>names.has(c.name));
+   };
+   // Bound each beam expansion by character, preserving all spell pairs for
+   // retained cards. Every owned card still has its own forced-anchor task.
+   const requiredBeamFull=requiredNames.length>0&&!!beam[0]&&beam[0].filter(card=>!card.support).length>=ownCount;
++  const completeOwnedOptions = generationExperiments.supportAwareShortlist ? options : undefined;
+   if (!requiredBeamFull) options=shortlist(options);
+   if (!requiredNames.length || !requiredSupport) supportOptions=shortlist(supportOptions);
+   if(supportFirst&&!fixedSupport&&!requiredSupport) {
+@@ -897,6 +900,12 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+       if(count>=2)return false;supportCounts.set(name,count+1);return true;
+     }),0);
+   }
++  // The support changes active buddy coverage. Reconsider the full legal pool
++  // after support selection rather than ranking against the unsupported anchor.
++  if(generationExperiments.supportAwareShortlist && completeOwnedOptions
++      && supportFirst && !fixedSupport && !requiredSupport && !requiredBeamFull && beam.length) {
++    options=shortlist(completeOwnedOptions);
++  }
+   const initialDepth=beam.length?beam[0].filter(card=>!card.support).length:(fixedSupport?0:1);
+   for (let depth = initialDepth; depth < ownCount; depth++) {
+     const expanded: { cards: SearchCard[]; value: number }[] = [];
+@@ -933,7 +942,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+     const compositions = new Map<string, number>();
+     beam = selectBeam(expanded.filter(e => {
+       const key = e.cards.map(c => c.name).join('|'), count = compositions.get(key) ?? 0;
+-      if (count >= (fixedSupport?1:2)) return false;
++      if (count >= (fixedSupport||generationExperiments.uniqueComposition?1:2)) return false;
+       compositions.set(key, count + 1); return true;
+     }),depth);
+   }
+@@ -960,7 +969,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+     const duplicate = finished.findIndex((e,i) => i > 0 && signature(e) === composition
+       && finished.slice(0,i).some(previous=>signature(previous) === composition));
+     if (duplicate >= 0) finished.splice(duplicate,1);
+-    if (finished.length > (requiredNames.length ? 8 : 2)) finished.pop();
++    if (finished.length > (requiredNames.length ? 8 : generationExperiments.finishedThree ? 3 : 2)) finished.pop();
+   }
+   const setups: typeof finished = [];
+   for (const {cards} of input.preset.kind==='DEFENCE'?[]:finished) for (const [index,card] of cards.entries()) {
+diff --git a/src/domain/examSearch/generationExperiments.ts b/src/domain/examSearch/generationExperiments.ts
+new file mode 100644
+index 00000000..599cfb54
+--- /dev/null
++++ b/src/domain/examSearch/generationExperiments.ts
+@@ -0,0 +1,10 @@
++/** Isolated development toggles. Defaults preserve the published baseline. */
++export const generationExperiments = {
++  supportAwareShortlist: false,
++  earlyBeam: true,
++  shortlistFour: false,
++  uniqueComposition: false,
++  finishedThree: false,
++  diverseEight: false,
++  shortlistTwo: false,
++};

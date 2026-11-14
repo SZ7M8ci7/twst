@@ -1,0 +1,19 @@
+diff --git a/src/domain/examSearch/statistics.ts b/src/domain/examSearch/statistics.ts
+index fbd83a05..b04eb653 100644
+--- a/src/domain/examSearch/statistics.ts
++++ b/src/domain/examSearch/statistics.ts
+@@ -153,7 +153,11 @@ export function rankedResults(results: SearchResult[], attempts: number, desired
+ }
+ 
+ export function compactResults(results: SearchResult[], attempts:number, desired:number):SearchResult[] {
+-  const rows=results.map(result=>({result,metrics:resultAutoScore(result,attempts,desired)}));
+-  return [...new Set(rows.map(r=>r.result.candidate.cost))].sort((a,b)=>a-b).map(cost=>
+-    rows.filter(row=>row.result.candidate.cost===cost).sort((a,b)=>compareAutoMetricValues(a.metrics,b.metrics,a.result,b.result))[0].result);
++  const winners = new Map<number, {result:SearchResult;metrics:AutoScoreMetrics}>();
++  for (const result of results) {
++    const metrics = resultAutoScore(result, attempts, desired), previous = winners.get(result.candidate.cost);
++    if (!previous || compareAutoMetricValues(metrics, previous.metrics, result, previous.result) < 0)
++      winners.set(result.candidate.cost, {result, metrics});
++  }
++  return [...winners.keys()].sort((a,b)=>a-b).map(cost=>winners.get(cost)!.result);
+ }

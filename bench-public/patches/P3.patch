@@ -1,0 +1,28 @@
+diff --git a/src/domain/examSearch/policy.ts b/src/domain/examSearch/policy.ts
+index f8ecb274..77ad3b38 100644
+--- a/src/domain/examSearch/policy.ts
++++ b/src/domain/examSearch/policy.ts
+@@ -48,12 +48,17 @@ export interface FlexiblePlanStep {
+   ids: [string,string]; earliestTurn: number; requires: string[];
+ }
+ export function chooseFlexiblePlanPair(turn:number, visible:readonly string[], used:ReadonlySet<string>, steps:readonly FlexiblePlanStep[]):[string,string]|null {
+-  const last=steps.length-1;
+-  const choices=steps.map((step,index)=>({step,index})).filter(({step,index})=>
+-    step.ids.every(id=>visible.includes(id)&&!used.has(id)) && step.earliestTurn<=turn
+-    && step.requires.every(id=>used.has(id)) && (index===last?turn>=steps.length:turn<steps.length));
+-  choices.sort((a,b)=>b.step.earliestTurn-a.step.earliestTurn||a.index-b.index);
+-  return choices[0]?.step.ids??null;
++  const last = steps.length - 1;
++  let best: FlexiblePlanStep | undefined;
++  for (let index = 0; index < steps.length; index++) {
++    const step = steps[index];
++    if (!step.ids.every(id => visible.includes(id) && !used.has(id)) || !(step.earliestTurn <= turn)
++      || !step.requires.every(id => used.has(id)) || !(index === last ? turn >= steps.length : turn < steps.length)) continue;
++    // Strictly greater preserves original stable tie order. Eligible steps
++    // cannot have NaN earliestTurn because the comparison above excludes it.
++    if (!best || step.earliestTurn > best.earliestTurn) best = step;
++  }
++  return best?.ids ?? null;
+ }
+ 
+ // Deliberately contains neither hidden cards, enemy deck nor a random generator.

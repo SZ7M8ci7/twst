@@ -1,0 +1,150 @@
+diff --git a/src/domain/examSearch/samplingExperiments.ts b/src/domain/examSearch/samplingExperiments.ts
+new file mode 100644
+index 00000000..f6dbeaaf
+--- /dev/null
++++ b/src/domain/examSearch/samplingExperiments.ts
+@@ -0,0 +1,35 @@
++import type { SearchResult } from '@/domain/examSearch/types';
++
++// Isolated research switches. Production defaults remain unchanged until a
++// paired, independent benchmark justifies adopting an individual hypothesis.
++export const samplingExperiments = {
++  balancedContenders: true,
++  ordinaryDiscoveryFirst: false,
++  expectedPlanParents: false,
++  shortContenderBatches: false,
++  ordinaryLoadoutFirst: false,
++  ordinaryPlanFirst: false,
++  lighterDiscoveryImportance: false,
++};
++
++export function balancedContenderOrder(rows: SearchResult[], batch: number): SearchResult[] {
++  const costs = [...new Set(rows.map(row => row.candidate.cost))].sort((a,b) => a-b);
++  if (!costs.length) return [];
++  const offset = batch % costs.length;
++  const groups = [...costs.slice(offset), ...costs.slice(0,offset)]
++    .map(cost => rows.filter(row => row.candidate.cost === cost));
++  return Array.from({length: Math.max(...groups.map(group => group.length))}, (_,i) =>
++    groups.flatMap(group => group[i] ? [group[i]] : [])).flat();
++}
++
++export function expectedPlanParentOrder(rows: SearchResult[], pool: SearchResult[], quality: (row: SearchResult) => number): SearchResult[] {
++  const costs = [...new Set(rows.map(row => row.candidate.cost))].sort((a,b) => a-b);
++  const groups = costs.map(cost => {
++    const available = pool.filter(row => row.candidate.cost === cost);
++    const champion = available.reduce<SearchResult | undefined>((best,row) => !best || quality(row)>quality(best) ? row : best, undefined);
++    return [...new Map([...(champion ? [champion] : []), ...rows.filter(row => row.candidate.cost === cost)]
++      .map(row => [row.candidate.id,row])).values()];
++  });
++  return Array.from({length: Math.max(0,...groups.map(group => group.length))}, (_,i) =>
++    groups.flatMap(group => group[i] ? [group[i]] : [])).flat();
++}
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..482711f3 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -1,3 +1,4 @@
++import { samplingExperiments, balancedContenderOrder, expectedPlanParentOrder } from '@/domain/examSearch/samplingExperiments';
+ import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
+ import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
+ import * as statistics from '@/domain/examSearch/statistics';
+@@ -369,8 +370,10 @@ export class SearchSession {
+         const result = this.pending[0];
+         if (!result) { await progress('generate'); continue; }
+         await this.engine.prepare(this.input, result.candidate);
+-        await this.scout(result,discoveryEnd,discoveryScoutSamples);
+-        await this.importanceScreen(result,discoveryEnd,16);
++        if (!samplingExperiments.ordinaryDiscoveryFirst) {
++          await this.scout(result,discoveryEnd,discoveryScoutSamples);
++          await this.importanceScreen(result,discoveryEnd,samplingExperiments.lighterDiscoveryImportance ? 8 : 16);
++        }
+         while (result.development.scores.length < discoverySamples && !this.stopped && performance.now() < discoveryEnd) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial = this.engine.trial(seed, result.candidate.policy);
+@@ -381,6 +384,10 @@ export class SearchSession {
+           result.development.turns += trial.finishTurn;
+           if (result.development.scores.length % 8 === 0) await progress('generate');
+         }
++        if (samplingExperiments.ordinaryDiscoveryFirst) {
++          await this.scout(result,discoveryEnd,discoveryScoutSamples);
++          await this.importanceScreen(result,discoveryEnd,samplingExperiments.lighterDiscoveryImportance ? 8 : 16);
++        }
+         if (result.development.scores.length >= discoverySamples) {
+           this.pool.push(result); this.pending.shift(); this.evaluatedCount++;
+           this.trimPool();
+@@ -397,8 +404,10 @@ export class SearchSession {
+         const candidate=options[index];if(!candidate||this.seen.has(candidate.id))continue;
+         const result:SearchResult={candidate,development:emptySamples(),validation:emptySamples(),validationTarget:VALIDATION_SAMPLES};
+         await this.engine.prepare(this.input,candidate);
+-        await this.scout(result,loadoutDeadline,8);
+-        await this.importanceScreen(result,loadoutDeadline,16);
++        if (!samplingExperiments.ordinaryLoadoutFirst) {
++          await this.scout(result,loadoutDeadline,8);
++          await this.importanceScreen(result,loadoutDeadline,16);
++        }
+         for(let i=0;i<16&&!this.stopped&&performance.now()<loadoutDeadline;i++) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial=this.engine.trial(seed,candidate.policy);
+@@ -408,19 +417,24 @@ export class SearchSession {
+           result.development.retired+=Number(trial.retired);result.development.turns+=trial.finishTurn;
+           if(i%8===0)await progress('generate');
+         }
++        if (samplingExperiments.ordinaryLoadoutFirst) {
++          await this.scout(result,loadoutDeadline,8);
++          await this.importanceScreen(result,loadoutDeadline,16);
++        }
+         if(result.development.scores.length){this.pool.push(result);this.remember(candidate.id);this.evaluatedCount++;}
+       }
+       // Rare successful draws are easily missed by the short ordinary screen.
+       // Give promising compositions in every resource band equal extra batches
+       // before fitting plans. These remain development data, never holdout data.
+       const contenders = this.contenders();
+-      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const result of contenders) {
++      const contenderBatch = samplingExperiments.shortContenderBatches ? 8 : 32;
++      for (let batch=0;batch<(wideInitialScreen?16:15)*(32/contenderBatch);batch++) for (const result of (samplingExperiments.balancedContenders ? balancedContenderOrder(contenders,batch) : contenders)) {
+         if(this.stopped || performance.now()>=contenderDeadline) break;
+         if(result.development.scores.length>=512) continue;
+         await this.engine.prepare(this.input,result.candidate);
+         if (wideInitialScreen) await this.scout(result,contenderDeadline,32);
+-        await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+32));
+-        for(let i=0;i<32 && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
++        await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+contenderBatch));
++        for(let i=0;i<contenderBatch && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial=this.engine.trial(seed,result.candidate.policy);
+           if(!result.developmentBest || trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+@@ -435,7 +449,9 @@ export class SearchSession {
+       // plan only chooses a pair if both cards are visible; otherwise the public
+       // observation policy takes over. Holdout trials never optimize their seed.
+       if (this.engine.learnPlan && !this.stopped) {
+-        const parents = this.diverseParents(3).slice(0,12);
++        const diverse = this.diverseParents(3);
++        const parents = (samplingExperiments.expectedPlanParents
++          ? expectedPlanParentOrder(diverse,this.pool,row=>this.quality(row)) : diverse).slice(0,12);
+         for (let planRound=0;planRound<3;planRound++) for (const parent of parents) {
+           if (this.stopped || performance.now() >= planDeadline) break;
+           await this.engine.prepare(this.input,parent.candidate);
+@@ -463,8 +479,10 @@ export class SearchSession {
+           if (this.seen.has(candidate.id)) continue;
+           const result: SearchResult = { candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES };
+           await this.engine.prepare(this.input,candidate);
+-          await this.scout(result,planDeadline,8);
+-          await this.importanceScreen(result,planDeadline,32);
++          if (!samplingExperiments.ordinaryPlanFirst) {
++            await this.scout(result,planDeadline,8);
++            await this.importanceScreen(result,planDeadline,32);
++          }
+           for (let i=0;i<64 && !this.stopped && performance.now()<planDeadline;i++) {
+             const seed=`${this.nonce}:development:${this.trialSerial++}`;
+             const trial = this.engine.trial(seed,candidate.policy);
+@@ -475,6 +493,10 @@ export class SearchSession {
+             result.development.turns += trial.finishTurn;
+             if (i % 8 === 0) await progress('generate');
+           }
++          if (samplingExperiments.ordinaryPlanFirst) {
++            await this.scout(result,planDeadline,8);
++            await this.importanceScreen(result,planDeadline,32);
++          }
+           if (result.development.scores.length === 64) { this.pool.push(result); this.remember(candidate.id); this.evaluatedCount++; }
+           }
+         }

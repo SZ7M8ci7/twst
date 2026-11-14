@@ -1,0 +1,16 @@
+diff --git a/src/domain/examSearch/policy.ts b/src/domain/examSearch/policy.ts
+index d824156f..ad702108 100644
+--- a/src/domain/examSearch/policy.ts
++++ b/src/domain/examSearch/policy.ts
+@@ -80,8 +80,9 @@ export function chooseObservedPair(observation: BattleObservation, policy: Polic
+   const plannedTurns = priorities?.length ? new Map<string, number>() : undefined;
+   if (plannedTurns && priorities) {
+     const cycleStart = Math.floor((observation.turn - 1) / 5) * 5;
+-    for (let index = cycleStart; index < Math.min(cycleStart + 5, priorities.length); index++)
+-      for (const id of priorities[index]) if (!plannedTurns.has(id)) plannedTurns.set(id, index + 1);
++    const cycle = priorities.slice(cycleStart, cycleStart + 5);
++    for (let index = 0; index < cycle.length; index++)
++      for (const id of cycle[index]) if (!plannedTurns.has(id)) plannedTurns.set(id, cycleStart + index + 1);
+     for (let index = 0; index < Math.min(5, priorities.length); index++)
+       for (const id of priorities[index]) if (!plannedTurns.has(id)) plannedTurns.set(id, cycleStart + index + 1);
+   }

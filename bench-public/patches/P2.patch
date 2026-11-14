@@ -1,0 +1,32 @@
+diff --git a/src/domain/examSearch/policy.ts b/src/domain/examSearch/policy.ts
+index f8ecb274..ea742b9a 100644
+--- a/src/domain/examSearch/policy.ts
++++ b/src/domain/examSearch/policy.ts
+@@ -70,6 +70,16 @@ export function chooseObservedPair(observation: BattleObservation, policy: Polic
+   const effects = policy.startsWith('effects');
+   const preserveDuos=policy==='effects-duo'&&observation.kind!=='DEFENCE';
+   let best: BattleObservation['pairs'][number] | undefined, bestScore = -Infinity;
++  // A priority is stable for this observation. Preserve first occurrence, as
++  // findIndex did, and retain first-cycle fallback for repeated battle cycles.
++  const plannedTurns = priorities?.length ? new Map<string, number>() : undefined;
++  if (plannedTurns && priorities) {
++    const cycleStart = Math.floor((observation.turn - 1) / 5) * 5;
++    for (let index = cycleStart; index < Math.min(cycleStart + 5, priorities.length); index++)
++      for (const id of priorities[index]) if (!plannedTurns.has(id)) plannedTurns.set(id, index + 1);
++    for (let index = 0; index < Math.min(5, priorities.length); index++)
++      for (const id of priorities[index]) if (!plannedTurns.has(id)) plannedTurns.set(id, cycleStart + index + 1);
++  }
+   for (const pair of observation.pairs) {
+     const damage = effects && pair.firstDamage >= observation.enemyHp ? pair.firstDamage : pair.damage;
+     let value = damage + pair.duo * 2200 + pair.utility * 2000;
+@@ -101,9 +111,7 @@ export function chooseObservedPair(observation: BattleObservation, policy: Polic
+       // exact partner to appear. Only the currently visible legal pairs compete.
+       for (const id of pair.ids) {
+         const cycleStart=Math.floor((observation.turn-1)/5)*5;
+-        const inCycle=priorities.slice(cycleStart,cycleStart+5).findIndex(p=>p.includes(id));
+-        const inFirstCycle=priorities.slice(0,5).findIndex(p=>p.includes(id));
+-        const plannedTurn=cycleStart+(inCycle>=0?inCycle+1:inFirstCycle>=0?inFirstCycle+1:6);
++        const plannedTurn = plannedTurns!.get(id) ?? cycleStart + 6;
+         value -= Math.abs(plannedTurn-observation.turn)*2500;
+       }
+     }

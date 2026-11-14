@@ -1,0 +1,21 @@
+diff --git a/src/domain/examSearch/statistics.ts b/src/domain/examSearch/statistics.ts
+index fbd83a05..2d222dcc 100644
+--- a/src/domain/examSearch/statistics.ts
++++ b/src/domain/examSearch/statistics.ts
+@@ -46,11 +46,13 @@ function expectedBestFromSorted(n: number, positive: number[], attempts: number)
+   if (!n || !Number.isInteger(attempts) || attempts < 1) return 0;
+   // Descending positive scores share the sort used by the display summaries.
+   // Zero/invalid outcomes still contribute to n and the chance of failing.
+-  let sum = 0, index = 0;
++  let sum = 0, index = 0, previousCdfPower = 1;
+   while (index < positive.length) {
+-    const start = index, score = positive[index];
++    const score = positive[index];
+     do index++; while (index < positive.length && positive[index] === score);
+-    sum += score * (Math.pow((n - start) / n, attempts) - Math.pow((n - index) / n, attempts));
++    const cdfPower = Math.pow((n - index) / n, attempts);
++    sum += score * (previousCdfPower - cdfPower);
++    previousCdfPower = cdfPower;
+   }
+   return sum;
+ }
