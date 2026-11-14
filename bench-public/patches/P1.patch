@@ -1,21 +1,282 @@
-diff --git a/src/domain/examSearch/statistics.ts b/src/domain/examSearch/statistics.ts
-index fbd83a05..2d222dcc 100644
---- a/src/domain/examSearch/statistics.ts
-+++ b/src/domain/examSearch/statistics.ts
-@@ -46,11 +46,13 @@ function expectedBestFromSorted(n: number, positive: number[], attempts: number)
-   if (!n || !Number.isInteger(attempts) || attempts < 1) return 0;
-   // Descending positive scores share the sort used by the display summaries.
-   // Zero/invalid outcomes still contribute to n and the chance of failing.
--  let sum = 0, index = 0;
-+  let sum = 0, index = 0, previousCdfPower = 1;
-   while (index < positive.length) {
--    const start = index, score = positive[index];
-+    const score = positive[index];
-     do index++; while (index < positive.length && positive[index] === score);
--    sum += score * (Math.pow((n - start) / n, attempts) - Math.pow((n - index) / n, attempts));
-+    const cdfPower = Math.pow((n - index) / n, attempts);
-+    sum += score * (previousCdfPower - cdfPower);
-+    previousCdfPower = cdfPower;
+diff --git a/src/domain/examSearch/fitnessTail.ts b/src/domain/examSearch/fitnessTail.ts
+new file mode 100644
+index 00000000..15b9cc03
+--- /dev/null
++++ b/src/domain/examSearch/fitnessTail.ts
+@@ -0,0 +1,47 @@
++import { CONTENDER_ORDINARY_SAMPLES } from '@/domain/examSearch/sampling';
++import type { Samples, SearchResult } from '@/domain/examSearch/types';
++import { expectedBestScore } from '@/domain/examSearch/statistics';
++
++// A fixed ordinary-trial prefix, not a reconstruction of fitnessSum or a claim
++// to summarize all later trials. Policy/time-dependent changes can make this
++// early prefix unrepresentative; it is not evidence of a confident score gain.
++// Bounds checkpoint growth at 128 numbers/row.
++export const DEVELOPMENT_FITNESS_PREFIX_LIMIT = 128;
++export function recordDevelopmentFitness(samples: Samples, fitness: number): void {
++  const prefix = samples.developmentFitnessPrefix ??= [];
++  if (prefix.length < DEVELOPMENT_FITNESS_PREFIX_LIMIT)
++    prefix.push(Number.isFinite(fitness) && fitness > 0 ? fitness : 0);
++}
++const allFail = (row: SearchResult) => row.development.scores.length > 0
++  && row.development.scores.every(score => !(Number.isFinite(score) && score > 0));
++
++/** One extra observation opportunity, never a score-ranking objective.
++ * Near-loss fitness rewards damage/survival and can oppose actual winning
++ * score. Its upper tail is merely a risky exploration proxy, not Emax(score).
++ * Preserve every ordinary-positive candidate, cost-band slot count, and total
++ * observation slots. If no all-fail slot exists, do not expand the budget.
++ */
++export function reserveFitnessTailObserver(selected: SearchResult[], pool: SearchResult[], attempts: number): SearchResult[] {
++  const ids = new Set(selected.map(row => row.candidate.id));
++  const eligibleCosts = new Set(selected.filter(allFail).map(row => row.candidate.cost));
++  let chosen: SearchResult | undefined, best = 0;
++  for (const row of pool) {
++    if (ids.has(row.candidate.id) || !eligibleCosts.has(row.candidate.cost)
++      || row.development.scores.length >= CONTENDER_ORDINARY_SAMPLES || !allFail(row)) continue;
++    const prefix = row.development.developmentFitnessPrefix;
++    if (!prefix?.length) continue; // Legacy checkpoint fitness cannot be inferred.
++    const value = expectedBestScore({scores: prefix, retired: 0, turns: 0}, attempts);
++    if (value > best || value === best && value > 0 && chosen && row.candidate.id < chosen.candidate.id) {
++      chosen = row; best = value;
++    }
++  }
++  if (!chosen) return selected;
++  const result = [...selected];
++  for (let index = result.length - 1; index >= 0; index--) {
++    if (result[index].candidate.cost === chosen.candidate.cost && allFail(result[index])) {
++      result[index] = chosen;
++      break;
++    }
++  }
++  return result;
++}
+diff --git a/src/domain/examSearch/sampling.ts b/src/domain/examSearch/sampling.ts
+index d0461a3a..db69d5d4 100644
+--- a/src/domain/examSearch/sampling.ts
++++ b/src/domain/examSearch/sampling.ts
+@@ -1,6 +1,7 @@
+ // Shared search/evaluation sizes. Comparison does not introduce a separate
+ // user-facing search-depth setting.
+ export const DISCOVERY_SAMPLES = 32;
++export const CONTENDER_ORDINARY_SAMPLES = 512;
+ export const VALIDATION_SAMPLES = 2048;
+ export const REFINED_VALIDATION_SAMPLES = 32768;
+ export const MAX_FINALISTS = 8;
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..f61de3f0 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -1,3 +1,4 @@
++import { recordDevelopmentFitness, reserveFitnessTailObserver } from '@/domain/examSearch/fitnessTail';
+ import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
+ import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
+ import * as statistics from '@/domain/examSearch/statistics';
+@@ -6,7 +7,7 @@ import { importanceUpperQuantile } from '@/domain/examSearch/importance';
+ import { diverseFinalists } from '@/domain/examSearch/finalists';
+ 
+ import { yieldToHost as yieldEventLoop } from '@/utils/yieldToHost';
+-import { DISCOVERY_SAMPLES, VALIDATION_SAMPLES, MAX_FINALISTS, REFINED_VALIDATION_SAMPLES as CONTINUOUS_VALIDATION_SAMPLES } from '@/domain/examSearch/sampling';
++import { CONTENDER_ORDINARY_SAMPLES, DISCOVERY_SAMPLES, VALIDATION_SAMPLES, MAX_FINALISTS, REFINED_VALIDATION_SAMPLES as CONTINUOUS_VALIDATION_SAMPLES } from '@/domain/examSearch/sampling';
+ const WIDE_DISCOVERY_SAMPLES = 8;
+ const WIDE_SCOUT_SAMPLES = 8;
+ const MAX_RECENT_CANDIDATES = 4096;
+@@ -250,11 +251,12 @@ export class SearchSession {
+   private contenders() {
+     const normal=this.diverseParents(4),losses=this.closeLosses(2);
+     const costs=[...new Set(this.pool.map(r=>r.candidate.cost))].sort((a,b)=>a-b);
+-    return costs.flatMap(cost=>{
++    const selected = costs.flatMap(cost=>{
+       const promising=normal.filter(r=>r.candidate.cost===cost),rare=losses.filter(r=>r.candidate.cost===cost);
+       const chosen=[...new Set([...promising.slice(0,3),...rare,...promising])];
+       return chosen.slice(0,4);
+     });
++    return reserveFitnessTailObserver(selected, this.pool, this.input.attempts);
    }
-   return sum;
+   private finalistCostOrder(costs: number[], available: number) {
+     if (costs.length <= available || available <= 0) return costs;
+@@ -377,6 +379,7 @@ export class SearchSession {
+           if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+           result.development.fitnessSum = (result.development.fitnessSum ?? 0) + (trial.fitness ?? trial.score);
++          recordDevelopmentFitness(result.development, trial.fitness ?? trial.score);
+           result.development.retired += Number(trial.retired);
+           result.development.turns += trial.finishTurn;
+           if (result.development.scores.length % 8 === 0) await progress('generate');
+@@ -405,6 +408,7 @@ export class SearchSession {
+           if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+           result.development.fitnessSum=(result.development.fitnessSum??0)+(trial.fitness??trial.score);
++          recordDevelopmentFitness(result.development, trial.fitness ?? trial.score);
+           result.development.retired+=Number(trial.retired);result.development.turns+=trial.finishTurn;
+           if(i%8===0)await progress('generate');
+         }
+@@ -416,16 +420,17 @@ export class SearchSession {
+       const contenders = this.contenders();
+       for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const result of contenders) {
+         if(this.stopped || performance.now()>=contenderDeadline) break;
+-        if(result.development.scores.length>=512) continue;
++        if(result.development.scores.length>=CONTENDER_ORDINARY_SAMPLES) continue;
+         await this.engine.prepare(this.input,result.candidate);
+         if (wideInitialScreen) await this.scout(result,contenderDeadline,32);
+         await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+32));
+-        for(let i=0;i<32 && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
++        for(let i=0;i<32 && result.development.scores.length<CONTENDER_ORDINARY_SAMPLES && !this.stopped && performance.now()<contenderDeadline;i++) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial=this.engine.trial(seed,result.candidate.policy);
+           if(!result.developmentBest || trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+           result.development.fitnessSum=(result.development.fitnessSum??0)+(trial.fitness??trial.score);
++          recordDevelopmentFitness(result.development, trial.fitness ?? trial.score);
+           result.development.retired+=Number(trial.retired);
+           result.development.turns+=trial.finishTurn;
+           if(i%8===0)await progress('generate');
+@@ -471,6 +476,7 @@ export class SearchSession {
+             if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+             result.development.scores.push(trial.score);
+             result.development.fitnessSum = (result.development.fitnessSum ?? 0) + (trial.fitness ?? trial.score);
++            recordDevelopmentFitness(result.development, trial.fitness ?? trial.score);
+             result.development.retired += Number(trial.retired);
+             result.development.turns += trial.finishTurn;
+             if (i % 8 === 0) await progress('generate');
+@@ -504,6 +510,7 @@ export class SearchSession {
+           if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+           result.development.scores.push(trial.score);
+           result.development.fitnessSum=(result.development.fitnessSum??0)+(trial.fitness??trial.score);
++          recordDevelopmentFitness(result.development, trial.fitness ?? trial.score);
+           result.development.retired+=Number(trial.retired);result.development.turns+=trial.finishTurn;
+           if(i%8===0)await progress('generate');
+         }
+diff --git a/src/domain/examSearch/types.ts b/src/domain/examSearch/types.ts
+index f99c2c37..65c0c32d 100644
+--- a/src/domain/examSearch/types.ts
++++ b/src/domain/examSearch/types.ts
+@@ -63,6 +63,8 @@ export interface Samples {
+   retired: number;
+   turns: number;
+   fitnessSum?: number;
++  // Bounded ordinary development proxy only; absent in legacy checkpoints.
++  developmentFitnessPrefix?: number[];
  }
+ export interface SearchResult {
+   candidate: Candidate;
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index d4a8a872..b06339dd 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -763,7 +763,7 @@
+ 
+ <script setup lang="ts">
+ import { yieldToHost } from '@/utils/yieldToHost';
+-import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
++import { computed, markRaw, toRaw, nextTick, onMounted, ref, watch } from 'vue';
+ import ExamSearchPanel from '@/components/ExamSearchPanelLoader.vue';
+ import { useI18n } from 'vue-i18n';
+ import { useRouter } from 'vue-router';
+@@ -4302,7 +4302,7 @@ let resourcePairSpend:ReturnType<typeof createPairSpend>|undefined;
+ let resourceInitialRuntime:SimulationRuntimeCache|null|undefined;
+ let resourceInitialState:SimulationState|undefined;
+ let resourceInitialStats:SimulationStats|undefined;
+-async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
++async function prepareResourceCandidate(input: SearchInput, candidate: Candidate, immutableDeck = false) {
+   favorableEffects.value = input.favorableEffects === true;
+   resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
+   resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
+@@ -4348,6 +4348,8 @@ async function prepareResourceCandidate(input: SearchInput, candidate: Candidate
+       &&getBuddyStatusForCharacter(raw,buddyIndex,{totsu:slot.totsu,isActive:true}).includes('クリティカル'))scoutTargets.add(index);
+   }
+   resourceCriticalScoutTargets=[...scoutTargets].sort((a,b)=>a-b);
++  // Prepared resource candidates are immutable until the next prepare call.
++  if (immutableDeck) deck.value = markRaw([...toRaw(deck.value)]);
+   // Let reactive derived values invalidate before constructing the per-deck cache.
+   await nextTick();
+   simulationRuntimeCache = createSimulationRuntimeCache();
+diff --git a/src/workers/resourceBattleHost.ts b/src/workers/resourceBattleHost.ts
+index 1d43fc45..0f7ebac2 100644
+--- a/src/workers/resourceBattleHost.ts
++++ b/src/workers/resourceBattleHost.ts
+@@ -24,7 +24,7 @@ export function createResourceBattleHost(): BattleEngine {
+   app.use(createI18n({ legacy: false, locale: 'ja', messages: { ja } }));
+   app.provide(routerKey, { currentRoute: { value: { query: {} } } } as any);
+   const simulator = app.mount(node()) as any;
+-  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate),
++  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate, true),
+     trial: (seed, policy, log) => simulator.runResourceTrial(seed, policy, log),
+     scout: (seed, policy, cardIndex, idealHand, magic) => simulator.scoutResourceCritical(seed,policy,cardIndex,idealHand,magic),
+     scoutTargets: () => simulator.resourceCriticalTargets(),
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..70d192f7 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,71 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++const fitnessTail = load('src/domain/examSearch/fitnessTail.ts');
++const proxyRow=(id,cost,fitness,scores=[0,0])=>({candidate:{id,cost,cards:[],challengeIds:[],policy:'effects'},
++  development:{scores:[...scores],fitnessSum:7,retired:0,turns:2,...(fitness?{developmentFitnessPrefix:[...fitness]}:{})},
++  validation:{scores:[],retired:0,turns:0},validationTarget:2048});
++
++test('fitness prefix is bounded and does not rewrite ordinary scores or fitness sum',()=>{
++  const samples={scores:[0,0],fitnessSum:99,retired:1,turns:9};
++  for(let i=0;i<200;i++)fitnessTail.recordDevelopmentFitness(samples,i);
++  assert.equal(samples.developmentFitnessPrefix.length,128);
++  assert.equal(samples.developmentFitnessPrefix[127],127);
++  assert.deepEqual(samples.scores,[0,0]);assert.equal(samples.fitnessSum,99);
++  assert.equal(samples.retired,1);assert.equal(samples.turns,9);
++  const legacy={scores:[0,0],fitnessSum:999999,retired:0,turns:0};
++  fitnessTail.recordDevelopmentFitness(legacy,17);
++  assert.deepEqual(clone(legacy.developmentFitnessPrefix),[17],'old aggregate must never fabricate a prefix');
++});
++
++test('fitness observer preserves positive rows and replaces at most one all-fail slot of the same cost',()=>{
++  const base=[proxyRow('positive',0,[999],[1]),proxyRow('fail0',0,[1]),proxyRow('fail1',1,[1])];
++  const pool=[...base,proxyRow('tail0',0,[500]),proxyRow('tail1',1,[600]),proxyRow('wrong-cost',2,[100000])];
++  const snapshot=clone(pool),out=fitnessTail.reserveFitnessTailObserver(base,pool,30);
++  assert.equal(out.length,base.length);assert.equal(out[0],base[0]);
++  assert.equal(out.filter((r,i)=>r!==base[i]).length,1);assert.equal(out[2].candidate.id,'tail1');
++  assert.deepEqual(clone(out.map(r=>r.candidate.cost)),base.map(r=>r.candidate.cost));
++  assert.deepEqual(clone(pool),snapshot,'no trial or checkpoint data changed');
++  assert.equal(out.reduce((n,r)=>n+r.development.scores.length,0),base.reduce((n,r)=>n+r.development.scores.length,0));
++});
++
++test('fitness observer uses requested attempts but never expands a positive-only observation set',()=>{
++  const base=[proxyRow('old',0,[0])],stable=proxyRow('stable',0,Array(100).fill(100)),rare=proxyRow('rare',0,[200,...Array(99).fill(0)]);
++  assert.equal(fitnessTail.reserveFitnessTailObserver(base,[stable,rare],30)[0].candidate.id,'stable');
++  assert.equal(fitnessTail.reserveFitnessTailObserver(base,[stable,rare],100)[0].candidate.id,'rare');
++  const positive=[proxyRow('winner',0,[1],[1])];
++  assert.equal(fitnessTail.reserveFitnessTailObserver(positive,[rare],100),positive);
++  assert.equal(fitnessTail.reserveFitnessTailObserver(base,[proxyRow('legacy',0,undefined)],30),base);
++  const sample=rare.development,before=stats.searchDevelopmentQuality(sample,{attempts:30,desiredProbability:.05});
++  sample.developmentFitnessPrefix=[99999999];
++  assert.equal(stats.searchDevelopmentQuality(sample,{attempts:30,desiredProbability:.05}),before,'ordinary ranking ignores proxy');
++});
++
++test('fitness prefix survives session checkpoint roundtrip while missing legacy prefixes remain missing',()=>{
++  const input=fixture(),candidate=generation.generateCandidates(input,generation.buildTasks(input,catalog)[0],catalog)[0];
++  assert.ok(candidate);
++  const row=proxyRow('roundtrip',candidate.cost,[10,20,30]);row.candidate=candidate;
++  const session=new SearchSession(input,catalog,{},'fitness-checkpoint');session.pool=[row];
++  const saved=clone(session.checkpoint());
++  const restored=new SearchSession(input,catalog,{},'ignored',saved);
++  assert.deepEqual(clone(restored.checkpoint().pool[0].development.developmentFitnessPrefix),[10,20,30]);
++  delete saved.pool[0].development.developmentFitnessPrefix;
++  const legacy=new SearchSession(input,catalog,{},'ignored',saved);
++  assert.equal(legacy.checkpoint().pool[0].development.developmentFitnessPrefix,undefined);
++});
++
++test('fitness observer skips exhausted ordinary candidates and keeps the old slot when none remain',()=>{
++  const cap=load('src/domain/examSearch/sampling.ts').CONTENDER_ORDINARY_SAMPLES;
++  const selected=[proxyRow('old-slot',0,[1])];
++  const capped=proxyRow('capped',0,[100000],Array(cap).fill(0));
++  const beyond=proxyRow('beyond-cap',0,[200000],Array(cap+1).fill(0));
++  const eligible=proxyRow('eligible',0,[10],Array(cap-1).fill(0));
++  assert.equal(fitnessTail.reserveFitnessTailObserver(selected,[capped,beyond,eligible],30)[0].candidate.id,'eligible',
++    'a high proxy cannot consume a slot when scheduler would skip all ordinary trials');
++  assert.equal(fitnessTail.reserveFitnessTailObserver(selected,[capped,beyond],30),selected,
++    'no eligible candidate means the old observation slot is preserved');
++  const restored=clone([capped,beyond,eligible]);
++  assert.equal(fitnessTail.reserveFitnessTailObserver(selected,restored,30)[0].candidate.id,'eligible',
++    'checkpoint-restored sample counts retain the same eligibility');
++});
