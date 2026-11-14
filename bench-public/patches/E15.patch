@@ -1,0 +1,149 @@
+diff --git a/src/domain/examSearch/candidateGenerator.ts b/src/domain/examSearch/candidateGenerator.ts
+index a87c2c86..b9fbc59e 100644
+--- a/src/domain/examSearch/candidateGenerator.ts
++++ b/src/domain/examSearch/candidateGenerator.ts
+@@ -1,3 +1,4 @@
++import { generationExperiments3 } from '@/domain/examSearch/generationExperiments3';
+ import { atkbuffDict, dmgbuffDict, healDict, healContinueDict, magicDict, recalculateATK, recalculateHP } from '@/utils/calculations';
+ import { getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
+ import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
+@@ -1146,6 +1147,14 @@ async function supportRoleExchangeNeighbors(input: SearchInput, parent: Candidat
+ export async function generateNeighbors(input: SearchInput, parent: Candidate, catalog: Catalog,
+   seen: Set<string>, stop: () => boolean): Promise<Candidate[]> {
+   const estimate = cachedEstimator(input, { anchor: '', totsu: 0, cost: 0, challenges: parent.challengeIds, style: 0 }, catalog);
++  const variantCache=new Map<string,SearchCard[]>();
++  const neighborVariants:typeof cardVariants=(card,rare,support=false,target=card.totsu,extra=0)=>{
++    if(!generationExperiments3.localNeighborVariants)return cardVariants(card,rare,support,target,extra);
++    const key=JSON.stringify([card.name,rare,support,target,extra]);
++    let result=variantCache.get(key);
++    if(!result){result=cardVariants(card,rare,support,target,extra);variantCache.set(key,result);}
++    return result;
++  };
+   const proposals: { candidate: Candidate; spellOnly: boolean; index: number; option: SearchCard }[] = [];
+   const rebalanced = new Map<string, { candidate: Candidate; hasM2: boolean }[]>();
+   const unique = new Set<string>();
+@@ -1157,7 +1166,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
+       if (++count % 64 === 0) { await yieldToHost(); if (stop()) return []; }
+       if (!slot.support && parent.cards.some((c, i) => i !== index && !c.support && c.name === raw.name)) continue;
+       const targets = slot.support ? [raw.totsu] : [raw.totsu, ...upgradeTargets(raw, catalog[raw.name].rare, input.budget, input.itemsPerLimitBreak)];
+-      for (const target of targets) for (const option of cardVariants(raw, catalog[raw.name].rare, slot.support, target, slot.additionalLevels)) {
++      for (const target of targets) for (const option of neighborVariants(raw, catalog[raw.name].rare, slot.support, target, slot.additionalLevels)) {
+         const replacement = parent.cards.map((c, i) => i === index ? option : c);
+         const cards = [...replacement.filter(c=>!c.support).sort((a,b)=>a.name.localeCompare(b.name)), ...replacement.filter(c=>c.support)];
+         const upgrades = cards.filter(c => !c.support && c.totsu > c.originalTotsu);
+@@ -1176,7 +1185,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
+                 if (!reduction) return card;
+                 const original = input.roster.find(raw => raw.name === card.name)!;
+                 const target = card.totsu - reduction;
+-                const options = cardVariants(original, catalog[card.name].rare, false, target, card.additionalLevels);
++                const options = neighborVariants(original, catalog[card.name].rare, false, target, card.additionalLevels);
+                 return options.find(candidate => candidate.selectedMagic.join(',') === card.selectedMagic.join(','))
+                   ?? options.find(candidate => candidate.selectedMagic.join(',') === '1,2');
+               });
+@@ -1261,30 +1270,33 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
+   for(const candidate of [...allocations.values()].sort((a,b)=>a.cost-b.cost||b.estimate-a.estimate)) {
+     selected.push(candidate);unique.add(candidate.id);
+   }
++  const linkedCandidates:Candidate[]=[];
+   // Introduce a linked pair together, even when neither one-card substitution
+   // was competitive enough to survive the measured pool.
+   for(let i=0;i<4;i++) for(let j=i+1;j<5;j++) {
+     await yieldToHost(); if(stop())return [];
++    let best:Candidate|undefined;
++    const directions=generationExperiments3.bidirectionalLinkedNeighbors?[[i,j],[j,i]]:[[i,j]];
++    for(const [first,second] of directions) {
+     const names=new Set<string>();
+-    const primary=proposals.filter(p=>p.index===i&&p.option.name!==parent.cards[i].name)
++    const primary=proposals.filter(p=>p.index===first&&p.option.name!==parent.cards[first].name)
+       .sort((a,b)=>b.candidate.estimate-a.candidate.estimate)
+       .filter(p=>!names.has(p.option.name)&&!!names.add(p.option.name)).slice(0,8);
+-    let best:Candidate|undefined;
+     for(const p of primary) {
+       const raw=catalog[p.option.name], partners=new Set([raw.duo,raw.buddy1c,raw.buddy2c,raw.buddy3c]);
+-      const support=parent.cards[j].support;
++      const support=parent.cards[second].support;
+       const source=(support?input.supports:input.roster).filter(c=>{
+         const other=catalog[c.name];
+         // Buddy/DUO links are directed. The second replacement can benefit
+         // from the first even when the first has no link pointing back.
+-        return c.name!==parent.cards[j].name&&(partners.has(other.chara)
++        return c.name!==parent.cards[second].name&&(partners.has(other.chara)
+           ||[other.duo,other.buddy1c,other.buddy2c,other.buddy3c].includes(raw.chara));
+       });
+       for(const card of source) {
+         if(++count%64===0){await yieldToHost();if(stop())return [];}
+         const targets=support?[card.totsu]:[card.totsu,...upgradeTargets(card,catalog[card.name].rare,input.budget,input.itemsPerLimitBreak)];
+-        for(const totsu of targets) for(const option of cardVariants(card,catalog[card.name].rare,support,totsu,parent.cards[j].additionalLevels)) {
+-          const replacement=parent.cards.map((c,index)=>index===i?p.option:index===j?option:c);
++        for(const totsu of targets) for(const option of neighborVariants(card,catalog[card.name].rare,support,totsu,parent.cards[second].additionalLevels)) {
++          const replacement=parent.cards.map((c,index)=>index===first?p.option:index===second?option:c);
+           const own=replacement.filter(c=>!c.support).sort((a,b)=>a.name.localeCompare(b.name));
+           if(new Set(own.map(c=>c.name)).size!==(examUsesSupport(input.preset)?4:5))continue;
+           const upgrades=own.filter(c=>c.totsu>c.originalTotsu);
+@@ -1298,11 +1310,20 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
+         }
+       }
+     }
+-    if(best){selected.push(best);unique.add(best.id);}
++    }
++    if(best){selected.push(best);linkedCandidates.push(best);unique.add(best.id);}
+   }
+   const returned=new Set<string>();
+   const result=selected.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog)
+     &&!returned.has(candidate.id)&&!!returned.add(candidate.id));
++  if(generationExperiments3.interleaveLinkedNeighbors&&linkedCandidates.length) {
++    const ids=new Set(linkedCandidates.map(c=>c.id));
++    const linked=result.filter(c=>ids.has(c.id)),regular=result.filter(c=>!ids.has(c.id)),ordered:Candidate[]=[];
++    for(let i=0;i<Math.max(linked.length,regular.length);i++) {
++      if(regular[i])ordered.push(regular[i]);if(linked[i])ordered.push(linked[i]);
++    }
++    result.splice(0,result.length,...ordered);
++  }
+   // The scheduler evaluates this array in order. Append at most two new teams
+   // after all original swaps, allocations and linked pairs, so broadening the
+   // search never replaces an established candidate or postpones it within this
+@@ -1335,7 +1356,11 @@ export function crossCandidates(input: SearchInput, a: Candidate, b: Candidate,
+   const supportAllowed=examUsesSupport(input.preset),ownCount=supportAllowed?4:5;
+   function* combinations(start=0,chosen:SearchCard[]=[]):Generator<SearchCard[]> {
+     if(chosen.length===ownCount){yield chosen;return;}
+-    for(let i=start;i<=all.length-(ownCount-chosen.length);i++)yield* combinations(i+1,[...chosen,all[i]]);
++    for(let i=start;i<=all.length-(ownCount-chosen.length);i++) {
++      if(generationExperiments3.earlyCrossPruning&&(chosen.some(card=>card.name===all[i].name)
++        ||upgradeCost(input,[...chosen,all[i]])>input.budget))continue;
++      yield* combinations(i+1,[...chosen,all[i]]);
++    }
+   }
+   for(const combination of combinations()) {
+     const own=[...combination].sort((x,y)=>x.name.localeCompare(y.name));
+@@ -1351,6 +1376,15 @@ export function crossCandidates(input: SearchInput, a: Candidate, b: Candidate,
+       unique.add(id); results.push({...a,preferredPlan:undefined,id,cards,cost,policy,estimate:estimate(cards)});
+     }
+   }
+-  return results.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog))
+-    .sort((a,b)=>b.estimate-a.estimate).slice(0,16);
++  const ranked=results.filter(candidate => candidateSatisfiesConstraints(input,candidate,catalog))
++    .sort((a,b)=>b.estimate-a.estimate);
++  if(!generationExperiments3.diverseCrossCompositions)return ranked.slice(0,16);
++  const selected:Candidate[]=[],compositions=new Set<string>(),ids=new Set<string>();
++  for(const candidate of ranked) {
++    const key=JSON.stringify(candidate.cards.map(c=>[c.name,c.level,c.totsu,c.support]).sort((a,b)=>String(a).localeCompare(String(b))));
++    if(compositions.has(key))continue;
++    compositions.add(key);selected.push(candidate);ids.add(candidate.id);if(selected.length>=16)break;
++  }
++  for(const candidate of ranked)if(selected.length<16&&!ids.has(candidate.id)){selected.push(candidate);ids.add(candidate.id);}
++  return selected;
+ }
+diff --git a/src/domain/examSearch/generationExperiments3.ts b/src/domain/examSearch/generationExperiments3.ts
+new file mode 100644
+index 00000000..d7fc774c
+--- /dev/null
++++ b/src/domain/examSearch/generationExperiments3.ts
+@@ -0,0 +1,8 @@
++/** Independent third-wave hypotheses, disabled by default. */
++export const generationExperiments3 = {
++  interleaveLinkedNeighbors: false,
++  bidirectionalLinkedNeighbors: true,
++  diverseCrossCompositions: false,
++  earlyCrossPruning: false,
++  localNeighborVariants: false,
++};

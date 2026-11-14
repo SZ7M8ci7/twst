@@ -1,0 +1,31 @@
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index d4a8a872..5c1c0253 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -4467,16 +4467,24 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
+   });
+   const publicTargets = publicEnemyAt.map(action=>action??{slotKey:'resource-unrevealed'} as RuntimeEnemyAction);
+   // Only this public enemy slot is available to the policy, never the enemy deck.
++  // Public state is unchanged while selecting this observation's finisher.
++  const finisherStrengths = new Map<string, number>();
+   const finisher = unusedMagic.reduce((best, id) => {
+     const magic = magicById(id), current = magicById(best);
+     const strength = (m: any, magicId: string) => {
++      const cached = finisherStrengths.get(magicId);
++      if (cached !== undefined) return cached;
+       if (!m) return 0;
+-      if (!effectAware) return safeNumber(buildRuntimeCharacter(m.deckIndex)?.atk) * magicHitCount(m.power);
++      if (!effectAware) {
++        const value = safeNumber(buildRuntimeCharacter(m.deckIndex)?.atk) * magicHitCount(m.power);
++        finisherStrengths.set(magicId, value); return value;
++      }
+       const parsed = parseMagicId(magicId)!;
+       const duo = unusedMagic.some(other => isDuoActiveForPair(magicId, other));
+       const target = exam.value.enemyElement === '全' ? '無' : exam.value.enemyElement;
+       const base=calculatePlayerDamageBaseFromState(state, magicId, parsed.deckIndex, parsed.magicSlot, target, 0, duo);
+-      return (base?.damage??0)*(tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(m.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER):1);
++      const value = (base?.damage??0)*(tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(m.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER):1);
++      finisherStrengths.set(magicId, value); return value;
+     };
+     return strength(magic, id) > strength(current, best) ? id : best;
+   }, '');

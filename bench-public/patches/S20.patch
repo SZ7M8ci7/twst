@@ -1,0 +1,371 @@
+diff --git a/src/domain/examSearch/samplingExperiments.ts b/src/domain/examSearch/samplingExperiments.ts
+new file mode 100644
+index 00000000..9ff37689
+--- /dev/null
++++ b/src/domain/examSearch/samplingExperiments.ts
+@@ -0,0 +1,82 @@
++import type { SearchResult } from '@/domain/examSearch/types';
++
++// Isolated research switches. Production defaults remain unchanged until a
++// paired, independent benchmark justifies adopting an individual hypothesis.
++export const samplingExperiments = {
++  balancedContenders: false,
++  ordinaryDiscoveryFirst: false,
++  expectedPlanParents: false,
++  shortContenderBatches: false,
++  ordinaryLoadoutFirst: false,
++  ordinaryPlanFirst: false,
++  lighterDiscoveryImportance: false,
++  expectedMutationParents: false,
++  extraRescueContenders: false,
++  moreLoadoutTime: false,
++  morePlanTime: false,
++  widerFinalists: false,
++  cachedParentPeaks: false,
++  refreshContenders: false,
++  interleaveTraining: false,
++  rotateCrossPartner: false,
++  boundedPlanLearning: false,
++  interleavePlanModes: true,
++  observedPlanFirst: false,
++  complementaryCrossPartner: false,
++};
++
++export function balancedContenderOrder(rows: SearchResult[], batch: number): SearchResult[] {
++  const costs = [...new Set(rows.map(row => row.candidate.cost))].sort((a,b) => a-b);
++  if (!costs.length) return [];
++  const offset = batch % costs.length;
++  const groups = [...costs.slice(offset), ...costs.slice(0,offset)]
++    .map(cost => rows.filter(row => row.candidate.cost === cost));
++  return Array.from({length: Math.max(...groups.map(group => group.length))}, (_,i) =>
++    groups.flatMap(group => group[i] ? [group[i]] : [])).flat();
++}
++
++export function expectedPlanParentOrder(rows: SearchResult[], pool: SearchResult[], quality: (row: SearchResult) => number): SearchResult[] {
++  const costs = [...new Set(rows.map(row => row.candidate.cost))].sort((a,b) => a-b);
++  const groups = costs.map(cost => {
++    const available = pool.filter(row => row.candidate.cost === cost);
++    const champion = available.reduce<SearchResult | undefined>((best,row) => !best || quality(row)>quality(best) ? row : best, undefined);
++    return [...new Map([...(champion ? [champion] : []), ...rows.filter(row => row.candidate.cost === cost)]
++      .map(row => [row.candidate.id,row])).values()];
++  });
++  return Array.from({length: Math.max(0,...groups.map(group => group.length))}, (_,i) =>
++    groups.flatMap(group => group[i] ? [group[i]] : [])).flat();
++}
++
++export function* trainingCandidateOrder<T, P>(parents: P[], generate: (parent: P) => T[], interleave: boolean): Generator<T> {
++  if (!interleave) {
++    for (const parent of parents) yield* generate(parent);
++    return;
++  }
++  const groups = parents.map(generate);
++  const maximum = Math.max(0,...groups.map(group=>group.length));
++  for (let i=0;i<maximum;i++) for (const group of groups) if (i<group.length) yield group[i];
++}
++
++export function planLearningBudget(deadline: number, now: number, bounded: boolean): number {
++  return bounded ? Math.max(0,Math.min(250,deadline-now)) : 250;
++}
++
++export function planParentJobs<T>(parents: T[], modes: number, interleave: boolean): {parent:T; modeIndex?:number}[] {
++  return interleave ? Array.from({length:modes},(_,modeIndex)=>parents.map(parent=>({parent,modeIndex}))).flat()
++    : parents.map(parent=>({parent}));
++}
++
++export function complementaryCrossPartner(parent: SearchResult, parents: SearchResult[]): SearchResult | undefined {
++  const compatible=parents.filter(row=>row!==parent && row.candidate.challengeIds.join('|')===parent.candidate.challengeIds.join('|'));
++  const sameCost=compatible.filter(row=>row.candidate.cost===parent.candidate.cost);
++  const candidates=sameCost.length?sameCost:compatible;
++  const key=(card:SearchResult['candidate']['cards'][number])=>JSON.stringify([card.name,card.level,card.totsu,card.selectedMagic,card.support]);
++  const base=new Set(parent.candidate.cards.map(key));
++  let best:SearchResult|undefined,novelty=-1;
++  for(const row of candidates) {
++    const keys=new Set(row.candidate.cards.map(key));
++    const distance=[...keys].filter(value=>!base.has(value)).length+[...base].filter(value=>!keys.has(value)).length;
++    if(distance>novelty){best=row;novelty=distance;}
++  }
++  return best;
++}
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..01db21db 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -1,3 +1,4 @@
++import { samplingExperiments, balancedContenderOrder, expectedPlanParentOrder, trainingCandidateOrder, planLearningBudget, planParentJobs, complementaryCrossPartner } from '@/domain/examSearch/samplingExperiments';
+ import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
+ import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
+ import * as statistics from '@/domain/examSearch/statistics';
+@@ -217,7 +218,9 @@ export class SearchSession {
+   }
+   private diverseParents(limit: number) {
+     const sorted = [...this.pool].sort(this.qualityComparator());
+-    const peak=(result:SearchResult)=>result.development.scores.reduce((a,b)=>Math.max(a,b),0);
++    const peakCache = samplingExperiments.cachedParentPeaks
++      ? new Map(sorted.map(result=>[result,result.development.scores.reduce((a,b)=>Math.max(a,b),0)])) : undefined;
++    const peak=(result:SearchResult)=>peakCache?.get(result) ?? result.development.scores.reduce((a,b)=>Math.max(a,b),0);
+     const ceilings=[...sorted].sort((a,b)=>peak(b)-peak(a));
+     const bands=[...new Set(sorted.map(r=>r.candidate.cost))].sort((a,b)=>a-b).map(cost=>{
+       const best=ceilings.find(r=>r.candidate.cost===cost),quality=sorted.find(r=>r.candidate.cost===cost);
+@@ -252,7 +255,7 @@ export class SearchSession {
+     const costs=[...new Set(this.pool.map(r=>r.candidate.cost))].sort((a,b)=>a-b);
+     return costs.flatMap(cost=>{
+       const promising=normal.filter(r=>r.candidate.cost===cost),rare=losses.filter(r=>r.candidate.cost===cost);
+-      const chosen=[...new Set([...promising.slice(0,3),...rare,...promising])];
++      const chosen=[...new Set([...promising.slice(0,samplingExperiments.extraRescueContenders ? 2 : 3),...rare,...promising])];
+       return chosen.slice(0,4);
+     });
+   }
+@@ -265,6 +268,7 @@ export class SearchSession {
+     return [...costs.slice(offset), ...costs.slice(0, offset)];
+   }
+   private selectFinalists() {
++    const finalistWidth = samplingExperiments.widerFinalists ? 12 : MAX_FINALISTS;
+     const qualityCache=new Map<SearchResult,number>();
+     const qualityOf=(result:SearchResult)=>{
+       const cached=qualityCache.get(result);if(cached!==undefined)return cached;
+@@ -287,14 +291,14 @@ export class SearchSession {
+           ||conservative(bm.empiricalScore)-conservative(am.empiricalScore)||bm.max-am.max;
+       }).slice(0,1));
+     const retainedIds=new Set(retained.map(r=>r.candidate.id)),selected:SearchResult[]=[];
+-    for(const cost of this.finalistCostOrder(costs, MAX_FINALISTS-retained.length)){
++    for(const cost of this.finalistCostOrder(costs, finalistWidth-retained.length)){
+       const band=sorted.filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id));
+       const expected=band[0],weighted=this.weightedChampion(band);
+       const scout=band.filter(r=>(r.criticalScout?.score??0)>0).sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
+       const peak=[...band].sort((a,b)=>{
+         const am=a.development.scores.reduce((x,y)=>Math.max(x,y),0),bm=b.development.scores.reduce((x,y)=>Math.max(x,y),0);return bm-am;
+       })[0];
+-      const slots=Math.max(1,Math.floor((MAX_FINALISTS-retained.length)/Math.max(1,costs.length)));
++      const slots=Math.max(1,Math.floor((finalistWidth-retained.length)/Math.max(1,costs.length)));
+       // Expected best of the requested attempts leads every automatic band.
+       // Keep rare-tail exploration in spare slots without changing its samples.
+       const role=(this.partition.islandIndex+this.round)%2;
+@@ -306,8 +310,8 @@ export class SearchSession {
+         [...retained,...selected,...priority].filter(result=>result.candidate.cost===cost))];
+       selected.push(...bandSelected);
+     }
+-    for(const result of sorted)if(selected.length<MAX_FINALISTS-retained.length&&!retainedIds.has(result.candidate.id)&&!selected.some(r=>r.candidate.id===result.candidate.id))selected.push(result);
+-    this.finalists=[...retained,...selected.slice(0,MAX_FINALISTS-retained.length).map(r=>({...r,validation:emptySamples(),validationBest:undefined,validationTarget:VALIDATION_SAMPLES}))];
++    for(const result of sorted)if(selected.length<finalistWidth-retained.length&&!retainedIds.has(result.candidate.id)&&!selected.some(r=>r.candidate.id===result.candidate.id))selected.push(result);
++    this.finalists=[...retained,...selected.slice(0,finalistWidth-retained.length).map(r=>({...r,validation:emptySamples(),validationBest:undefined,validationTarget:VALIDATION_SAMPLES}))];
+     this.round++;
+   }
+   async run(durationMs: number, publish: (progress: SearchProgress) => void, continuous = false) {
+@@ -318,9 +322,9 @@ export class SearchSession {
+     const discoverySamples = wideInitialScreen ? WIDE_DISCOVERY_SAMPLES : DISCOVERY_SAMPLES;
+     const discoveryScoutSamples = wideInitialScreen ? WIDE_SCOUT_SAMPLES : DISCOVERY_SAMPLES;
+     const start = performance.now(), deadline = start + durationMs, discoveryEnd = start + durationMs * 0.48;
+-    const loadoutDeadline = start + durationMs * 0.55;
++    const loadoutDeadline = start + durationMs * (samplingExperiments.moreLoadoutTime ? 0.58 : 0.55);
+     const contenderDeadline = start + durationMs * 0.65;
+-    const planDeadline = start + durationMs * 0.7;
++    const planDeadline = start + durationMs * (samplingExperiments.morePlanTime ? 0.73 : 0.7);
+     const report = (phase: SearchProgress['phase']) => publish({ phase, generated: this.generatedCount,
+       evaluated: this.evaluatedCount, tasksDone: this.cursor, tasksTotal: this.knownTasksTotal,
+       elapsedMs: this.elapsed + performance.now() - start, results: this.finalists });
+@@ -353,9 +357,21 @@ export class SearchSession {
+             if (candidates) this.cursor++;
+           } else {
+             const parents = this.diverseParents(4);
+-            const parent = parents[this.mutationRound++ % parents.length];
++            const mutationIndex=this.mutationRound++;
++            let parent = parents[mutationIndex % parents.length];
++            if (samplingExperiments.expectedMutationParents && mutationIndex%2===1) {
++              const costs=[...new Set(this.pool.map(row=>row.candidate.cost))].sort((a,b)=>a-b);
++              const cost=costs[Math.floor(mutationIndex/2)%costs.length];
++              parent=[...this.pool].filter(row=>row.candidate.cost===cost).sort(this.qualityComparator())[0] ?? parent;
++            }
+             candidates = await generateNeighbors(this.input, parent.candidate, this.catalog, this.seen, stop);
+-            const partner=parents.find(r=>r!==parent && r.candidate.cost===parent.candidate.cost) ?? parents.find(r=>r!==parent);
++            let partner=parents.find(r=>r!==parent && r.candidate.cost===parent.candidate.cost) ?? parents.find(r=>r!==parent);
++            if (samplingExperiments.rotateCrossPartner) {
++              let partners=parents.filter(row=>row!==parent && row.candidate.cost===parent.candidate.cost);
++              if (!partners.length) partners=parents.filter(row=>row!==parent);
++              partner=partners[mutationIndex%partners.length];
++            }
++            if (samplingExperiments.complementaryCrossPartner) partner=complementaryCrossPartner(parent,parents);
+             if(partner && !stop()) candidates.push(...crossCandidates(this.input,parent.candidate,partner.candidate,this.catalog,this.seen));
+             if (!candidates.length && ++emptyMutations >= parents.length && this.cursor >= this.tasks.length) break;
+             if (candidates.length) emptyMutations = 0;
+@@ -369,8 +385,10 @@ export class SearchSession {
+         const result = this.pending[0];
+         if (!result) { await progress('generate'); continue; }
+         await this.engine.prepare(this.input, result.candidate);
+-        await this.scout(result,discoveryEnd,discoveryScoutSamples);
+-        await this.importanceScreen(result,discoveryEnd,16);
++        if (!samplingExperiments.ordinaryDiscoveryFirst) {
++          await this.scout(result,discoveryEnd,discoveryScoutSamples);
++          await this.importanceScreen(result,discoveryEnd,samplingExperiments.lighterDiscoveryImportance ? 8 : 16);
++        }
+         while (result.development.scores.length < discoverySamples && !this.stopped && performance.now() < discoveryEnd) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial = this.engine.trial(seed, result.candidate.policy);
+@@ -381,6 +399,10 @@ export class SearchSession {
+           result.development.turns += trial.finishTurn;
+           if (result.development.scores.length % 8 === 0) await progress('generate');
+         }
++        if (samplingExperiments.ordinaryDiscoveryFirst) {
++          await this.scout(result,discoveryEnd,discoveryScoutSamples);
++          await this.importanceScreen(result,discoveryEnd,samplingExperiments.lighterDiscoveryImportance ? 8 : 16);
++        }
+         if (result.development.scores.length >= discoverySamples) {
+           this.pool.push(result); this.pending.shift(); this.evaluatedCount++;
+           this.trimPool();
+@@ -397,8 +419,10 @@ export class SearchSession {
+         const candidate=options[index];if(!candidate||this.seen.has(candidate.id))continue;
+         const result:SearchResult={candidate,development:emptySamples(),validation:emptySamples(),validationTarget:VALIDATION_SAMPLES};
+         await this.engine.prepare(this.input,candidate);
+-        await this.scout(result,loadoutDeadline,8);
+-        await this.importanceScreen(result,loadoutDeadline,16);
++        if (!samplingExperiments.ordinaryLoadoutFirst) {
++          await this.scout(result,loadoutDeadline,8);
++          await this.importanceScreen(result,loadoutDeadline,16);
++        }
+         for(let i=0;i<16&&!this.stopped&&performance.now()<loadoutDeadline;i++) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial=this.engine.trial(seed,candidate.policy);
+@@ -408,19 +432,26 @@ export class SearchSession {
+           result.development.retired+=Number(trial.retired);result.development.turns+=trial.finishTurn;
+           if(i%8===0)await progress('generate');
+         }
++        if (samplingExperiments.ordinaryLoadoutFirst) {
++          await this.scout(result,loadoutDeadline,8);
++          await this.importanceScreen(result,loadoutDeadline,16);
++        }
+         if(result.development.scores.length){this.pool.push(result);this.remember(candidate.id);this.evaluatedCount++;}
+       }
+       // Rare successful draws are easily missed by the short ordinary screen.
+       // Give promising compositions in every resource band equal extra batches
+       // before fitting plans. These remain development data, never holdout data.
+-      const contenders = this.contenders();
+-      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const result of contenders) {
++      let contenders = this.contenders();
++      const contenderBatch = samplingExperiments.shortContenderBatches ? 8 : 32;
++      for (let batch=0;batch<(wideInitialScreen?16:15)*(32/contenderBatch);batch++) {
++      if (samplingExperiments.refreshContenders && batch>0 && batch%4===0 && !this.stopped && performance.now()<contenderDeadline) contenders=this.contenders();
++      for (const result of (samplingExperiments.balancedContenders ? balancedContenderOrder(contenders,batch) : contenders)) {
+         if(this.stopped || performance.now()>=contenderDeadline) break;
+         if(result.development.scores.length>=512) continue;
+         await this.engine.prepare(this.input,result.candidate);
+         if (wideInitialScreen) await this.scout(result,contenderDeadline,32);
+-        await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+32));
+-        for(let i=0;i<32 && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
++        await this.importanceScreen(result,contenderDeadline,Math.min(512,(result.importance?.n??0)+contenderBatch));
++        for(let i=0;i<contenderBatch && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
+           const seed=`${this.nonce}:development:${this.trialSerial++}`;
+           const trial=this.engine.trial(seed,result.candidate.policy);
+           if(!result.developmentBest || trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+@@ -431,20 +462,35 @@ export class SearchSession {
+           if(i%8===0)await progress('generate');
+         }
+       }
++      }
+       // Fit a small number of explicit plans on development seeds. At runtime a
+       // plan only chooses a pair if both cards are visible; otherwise the public
+       // observation policy takes over. Holdout trials never optimize their seed.
+       if (this.engine.learnPlan && !this.stopped) {
+-        const parents = this.diverseParents(3).slice(0,12);
+-        for (let planRound=0;planRound<3;planRound++) for (const parent of parents) {
++        const diverse = this.diverseParents(3);
++        const parents = (samplingExperiments.expectedPlanParents
++          ? expectedPlanParentOrder(diverse,this.pool,row=>this.quality(row)) : diverse).slice(0,12);
++        const availableModes=this.input.preset.kind==='BASIC'?['flexible','turn','priority'] as const:['turn','priority'] as const;
++        for (let planRound=0;planRound<3;planRound++) {
++        const learnedPlans=new Map<SearchResult,NonNullable<SearchResult['candidate']['preferredPlan']>>();
++        for (const {parent,modeIndex} of planParentJobs(parents,availableModes.length,samplingExperiments.interleavePlanModes)) {
+           if (this.stopped || performance.now() >= planDeadline) break;
++          let plan: SearchResult['candidate']['preferredPlan'] | null;
++          if(modeIndex===undefined || modeIndex===0) {
+           await this.engine.prepare(this.input,parent.candidate);
+-          let plan;
+-          if(planRound===0&&(parent.criticalScout?.score??0)>(parent.developmentBest?.score??0))plan=parent.criticalScout?.plan;
++          if(samplingExperiments.observedPlanFirst && planRound===0 && parent.developmentBest && parent.developmentBest.score>0) {
++            const observed=this.engine.trial(parent.developmentBest.seed,parent.candidate.policy,true);
++            if(observed.score!==parent.developmentBest.score)throw new Error('Development trial replay mismatch');
++            plan=observed.plan;
++          }
++          if(!plan&&planRound===0&&(parent.criticalScout?.score??0)>(parent.developmentBest?.score??0))plan=parent.criticalScout?.plan;
+           // Keep the observed plan first, then optimize a template without a
+           // particular hand draw. Only ordinary trials below can rank it.
+-          if(planRound===1&&parent.criticalScout?.cardIndex!==undefined&&this.engine.learnCriticalPlan)
+-            plan=await this.engine.learnCriticalPlan(parent.criticalScout.seed??`${this.nonce}:ideal-critical-plan-development:${this.trialSerial++}`,250,parent.criticalScout.cardIndex,true,parent.criticalScout.magic);
++          if(planRound===1&&parent.criticalScout?.cardIndex!==undefined&&this.engine.learnCriticalPlan) {
++            const budget=planLearningBudget(planDeadline,performance.now(),samplingExperiments.boundedPlanLearning);
++            if(budget<=0)break;
++            plan=await this.engine.learnCriticalPlan(parent.criticalScout.seed??`${this.nonce}:ideal-critical-plan-development:${this.trialSerial++}`,budget,parent.criticalScout.cardIndex,true,parent.criticalScout.magic);
++          }
+           if(!plan&&planRound<=1&&parent.developmentBest&&parent.developmentBest.score>0) {
+             const observed=this.engine.trial(parent.developmentBest.seed,parent.candidate.policy,true);
+             if(observed.score!==parent.developmentBest.score)throw new Error('Development trial replay mismatch');
+@@ -452,19 +498,30 @@ export class SearchSession {
+           }
+           // An observed successful development run is often a better starting
+           // point than an unrelated draw. It is never a validation/audit seed.
+-          if(!plan&&planRound===2&&parent.criticalScout?.cardIndex!==undefined&&this.engine.learnCriticalPlan)
+-            plan=await this.engine.learnCriticalPlan(`${this.nonce}:critical-plan-development:${this.trialSerial++}`,250,parent.criticalScout.cardIndex,false,parent.criticalScout.magic);
+-          plan??=await this.engine.learnPlan(`${this.nonce}:plan-development:${this.trialSerial++}`, 250);
++          if(!plan&&planRound===2&&parent.criticalScout?.cardIndex!==undefined&&this.engine.learnCriticalPlan) {
++            const budget=planLearningBudget(planDeadline,performance.now(),samplingExperiments.boundedPlanLearning);
++            if(budget<=0)break;
++            plan=await this.engine.learnCriticalPlan(`${this.nonce}:critical-plan-development:${this.trialSerial++}`,budget,parent.criticalScout.cardIndex,false,parent.criticalScout.magic);
++          }
++          if(!plan) {
++            const budget=planLearningBudget(planDeadline,performance.now(),samplingExperiments.boundedPlanLearning);
++            if(budget<=0)break;
++            plan=await this.engine.learnPlan(`${this.nonce}:plan-development:${this.trialSerial++}`,budget);
++          }
++          if(plan && samplingExperiments.interleavePlanModes)learnedPlans.set(parent,plan);
++          } else plan=learnedPlans.get(parent);
+           if (!plan || this.stopped) continue;
+-          const planModes=this.input.preset.kind==='BASIC'?['flexible','turn','priority'] as const:['turn','priority'] as const;
++          const planModes=modeIndex===undefined?availableModes:[availableModes[modeIndex]];
+           for (const preferredPlanMode of planModes) {
+           const candidate = { ...parent.candidate, preferredPlan: plan, preferredPlanMode,
+             id: JSON.stringify([parent.candidate.cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.candidate.challengeIds,parent.candidate.policy,plan,preferredPlanMode]) };
+           if (this.seen.has(candidate.id)) continue;
+           const result: SearchResult = { candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES };
+           await this.engine.prepare(this.input,candidate);
+-          await this.scout(result,planDeadline,8);
+-          await this.importanceScreen(result,planDeadline,32);
++          if (!samplingExperiments.ordinaryPlanFirst) {
++            await this.scout(result,planDeadline,8);
++            await this.importanceScreen(result,planDeadline,32);
++          }
+           for (let i=0;i<64 && !this.stopped && performance.now()<planDeadline;i++) {
+             const seed=`${this.nonce}:development:${this.trialSerial++}`;
+             const trial = this.engine.trial(seed,candidate.policy);
+@@ -475,10 +532,15 @@ export class SearchSession {
+             result.development.turns += trial.finishTurn;
+             if (i % 8 === 0) await progress('generate');
+           }
++          if (samplingExperiments.ordinaryPlanFirst) {
++            await this.scout(result,planDeadline,8);
++            await this.importanceScreen(result,planDeadline,32);
++          }
+           if (result.development.scores.length === 64) { this.pool.push(result); this.remember(candidate.id); this.evaluatedCount++; }
+           }
+         }
+       }
++      }
+       // Check whether each promising upgraded team can work with fewer items,
+       // including the same learned instructions when its spells remain legal.
+       const plannedParents=[...this.pool].filter(r=>r.candidate.preferredPlan?.length)
+@@ -487,10 +549,14 @@ export class SearchSession {
+       const trainingParents=[...new Set([...this.diverseParents(1),...plannedParents.filter(r=>{
+         if(plannedCosts.has(r.candidate.cost))return false;plannedCosts.add(r.candidate.cost);return true;
+       })])];
+-      for(const parent of trainingParents)for(const candidate of [
+-        ...lowerCostCandidates(this.input,parent.candidate,this.catalog),
+-        ...trainedUpgradeCandidates(this.input,parent.candidate,this.catalog),
+-      ]) {
++      const trainingGroups: (SearchResult | null)[] = samplingExperiments.interleaveTraining ? [null] : trainingParents;
++      for(const parent of trainingGroups)for(const candidate of (samplingExperiments.interleaveTraining
++        ? trainingCandidateOrder(trainingParents,row=>[
++          ...lowerCostCandidates(this.input,row.candidate,this.catalog),
++          ...trainedUpgradeCandidates(this.input,row.candidate,this.catalog),
++        ],true)
++        : [...lowerCostCandidates(this.input,parent!.candidate,this.catalog),
++          ...trainedUpgradeCandidates(this.input,parent!.candidate,this.catalog)])) {
+         if (!candidateSatisfiesConstraints(this.input,candidate,this.catalog)) continue;
+         if(this.stopped||performance.now()>=deadline-durationMs*0.25)break;
+         if(this.seen.has(candidate.id))continue;
