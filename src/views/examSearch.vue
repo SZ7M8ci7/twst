@@ -75,7 +75,7 @@
       <v-tab value="results" data-testid="search-results-tab">{{ t('examComparison.results') }}</v-tab>
       <v-tab value="compare" data-testid="comparison-tab">{{ t('examComparison.tab') }}<span v-if="comparisonRef?.count" class="ml-1">({{ comparisonRef.count }})</span></v-tab>
     </v-tabs>
-    <ExamSearchResultsTable v-if="resultGroups.length" v-show="resultsTab === 'results'" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.variants.length }))"
+    <ExamSearchResultsTable v-if="resultGroups.length" v-show="resultsTab === 'results'" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.allVariants.length }))"
       :card-images="cardImages" :card-label="cardLabel" :upgrade-summary="variantCardSummary" :busy="busy"
       :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds" @compare="addComparison"
       @preview="preview" @simulator="openSimulator" @variants="openVariants" />
@@ -86,6 +86,7 @@
       <v-card class="modal-card variants-card">
         <v-card-title class="modal-title">{{ t('examSearch.variantsTitle') }}</v-card-title>
         <v-card-text>
+          <v-checkbox v-if="hasHiddenTrainingVariants" v-model="showAllTrainingVariants" :label="t('examSearch.showAllTrainingVariants')" density="compact" hide-details />
           <ExamSearchResultsTable :rows="variantRows" :card-images="cardImages" :card-label="cardLabel"
             :upgrade-summary="variantCardSummary" :busy="busy" :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds"
             @compare="addComparison" @preview="preview" @simulator="openSimulator" />
@@ -99,7 +100,9 @@
         <v-card-text>
           <fieldset :disabled="busy" class="search-settings-fields">
             <v-switch v-model="favorableEffects" data-testid="search-favorable-effects" :disabled="busy" color="primary" inset hide-details :label="t('examSearch.favorableEffects')" />
+            <v-checkbox v-if="input.preset.kind === 'BASIC'" v-model="forceFinisherTripleCritical" data-testid="search-force-finisher-triple-critical" :disabled="busy" color="primary" hide-details :label="t('examSearch.forceFinisherTripleCritical')" />
             <v-text-field v-model.number="additionalBreaks" type="number" min="0" max="4" step="1" :label="t('examSearch.extraBreaks')" :error-messages="additionalBreaksError" density="compact" variant="outlined" hide-details="auto" />
+            <v-checkbox v-model="excludeDormFromUpgrades" data-testid="search-exclude-dorm-upgrades" :disabled="busy" color="primary" hide-details :label="t('examSearch.excludeDormFromUpgrades')" />
             <v-text-field v-model.number="additionalLevelCap" data-testid="additional-level-cap" type="number" min="0" max="100" step="1" :label="t('examSearch.additionalLevelCap')" :error-messages="additionalLevelCapError" density="compact" variant="outlined" hide-details="auto" />
             <v-text-field v-model.number="input.attempts" type="number" min="1" max="100000" step="1" :label="t('examSearch.attempts')" :error-messages="attemptsError" density="compact" variant="outlined" hide-details="auto" />
           </fieldset>
@@ -157,6 +160,7 @@ import { useHandCollectionStore } from '@/store/handCollection';
 import { getInputMaxLevel } from '@/constants/levels';
 import { localizeCharacterName, localizeCostumeName, localizeGameText } from '@/utils/localizedDisplay';
 import { loadExamSearch, saveExamSearch, loadSearchSession, saveSearchSession, saveSearchTransfer, loadSearchSeedTeams, type SavedSearchSession } from '@/storage/examSearchStorage';
+import { groupSearchResults, resultDeckKey } from '@/domain/examSearch/resultGroups';
 import { validateInput, invalidSearchCards, examUsesSupport } from '@/domain/examSearch/variants';
 import { constrainCheckpoint } from '@/domain/examSearch/requiredCheckpoint';
 import { rankedResults } from '@/domain/examSearch/statistics';
@@ -198,7 +202,7 @@ const busy = computed({ get: () => searchBusy.value || comparisonBusy.value, set
 const error = ref(''), progress = ref<SearchProgress | null>(null);
 const comparisonRef = ref<InstanceType<typeof ExamFormationComparison> | null>(null);
 const resultsTab = ref<'results' | 'compare'>('results');
-const comparisonContextKey = computed(() => JSON.stringify([input.value.preset, input.value.favorableEffects, input.value.challengeLocks]));
+const comparisonContextKey = computed(() => JSON.stringify([input.value.preset, input.value.favorableEffects, input.value.forceFinisherTripleCritical, input.value.challengeLocks]));
 function addComparison(result: SearchResult) {
   if (busy.value || !evaluatedInput.value) return;
   comparisonRef.value?.toggle(result, evaluatedInput.value);
@@ -246,6 +250,14 @@ const favorableEffects = computed({
   get: () => input.value.favorableEffects === true,
   set: (value: boolean) => { if (!busy.value) input.value.favorableEffects = value; },
 });
+const forceFinisherTripleCritical = computed({
+  get: () => input.value.forceFinisherTripleCritical === true,
+  set: (value: boolean) => { if (!busy.value) input.value.forceFinisherTripleCritical = value; },
+});
+const excludeDormFromUpgrades = computed({
+  get: () => input.value.excludeDormFromUpgrades === true,
+  set: (value: boolean) => { if (!busy.value) input.value.excludeDormFromUpgrades = value; },
+});
 const additionalBreaks = computed({ get: () => input.value.budget / input.value.itemsPerLimitBreak, set: n => { input.value.budget = n * input.value.itemsPerLimitBreak; } });
 const additionalBreaksError = computed(() => Number.isInteger(additionalBreaks.value) && additionalBreaks.value >= 0 && additionalBreaks.value <= 4
   ? '' : t('examSearch.validation.additional-breaks'));
@@ -264,43 +276,21 @@ const characterChoices = computed(() => characterOptions.value.map(name => ({
 const visibleCharacterOptions = characterChoices;
 const results = computed(() => evaluatedInput.value ? rankedResults(progress.value?.results ?? [], evaluatedInput.value.attempts, evaluatedInput.value.desiredProbability) : []);
 const visibleResults = results;
-type ResultGroup = { primary: SearchResult; variants: SearchResult[] };
-const deckKey = (result: SearchResult) => result.candidate.cards
-  .map(card => `${card.support ? 'support' : 'own'}:${card.name}`)
-  .sort()
-  .join('|');
-const investmentKey = (result: SearchResult) => result.candidate.cards
-  .map(card => `${card.support ? 'support' : 'own'}:${card.name}:${card.level}:${card.totsu}`)
-  .sort()
-  .join('|');
-const resultGroups = computed<ResultGroup[]>(() => {
-  const groups = new Map<string, ResultGroup>();
-  const investments = new Map<string, Set<string>>();
-  for (const result of visibleResults.value) {
-    const key = deckKey(result);
-    const group = groups.get(key);
-    if (!group) {
-      groups.set(key, { primary: result, variants: [] });
-      investments.set(key, new Set([investmentKey(result)]));
-      continue;
-    }
-    const keySet = investments.get(key)!;
-    const variantKey = investmentKey(result);
-    if (!keySet.has(variantKey)) {
-      keySet.add(variantKey);
-      group.variants.push(result);
-    }
-  }
-  return [...groups.values()];
-});
+const deckKey = resultDeckKey;
+const resultGroups = computed(() => groupSearchResults(visibleResults.value,
+  (evaluatedInput.value?.additionalLevelCap ?? 0) > 0));
 const variantsOpen = ref(false);
 const variantsDeckKey = ref('');
+const showAllTrainingVariants = ref(false);
+const activeVariantGroup = computed(() => resultGroups.value.find(group => deckKey(group.primary) === variantsDeckKey.value));
+const hasHiddenTrainingVariants = computed(() => !!activeVariantGroup.value && activeVariantGroup.value.allVariants.length > activeVariantGroup.value.variants.length);
 const variantRows = computed(() => {
-  const group = resultGroups.value.find(group => deckKey(group.primary) === variantsDeckKey.value);
-  return group ? [group.primary, ...group.variants].map(result => ({ result })) : [];
+  const group = activeVariantGroup.value;
+  return group ? [group.primary, ...(showAllTrainingVariants.value ? group.allVariants : group.variants)].map(result => ({ result })) : [];
 });
 function openVariants(result: SearchResult) {
   variantsDeckKey.value = deckKey(result);
+  showAllTrainingVariants.value = false;
   variantsOpen.value = true;
 }
 watch(() => visibleResults.value.flatMap(r => r.candidate.cards.map(c => c.name)), names => {
@@ -359,7 +349,7 @@ watch(characterFilter, names => {
 watch([() => input.value.budget, () => input.value.additionalLevelCap, () => input.value.attempts], () => {
   if (!busy.value) invalidateActiveSearch();
 });
-watch(favorableEffects, () => {
+watch([favorableEffects, forceFinisherTripleCritical, excludeDormFromUpgrades], () => {
   invalidateActiveSearch();
   finishRequest();
   if (!saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');

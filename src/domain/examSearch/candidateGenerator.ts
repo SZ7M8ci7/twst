@@ -4,7 +4,7 @@ import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
 import { criticalRatePowerScale, criticalTailMultiplier } from '@/utils/criticalRates';
 import { evasionRateByPower, defenceEvasionValue } from '@/utils/evasionRates';
 import { yieldToHost } from '@/utils/yieldToHost';
-import { searchCardVariants as cardVariants, challengeVariants, upgradeTargets, examUsesSupport, allocationCards, upgradeCost,
+import { searchCardVariants as cardVariants, challengeVariants, inputUpgradeTargets, examUsesSupport, allocationCards, upgradeCost,
   requiredCardSupportAssignments, requiredOwnedNames, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
 import type { Candidate, SearchCard, SearchInput, PolicyKind } from '@/domain/examSearch/types';
 import { createCompletionCheck } from '@/domain/examSearch/completion';
@@ -41,7 +41,7 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
   const supportAllowed=examUsesSupport(input.preset),ownCount=supportAllowed?4:5;
   const challenges = challengeVariants(input), lanes = new Map<number, GenerationTask[]>();
   for (const card of input.roster) {
-    for (const totsu of [card.totsu, ...upgradeTargets(card, catalog[card.name].rare, input.budget, input.itemsPerLimitBreak)]) {
+    for (const totsu of [card.totsu, ...inputUpgradeTargets(input, card, catalog, input.budget)]) {
       const cost = (totsu - card.totsu) * input.itemsPerLimitBreak;
       if (!lanes.has(cost)) lanes.set(cost, []);
       const style = [...card.name].reduce((sum,c)=>sum+c.charCodeAt(0),totsu) % 3;
@@ -235,7 +235,7 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
     uniqueTeams.add(key);
     for(const [index,name] of team.slice(0,ownCount).entries()) {
       const card=input.roster.find(c=>c.name===name)!;
-      for(const totsu of [...(index===0?[card.totsu]:[]),...upgradeTargets(card,catalog[name].rare,input.budget,input.itemsPerLimitBreak)])
+      for(const totsu of [...(index===0?[card.totsu]:[]),...inputUpgradeTargets(input, card, catalog, input.budget)])
         for(const ids of challenges)seeds.push({anchor:name,totsu,cost:(totsu-card.totsu)*input.itemsPerLimitBreak,challenges:ids,style:0,seedTeam:team});
     }
   }
@@ -643,7 +643,7 @@ function* duoChainSteps(input:SearchInput,task:GenerationTask,catalog:Catalog):G
     const byCost=new Map<number,Map<string,{card:SearchCard;value:number;linked:boolean}>>();
     for(const raw of input.roster) {
       if(raw.name===name)continue;
-      for(const target of upgradeTargets(raw,catalog[raw.name].rare,remaining,input.itemsPerLimitBreak)) {
+      for(const target of inputUpgradeTargets(input, raw, catalog, remaining)) {
         if(++work%64===0)yield;
         const variants=cardVariants(raw,catalog[raw.name].rare,false,target)
           .filter(c=>c.selectedMagic.includes(2)&&c.magicLevels[1]>=5);
@@ -784,7 +784,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
   let options = input.roster.filter(c => (fixedSupport||c.name !== task.anchor)
     && !requiredOwned.includes(c.name)
     &&(!task.seedTeam||task.seedTeam.slice(0,ownCount).includes(c.name)))
-    .flatMap(c => [c.totsu,...(splitBudget?upgradeTargets(c,catalog[c.name].rare,input.budget-task.cost,input.itemsPerLimitBreak):[])]
+    .flatMap(c => [c.totsu,...(splitBudget?inputUpgradeTargets(input, c, catalog, input.budget-task.cost):[])]
       .flatMap(t=>cardVariants(c,catalog[c.name].rare,false,t)));
   let supportOptions = supportAllowed?input.supports.filter(c=>(!task.seedTeam||c.name===task.seedTeam[4])
     &&(!forcedSupport||c.name===forcedSupport)).flatMap(s => cardVariants(s, catalog[s.name].rare, true)):[];
@@ -802,7 +802,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
     const targetsByName = new Map<string, number[]>();
     for (const name of requiredOwned) {
       const raw=input.roster.find(c=>c.name===name)!;
-      targetsByName.set(name,[raw.totsu,...upgradeTargets(raw,catalog[name].rare,input.budget,input.itemsPerLimitBreak)]);
+      targetsByName.set(name,[raw.totsu,...inputUpgradeTargets(input, raw, catalog, input.budget)]);
     }
     const allocations:{name:string;target:number}[][]=[];
     const visit=(index:number,cost:number,row:{name:string;target:number}[])=>{
@@ -1075,7 +1075,7 @@ async function supportRoleExchangeNeighbors(input: SearchInput, parent: Candidat
       const supportOptions = cardVariants(supportRaw, catalog[supportRaw.name].rare, true, supportRaw.totsu);
       for (const replacementRaw of replacements) {
         const targets = [replacementRaw.totsu,
-          ...upgradeTargets(replacementRaw, catalog[replacementRaw.name].rare, input.budget, input.itemsPerLimitBreak)];
+          ...inputUpgradeTargets(input, replacementRaw, catalog, input.budget)];
         for (const target of targets) for (const replacement of cardVariants(
           replacementRaw, catalog[replacementRaw.name].rare, false, target, promoted.additionalLevels)) for (const support of supportOptions) {
           if (++work % 64 === 0) { await yieldToHost(); if (stop()) return []; }
@@ -1156,7 +1156,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
     for (const raw of source) {
       if (++count % 64 === 0) { await yieldToHost(); if (stop()) return []; }
       if (!slot.support && parent.cards.some((c, i) => i !== index && !c.support && c.name === raw.name)) continue;
-      const targets = slot.support ? [raw.totsu] : [raw.totsu, ...upgradeTargets(raw, catalog[raw.name].rare, input.budget, input.itemsPerLimitBreak)];
+      const targets = slot.support ? [raw.totsu] : [raw.totsu, ...inputUpgradeTargets(input, raw, catalog, input.budget)];
       for (const target of targets) for (const option of cardVariants(raw, catalog[raw.name].rare, slot.support, target, slot.additionalLevels)) {
         const replacement = parent.cards.map((c, i) => i === index ? option : c);
         const cards = [...replacement.filter(c=>!c.support).sort((a,b)=>a.name.localeCompare(b.name)), ...replacement.filter(c=>c.support)];
@@ -1282,7 +1282,7 @@ export async function generateNeighbors(input: SearchInput, parent: Candidate, c
       });
       for(const card of source) {
         if(++count%64===0){await yieldToHost();if(stop())return [];}
-        const targets=support?[card.totsu]:[card.totsu,...upgradeTargets(card,catalog[card.name].rare,input.budget,input.itemsPerLimitBreak)];
+        const targets=support?[card.totsu]:[card.totsu,...inputUpgradeTargets(input, card, catalog, input.budget)];
         for(const totsu of targets) for(const option of cardVariants(card,catalog[card.name].rare,support,totsu,parent.cards[j].additionalLevels)) {
           const replacement=parent.cards.map((c,index)=>index===i?p.option:index===j?option:c);
           const own=replacement.filter(c=>!c.support).sort((a,b)=>a.name.localeCompare(b.name));

@@ -930,6 +930,8 @@
     "chooseCharacters": "Choose characters",
     "characterFilterHelp": "Characters required in searched teams ({count}/5)",
     "filterEmpty": "No teams or cards match these filters.",
+    "forceFinisherTripleCritical": "Fix critical-capable finishers to three critical hits",
+    "excludeDormFromUpgrades": "Exclude Dorm Uniform cards from additional limit breaks",
     "extraBreaks": "Extra limit breaks",
     "additionalLevelCap": "Extra level cap",
     "difficulty": "Difficulty multiplier",
@@ -992,6 +994,7 @@
     "evaluationDone": "Evaluated",
     "compareVariants": "{count} training variants",
     "compareVariantsFor": "Compare {count} training variants for team {rank}",
+    "showAllTrainingVariants": "Show all level allocations",
     "variantsTitle": "Training variants for this team",
     "table": {
       "highest": "Highest score",

@@ -5,7 +5,7 @@ import { candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
 // Sanitize before the coordinator publishes restored island results, including
 // when a resumed search is stopped before a child worker has initialized.
 export function constrainCheckpoint(input: SearchInput, checkpoint: SessionCheckpoint,
-  catalog?: Record<string, { chara?: string; rare?: string }>): SessionCheckpoint {
+  catalog?: Record<string, { chara?: string; rare?: string; costume?: string }>): SessionCheckpoint {
   const matches = (result: SearchResult) => candidateSatisfiesConstraints(input, result.candidate, catalog);
   const parallel = checkpoint.parallel;
   const children = parallel?.checkpoints.map(child => constrainCheckpoint(input, child, catalog));

@@ -45,8 +45,11 @@ export function candidateIncludesRequired(input: SearchInput, candidate: Pick<Ca
 }
 
 export function candidateSatisfiesConstraints(input: SearchInput, candidate: Pick<Candidate, 'cards'>,
-  catalog?: Record<string, { chara?: string; rare?: string }>): boolean {
-  return withinLevelBudget(input, candidate.cards, catalog) && candidateIncludesRequired(input, candidate, catalog);
+  catalog?: Record<string, { chara?: string; rare?: string; costume?: string }>): boolean {
+  return withinLevelBudget(input, candidate.cards, catalog) && candidateIncludesRequired(input, candidate, catalog)
+    && (!input.excludeDormFromUpgrades || candidate.cards.every(card => card.support
+      || catalog?.[card.name]?.costume !== '寮服'
+      || card.totsu <= (input.roster.find(original => original.name === card.name)?.totsu ?? card.originalTotsu)));
 }
 
 export function challengeVariants(input: Pick<SearchInput, 'preset' | 'challengeLocks' | 'maxRemoved'>): string[][] {
@@ -87,6 +90,13 @@ export function upgradeTargets(card: RosterCard, rare: string, budget: number, i
   return [1, 2, 3, 4].filter(t => t > card.totsu && (t - card.totsu) * itemCost <= budget);
 }
 
+/** Apply upgrade restrictions centrally, without excluding the card itself. */
+export function inputUpgradeTargets(input: SearchInput, card: RosterCard,
+  catalog: Record<string, { rare: string; costume?: string }>, budget = input.budget): number[] {
+  if (input.excludeDormFromUpgrades && catalog[card.name]?.costume === '寮服') return [];
+  return upgradeTargets(card, catalog[card.name].rare, budget, input.itemsPerLimitBreak);
+}
+
 export function searchCardVariants(card: RosterCard, rare: string, support = false, targetTotsu = card.totsu, allocatedLevels = 0): SearchCard[] {
   return cardVariants(card,rare,support,targetTotsu,allocatedLevels);
 }
@@ -94,7 +104,7 @@ export function searchCardVariants(card: RosterCard, rare: string, support = fal
 // At most 3^5 loadouts. Include single substitutions too: the separate
 // composition refinement may not have visited this parent within the time limit.
 // Training, cost and names are fixed.
-export function jointSpellCandidates(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string}>): Candidate[] {
+export function jointSpellCandidates(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string;costume?:string}>): Candidate[] {
   let teams: SearchCard[][] = [[]];
   for (const card of parent.cards) {
     const original=(card.support?input.supports:input.roster).find(c=>c.name===card.name);
@@ -118,7 +128,7 @@ export function alternatePolicyCandidates(input: SearchInput, parent: Candidate)
     id:JSON.stringify([parent.cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.challengeIds,policy])}));
 }
 
-export function lowerCostCandidates(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string}>): Candidate[] {
+export function lowerCostCandidates(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string;costume?:string}>): Candidate[] {
   return [...allocationCards(input,parent,catalog,true)].filter(cards=>upgradeCost(input,cards)<parent.cost).map(cards=>{
     const legalPlan=parent.preferredPlan?.every(pair=>pair.every(id=>{
       const match=/^(\d+)-M([123])$/.exec(id);
@@ -139,7 +149,7 @@ export function upgradeCost(input: Pick<SearchInput,'itemsPerLimitBreak'>, cards
   return cards.reduce((sum,c)=>sum+(c.support?0:Math.max(0,c.totsu-c.originalTotsu)*input.itemsPerLimitBreak),0);
 }
 
-export function trainedUpgradeCandidates(input:SearchInput,parent:Candidate,catalog:Record<string,{rare:string}>):Candidate[] {
+export function trainedUpgradeCandidates(input:SearchInput,parent:Candidate,catalog:Record<string,{rare:string;costume?:string}>):Candidate[] {
   return [...allocationCards(input,parent,catalog)]
     // Keep learned-plan redistribution at the same total cost (for example
     // 2+1 -> 3+0); omit only the unchanged parent and preserve its spells.
@@ -159,13 +169,13 @@ export function trainedUpgradeCandidates(input:SearchInput,parent:Candidate,cata
 // Enumerate allocations only within this team, pruning by total item cost.
 // Unchanged training retains its spells; changed training tries every legal pair.
 // A generator lets callers yield between estimates and honour cancellation.
-export function* allocationCards(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string}>, reduceOnly=false,
+export function* allocationCards(input: SearchInput, parent: Candidate, catalog: Record<string,{rare:string;costume?:string}>, reduceOnly=false,
   index=0, cards: SearchCard[]=[], cost=0): Generator<SearchCard[]> {
   if(index===parent.cards.length){if(withinLevelBudget(input,cards,catalog))yield cards;return;}
   const slot=parent.cards[index];
   const original=(slot.support?input.supports:input.roster).find(c=>c.name===slot.name);
   if(!original)return;
-  const targets=slot.support?[slot.totsu]:[original.totsu,...upgradeTargets(original,catalog[slot.name].rare,input.budget-cost,input.itemsPerLimitBreak)]
+  const targets=slot.support?[slot.totsu]:[original.totsu,...inputUpgradeTargets(input,original,catalog,input.budget-cost)]
     .filter(t=>!reduceOnly||t<=slot.totsu);
   for(const target of targets) {
     const nextCost=cost+(slot.support?0:(target-original.totsu)*input.itemsPerLimitBreak);

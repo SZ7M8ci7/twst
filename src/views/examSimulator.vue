@@ -1051,6 +1051,7 @@ interface AutoBestPruneBenchmark {
 }
 interface AutoBestWorkerSnapshot {
   favorableEffects?: boolean;
+  forceFinisherTripleCritical?: boolean;
   exam: ExamDefinition;
   enemySlots: EnemySlotDefinition[];
   deck: DeckSlot[];
@@ -1080,6 +1081,7 @@ interface AutoBestWorkerClient {
 
 interface ExamSettingsPayload {
   favorableEffects?: boolean;
+  forceFinisherTripleCritical?: boolean;
   deck: Array<Record<string, any>>;
   turnPlans: TurnPlan[];
   useElementCompatibilityPriority?: boolean;
@@ -1592,6 +1594,7 @@ const turnPlans = ref<TurnPlan[]>(Array.from({ length: 5 }, (_, index) => ({
 const openedTurnPanels = ref<number[]>([0, 1, 2, 3, 4]);
 const simulationMode = ref<SimulationMode>('normal');
 const favorableEffects = ref(false);
+const forceFinisherTripleCritical = ref(false);
 const normalIterations = ref(10000);
 const autoBestIterations = ref(1000);
 const iterations = computed<number>({
@@ -1947,7 +1950,7 @@ watch(() => exam.value.enemyElement, () => {
 watch(exam, markEnemyConditionsTouched, { deep: true });
 watch(enemySlots, markEnemyConditionsTouched, { deep: true });
 watch(
-  [exam, enemySlots, deck, turnPlans, selectedSpecialChallengeIds, favorableEffects],
+  [exam, enemySlots, deck, turnPlans, selectedSpecialChallengeIds, favorableEffects, forceFinisherTripleCritical],
   () => {
     clearResults();
     if (isRunning.value) requestSimulationStop();
@@ -2160,6 +2163,7 @@ function serializeDeckSlotForSettings(slot: DeckSlot) {
 function buildExamSettingsPayload(): ExamSettingsPayload {
   return {
     favorableEffects: favorableEffects.value,
+    forceFinisherTripleCritical: forceFinisherTripleCritical.value,
     deck: deck.value.map(serializeDeckSlotForSettings),
     useElementCompatibilityPriority: allTurnElementCompatibilityPriority.value,
     turnPlans: turnPlans.value.map((turn) => ({
@@ -2218,6 +2222,7 @@ async function applySavedExamSettingsSet(setting: SavedExamSimulatorSettings) {
   const payload = setting.payload as Partial<ExamSettingsPayload> | null;
   if (!payload?.deck && !payload?.turnPlans) return;
   favorableEffects.value = payload.favorableEffects === true;
+  forceFinisherTripleCritical.value = payload.forceFinisherTripleCritical === true;
 
   const characterStore = useCharacterStore();
   deck.value = await Promise.all(Array.from({ length: 5 }, (_, index) => (
@@ -3939,6 +3944,7 @@ async function searchAutoBestSeedParallel(
 async function runAutoBestSimulation(count: number, resultGeneration: number) {
   const snapshotJson = JSON.stringify({
     favorableEffects: favorableEffects.value,
+    forceFinisherTripleCritical: forceFinisherTripleCritical.value,
     exam: exam.value,
     enemySlots: enemySlots.value,
     deck: deck.value,
@@ -4255,6 +4261,7 @@ async function runAutoBestWorkerPartition(
 ) {
   if (snapshot) {
     favorableEffects.value = snapshot.favorableEffects === true;
+    forceFinisherTripleCritical.value = snapshot.forceFinisherTripleCritical === true;
     exam.value = markRaw(snapshot.exam);
     appliedExamPreset.value = snapshot.presetMetadata ?? null;
     enemySlots.value = markRaw(snapshot.enemySlots);
@@ -4304,6 +4311,7 @@ let resourceInitialState:SimulationState|undefined;
 let resourceInitialStats:SimulationStats|undefined;
 async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
   favorableEffects.value = input.favorableEffects === true;
+  forceFinisherTripleCritical.value = input.forceFinisherTripleCritical === true;
   resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
   resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
   resourcePreferredPlanMode = candidate.preferredPlanMode ?? 'turn';
@@ -4439,6 +4447,7 @@ function runResourceImportanceTrial(seedText:string,policy:PolicyKind) {
 
 function observeResourceBattle(turnIndex: number, visible: string[], state: SimulationState,
   playerHp: number, enemyHp: number, knownEnemy: RuntimeEnemyAction | undefined, stats: SimulationStats, effectAware: boolean, unusedMagic: string[], scoreAware=false, publicForecast=false, tailAware=false,duoAware=false): BattleObservation {
+  const fixedCriticalFinish = forceFinisherTripleCritical.value && exam.value.kind === 'BASIC';
   let futureSpend:((pair:PlayerPair)=>number)|undefined;
   if(duoAware&&exam.value.kind!=='DEFENCE'){
     if(resourcePairRuntime!==simulationRuntimeCache||!resourcePairSpend){
@@ -4476,7 +4485,7 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
       const duo = unusedMagic.some(other => isDuoActiveForPair(magicId, other));
       const target = exam.value.enemyElement === '全' ? '無' : exam.value.enemyElement;
       const base=calculatePlayerDamageBaseFromState(state, magicId, parsed.deckIndex, parsed.magicSlot, target, 0, duo);
-      return (base?.damage??0)*(tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(m.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER):1);
+      return (base?.damage??0)*(fixedCriticalFinish && (duo?3:magicHitCount(m.power)) === 3 && (base?.criticalChance??0)>0 ? CRITICAL_DAMAGE_MULTIPLIER : tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(m.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER):1);
     };
     return strength(magic, id) > strength(current, best) ? id : best;
   }, '');
@@ -4527,9 +4536,14 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
         - (effectAware ? sumDamageRatesForElementAndEnemy(predicted.enemyDamageTakenUps, magic.element, targetKey) : 0);
       const base = calculatePlayerDamageBaseFromState(predicted, id, parsed.deckIndex, parsed.magicSlot, target, reduction, activeDuo);
       // damage already includes the full multi-hit multiplier in the shared engine.
-      const d = hasEnemyDamageNull(predicted, magic.element, targetKey) ? 0 : (base?.damage ?? 0)
+      let d = hasEnemyDamageNull(predicted, magic.element, targetKey) ? 0 : (base?.damage ?? 0)
         * (tailAware?criticalTailMultiplier(base?.criticalChance??0,activeDuo?3:magicHitCount(magic.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER)
           :effectAware ? 1 + (base?.criticalChance ?? 0) * (CRITICAL_DAMAGE_MULTIPLIER - 1) : 1);
+      const tripleDamage = 3 * floorAttackDamage((base?.damage ?? 0) * CRITICAL_DAMAGE_MULTIPLIER / 3);
+      if (fixedCriticalFinish && (activeDuo?3:magicHitCount(magic.power)) === 3
+        && (base?.criticalChance ?? 0) > 0 && tripleDamage >= enemyHp - damage
+        && !hasEnemyDamageNull(predicted, magic.element, targetKey)
+        && !predicted.enemyGuts.some(entry => entry.turns > 0 && entry.count > 0 && timedRateAppliesToEnemy(entry, targetKey))) d = tripleDamage;
       damage += d;
       if (index === 0) firstDamage = d;
       duo += Number(activeDuo && parsed.magicSlot === 2);
@@ -4565,7 +4579,7 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
         const damage=(s:SimulationState)=>{
           const base=calculatePlayerDamageBaseFromState(s,id,parsed.deckIndex,parsed.magicSlot,target,0,duo);
           const magic=magicById(id)!;
-          const critical=tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(magic.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER)
+          const critical=fixedCriticalFinish && (duo?3:magicHitCount(magic.power)) === 3 && (base?.criticalChance??0)>0 ? CRITICAL_DAMAGE_MULTIPLIER : tailAware?criticalTailMultiplier(base?.criticalChance??0,duo?3:magicHitCount(magic.power),resourcePerAttemptProbability,CRITICAL_DAMAGE_MULTIPLIER)
             :1+(base?.criticalChance??0)*(CRITICAL_DAMAGE_MULTIPLIER-1);
           return (base?.damage??0)*critical;
         };
@@ -4881,7 +4895,8 @@ function runOneSimulation(rng: StatefulRng, keepLog: boolean, options: Simulatio
         const enemyHpBeforePhase = enemyHp;
         const targetElement = resolveTargetElement(enemyAction);
         const duoActive = isDuoActiveForPair(magicId, pairedMagicId);
-        const playerAttack = calculatePlayerDamage(magicId, targetElement, state, rng, stats, duoActive, enemyAction);
+        const playerAttack = calculatePlayerDamage(magicId, targetElement, state, rng, stats, duoActive, enemyAction,
+          forceFinisherTripleCritical.value && exam.value.kind === 'BASIC', enemyHp);
         if (stats.playerAttackSnapshots && playerAttack.transferSnapshot) {
           stats.playerAttackSnapshots.push(playerAttack.transferSnapshot);
         }
@@ -6175,6 +6190,8 @@ function calculatePlayerDamage(
   stats: SimulationStats,
   duoActive = false,
   targetEnemy?: RuntimeEnemyAction,
+  forceTripleCriticalFinisher = false,
+  remainingEnemyHp = Infinity,
 ) {
   const parsed = parseMagicId(magicId);
   const magic = magicById(magicId);
@@ -6235,6 +6252,13 @@ function calculatePlayerDamage(
   let evasionCount = 0;
   let criticalCount = 0;
   let damage = 0;
+  // Only a real three-hit, critical-capable finishing attack is eligible.
+  // Guts, evasion, blind and damage nullification must not be bypassed.
+  const fixedFinisherEligible = forceTripleCriticalFinisher && hitCount === 3
+    && damageBase.criticalChance > 0 && remainingEnemyHp > 0
+    && !state.enemyGuts?.some(entry => entry.turns > 0 && entry.count > 0
+      && timedRateAppliesToEnemy(entry, targetEnemySlotKey));
+  let tripleCriticalDamage = 0;
   for (let hit = 0; hit < hitCount; hit += 1) {
     if (evasionRate > 0) {
       const evaded = rollEffect(evasionRate * 100, rng, false);
@@ -6245,7 +6269,7 @@ function calculatePlayerDamage(
     }
     // Still consume the ordinary roll. Scouting only forces an already
     // possible critical on one chosen card, never on enemies or frozen buffs.
-    const proposal=resourceImportanceWeight===undefined||favorableEffects.value?undefined:criticalProposal(damageBase.criticalChance);
+    const proposal=resourceImportanceWeight===undefined||favorableEffects.value||fixedFinisherEligible?undefined:criticalProposal(damageBase.criticalChance);
     const criticalRolled = damageBase.criticalChance > 0 && rollEffect((proposal?.proposal??damageBase.criticalChance) * 100, rng, true);
     if(proposal)resourceImportanceWeight!*=proposal.weight(criticalRolled);
     const criticalForced = !criticalRolled&&damageBase.criticalChance>0&&resourceCriticalScoutCard===parsed.deckIndex
@@ -6258,6 +6282,14 @@ function calculatePlayerDamage(
     const hitDamage = floorAttackDamage(raw);
     if (criticalActive && hitDamage > 0) criticalCount += 1;
     damage += hitDamage;
+    if (fixedFinisherEligible) tripleCriticalDamage += floorAttackDamage(
+      (baseDamage * CRITICAL_DAMAGE_MULTIPLIER / hitCount) * randomFactor);
+  }
+  // Reuse exactly the ordinary hit/damage rolls. An attack that would not finish
+  // even with three criticals remains an ordinary probabilistic attack.
+  if (fixedFinisherEligible && evasionCount === 0 && tripleCriticalDamage >= remainingEnemyHp) {
+    damage = tripleCriticalDamage;
+    criticalCount = 3;
   }
   const cachedResult = simulationRuntimeCache?.playerDamageResult;
   transferSnapshot.criticalCount = criticalCount;

@@ -930,6 +930,8 @@
     "chooseCharacters": "选择角色",
     "characterFilterHelp": "探索编队中必须包含的角色（{count}/5）",
     "filterEmpty": "没有符合条件的编队或卡片。",
+    "forceFinisherTripleCritical": "可触发暴击的终结攻击固定为3次暴击",
+    "excludeDormFromUpgrades": "追加突破对象排除寮服",
     "extraBreaks": "额外突破",
     "additionalLevelCap": "追加等级上限",
     "difficulty": "难度系数",
@@ -992,6 +994,7 @@
     "evaluationDone": "已评估",
     "compareVariants": "{count}种培养方案",
     "compareVariantsFor": "比较第{rank}个队伍的{count}种培养方案",
+    "showAllTrainingVariants": "显示全部等级分配",
     "variantsTitle": "同队伍的培养方案",
     "table": {
       "highest": "最高分",

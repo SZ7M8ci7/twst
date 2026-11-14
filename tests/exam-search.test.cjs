@@ -2709,3 +2709,97 @@ test('invalid active search settings return translated non-legacy validation cod
     assert.equal(text.examSearch.validation.target,undefined);
   }
 });
+
+test('dorm exclusion blocks only additional dorm limit breaks across generation and refinement',async()=>{
+  const input=fixture();
+  const dorm=Object.values(catalog).find(card=>card.costume==='寮服'&&card.rare==='SSR');
+  input.roster[0]={...input.roster[0],name:dorm.name,totsu:1,level:85};
+  input.supports=[{...input.roster[0],totsu:4,level:110}];
+  input.excludeDormFromUpgrades=true;
+  const before=clone(input.roster);
+  assert.equal(variants.inputUpgradeTargets(input,input.roster[0],catalog).length,0);
+  assert.ok(variants.inputUpgradeTargets(input,input.roster[1],catalog).length>0);
+  const base=input.roster.map(card=>variants.cardVariants(card,catalog[card.name].rare)[0]);
+  base.push(variants.cardVariants(input.supports[0],'SSR',true)[0]);
+  const parent={id:'dorm-restriction',cards:base,cost:0,estimate:0,challengeIds:[],policy:'effects'};
+  const allocations=[...variants.allocationCards(input,parent,catalog)];
+  assert.ok(allocations.length>1);
+  assert.ok(allocations.every(cards=>cards[0].totsu===1&&cards[4].totsu===4));
+  const illegal={...parent,cards:base.map((card,index)=>index===0?variants.cardVariants(input.roster[0],'SSR',false,2)[0]:card),cost:1};
+  assert.equal(variants.candidateSatisfiesConstraints(input,parent,catalog),true);
+  assert.equal(variants.candidateSatisfiesConstraints(input,illegal,catalog),false);
+  for(const task of generation.buildTasks(input,catalog)) {
+    const candidates=generation.generateCandidates(input,task,catalog);
+    assert.ok(candidates.every(candidate=>candidate.cards.every(card=>card.support||card.name!==dorm.name||card.totsu===1)));
+  }
+  const neighbors=await generation.generateNeighbors(input,parent,catalog,new Set(),()=>false);
+  assert.ok(neighbors.every(candidate=>variants.candidateSatisfiesConstraints(input,candidate,catalog)));
+  const upgraded=variants.trainedUpgradeCandidates(input,parent,catalog);
+  assert.ok(upgraded.every(candidate=>candidate.cards[0].totsu===1));
+  const checkpoint={pool:[{candidate:parent},{candidate:illegal}],pending:[{candidate:illegal}],finalists:[{candidate:illegal}]};
+  const {constrainCheckpoint}=load('src/domain/examSearch/requiredCheckpoint.ts');
+  const cleaned=constrainCheckpoint(input,checkpoint,catalog);
+  assert.equal(cleaned.pool.length,1);assert.equal(cleaned.pending.length,0);assert.equal(cleaned.finalists.length,0);
+  input.excludeDormFromUpgrades=false;
+  assert.ok(variants.inputUpgradeTargets(input,input.roster[0],catalog).includes(2));
+  assert.equal(variants.candidateSatisfiesConstraints(input,illegal,catalog),true);
+  assert.deepEqual(input.roster,before);
+});
+
+test('new search options survive settings, checkpoints and simulator transfer without changing legacy defaults',()=>{
+  const storage=load('src/storage/examSearchStorage.ts');
+  const key='twst-exam-resource-search-v1',version=load('src/domain/examSearch/types.ts').ENGINE_VERSION;
+  const input={...fixture(),forceFinisherTripleCritical:true,excludeDormFromUpgrades:true};
+  localStorage.setItem(key,JSON.stringify({...input,setupVersion:2}));
+  localStorage.setItem(key+'-session',JSON.stringify({input,version,catalogVersion:'test',checkpoint:{seen:[],pool:[],pending:[],finalists:[]}}));
+  try {
+    assert.equal(storage.loadExamSearch().forceFinisherTripleCritical,true);
+    assert.equal(storage.loadExamSearch().excludeDormFromUpgrades,true);
+    assert.deepEqual(clone(storage.loadSearchSession().input),input);
+    const transferId=storage.saveSearchTransfer(input,{id:'options-transfer',cards:[],cost:0,challengeIds:[],policy:'effects',estimate:0});
+    assert.deepEqual(clone(storage.loadSearchTransfer(transferId).input),input);
+    localStorage.setItem(key,JSON.stringify({...fixture(),setupVersion:2}));
+    assert.equal(storage.loadExamSearch().forceFinisherTripleCritical,undefined);
+    assert.equal(storage.loadExamSearch().excludeDormFromUpgrades,undefined);
+  } finally {storedValues.delete(key);storedValues.delete(key+'-session');}
+});
+
+test('training results keep best and cheapest representatives without dropping detailed allocations',()=>{
+  const {groupSearchResults}=load('src/domain/examSearch/resultGroups.ts');
+  const make=(id,levels,totsu=[0,0],names=['a','b'],support=-1)=>({candidate:{id,cards:names.map((name,i)=>({name,support:i===support,level:80+levels[i]+totsu[i]*5,totsu:totsu[i],additionalLevels:levels[i]}))}});
+  const rows=[make('best',[5,5]),make('same-total',[6,4]),make('more-training',[6,5]),
+    make('cheaper',[4,4]),make('cheaper-tie',[3,5]),make('base',[0,0]),
+    make('different-upgrade',[5,5],[1,0]),make('different-upgrade-allocation',[5,5],[0,1]),
+    make('other-team',[5,5],[0,0],['a','c']),make('support',[5,0],[0,0],['a','b'],1)];
+  const before=JSON.stringify(rows);
+  const groups=groupSearchResults(rows,true);
+  assert.equal(groups.length,3);
+  assert.deepEqual(Array.from([groups[0].primary,...groups[0].variants],r=>r.candidate.id),
+    ['best','base','different-upgrade','different-upgrade-allocation']);
+  assert.equal(groups[0].allVariants.length,7,'every intermediate investment remains available on demand');
+  assert.equal(JSON.stringify(rows),before,'display grouping never edits replay or checkpoint candidates');
+  assert.equal(groupSearchResults(rows,false)[0].variants.length,7,'without extra training existing investment alternatives are unchanged');
+});
+
+test('training result grouping is independent of slot order and keeps all distinct decks',()=>{
+  const {groupSearchResults}=load('src/domain/examSearch/resultGroups.ts');
+  const row=(id,names,levels)=>({candidate:{id,cards:names.map((name,i)=>({name,support:false,level:80+levels[i],totsu:0,additionalLevels:levels[i]}))}});
+  const primary=row('primary',['a','b'],[5,5]);
+  const groups=groupSearchResults([primary,row('reordered',['b','a'],[5,5]),row('redistributed',['b','a'],[4,6]),row('different',['a','c'],[5,5])],true);
+  assert.equal(groups.length,2);assert.equal(groups[0].primary,primary);assert.equal(groups[0].variants.length,0);
+  assert.equal(groupSearchResults([],true).length,0);
+});
+
+test('training comparison keeps at most two representatives per upgrade allocation and retains all details',()=>{
+  const {groupSearchResults}=load('src/domain/examSearch/resultGroups.ts');
+  const rows=Array.from({length:21},(_,i)=>({candidate:{id:`lv${20-i}`,cards:[{name:'a',support:false,level:80+20-i,totsu:0,additionalLevels:20-i}]}}));
+  const [group]=groupSearchResults(rows,true);
+  assert.equal(group.primary,rows[0]);assert.equal(group.variants.length,1);assert.equal(group.variants[0],rows[20]);
+  assert.equal(group.allVariants.length,20);
+  const [cheapestBest]=groupSearchResults([...rows].reverse(),true);
+  assert.equal(cheapestBest.variants.length,0);assert.equal(cheapestBest.allVariants.length,20,'even an entirely dominated group can still open its details');
+  const source=fs.readFileSync(path.join(root,'src/views/examSearch.vue'),'utf8');
+  assert.ok(source.includes('variantCount: group.allVariants.length'));
+  assert.ok(source.includes('showAllTrainingVariants.value ? group.allVariants : group.variants'));
+  assert.match(source,/function openVariants[\s\S]*?showAllTrainingVariants\.value = false;/);
+});

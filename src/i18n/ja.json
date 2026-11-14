@@ -930,6 +930,8 @@
     "chooseCharacters": "キャラを選択",
     "characterFilterHelp": "探索する編成に必ず含めるキャラクター（{count}/5人）",
     "filterEmpty": "条件に一致する編成・カードがありません。",
+    "forceFinisherTripleCritical": "クリティカルが発動するフィニッシャーは3クリに固定する",
+    "excludeDormFromUpgrades": "凸対象から寮服を除く",
     "extraBreaks": "追加凸",
     "additionalLevelCap": "追加レベル上限",
     "difficulty": "難易度係数",
@@ -992,6 +994,7 @@
     "evaluationDone": "評価済み",
     "compareVariants": "育成違い {count}件",
     "compareVariantsFor": "編成{rank}の育成違い{count}件を比較",
+    "showAllTrainingVariants": "すべてのレベル配分を表示",
     "variantsTitle": "同じ編成の育成違い",
     "table": {
       "highest": "最高スコア",

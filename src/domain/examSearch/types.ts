@@ -25,6 +25,10 @@ export interface SearchInput {
   useHandCollection?: boolean;
   /** Resolve existing chance-based effects in the player's favor. */
   favorableEffects?: boolean;
+  /** BASIC only: force eligible finishing DUO attacks to three critical hits. */
+  forceFinisherTripleCritical?: boolean;
+  /** Keep dorm-uniform cards at their registered limit-break count. */
+  excludeDormFromUpgrades?: boolean;
   seedTeams?: string[][];
   /** Card catalog names that every generated/evaluated loadout must contain. */
   requiredCards?: string[];
@@ -108,5 +112,5 @@ export interface BattleEngine {
   learnCriticalPlan?(seed:string,durationMs:number,cardIndex:number,idealHand?:boolean,magic?:MagicSlot):Promise<[string,string][]|null>;
 }
 export interface BattleTrial { score: number; retired: boolean; finishTurn: number; fitness?: number; log?: string[]; plan?: [string, string][] }
-export const ENGINE_VERSION = 'exam-resource-search-140';
+export const ENGINE_VERSION = 'exam-resource-search-141';
 export const emptySamples = (): Samples => ({ scores: [], retired: 0, turns: 0 });
