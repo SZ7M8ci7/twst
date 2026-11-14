@@ -1,0 +1,742 @@
+[
+  {
+    "profile": "original",
+    "id": "第19回統一火BS"
+  },
+  {
+    "profile": "original",
+    "id": "第19回統一水BS"
+  },
+  {
+    "profile": "original",
+    "id": "第19回統一木DF"
+  },
+  {
+    "profile": "original",
+    "id": "第19回統一無DF"
+  },
+  {
+    "profile": "original",
+    "id": "第19回統一全ATK"
+  },
+  {
+    "profile": "original",
+    "id": "2026/09-2無BS"
+  },
+  {
+    "profile": "original",
+    "id": "2026/09-2水DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/09-1木DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/09-1全ATK"
+  },
+  {
+    "profile": "original",
+    "id": "2026/08-2水ATK"
+  },
+  {
+    "profile": "original",
+    "id": "2026/08-2火BS"
+  },
+  {
+    "profile": "original",
+    "id": "2026/08-1全BS"
+  },
+  {
+    "profile": "original",
+    "id": "2026/08-1無DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/07-2火DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/07-2木ATK"
+  },
+  {
+    "profile": "original",
+    "id": "2026/07-1無ATK"
+  },
+  {
+    "profile": "original",
+    "id": "2026/07-1水BS"
+  },
+  {
+    "profile": "original",
+    "id": "2026/06-2木BS"
+  },
+  {
+    "profile": "original",
+    "id": "2026/06-2全DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/06-1水DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/06-1火ATK"
+  },
+  {
+    "profile": "original",
+    "id": "第18回統一火DF"
+  },
+  {
+    "profile": "original",
+    "id": "第18回統一水ATK"
+  },
+  {
+    "profile": "original",
+    "id": "第18回統一木BS"
+  },
+  {
+    "profile": "original",
+    "id": "第18回統一無ATK"
+  },
+  {
+    "profile": "original",
+    "id": "第18回統一全BS"
+  },
+  {
+    "profile": "original",
+    "id": "第17回統一火ATK"
+  },
+  {
+    "profile": "original",
+    "id": "第17回統一水DF"
+  },
+  {
+    "profile": "original",
+    "id": "第17回統一木ATK"
+  },
+  {
+    "profile": "original",
+    "id": "第17回統一無BS"
+  },
+  {
+    "profile": "original",
+    "id": "第17回統一全DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/05-2全ATK"
+  },
+  {
+    "profile": "original",
+    "id": "2026/05-2無BS"
+  },
+  {
+    "profile": "original",
+    "id": "2026/05-1火BS"
+  },
+  {
+    "profile": "original",
+    "id": "2026/05-1木DF"
+  },
+  {
+    "profile": "original",
+    "id": "2026/04-2水ATK"
+  },
+  {
+    "profile": "original",
+    "id": "2026/04-2無DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第19回統一火BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第19回統一水BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第19回統一木DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第19回統一無DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第19回統一全ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/09-2無BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/09-2水DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/09-1木DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/09-1全ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/08-2水ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/08-2火BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/08-1全BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/08-1無DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/07-2火DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/07-2木ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/07-1無ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/07-1水BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/06-2木BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/06-2全DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/06-1水DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/06-1火ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第18回統一火DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第18回統一水ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第18回統一木BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第18回統一無ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第18回統一全BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第17回統一火ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第17回統一水DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第17回統一木ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第17回統一無BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "第17回統一全DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/05-2全ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/05-2無BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/05-1火BS"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/05-1木DF"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/04-2水ATK"
+  },
+  {
+    "profile": "original-zero",
+    "id": "2026/04-2無DF"
+  },
+  {
+    "profile": "provided",
+    "id": "第19回統一火BS"
+  },
+  {
+    "profile": "provided",
+    "id": "第19回統一水BS"
+  },
+  {
+    "profile": "provided",
+    "id": "第19回統一木DF"
+  },
+  {
+    "profile": "provided",
+    "id": "第19回統一無DF"
+  },
+  {
+    "profile": "provided",
+    "id": "第19回統一全ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/09-2無BS"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/09-2水DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/09-1木DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/09-1全ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/08-2水ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/08-2火BS"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/08-1全BS"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/08-1無DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/07-2火DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/07-2木ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/07-1無ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/07-1水BS"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/06-2木BS"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/06-2全DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/06-1水DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/06-1火ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "第18回統一火DF"
+  },
+  {
+    "profile": "provided",
+    "id": "第18回統一水ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "第18回統一木BS"
+  },
+  {
+    "profile": "provided",
+    "id": "第18回統一無ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "第18回統一全BS"
+  },
+  {
+    "profile": "provided",
+    "id": "第17回統一火ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "第17回統一水DF"
+  },
+  {
+    "profile": "provided",
+    "id": "第17回統一木ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "第17回統一無BS"
+  },
+  {
+    "profile": "provided",
+    "id": "第17回統一全DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/05-2全ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/05-2無BS"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/05-1火BS"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/05-1木DF"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/04-2水ATK"
+  },
+  {
+    "profile": "provided",
+    "id": "2026/04-2無DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第19回統一火BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第19回統一水BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第19回統一木DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第19回統一無DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第19回統一全ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/09-2無BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/09-2水DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/09-1木DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/09-1全ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/08-2水ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/08-2火BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/08-1全BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/08-1無DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/07-2火DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/07-2木ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/07-1無ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/07-1水BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/06-2木BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/06-2全DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/06-1水DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/06-1火ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第18回統一火DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第18回統一水ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第18回統一木BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第18回統一無ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第18回統一全BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第17回統一火ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第17回統一水DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第17回統一木ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第17回統一無BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "第17回統一全DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/05-2全ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/05-2無BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/05-1火BS"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/05-1木DF"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/04-2水ATK"
+  },
+  {
+    "profile": "all-owned",
+    "id": "2026/04-2無DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "第19回統一火BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "第19回統一水BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "第19回統一木DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "第19回統一無DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "第19回統一全ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/09-2無BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/09-2水DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/09-1木DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/09-1全ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/08-2水ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/08-2火BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/08-1全BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/08-1無DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/07-2火DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/07-2木ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/07-1無ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/07-1水BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/06-2木BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/06-2全DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/06-1水DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/06-1火ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "第18回統一火DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "第18回統一水ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "第18回統一木BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "第18回統一無ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "第18回統一全BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "第17回統一火ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "第17回統一水DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "第17回統一木ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "第17回統一無BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "第17回統一全DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/05-2全ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/05-2無BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/05-1火BS"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/05-1木DF"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/04-2水ATK"
+  },
+  {
+    "profile": "sparse",
+    "id": "2026/04-2無DF"
+  }
+]

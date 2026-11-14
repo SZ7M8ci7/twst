@@ -9,6 +9,7 @@ const key=r=>r.profile+'|'+r.caseId,metric=r=>{const {optimism,...fixed}=r.valid
 const runs=[];
 for(const tag of tags){
  const plan=JSON.parse(fs.readFileSync(`${root}/${tag}-before/plan-0.json`,'utf8'));
+ if(plan.processIsolation==='pair')for(let shard=0;shard<4;shard++){const sibling=JSON.parse(fs.readFileSync(`${root}/${tag}-before/plan-${shard}.json`,'utf8'));assert.equal(sibling.processIsolation,'pair');assert.equal(sibling.count,4);assert.deepEqual(sibling.planned,plan.planned);}
  const sides=['before','after'].map(side=>read(`${root}/${tag}-${side}`));
  const expected=new Set(plan.planned.map(r=>r.profile+'|'+r.id));
  let candidates=0,auditTrials=0,shared=0;
@@ -42,7 +43,7 @@ for(const tag of tags){
    assert.deepEqual(metric(candidate),metric(same));shared++;
   }
  }
- runs.push({tag,pairs:expected.size,candidates,auditTrials,sharedCandidateAudits:shared,sourceBefore:plan.sourceHash,sourceAfter:plan.afterSourceHash,catalogHash:plan.catalogHash,presetsHash:plan.presetsHash,profileManifestHash:plan.profilesHash});
+ runs.push({tag,processIsolation:plan.processIsolation||'reused-shard',pairs:expected.size,candidates,auditTrials,sharedCandidateAudits:shared,sourceBefore:plan.sourceHash,sourceAfter:plan.afterSourceHash,catalogHash:plan.catalogHash,presetsHash:plan.presetsHash,profileManifestHash:plan.profilesHash});
 }
 for(const field of ['sourceBefore','sourceAfter','catalogHash','presetsHash','profileManifestHash'])assert.equal(new Set(runs.map(run=>run[field])).size,1,`Mixed ${field}`);
 const report={complete:true,runs,pairs:runs.reduce((n,r)=>n+r.pairs,0),candidates:runs.reduce((n,r)=>n+r.candidates,0),auditTrials:runs.reduce((n,r)=>n+r.auditTrials,0),sharedCandidateAudits:runs.reduce((n,r)=>n+r.sharedCandidateAudits,0),constraintsPassed:true,maximaReplayed:true,identicalSharedAudits:true};

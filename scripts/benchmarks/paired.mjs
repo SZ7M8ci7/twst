@@ -38,9 +38,13 @@ try{
  assert.ok(Array.isArray(planned)&&planned.length>0,'Empty case plan');
  assert.equal(new Set(planned.map(row=>JSON.stringify([row.profile,row.id]))).size,planned.length,'Duplicate planned cases');
  for(const row of planned){assert.ok(profiles.profiles[row.profile],row.profile);assert.ok(before.presets.some(p=>p.id===row.id),row.id);}
- fs.writeFileSync(path.join(before.outputDir,`plan-${shard}.json`),JSON.stringify({profilesHash:digest(profiles),planned,durationMs,auditTrials,nonceBase,shard,count,supportMode,sourceHash:before.sourceHash,afterSourceHash:after?.sourceHash,catalogHash:before.catalogHash,presetsHash:before.presetsHash},null,2));
+ const caseIndex=args.has('case-index')?Number(args.get('case-index')):null;
+ if(caseIndex!==null)assert.ok(Number.isInteger(caseIndex)&&caseIndex>=0&&caseIndex<planned.length);
+ const planPath=path.join(before.outputDir,`plan-${shard}.json`),planTemporary=planPath+'.'+process.pid+'.pending';
+ fs.writeFileSync(planTemporary,JSON.stringify({profilesHash:digest(profiles),planned,durationMs,auditTrials,nonceBase,shard,count,supportMode,sourceHash:before.sourceHash,afterSourceHash:after?.sourceHash,catalogHash:before.catalogHash,presetsHash:before.presetsHash,processIsolation:args.get('isolation')||'reused-shard'},null,2));
+ fs.renameSync(planTemporary,planPath);
  for(const [i,{profile,id}] of planned.entries()){
-  if(i%count!==shard)continue;
+  if(i%count!==shard || caseIndex!==null&&i!==caseIndex)continue;
   const preset=structuredClone(before.presets.find(p=>p.id===id));assert.ok(preset,id);preset.difficulty??=1.5;
   const mode=args.get('challenges')||'on';assert.ok(['on','auto','off'].includes(mode));
   const input={preset,...structuredClone(profiles.profiles[profile]),supports:preset.title.includes('統一')?structuredClone(supports):[],itemsPerLimitBreak:1,additionalLevelCap:0,target:0,attempts:30,desiredProbability:.05,tolerance:0,challengeLocks:Object.fromEntries((preset.specialChallenges??[]).map(c=>[c.id,mode])),maxRemoved:1};
@@ -58,4 +62,5 @@ try{
    console.log(JSON.stringify({version:c.tag,profile,id,evaluated:report.evaluated,top:report.topCandidates.map(r=>({rank:r.rank,max:r.validation1024.max,p95:r.validation1024.p95,expected30:r.validation1024.expectedMaxOfAttempts,winRate:r.validation1024.winRate}))}));
   }
  }
+ if(args.get('isolation')==='pair')console.log(JSON.stringify({caseIndex,resourceUsage:process.resourceUsage(),rssBytes:process.memoryUsage().rss}));
 }finally{await before.server.close();if(after)await after.server.close();}

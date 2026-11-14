@@ -17,18 +17,15 @@ node scripts/benchmarks/make-profiles.cjs current-sets.json provided-v3.json art
 ## Paired searches
 
 ```sh
-for shard in 0 1 2 3; do
-  node scripts/benchmarks/paired.mjs --before=../twst-nrc19-baseline --after=. --cases=all --tag=expected-primary --nonce=nrc19-expected-primary-v1 --shard=$shard/4 > artifacts/nrc19/expected-primary-$shard.log 2>&1 &
-done
-wait
-node scripts/benchmarks/summarize.mjs artifacts/nrc19/expected-primary-before artifacts/nrc19/expected-primary-after artifacts/nrc19/expected-primary-summary.json
+node scripts/benchmarks/isolated-paired.mjs --before=../twst-nrc19-baseline --after=. --plan=scripts/benchmarks/expected-primary-plan.json --tag=expected-primary-isolated --nonce=nrc19-expected-primary-isolated-v1
+node scripts/benchmarks/summarize.mjs artifacts/nrc19/expected-primary-isolated-before artifacts/nrc19/expected-primary-isolated-after artifacts/nrc19/expected-primary-isolated-summary.json
 ```
 
 Check every shard log and require `complete185: true` in the summary. A partial progress summary is not an adoption result. Completed cases can be resumed with identical arguments. Input/nonce/source mismatches abort instead of silently accepting stale files. Source fingerprints include src, build adapters, Vite configuration and the dependency lock; card and preset fingerprints must agree between versions. Keep an entire run directory together with its plan and checkpoints.
 
 Each version runs a 30-second search, freezes the top three distinct published compositions using the production ranking, then evaluates each with 1,024 fresh ordinary trials. The primary metric is rank one's empirical expected maximum over 30 attempts. Audit scores never select or train candidates. Candidate-specific seeds make the same candidate's audit identical between versions. Every audited candidate is checked for ownership, support role, required characters, training, challenge locks and budget. The maximum audit result is replayed both by seed and explicit plan. Wall-clock bounds allow timing noise and cannot prove that every individual user search improves.
 
-Use `--time-ms=180000 --nonce=nrc19-expected-long-v1 --plan=scripts/benchmarks/expected-long-plan.json --tag=expected-long` for the fixed21 long comparisons (the original17: both set1 budgets × current5, original-zero × historical tuning6, original × NRC17 allDF; plus provided/all-owned/sparse NRC19 woodDF and original NRC18 waterATK). Use four shards as above. Use `--supports=current --profiles=original,original-zero --cases=current --tag=expected-current-support --nonce=nrc19-expected-current-support-v1` for the separate current-535 support check. Do not mix these extra runs into the70/30 primary weighting.
+Use `--time-ms=180000 --nonce=nrc19-expected-long-isolated-v1 --plan=scripts/benchmarks/expected-long-plan.json --tag=expected-long-isolated` for the fixed21 long comparisons (the original17: both set1 budgets × current5, original-zero × historical tuning6, original × NRC17 allDF; plus provided/all-owned/sparse NRC19 woodDF and original NRC18 waterATK). Use isolated-paired.mjs with its four concurrent slots as above. Use `--supports=current --plan=scripts/benchmarks/expected-current-support-plan.json --tag=expected-current-support-isolated --nonce=nrc19-expected-current-support-isolated-v1` for the separate current-535 support check. Do not mix these extra runs into the70/30 primary weighting.
 
 ## Checks and diagnostics
 
@@ -53,4 +50,4 @@ The repository already contains all five NRC19 subjects and 30 challenges. The [
 
 `python3 scripts/benchmarks/recovery-snapshot.py` bundles the clean committed source, private profiles and only matched completed case reports. Save this archive to the same private Library item after each group of completed cases. It contains personal hand data; it is separate from the public source/review deliverable. On recovery, restore the recorded branch and profiles, then rerun the identical tag/nonce/shard arguments. Interrupted pairs are rerun on both versions; do not resume their partial time budgets. `status-pairs.py TAG` reports completion without exposing holdout score outcomes during the fixed-code confirmation run. `verify-paired.mjs output.json TAG...` validates complete plans, independent1024-trial audits, maximum replay, constraints and common-candidate equality. `lifecycle.mjs expected-lifecycle` preserves separate lifecycle evidence.
 
-The current535 support supplement also runs the same entire10 cases at180 seconds with `--time-ms=180000 --tag=expected-current-support-long --nonce=nrc19-expected-current-support-long-v1`. Do not replace or mix the30-second result.
+The current535 support supplement also runs the same entire10 cases at180 seconds with `--time-ms=180000 --tag=expected-current-support-long-isolated --nonce=nrc19-expected-current-support-long-isolated-v1`. Do not replace or mix the30-second result.
