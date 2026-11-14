@@ -1,0 +1,166 @@
+From 14ec17b5866ab64170fbbad86bfe08e9dd7b59e3 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 15 Nov 2026 08:37:48 +0900
+Subject: [PATCH] experiment: port pure T3 buff coefficient cache onto current
+ master
+
+---
+ .../exam-buff-coefficient-cache.test.cjs      | 35 +++++++++++++
+ src/views/examSimulator.vue                   | 49 ++++++++++++++-----
+ tests/exam-damage-calculation.test.cjs        |  2 +-
+ 3 files changed, 73 insertions(+), 13 deletions(-)
+ create mode 100644 scripts/tests/exam-buff-coefficient-cache.test.cjs
+
+diff --git a/scripts/tests/exam-buff-coefficient-cache.test.cjs b/scripts/tests/exam-buff-coefficient-cache.test.cjs
+new file mode 100644
+index 00000000..6f7c1edc
+--- /dev/null
++++ b/scripts/tests/exam-buff-coefficient-cache.test.cjs
+@@ -0,0 +1,35 @@
++const {test}=require('node:test');
++const assert=require('node:assert/strict');
++const {runtime,state}=require('./helpers/exam-runtime.cjs');
++function reference(c,b) {
++ const kind=b.buffOption,power=b.powerOption,level=Math.min(10,Math.max(1,Math.floor(c.safeNumber(b.levelOption)||10)));
++ let atkRate=0,damageRate=0,criticalRate=0;
++ if(kind==='ATKUP'||kind==='ATKDOWN')atkRate=c.safeNumber(c.atkbuffDict[`${kind}(${power})${level}`]);
++ else if(['ダメージUP','ダメージDOWN','属性ダメUP','属性ダメDOWN'].includes(kind)) {
++  const prefix=kind==='ダメージUP'?'ダメUP':kind==='ダメージDOWN'?'ダメDOWN':kind;
++  damageRate=c.safeNumber(c.dmgbuffDict[`${prefix}(${power})${level}`]);
++ }else if(kind==='クリティカル')criticalRate=c.criticalChanceFromPower(power);
++ return {kind,power,rawLevel:b.levelOption,atkRate,damageRate,criticalRate};
++}
++function context(){const c=runtime();c.atkbuffDict={};c.dmgbuffDict={};for(const kind of ['ATKUP','ATKDOWN','ダメUP','ダメDOWN','属性ダメUP','属性ダメDOWN'])for(const p of ['小','中','大'])for(let l=1;l<=10;l++){c.atkbuffDict[`${kind}(${p})${l}`]=l/100;c.dmgbuffDict[`${kind}(${p})${l}`]=l/200;}c.simulationRuntimeCache={playerBuffCoefficients:new WeakMap()};return c;}
++test('T3 coefficients match direct formula over descriptors and normalization boundaries',()=>{
++ const c=context();let n=0;
++ for(const kind of ['ATKUP','ATKDOWN','ダメージUP','ダメージDOWN','属性ダメUP','属性ダメDOWN','クリティカル','unknown'])for(const power of ['小','中','大','unknown'])for(const level of [undefined,null,NaN,-1,0,1,2.4,9,10,11,'7',Infinity]){
++  const b={buffOption:kind,powerOption:power,levelOption:level};const first=c.playerBuffCoefficients(b);
++  assert.deepEqual({...first},reference(c,b));const second=c.playerBuffCoefficients(b);
++  if(!Number.isNaN(level))assert.equal(first,second);n++;
++ }assert.equal(n,384);
++});
++test('T3 invalidates mutable raw coefficient fields and runtime replacement',()=>{
++ const c=context(),b={buffOption:'ATKUP',powerOption:'小',levelOption:1};let last=c.playerBuffCoefficients(b);
++ for(const edit of [{levelOption:10},{powerOption:'大'},{buffOption:'ダメージUP'},{buffOption:'ATKUP',powerOption:'小',levelOption:1}]){Object.assign(b,edit);const now=c.playerBuffCoefficients(b);assert.notEqual(now,last);assert.deepEqual({...now},reference(c,b));last=now;}
++ c.simulationRuntimeCache={playerBuffCoefficients:new WeakMap()};assert.notEqual(c.playerBuffCoefficients(b),last);
++ c.simulationRuntimeCache=null;assert.deepEqual({...c.playerBuffCoefficients(b)},reference(c,b));
++});
++test('T3 target/turn/buddy magic/attribute gates remain dynamic across cache hits',()=>{
++ const c=context(),s=state();c.getPlayerMagicRuntimeMeta=()=>({runtimeAtk:100,buddyAtk:0,magicAttribute:'火',adjustedPower:'',level:10,magicRatio:1,attributeAdjust:1,rengekiMultiplier:1});
++ c.playerAttributeMultiplier=()=>1;c.sumDamageDownRatesForCard=()=>0;c.effectProbability=x=>x;
++ const b={buffOption:'属性ダメUP',powerOption:'小',levelOption:10,attributeOption:'火',magicOption:'M1',isBuddyGenerated:true};
++ const e={targetDeckIndex:0,turns:1,buff:b};s.playerBuffs=[e];const damage=()=>c.calculatePlayerDamageBaseFromState(s,'0-M1',0,1,'火',0,false).damage;
++ assert.equal(damage(),105);b.attributeOption='水';assert.equal(damage(),100);b.attributeOption='火';b.magicOption='M2';assert.equal(damage(),100);b.magicOption='M1';e.turns=0;assert.equal(damage(),100);e.turns=1;e.targetDeckIndex=1;assert.equal(damage(),100);e.targetDeckIndex=0;assert.equal(damage(),105);
++});
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index dfbf0dc5..3e18134d 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -971,6 +971,15 @@ type StatefulRng = (() => number) & {
+   setState: (state: number) => void;
+ };
+ 
++interface PlayerBuffCoefficients {
++  kind: ParsedBuff['buffOption'];
++  power: ParsedBuff['powerOption'];
++  rawLevel: ParsedBuff['levelOption'];
++  atkRate: number;
++  damageRate: number;
++  criticalRate: number;
++}
++
+ interface SimulationRuntimeCache {
+   turnLimit: number;
+   totalDeckHp: number;
+@@ -980,6 +989,7 @@ interface SimulationRuntimeCache {
+   specialChallengeLabels: string[];
+   runtimeCharacters: Map<number, any>;
+   runtimeBuffs: Map<number, any[]>;
++  playerBuffCoefficients: WeakMap<ParsedBuff, PlayerBuffCoefficients>;
+   automaticMagicBuffs: Map<string, ParsedBuff[]>;
+   automaticOpponentDebuffs: Map<string, ParsedBuff[]>;
+   buddyAtk: Map<number, number>;
+@@ -3681,6 +3691,7 @@ function createSimulationRuntimeCache(): SimulationRuntimeCache {
+     specialChallengeLabels: selectedSpecialChallenges.value.map((challenge) => challenge.label),
+     runtimeCharacters: new Map(),
+     runtimeBuffs: new Map(),
++    playerBuffCoefficients: new WeakMap(),
+     automaticMagicBuffs: new Map(),
+     automaticOpponentDebuffs: new Map(),
+     buddyAtk: new Map(),
+@@ -6007,6 +6018,29 @@ function calculateRuntimeBuddyAtk(runtime: any) {
+   return total;
+ }
+ 
++// Buff descriptors repeat across prepared trials; dynamic target/turn/attribute
++// checks remain at the call site. Guard raw fields so edited descriptors cannot
++// reuse stale coefficients. The map lives only for one prepared runtime.
++function playerBuffCoefficients(buff: ParsedBuff): PlayerBuffCoefficients {
++  const kind = buff.buffOption, power = buff.powerOption, rawLevel = buff.levelOption;
++  const cache = simulationRuntimeCache?.playerBuffCoefficients;
++  const previous = cache?.get(buff);
++  if (previous && previous.kind === kind && previous.power === power && previous.rawLevel === rawLevel) return previous;
++  const level = Math.min(10, Math.max(1, Math.floor(safeNumber(rawLevel) || 10)));
++  let atkRate = 0, damageRate = 0, criticalRate = 0;
++  if (kind === 'ATKUP' || kind === 'ATKDOWN') {
++    atkRate = safeNumber(atkbuffDict[`${kind}(${power})${level}`]);
++  } else if (kind === 'ダメージUP' || kind === 'ダメージDOWN' || kind === '属性ダメUP' || kind === '属性ダメDOWN') {
++    const prefix = kind === 'ダメージUP' ? 'ダメUP' : kind === 'ダメージDOWN' ? 'ダメDOWN' : kind;
++    damageRate = safeNumber(dmgbuffDict[`${prefix}(${power})${level}`]);
++  } else if (kind === 'クリティカル') {
++    criticalRate = criticalChanceFromPower(power);
++  }
++  const value = { kind, power, rawLevel, atkRate, damageRate, criticalRate };
++  cache?.set(buff, value);
++  return value;
++}
++
+ function calculatePlayerDamageBaseFromState(
+   state: SimulationState,
+   magicId: string,
+@@ -6038,26 +6072,17 @@ function calculatePlayerDamageBaseFromState(
+     const buff = entry.buff;
+     if (buff?.isBuddyGenerated && buff.magicOption !== currentMagicOption) continue;
+     const buffType = buff?.buffOption;
+-    const powerType = buff?.powerOption;
+-    const buffLevel = Math.min(10, Math.max(1, Math.floor(safeNumber(buff?.levelOption) || 10)));
+     if (buffType === 'ATKUP' || buffType === 'ATKDOWN') {
+-      atkBuffTotal += safeNumber(atkbuffDict[`${buffType}(${powerType})${buffLevel}`]) * runtimeAtk;
++      atkBuffTotal += playerBuffCoefficients(buff).atkRate * runtimeAtk;
+       continue;
+     }
+     if (buffType === 'ダメージUP' || buffType === '属性ダメUP' || buffType === 'ダメージDOWN' || buffType === '属性ダメDOWN') {
+       if ((buffType === '属性ダメUP' || buffType === '属性ダメDOWN') && buff.attributeOption && buff.attributeOption !== magicAttribute) continue;
+-      const prefix = buffType === 'ダメージUP'
+-        ? 'ダメUP'
+-        : buffType === 'ダメージDOWN'
+-          ? 'ダメDOWN'
+-          : buffType === '属性ダメUP'
+-            ? '属性ダメUP'
+-            : '属性ダメDOWN';
+-      dmgBuffTotal += safeNumber(dmgbuffDict[`${prefix}(${powerType})${buffLevel}`]);
++      dmgBuffTotal += playerBuffCoefficients(buff).damageRate;
+       continue;
+     }
+     if (buffType === 'クリティカル') {
+-      criticalChance = Math.min(1, criticalChance + criticalChanceFromPower(powerType));
++      criticalChance = Math.min(1, criticalChance + playerBuffCoefficients(buff).criticalRate);
+     }
+   }
+ 
+diff --git a/tests/exam-damage-calculation.test.cjs b/tests/exam-damage-calculation.test.cjs
+index 2b0f0ea9..702f182c 100644
+--- a/tests/exam-damage-calculation.test.cjs
++++ b/tests/exam-damage-calculation.test.cjs
+@@ -11,7 +11,7 @@ const source = fs.readFileSync(path.join(__dirname, '../src/views/examSimulator.
+ const script = source.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1];
+ const ast = ts.createSourceFile('exam.ts', script, ts.ScriptTarget.Latest, true);
+ const names = [
+-  'calculatePlayerDamageBaseFromState', 'calculatePlayerDamage', 'calculateEnemyDamage',
++  'playerBuffCoefficients', 'calculatePlayerDamageBaseFromState', 'calculatePlayerDamage', 'calculateEnemyDamage',
+   'floorAttackDamage', 'ceilDamage', 'effectProbability', 'rollEffect', 'isPlayerImmune',
+   'sumRatesForCard', 'sumRatesForEnemy', 'sumDamageDownRatesForCard',
+   'sumDamageRatesForElementAndEnemy', 'sumDamageTakenDownRatesForCard',
+-- 
+2.52.0
+
