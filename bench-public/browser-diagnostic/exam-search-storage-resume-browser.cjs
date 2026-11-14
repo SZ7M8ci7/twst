@@ -75,7 +75,7 @@ async function idle(page) {
         if (!/examSearch\.worker/.test(String(args[0]))) return worker;
         const post = worker.postMessage.bind(worker);
         worker.postMessage = (message, ...rest) => {
-          if (['start', 'resume'].includes(message.method)) message.durationMs = 3000;
+          if (['start', 'resume'].includes(message.method)) message.durationMs = window.qaBudgetMs ?? 3000;
           window.trace.requests.push(structuredClone(message));
           return post(message, ...rest);
         };
@@ -162,6 +162,49 @@ async function idle(page) {
     }
     await context.close();
   }
+
+  // Separate realistic-budget continuation QA. Keep the four fast persistence
+  // cases above unchanged; elapsed time alone is not evidence of new trials.
+  const expandedSeen = new Set();
+  const expandedRoster = cards.filter(c => c.rare === 'SSR' && !expandedSeen.has(c.chara) && expandedSeen.add(c.chara)).slice(0, 12)
+    .map(c => ({ name: c.name, level: 110, totsu: 4, magicLevels: [10, 10, 10], buddyLevels: [10, 10, 10], allowUpgrade: true }));
+  const realistic = await open({ ...input, roster: expandedRoster, requiredCards: [] });
+  const islandStats = checkpoint => (checkpoint.parallel?.checkpoints ?? [checkpoint]).map(c => ({
+    evaluated: c.evaluatedCount ?? 0, trialSerial: c.trialSerial, round: c.round,
+    cursor: c.cursor, partition: c.partition, elapsed: c.elapsed
+  }));
+  await realistic.page.evaluate(() => { window.qaBudgetMs = 30000; });
+  await realistic.page.getByTestId('resource-start').click(); await idle(realistic.page);
+  const beforeReal = await readSession(realistic.page);
+  const beforeIslands = islandStats(beforeReal.checkpoint);
+  assert.ok(beforeIslands.length >= 1);
+  assert.ok(beforeIslands.reduce((n, c) => n + c.trialSerial, 0) > 0);
+  await realistic.page.reload(); await ready(realistic.page); await idle(realistic.page);
+  assert.deepEqual(await readSession(realistic.page), beforeReal);
+  await realistic.page.evaluate(() => { window.qaBudgetMs = 30000; });
+  await realistic.page.getByTestId('resource-resume').click();
+  await realistic.page.waitForFunction(() => window.trace.requests.some(r => r.method === 'resume'));
+  await idle(realistic.page);
+  const afterReal = await readSession(realistic.page);
+  const afterIslands = islandStats(afterReal.checkpoint);
+  const sentReal = await realistic.page.evaluate(() => window.trace.requests.find(r => r.method === 'resume'));
+  assert.deepEqual(sentReal.checkpoint, beforeReal.checkpoint);
+  assert.deepEqual(sentReal.input, beforeReal.input);
+  assert.equal(sentReal.durationMs, 30000);
+  assert.equal(afterIslands.length, beforeIslands.length);
+  assert.ok(afterIslands.reduce((n, c) => n + c.trialSerial, 0) > beforeIslands.reduce((n, c) => n + c.trialSerial, 0),
+    'resume must execute new battle trials, not merely advance elapsed time');
+  for (let i = 0; i < afterIslands.length; i++) {
+    assert.ok(afterIslands[i].trialSerial >= beforeIslands[i].trialSerial);
+    assert.deepEqual(afterIslands[i].partition, beforeIslands[i].partition);
+  }
+  await realistic.page.reload(); await ready(realistic.page); await idle(realistic.page);
+  assert.deepEqual(await readSession(realistic.page), afterReal);
+  report.cases.push({ name: '30-second real worker continuation executes new trials and persists exact multi-island checkpoints',
+    passed: true, budgetMs: 30000, islandCount: beforeIslands.length, beforeIslands, afterIslands,
+    beforeEvaluated: beforeReal.checkpoint.evaluatedCount, afterEvaluated: afterReal.checkpoint.evaluatedCount });
+  await realistic.context.close();
+
   assert.deepEqual(report.errors, []);
 })().catch(error => { report.failure = { message: error.message.slice(0, 2000), stack: error.stack.split('\n').slice(-4).join('\n') }; process.exitCode = 1; }).finally(async () => {
   await browser?.close();
