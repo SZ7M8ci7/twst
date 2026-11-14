@@ -1,0 +1,25 @@
+diff --git a/src/domain/examSearch/candidateGenerator.ts b/src/domain/examSearch/candidateGenerator.ts
+index a87c2c86..857c7612 100644
+--- a/src/domain/examSearch/candidateGenerator.ts
++++ b/src/domain/examSearch/candidateGenerator.ts
+@@ -880,6 +880,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+   // Bound each beam expansion by character, preserving all spell pairs for
+   // retained cards. Every owned card still has its own forced-anchor task.
+   const requiredBeamFull=requiredNames.length>0&&!!beam[0]&&beam[0].filter(card=>!card.support).length>=ownCount;
++  const completeOwnedOptions=options;
+   if (!requiredBeamFull) options=shortlist(options);
+   if (!requiredNames.length || !requiredSupport) supportOptions=shortlist(supportOptions);
+   if(supportFirst&&!fixedSupport&&!requiredSupport) {
+@@ -899,6 +900,12 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+   }
+   const initialDepth=beam.length?beam[0].filter(card=>!card.support).length:(fixedSupport?0:1);
+   for (let depth = initialDepth; depth < ownCount; depth++) {
++    // Revisit the catalogue once a real partner has been selected. A costume
++    // weak beside the root can unlock a buddy/DUO for that second member.
++    if(depth===2 && completeOwnedOptions!==options && !requiredBeamFull) {
++      options=shortlist(completeOwnedOptions);
++      yield;
++    }
+     const expanded: { cards: SearchCard[]; value: number }[] = [];
+     const seen = new Set<string>();
+     let processed = 0;

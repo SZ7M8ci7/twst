@@ -1,0 +1,44 @@
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index d4a8a872..b06339dd 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -763,7 +763,7 @@
+ 
+ <script setup lang="ts">
+ import { yieldToHost } from '@/utils/yieldToHost';
+-import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
++import { computed, markRaw, toRaw, nextTick, onMounted, ref, watch } from 'vue';
+ import ExamSearchPanel from '@/components/ExamSearchPanelLoader.vue';
+ import { useI18n } from 'vue-i18n';
+ import { useRouter } from 'vue-router';
+@@ -4302,7 +4302,7 @@ let resourcePairSpend:ReturnType<typeof createPairSpend>|undefined;
+ let resourceInitialRuntime:SimulationRuntimeCache|null|undefined;
+ let resourceInitialState:SimulationState|undefined;
+ let resourceInitialStats:SimulationStats|undefined;
+-async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
++async function prepareResourceCandidate(input: SearchInput, candidate: Candidate, immutableDeck = false) {
+   favorableEffects.value = input.favorableEffects === true;
+   resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
+   resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
+@@ -4348,6 +4348,8 @@ async function prepareResourceCandidate(input: SearchInput, candidate: Candidate
+       &&getBuddyStatusForCharacter(raw,buddyIndex,{totsu:slot.totsu,isActive:true}).includes('クリティカル'))scoutTargets.add(index);
+   }
+   resourceCriticalScoutTargets=[...scoutTargets].sort((a,b)=>a-b);
++  // Prepared resource candidates are immutable until the next prepare call.
++  if (immutableDeck) deck.value = markRaw([...toRaw(deck.value)]);
+   // Let reactive derived values invalidate before constructing the per-deck cache.
+   await nextTick();
+   simulationRuntimeCache = createSimulationRuntimeCache();
+diff --git a/src/workers/resourceBattleHost.ts b/src/workers/resourceBattleHost.ts
+index 1d43fc45..0f7ebac2 100644
+--- a/src/workers/resourceBattleHost.ts
++++ b/src/workers/resourceBattleHost.ts
+@@ -24,7 +24,7 @@ export function createResourceBattleHost(): BattleEngine {
+   app.use(createI18n({ legacy: false, locale: 'ja', messages: { ja } }));
+   app.provide(routerKey, { currentRoute: { value: { query: {} } } } as any);
+   const simulator = app.mount(node()) as any;
+-  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate),
++  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate, true),
+     trial: (seed, policy, log) => simulator.runResourceTrial(seed, policy, log),
+     scout: (seed, policy, cardIndex, idealHand, magic) => simulator.scoutResourceCritical(seed,policy,cardIndex,idealHand,magic),
+     scoutTargets: () => simulator.resourceCriticalTargets(),

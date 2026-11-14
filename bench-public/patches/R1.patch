@@ -1,0 +1,31 @@
+diff --git a/src/domain/examSearch/statistics.ts b/src/domain/examSearch/statistics.ts
+index fbd83a05..53f1f385 100644
+--- a/src/domain/examSearch/statistics.ts
++++ b/src/domain/examSearch/statistics.ts
+@@ -6,7 +6,25 @@ export function searchDevelopmentQuality(samples: Samples, input: Pick<SearchInp
+   const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, auto.n);
+   // Ordinary outcomes, including failed attempts, determine the objective.
+   // Near-win fitness only guides candidates with no positive ordinary score.
+-  return auto.expectedBestScore || mean * 1e-9;
++  return developmentExpectedBestScore(samples, input.attempts) || mean * 1e-9;
++}
++
++/** Unbiased U-statistic for expected maximum when n >= attempts.
++ * Development screening only: validation/display keep empirical estimates.
++ * For smaller samples the empirical fallback avoids changing the objective's
++ * attempt count or claiming extrapolation beyond observed data.
++ */
++export function developmentExpectedBestScore(samples: Samples, attempts: number): number {
++  const n = samples.scores.length;
++  if (!Number.isInteger(attempts) || attempts < 1 || n < attempts) return expectedBestScore(samples, attempts);
++  const positive = sortedPositiveScores(samples);
++  let noLarger = 1, expected = 0;
++  for (let j = 0; j < positive.length && noLarger > 0; j++) {
++    const next = noLarger * Math.max(0, n - j - attempts) / (n - j);
++    expected += positive[j] * (noLarger - next);
++    noLarger = next;
++  }
++  return expected;
+ }
+ 
+ export function reachProbability(p: number, attempts: number): number {

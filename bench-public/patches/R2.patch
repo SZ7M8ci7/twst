@@ -1,0 +1,19 @@
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..d13be82b 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -302,6 +302,14 @@ export class SearchSession {
+       // Protect the explicit champion roles before diversifying spare slots.
+       // A scout or weighted winner may be a useful spell/plan of the same team.
+       const priority=[...new Set(champions.filter((result):result is SearchResult=>!!result))].slice(0,slots);
++      // Reserve one finalist opportunity for a genuinely different team when
++      // champion roles collapse onto spell/policy variants of one composition.
++      const teamKey=(row:SearchResult)=>JSON.stringify(row.candidate.cards
++        .map(card=>[card.name,!!card.support]).sort((a,b)=>String(a).localeCompare(String(b))));
++      if(slots>1 && priority.length>1 && new Set(priority.map(teamKey)).size===1){
++        const alternate=band.find(row=>teamKey(row)!==teamKey(priority[0]));
++        if(alternate)priority[priority.length-1]=alternate;
++      }
+       const bandSelected=[...priority,...diverseFinalists(band,slots-priority.length,
+         [...retained,...selected,...priority].filter(result=>result.candidate.cost===cost))];
+       selected.push(...bandSelected);

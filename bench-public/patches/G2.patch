@@ -1,0 +1,54 @@
+diff --git a/src/domain/examSearch/candidateGenerator.ts b/src/domain/examSearch/candidateGenerator.ts
+index a87c2c86..6d0d90b8 100644
+--- a/src/domain/examSearch/candidateGenerator.ts
++++ b/src/domain/examSearch/candidateGenerator.ts
+@@ -991,7 +991,23 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
+     }
+     if(best)scoringSetups.push(best);
+   }
+-  const initial=[...finished,...setups.sort((a,b)=>b.value-a.value).slice(0,2),
++  // A curse-safe spell pair can be weaker under the scalar team estimate
++  // while enabling healing after the opening turns. Reserve one real trial.
++  const cureSetups:typeof finished=[];
++  const curseChallenge=input.preset.specialChallenges?.some(challenge=>task.challenges.includes(challenge.id)
++    &&challenge.effects.some(effect=>effect.kind==='playerCurse'));
++  if(input.preset.kind==='DEFENCE'&&curseChallenge)for(const {cards} of finished)for(const [index,card] of cards.entries()) {
++    const cureMagic=parseMagicBuffsFromEtc(catalog[card.name]).filter(buff=>
++      buff.buffOption==='呪い無効'||buff.buffOption==='デバフ解除').map(buff=>Number(buff.magicOption.slice(1)));
++    if(!cureMagic.length||card.selectedMagic.some(m=>cureMagic.includes(m)))continue;
++    const original=(card.support?input.supports:input.roster).find(raw=>raw.name===card.name)!;
++    for(const option of cardVariants(original,catalog[card.name].rare,card.support,card.totsu,card.additionalLevels)) {
++      if(!option.selectedMagic.some(m=>cureMagic.includes(m)))continue;
++      const team=cards.map((other,i)=>i===index?option:other);
++      cureSetups.push({cards:team,value:estimate(team)});
++    }
++  }
++  const initial=[...finished,...cureSetups.sort((a,b)=>b.value-a.value).slice(0,1),...setups.sort((a,b)=>b.value-a.value).slice(0,2),
+     ...scoringSetups.sort((a,b)=>b.gain-a.gain||b.value-a.value).slice(0,2)];
+   // Compare more compositions before repeating every policy on the same five.
+   // Promising compositions receive the other policies in the refinement stage.
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..75729284 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,20 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++test('DF curse construction reserves a discarded cure spell pair for real trials',()=>{
++  const input=fixture(); input.budget=0; input.preset.kind='DEFENCE';
++  input.preset.specialChallenges=[{id:'curse-reserve',effects:[{kind:'playerCurse',duration:3}]}];
++  for(const card of [...input.roster,...input.supports]){card.totsu=4;card.level=110;}
++  const data=clone(catalog),name=input.roster[0].name;
++  for(const card of [...input.roster,...input.supports]){
++    const raw=data[card.name]; raw.etc='';
++    for(const m of [1,2,3]){raw[`magic${m}etc`]='';raw[`magic${m}heal`]='';raw[`magic${m}buf`]='';}
++  }
++  data[name].etc='呪い無効(自/3T)(M3)';
++  const task={anchor:name,totsu:4,cost:0,challenges:['curse-reserve'],style:0};
++  const result=generation.generateCandidates(input,task,data);
++  assert.ok(result.length>0);
++  assert.ok(result.some(candidate=>candidate.cards.some(card=>card.name===name&&card.selectedMagic.includes(3))));
++  for(const candidate of result)assert.ok(variants.candidateSatisfiesConstraints(input,candidate,data));
++});

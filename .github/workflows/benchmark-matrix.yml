@@ -1,7 +1,7 @@
-name: Synthetic paired screening 20 independent runners
+name: Synthetic screening independent source processes
 on:
   push:
-    branches: [codex/benchmark-matrix-wave3-20261114]
+    branches: [codex/benchmark-matrix-wave4-20261114]
 permissions:
   contents: read
 jobs:
@@ -12,7 +12,8 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        variant: [E14,E15,E16,E17,E18,S19,S20,S21,S22,P14]
+        variant: [G1,G2,R1,R2,T1,T2]
+        replicate: [0,1,2]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,11 +39,11 @@ jobs:
       - name: Paired 15-case small screening
         env:
           VARIANT: ${{ matrix.variant }}
-        run: node scripts/benchmarks/paired.mjs --before=baseline --after=candidate --inputs=bench-public/profiles.generated.json --plan=bench-public/plan.json --time-ms=30000 --audit=256 --supports=current --nonce=actions-synthetic-20261114-wave3 --tag="$VARIANT"
+        run: node bench-public/run-isolated.mjs "$VARIANT" "${{ matrix.replicate }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: paired-${{ matrix.variant }}
+          name: paired-${{ matrix.variant }}-rep${{ matrix.replicate }}
           path: |
             artifacts/runner.json
             artifacts/nrc19/**/case-*.json

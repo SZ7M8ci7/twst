@@ -1,0 +1,41 @@
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index d4a8a872..04348da3 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -987,7 +987,7 @@ interface SimulationRuntimeCache {
+   parsedMagicIds: Map<string, ParsedMagicId | null>;
+   visiblePairs: Map<string, PlayerPair[]>;
+   enemyActionPools: RuntimeEnemyAction[][];
+-  duoActive: Map<string, boolean>;
++  duoActive: Map<string, Map<string, boolean>>;
+   enemyActionMeta: Map<string, { baseAtk: number; magicRatio: number; rengekiMultiplier: number; hitCount: number }>;
+   playerMagicMeta: Map<string, {
+     runtimeAtk: number;
+@@ -5410,19 +5410,23 @@ function buddyDamageTakenDownRate(power: string, attributeSpecific: boolean) {
+ }
+ 
+ function isDuoActiveForPair(magicId: string, pairedMagicId: string) {
+-  const cacheKey = `${magicId}|${pairedMagicId}`;
+-  const cached = simulationRuntimeCache?.duoActive.get(cacheKey);
++  let pairCache = simulationRuntimeCache?.duoActive.get(magicId);
++  if (!pairCache && simulationRuntimeCache) {
++    pairCache = new Map();
++    simulationRuntimeCache.duoActive.set(magicId, pairCache);
++  }
++  const cached = pairCache?.get(pairedMagicId);
+   if (cached !== undefined) return cached;
+   const parsed = parseMagicId(magicId);
+   const paired = parseMagicId(pairedMagicId);
+   if (!parsed || !paired || parsed.magicSlot !== 2) {
+-    simulationRuntimeCache?.duoActive.set(cacheKey, false);
++    pairCache?.set(pairedMagicId, false);
+     return false;
+   }
+   const source = deck.value[parsed.deckIndex]?.character;
+   const partner = deck.value[paired.deckIndex]?.character;
+   const active = !!source?.duo && !!partner && partner.chara === source.duo;
+-  simulationRuntimeCache?.duoActive.set(cacheKey, active);
++  pairCache?.set(pairedMagicId, active);
+   return active;
+ }
+ 
