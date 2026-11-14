@@ -40,7 +40,7 @@ jobs:
         working-directory: target
         run: |
           npm run build
-          npx vite preview --host 127.0.0.1 --port 4173 > preview.log 2>&1 &
+          npx vite preview --base /twst/ --host 127.0.0.1 --port 4173 > preview.log 2>&1 &
           for n in $(seq 1 60); do curl -fsS http://127.0.0.1:4173/twst/ >/dev/null && break || sleep 1; done
           TEST_URL='http://127.0.0.1:4173/twst/exam-simulator?tab=search' node scripts/tests/exam-search-storage-resume-browser.cjs
       - uses: actions/upload-artifact@v4
@@ -49,6 +49,7 @@ jobs:
           name: browser-${{ matrix.source }}
           path: |
             target/artifacts/exam-search-storage-*
+            target/artifacts/resume-ready-failure.*
             target/preview.log
             target/storage-tests.tap
           retention-days: 14

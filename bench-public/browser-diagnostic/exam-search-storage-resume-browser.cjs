@@ -57,13 +57,8 @@ async function idle(page) {
     ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}) });
   async function open(seedInput, legacy) {
     const context = await browser.newContext();
-    // The deployed site is mounted at /twst/. Vite preview serves its assets
-    // at /assets/, so mirror that deployment mount for deep-link reloads.
-    await context.route('**/twst/assets/**', route => {
-      const asset = new URL(route.request().url());
-      asset.pathname = asset.pathname.replace(/^\/twst\/assets\//, '/assets/');
-      return route.continue({ url: asset.href });
-    });
+    // The preview server mounts the complete built app at /twst/, including
+    // service-worker and nested-worker requests that page routing cannot rewrite.
     await context.addInitScript({ content: `${bundle}\nglobalThis.ExamStorage = ExamStorage;` });
     await context.addInitScript(({ input, legacy, setupKey, sessionKey }) => {
       if (!localStorage.getItem('storage-resume-test-seeded')) {
