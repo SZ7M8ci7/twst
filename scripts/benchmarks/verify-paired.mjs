@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 const [output,...tags]=process.argv.slice(2);
 assert.ok(output&&tags.length,'Usage: verify-paired.mjs output.json tag [tag...]');
 const root='artifacts/nrc19',read=dir=>fs.readdirSync(dir).filter(f=>f.startsWith('case-')&&f.endsWith('.json')).map(f=>JSON.parse(fs.readFileSync(dir+'/'+f,'utf8')));
-const key=r=>r.profile+'|'+r.caseId,metric=r=>{const {optimism,...fixed}=r.validation1024;return fixed;};
+const key=r=>r.profile+'|'+r.caseId,metric=r=>{const {optimism,...fixed}=r.validation1024;
+ if(fixed.auto){const {expectedBestScore,...commonAuto}=fixed.auto;fixed.auto=commonAuto;}
+ return fixed;};
 const runs=[];
 for(const tag of tags){
  const plan=JSON.parse(fs.readFileSync(`${root}/${tag}-before/plan-0.json`,'utf8'));
@@ -24,6 +26,7 @@ for(const tag of tags){
    for(const [rank,result] of row.topCandidates.entries()){
     const v=result.validation1024;assert.equal(result.rank,rank+1);
     assert.equal(v.n,1024);assert.equal(v.trials,1024);assert.equal(v.max,v.replayScore);
+    if(v.auto?.expectedBestScore!==undefined)assert.ok(Math.abs(v.auto.expectedBestScore-v.expectedMaxOfAttempts)<1e-7);
     assert.ok(v.expectedMaxOfAttempts>=0&&v.expectedMaxOfAttempts<=v.max+1e-8);
     assert.ok(v.p95>=0&&v.p95<=v.max);assert.ok(v.winRate>=0&&v.winRate<=1);
     candidates++;auditTrials+=v.trials;

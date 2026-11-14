@@ -9,12 +9,6 @@ function deckKey(candidate) {
   return JSON.stringify(candidate.cards.map(card => [card.name, !!card.support]).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
 }
 
-function resultRank(result, attempts, autoScoreMetrics) {
-  const scores = result.development?.scores ?? [];
-  const mean = (result.development?.fitnessSum ?? scores.reduce((sum, score) => sum + score, 0)) / Math.max(1, scores.length);
-  const empirical = autoScoreMetrics(result.development, attempts, 0.05).empiricalScore ?? 0;
-  return empirical + (autoScoreMetrics(result.development, attempts, 0.05).max ?? 0) * 1e-6 + mean * 1e-9;
-}
 
 function constraintCheck(input, candidate, catalog, profile) {
   const challengeIds = (input.preset.specialChallenges ?? []).map(challenge => challenge.id).sort();
@@ -54,7 +48,7 @@ function constraintCheck(input, candidate, catalog, profile) {
 
 export async function runHistoryCase({input,preset,entry,profile,tag,outputDir,durationMs,auditTrials,nonce,auditOnly=false,
   validationOnly=false,startingCheckpoint,sourceHash,modules}) {
-  const {createResourceBattleHost,SearchSession,runSessionWithinBudget,metrics,scoreDistribution,autoScoreMetrics,compareAutoResults,ENGINE_VERSION,catalog}=modules;
+  const {createResourceBattleHost,SearchSession,runSessionWithinBudget,metrics,scoreDistribution,autoScoreMetrics,compareAutoResults,searchDevelopmentQuality,ENGINE_VERSION,catalog}=modules;
   const caseId=preset.id;
 function saveJson(file, value) {
   const target = path.isAbsolute(file) ? file : path.join(outputDir, file);
@@ -110,7 +104,7 @@ function saveJson(file, value) {
       return { result, developmentMetrics,
         publishedMetrics: autoScoreMetrics(result.validation,input.attempts,input.desiredProbability),
         publishedDistribution: scoreDistribution(result.validation), finalist: finalistIds.has(result.candidate.id),
-        rankingScore: resultRank(result, input.attempts, autoScoreMetrics) };
+        rankingScore: searchDevelopmentQuality(result.development, input) };
     }).sort((a, b) => compareAutoResults(a.result,b.result,input.attempts,input.desiredProbability)
       || b.rankingScore - a.rankingScore || Number(b.finalist) - Number(a.finalist)
       || a.result.candidate.cost - b.result.candidate.cost || a.result.candidate.id.localeCompare(b.result.candidate.id));

@@ -235,7 +235,8 @@ export class SearchSession {
       const scout=sorted.filter(r=>r.candidate.cost===cost&&(r.criticalScout?.score??0)>0)
         .sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
       const weighted=this.weightedChampion(sorted.filter(r=>r.candidate.cost===cost),this.input.target);
-      const champions=[...new Set([best,weighted,scout,quality].filter((r):r is SearchResult=>!!r))];
+      const priorities=this.input.target===0?[quality,best,weighted,scout]:[best,weighted,scout,quality];
+      const champions=[...new Set(priorities.filter((r):r is SearchResult=>!!r))];
       const seen=new Set(champions.map(r=>JSON.stringify(r.candidate.cards.map(c=>c.name))));
       return [...champions,...sorted.filter(r=>r.candidate.cost===cost).filter(r=>{
         const key=JSON.stringify(r.candidate.cards.map(c=>c.name));
@@ -355,7 +356,7 @@ export class SearchSession {
     };
     const sorted=[...this.pool].sort((a,b)=>qualityOf(b)-qualityOf(a));
     const costs=[...new Set([...sorted,...this.finalists].map(r=>r.candidate.cost))].sort((a,b)=>a-b);
-    type AutoMetrics={n:number;retired:number;empiricalScore:number|null;conservativeScore:number|null;max:number};
+    type AutoMetrics=ReturnType<typeof statistics.autoScoreMetrics>;
     const scoreCache=new Map<SearchResult,AutoMetrics>();
     const scoreOf=(result:SearchResult):AutoMetrics=>{
       const cached=scoreCache.get(result);if(cached)return cached;
@@ -365,30 +366,26 @@ export class SearchSession {
       .sort((a,b)=>{
         const am=scoreOf(a),bm=scoreOf(b);
         const conservative=(value:number|null)=>value===null?-1:value;
-        return conservative(bm.conservativeScore)-conservative(am.conservativeScore)
+        return conservative(bm.expectedBestScore)-conservative(am.expectedBestScore)
+          ||conservative(bm.conservativeScore)-conservative(am.conservativeScore)
           ||conservative(bm.empiricalScore)-conservative(am.empiricalScore)||bm.max-am.max;
       }).slice(0,1));
     const retainedIds=new Set(retained.map(r=>r.candidate.id)),selected:SearchResult[]=[];
     for(const cost of this.finalistCostOrder(costs, MAX_FINALISTS-retained.length)){
       const band=sorted.filter(r=>r.candidate.cost===cost&&!retainedIds.has(r.candidate.id));
-      const empirical=band[0],weighted=this.weightedChampion(band,0);
+      const expected=band[0],weighted=this.weightedChampion(band,0);
       const scout=band.filter(r=>(r.criticalScout?.score??0)>0).sort((a,b)=>b.criticalScout!.score-a.criticalScout!.score)[0];
       const peak=[...band].sort((a,b)=>{
         const am=a.development.scores.reduce((x,y)=>Math.max(x,y),0),bm=b.development.scores.reduce((x,y)=>Math.max(x,y),0);return bm-am;
       })[0];
-      const stable=band.map(result=>({result,value:statistics.expectedBestScore(result.development,this.input.attempts)}))
-        .sort((a,b)=>b.value-a.value)[0]?.result;
       const slots=Math.max(1,Math.floor((MAX_FINALISTS-retained.length)/Math.max(1,costs.length)));
-      // Cost bands with one slot rotate their champion role across islands and
-      // continuation rounds. This keeps one island empirical-first while the
-      // others get a chance to validate the weighted tail and scout signals.
-      const role=(this.partition.islandIndex+this.round)%3;
-      const champions=role===0?[empirical,weighted,scout,peak]
-        :role===1?[weighted,empirical,scout,peak]
-        :[scout,weighted,empirical,peak];
+      // Expected best of the requested attempts leads every automatic band.
+      // Keep rare-tail exploration in spare slots without changing its samples.
+      const role=(this.partition.islandIndex+this.round)%2;
+      const champions=role===0?[expected,weighted,scout,peak]:[expected,scout,weighted,peak];
       // Protect the explicit champion roles before diversifying spare slots.
       // A scout or weighted winner may be a useful spell/plan of the same team.
-      const priority=[...new Set([...champions,stable].filter((result):result is SearchResult=>!!result))].slice(0,slots);
+      const priority=[...new Set(champions.filter((result):result is SearchResult=>!!result))].slice(0,slots);
       const bandSelected=[...priority,...diverseFinalists(band,slots-priority.length,
         [...retained,...selected,...priority].filter(result=>result.candidate.cost===cost))];
       selected.push(...bandSelected);

@@ -18,19 +18,6 @@ function attackScoreEffects(raw:Catalog[string]):ParsedBuff[] {
     &&['self','allySelected','allyAll'].includes(b.targetType??'self'));
 }
 export interface GenerationTask { anchor: string; totsu: number; cost: number; challenges: string[]; style: number; supportFirst?: boolean; supportAnchor?: string; seedTeam?: string[]; requiredCharacters?: string[]; requiredCards?: string[]; requiredSupport?: string; duoChain?: boolean }
-// Only the explicit, team-wide challenge rate is known here. Timed magic
-// immunity and scoped/unspecified effects remain the battle engine's job.
-function challengeBurnRates(input: SearchInput, challengeIds: string[]): number[] {
-  if (input.preset.kind !== 'DEFENCE') return [];
-  const effects = (input.preset.specialChallenges ?? []).filter(c => challengeIds.includes(c.id))
-    .flatMap(c => c.effects).filter(effect => effect.kind === 'playerBurn'
-      && !effect.dorm && !effect.dormMode && !effect.attribute
-      && Number.isFinite(effect.value) && Number(effect.value) > 0
-      && Number.isInteger(effect.duration) && Number(effect.duration) > 0);
-  if (!effects.length) return [];
-  return Array.from({ length: 5 }, (_, turn) => effects.reduce((sum, effect) =>
-    sum + (Number(effect.duration) > turn ? Number(effect.value) : 0), 0));
-}
 const estimatorCache=new WeakMap<SearchInput,WeakMap<Catalog,Map<string,ReturnType<typeof createEstimator>>>>();
 function cachedEstimator(input:SearchInput,task:GenerationTask,catalog:Catalog) {
   let byCatalog=estimatorCache.get(input);
@@ -238,72 +225,6 @@ function* taskSteps(input: SearchInput, catalog: Catalog): Generator<void,Genera
       if(i%12===7&&upgradeChains[Math.floor(i/12)])output.push(upgradeChains[Math.floor(i/12)]);
     }
   }
-  if (input.preset.kind === 'DEFENCE' && challenges.some(ids => challengeBurnRates(input, ids).length)) {
-    const own = new Set(input.roster.map(card => catalog[card.name].chara));
-    const all = new Set([...own, ...(supportAllowed ? input.supports.map(card => catalog[card.name].chara) : [])]);
-    const burnBySet = new Map(challenges.map(ids => [ids, challengeBurnRates(input, ids)]));
-    const ranked = new Map<number, { task: GenerationTask; value: number; root: string }[]>();
-    const seen = new Set<string>();
-    const partners = new Map<string, SearchCard[]>();
-    for (const task of output) {
-      if (task.requiredCharacters || task.seedTeam) continue;
-      const rates = burnBySet.get(task.challenges) ?? [];
-      if (!rates.length) continue;
-      const support = !!task.supportAnchor, name = task.supportAnchor ?? task.anchor;
-      const original = (support ? input.supports : input.roster).find(card => card.name === name)!;
-      const totsu = support ? original.totsu : task.totsu;
-      const key = JSON.stringify([name, totsu, support, task.challenges]);
-      if (seen.has(key)) continue; seen.add(key);
-      const raw = catalog[name];
-      const immuneBuddies = ([1, 2, 3] as const).flatMap(index => {
-        const partner = raw['buddy' + index + 'c'];
-        const status = getBuddyStatusForCharacter(raw, index, { totsu, isActive: true });
-        return status.includes('やけど無効') && (support ? own : all).has(partner) ? [{ index, partner, status }] : [];
-      });
-      if (!immuneBuddies.length) continue;
-      const variants = cardVariants(original, raw.rare, support, totsu);
-      if (!variants.length) continue;
-      const estimate = cachedEstimator(input, { ...task, style: 3 }, catalog);
-      for (const { partner } of immuneBuddies) {
-        const partnerKey = JSON.stringify([partner, support]);
-        if (!partners.has(partnerKey)) partners.set(partnerKey,
-          [...input.roster.filter(card => catalog[card.name].chara === partner)
-            .flatMap(card => cardVariants(card, catalog[card.name].rare, false)),
-          ...(!support && supportAllowed ? input.supports.filter(card => catalog[card.name].chara === partner)
-            .flatMap(card => cardVariants(card, catalog[card.name].rare, true)) : [])]);
-        let value = -Infinity;
-        for (const card of variants) for (const buddy of partners.get(partnerKey)!) {
-          if (!card.support && !buddy.support && card.name === buddy.name) continue;
-          value = Math.max(value, estimate([card, buddy]));
-        }
-        if (!Number.isFinite(value)) continue;
-        const lane = ranked.get(task.cost) ?? [];
-        // Borrowing the same immunity owner is not a second distinct pair.
-        const root = JSON.stringify([name, partner, task.challenges]);
-        lane.push({ task: { ...task, style: 3, requiredCharacters: [partner] }, value, root });
-        ranked.set(task.cost, lane);
-      }
-      yield;
-    }
-    const lanes = [...ranked.entries()].sort(([a], [b]) => a - b).map(([, rows]) => {
-      rows.sort((a, b) => b.value - a.value || a.root.localeCompare(b.root));
-      const roots = new Set<string>();
-      return rows.filter(row => {
-        if (roots.has(row.root)) return false;
-        roots.add(row.root); return true;
-      }).slice(0, 2).map(row => row.task);
-    });
-    const additions = [0, 1].flatMap(index => lanes.flatMap(lane => lane[index] ? [lane[index]] : []));
-    if (additions.length) {
-      const regular = [...output]; output.length = 0;
-      // Require a real available immunity buddy in these few extra paths.
-      // Keep every ordinary task, its relative order and all cost bands.
-      for (let index = 0; index < Math.max(regular.length, additions.length * 8); index++) {
-        if (regular[index]) output.push(regular[index]);
-        if (index % 8 === 7 && additions[Math.floor(index / 8)]) output.push(additions[Math.floor(index / 8)]);
-      }
-    }
-  }
   const seeds:GenerationTask[]=[];
   const uniqueTeams=new Set<string>();
   for(const team of input.seedTeams??[]) {
@@ -447,46 +368,7 @@ function advantage(a: string, b: string): number {
   return ({ 火: '木', 木: '水', 水: '火' } as Record<string, string>)[a] === b ? 1.5 : 0.5;
 }
 
-function createBurnAwareEstimator(input: SearchInput, task: GenerationTask, catalog: Catalog): (cards: SearchCard[]) => number {
-  const ordinary = cachedEstimator(input, { ...task, style: 0 }, catalog);
-  const rates = challengeBurnRates(input, task.challenges);
-  if (!rates.length) return ordinary;
-  const owned = new Set(input.roster.map(card => catalog[card.name].chara));
-  const borrowed = new Set(input.supports.map(card => catalog[card.name].chara));
-  const features = new Map<string, { loss: number; buddies: string[] }>();
-  return (cards: SearchCard[]): number => {
-    const names = new Set(cards.map(card => catalog[card.name].chara));
-    const canBorrow = examUsesSupport(input.preset) && !cards.some(card => card.support);
-    const potential = new Map<string, number>();
-    let loss = 0, recoverable = 0;
-    for (const card of cards) {
-      const key = JSON.stringify([card.name, card.level, card.totsu]);
-      let feature = features.get(key);
-      if (!feature) {
-        const raw = catalog[card.name], hp = Math.ceil(recalculateHP(raw, card.level, card.totsu === 4));
-        feature = { loss: rates.reduce((sum, rate) => sum + Math.floor(hp * rate / 100), 0),
-          buddies: ([1, 2, 3] as const).filter(index => getBuddyStatusForCharacter(raw, index,
-            { totsu: card.totsu, isActive: true }).includes('やけど無効')).map(index => raw['buddy' + index + 'c']) };
-        features.set(key, feature);
-      }
-      if (feature.buddies.some(name => names.has(name))) continue;
-      loss += feature.loss;
-      if (cards.length >= 2 && cards.length < 5) {
-        const available = feature.buddies.filter(name => owned.has(name) || canBorrow && borrowed.has(name));
-        if (available.length) recoverable += feature.loss;
-        for (const name of available) potential.set(name, (potential.get(name) ?? 0) + feature.loss);
-      }
-    }
-    // This secondary five-turn estimate leaves early finishes, timed cures
-    // and nonlethal caps to real battles. Never credit more recoverable HP.
-    const completion = Math.min(recoverable, [...potential.values()].sort((a, b) => b - a)
-      .slice(0, 5 - cards.length).reduce((sum, value) => sum + value, 0)) * .5;
-    return ordinary(cards) - loss + completion;
-  };
-}
-
 export function createEstimator(input: SearchInput, task: GenerationTask, catalog: Catalog) {
-  if (task.style === 3) return createBurnAwareEstimator(input, task, catalog);
   const ownCharacters=new Set(input.roster.map(c=>catalog[c.name].chara));
   const supportCharacters=new Set(input.supports.map(c=>catalog[c.name].chara));
   const requiredPerAttempt = -Math.expm1(Math.log1p(-input.desiredProbability) / input.attempts);
@@ -888,9 +770,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
   }
   const anchor = input.roster.find(c => c.name === task.anchor)!;
   const requiredNames=task.requiredCards ? [...new Set(task.requiredCards)] : [...new Set(input.requiredCards ?? [])];
-  const constructionInput = task.style === 3 ? { ...input, requiredCharacters:
-    [...new Set([...(input.requiredCharacters ?? []), ...(task.requiredCharacters ?? [])])] } : input;
-  const requiredCharacters=[...new Set(constructionInput.requiredCharacters ?? [])];
+  const requiredCharacters=[...new Set(input.requiredCharacters ?? [])];
   const inferredSupport=requiredNames.length&&!task.requiredSupport
     ? requiredCardSupportAssignments(input)[0] : undefined;
   const requiredSupport=task.requiredSupport ?? inferredSupport;
@@ -966,7 +846,7 @@ function* generateSteps(input: SearchInput, task: GenerationTask, catalog: Catal
     }
     if(!beam.length && !requiredOwned.length) beam=cardVariants(anchor,catalog[anchor.name].rare,false,task.totsu).map(c=>[c]);
   }
-  const canCompleteCharacters = createCompletionCheck(constructionInput, catalog, options, supportOptions, requiredNames);
+  const canCompleteCharacters = createCompletionCheck(input, catalog, options, supportOptions, requiredNames);
   if (canCompleteCharacters) beam = beam.filter(canCompleteCharacters);
   if (!beam.length) return [];
   const selectBeam=(choices:{cards:SearchCard[];value:number}[],depth:number)=>{

@@ -85,6 +85,7 @@ export interface ScoreDistribution { n:number; max:number; p95:number|null }
 export interface AutoScoreMetrics {
   n: number;
   retired: number;
+  expectedBestScore: number | null;
   empiricalScore: number | null;
   conservativeScore: number | null;
   max: number;
@@ -109,5 +110,5 @@ export interface BattleEngine {
   learnCriticalPlan?(seed:string,durationMs:number,cardIndex:number,idealHand?:boolean,magic?:MagicSlot):Promise<[string,string][]|null>;
 }
 export interface BattleTrial { score: number; retired: boolean; finishTurn: number; fitness?: number; log?: string[]; plan?: [string, string][] }
-export const ENGINE_VERSION = 'exam-resource-search-139';
+export const ENGINE_VERSION = 'exam-resource-search-140';
 export const emptySamples = (): Samples => ({ scores: [], retired: 0, turns: 0 });

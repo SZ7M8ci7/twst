@@ -2606,47 +2606,54 @@ test('five distinct required characters construct legal normal and unified teams
   }
 });
 
+test('expected best includes failed attempts and matches the exact repeated-draw distribution',()=>{
+  const samples={scores:[0,10],retired:1,turns:2};
+  assert.equal(stats.expectedBestScore(samples,1),5);
+  assert.equal(stats.expectedBestScore(samples,2),7.5);
+  assert.equal(stats.expectedBestScore(samples,0),0);
+  assert.equal(stats.expectedBestScore({scores:Array(500).fill(45000)},30),45000);
+  assert.equal(stats.expectedBestScore({scores:Array(1024).fill(45000)},30),45000);
+  assert.equal(stats.expectedBestScore({scores:[NaN,-5,Infinity,10]},2),10*(1-.75**2));
+  for(const attempts of [1,2,30,100000]) {
+    const scores=[0,0,10,10,20],sorted=[...scores].sort((a,b)=>a-b);
+    const exact=sorted.reduce((sum,score,i)=>sum+score*(((i+1)/scores.length)**attempts-(i/scores.length)**attempts),0);
+    assert.ok(Math.abs(stats.autoScoreMetrics({scores},attempts,.05).expectedBestScore-exact)<1e-10);
+  }
+  assert.equal(stats.autoScoreMetrics({scores:[]},30,.05).expectedBestScore,null);
+});
 
-test('burn-aware exploration keeps ordinary task order and respects known passive immunity',()=>{
-  const input=fixture(); input.preset.kind='DEFENCE';
-  input.preset.specialChallenges=[{id:'burn',rank:3,score:1,label:'known burn',effects:[{kind:'playerBurn',value:5,duration:5}]}];
-  input.challengeLocks={burn:'on'};
-  input.roster=input.roster.map(c=>({...c,totsu:4}));
-  input.supports=input.supports.map(c=>({...c,totsu:4}));
-  const immuneRaw=Object.values(catalog).find(c=>c.rare==='SSR'&&[1,2,3].some(i=>String(c['buddy'+i+'s_totsu']).includes('やけど無効')));
-  const immuneSlot=[1,2,3].find(i=>String(immuneRaw['buddy'+i+'s_totsu']).includes('やけど無効'));
-  const partnerRaw=Object.values(catalog).find(c=>c.rare==='SSR'&&c.chara===immuneRaw['buddy'+immuneSlot+'c']);
-  const names=[immuneRaw.name,partnerRaw.name,...Object.values(catalog).filter(c=>c.rare==='SSR'&&![immuneRaw.name,partnerRaw.name].includes(c.name)).slice(0,2).map(c=>c.name)];
-  input.roster=input.roster.map((c,i)=>({...c,name:names[i]}));input.supports=[{...input.supports[0],name:names[0]}];
-  const noBurn=clone(input);noBurn.preset.specialChallenges[0].effects=[];
-  const baseline=generation.buildTasks(noBurn,catalog),expanded=generation.buildTasks(input,catalog);
-  assert.deepEqual(clone(expanded.filter(t=>t.style!==3)),clone(baseline));
-  const added=expanded.filter(t=>t.style===3);assert.ok(added.length);
-  for(const cost of new Set(added.map(t=>t.cost)))assert.ok(added.filter(t=>t.cost===cost).length<=2);
-  const generated=generation.generateCandidates(input,added[0],catalog);assert.ok(generated.length);
-  for(const c of generated){
-    assert.ok(variants.candidateSatisfiesConstraints(input,c,catalog));
-    assert.ok(c.cards.some(card=>catalog[card.name].chara===added[0].requiredCharacters[0]));
-  }
-  const fixed={...clone(input),requiredCards:input.roster.map(card=>card.name)};
-  assert.equal(generation.generateCandidates(fixed,{...added[0],requiredCharacters:['missing-immunity-buddy']},catalog).length,0,
-    'an auxiliary immunity buddy is mandatory even when all owned slots were already fixed');
-  const data=clone(catalog),[owner,partner]=input.roster;
-  for(const entry of [owner,partner])for(const slot of [1,2,3]){
-    data[entry.name]['buddy'+slot+'s']='HPUP(小)';data[entry.name]['buddy'+slot+'s_totsu']='HPUP(小)';
-  }
-  data[owner.name].buddy1c=data[partner.name].chara;
-  data[owner.name].buddy1s_totsu='HPUP(中)&やけど無効';
-  const own=variants.cardVariants(owner,data[owner.name].rare)[0],other=variants.cardVariants(partner,data[partner.name].rare)[0];
-  const estimate=(i,style,cards)=>generation.createEstimator(i,{anchor:'',totsu:0,cost:0,challenges:['burn'],style},data)(cards);
-  const {recalculateHP}=load('src/utils/calculations.ts');
-  const loss=c=>5*Math.floor(Math.ceil(recalculateHP(data[c.name],c.level,c.totsu===4))*.05);
-  assert.ok(Math.abs(estimate(input,0,[own])-estimate(input,3,[own])-loss(own))<1e-7);
-  assert.ok(Math.abs(estimate(input,0,[own,other])-estimate(input,3,[own,other])-loss(other))<1e-7,'buddy HP must not enlarge base burn damage');
-  for(const style of [0,1,2])assert.equal(estimate(input,style,[own,other]),estimate(noBurn,style,[own,other]));
-  for(const effect of [{kind:'playerBurn',duration:5},{kind:'playerBurn',value:5,duration:5,dorm:'イグニハイド'}]){
-    const unknown=clone(input);unknown.preset.specialChallenges[0].effects=[effect];
-    assert.equal(estimate(unknown,3,[own]),estimate(unknown,0,[own]));
-    assert.ok(generation.buildTasks(unknown,data).every(t=>t.style!==3));
-  }
+test('automatic results and compact packets prioritize expected best over rare upper tails',()=>{
+  const row=(id,cost,scores)=>({candidate:{id,cost,cards:[]},development:{scores,retired:0,turns:0},
+    validation:{scores,retired:0,turns:0},validationTarget:500});
+  const rare=row('rare',0,[...Array(10).fill(80000),...Array(490).fill(0)]),steady=row('steady',2,Array(500).fill(45000));
+  assert.ok(stats.autoScoreMetrics(rare.validation,30,.05).conservativeScore>45000,'fixture exposes the former tail-first ordering');
+  assert.ok(stats.searchDevelopmentQuality(steady.development,{target:0,attempts:30,desiredProbability:.05})>
+    stats.searchDevelopmentQuality(rare.development,{target:0,attempts:30,desiredProbability:.05}));
+  assert.deepEqual(clone(stats.rankedResults([rare,steady],0,30,.05).map(r=>r.candidate.id)),['steady','rare']);
+  const cheap={...steady,candidate:{...steady.candidate,id:'cheap',cost:0}};
+  assert.deepEqual(clone(stats.rankedResults([steady,cheap],0,30,.05).map(r=>r.candidate.id)),['cheap','steady']);
+  assert.deepEqual(clone(stats.compactResults([rare,cheap,steady],0,30,.05).map(r=>r.candidate.id)),['cheap','steady']);
+  const raw={phase:'done',generated:2,evaluated:2,tasksDone:2,tasksTotal:2,elapsedMs:1,results:[rare,steady]};
+  const packet=stats.displayProgress(raw,0,30,.05);
+  assert.ok(packet.results.every(r=>r.validation.scores.length===0));
+  assert.deepEqual(clone(stats.rankedResults(packet.results,0,30,.05).map(r=>r.candidate.id)),['steady','rare']);
+  assert.equal(stats.resultExpectedBestScore(packet.results[1],30),45000);
+  assert.equal(stats.resultExpectedBestScore(packet.results[1],1),null,'a summary cannot be reused for a different attempt count');
+  assert.deepEqual(clone(stats.displayProgress(packet,0,30,.05)),clone(packet));
+  assert.equal(rare.validation.scores.length,500,'display packets must not mutate resumable samples');
+});
+
+test('automatic parent and finalist selection keep expected-best champions in every cost band',()=>{
+  const input=fixture();input.target=0;input.attempts=30;
+  const session=new SearchSession(input,catalog,{},'expected-champions');
+  const row=(id,cost,scores)=>({candidate:{id,cost,cards:[{name:id,selectedMagic:[1,2]}],challengeIds:[],policy:'effects'},
+    development:{scores,retired:0,turns:0},validation:{scores:[],retired:0,turns:0},validationTarget:500});
+  session.pool=[0,1,2,3].flatMap(cost=>[row('rare-'+cost,cost,[80000,...Array(63).fill(0)]),row('steady-'+cost,cost,Array(64).fill(45000))]);
+  for(const cost of [0,1,2,3])assert.equal(session.diverseParents(2).find(r=>r.candidate.cost===cost).candidate.id,'steady-'+cost);
+  session.selectFinalists();
+  for(const cost of [0,1,2,3])assert.ok(session.checkpoint().finalists.some(r=>r.candidate.id==='steady-'+cost));
+  const stable=row('retained-stable',0,Array(500).fill(45000)),tail=row('retained-tail',0,[...Array(10).fill(80000),...Array(490).fill(0)]);
+  stable.validation=stable.development;tail.validation=tail.development;
+  session.finalists=[tail,stable];session.selectFinalists();
+  assert.ok(session.checkpoint().finalists.some(r=>r.candidate.id==='retained-stable'&&r.validation.scores.length===500));
 });

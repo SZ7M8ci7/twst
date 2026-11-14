@@ -5,8 +5,9 @@ export function searchDevelopmentQuality(samples: Samples, input: Pick<SearchInp
   if (input.target === 0) {
     const auto = autoScoreMetrics(samples, input.attempts, input.desiredProbability);
     const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, auto.n);
-    // Reachable score first; maximum and mean only break ties.
-    return (auto.empiricalScore ?? 0) + auto.max * 1e-6 + mean * 1e-9;
+    // Ordinary outcomes, including failed attempts, determine the objective.
+    // Near-win fitness only guides candidates with no positive ordinary score.
+    return auto.expectedBestScore || mean * 1e-9;
   }
   const m = metrics(samples, input.target, input.attempts);
   const mean = (samples.fitnessSum ?? samples.scores.reduce((a, b) => a + b, 0)) / Math.max(1, m.n);
@@ -43,9 +44,19 @@ function normalizedScore(score:number):number {
 /** Expected best of repeated draws from the ordinary empirical distribution. */
 export function expectedBestScore(samples: Samples, attempts: number): number {
   if (!samples.scores.length || !Number.isInteger(attempts) || attempts < 1) return 0;
-  const sorted = samples.scores.map(normalizedScore).sort((a,b)=>a-b), n = sorted.length;
-  return sorted.reduce((sum,score,index)=>sum+score*
-    (Math.pow((index+1)/n,attempts)-Math.pow(index/n,attempts)),0);
+  return expectedBestFromSorted(samples.scores.length, sortedPositiveScores(samples), attempts);
+}
+function expectedBestFromSorted(n: number, positive: number[], attempts: number): number {
+  if (!n || !Number.isInteger(attempts) || attempts < 1) return 0;
+  // Descending positive scores share the sort used by the display summaries.
+  // Zero/invalid outcomes still contribute to n and the chance of failing.
+  let sum = 0, index = 0;
+  while (index < positive.length) {
+    const start = index, score = positive[index];
+    do index++; while (index < positive.length && positive[index] === score);
+    sum += score * (Math.pow((n - start) / n, attempts) - Math.pow((n - index) / n, attempts));
+  }
+  return sum;
 }
 export function scoreDistribution(samples: Samples):ScoreDistribution {
   return distributionFromSorted(samples.scores.length, sortedPositiveScores(samples));
@@ -84,7 +95,8 @@ function autoScoreFromSorted(samples: Samples, attempts: number, desired: number
       if(empiricalScore!==null && conservativeScore!==null) break;
     }
   }
-  return {n,retired:Number.isFinite(samples.retired)?samples.retired:0,empiricalScore,conservativeScore,max};
+  return {n,retired:Number.isFinite(samples.retired)?samples.retired:0,
+    expectedBestScore:n?expectedBestFromSorted(n,positive,attempts):null,empiricalScore,conservativeScore,max};
 }
 export function resultMetrics(result:SearchResult,target:number,attempts:number):ScoreMetrics {
   const summary=result.validationSummary;
@@ -94,6 +106,11 @@ export function resultAutoScore(result:SearchResult, attempts:number, desired:nu
   const cached=result.validationSummary?.auto;
   if(cached && cached.attempts===attempts && cached.desiredProbability===desired) return cached.metrics;
   return autoScoreMetrics(result.validation,attempts,desired);
+}
+export function resultExpectedBestScore(result: SearchResult, attempts: number): number | null {
+  if (result.validation.scores.length) return expectedBestScore(result.validation, attempts);
+  const cached = result.validationSummary?.auto;
+  return cached?.attempts === attempts ? cached.metrics.expectedBestScore ?? null : null;
 }
 export function resultScoreDistribution(result:SearchResult):ScoreDistribution {
   if(result.validation.scores.length)return scoreDistribution(result.validation);
@@ -108,7 +125,9 @@ export function displayProgress(progress:SearchProgress,target:number,attempts:n
     // Each progress packet needs both summaries. Sort the growing validation
     // batch once so frequent UI updates leave more time for battle trials.
     const positive=target===0?sortedPositiveScores(result.validation):undefined;
-    const auto=positive?autoScoreFromSorted(result.validation,attempts,desiredProbability,3.5,positive):undefined;
+    const auto=positive?(result.validation.scores.length
+      ? autoScoreFromSorted(result.validation,attempts,desiredProbability,3.5,positive)
+      : resultAutoScore(result,attempts,desiredProbability)):undefined;
     const scoreDistribution=positive && result.validation.scores.length
       ? distributionFromSorted(result.validation.scores.length,positive) : resultScoreDistribution(result);
     return {candidate:result.candidate,development:emptySamples(),validation:{...result.validation,scores:[]},validationTarget:result.validationTarget,
@@ -122,9 +141,11 @@ function compareNullableDescending(a:number|null,b:number|null):number {
   return b-a;
 }
 function compareAutoMetricValues(am:AutoScoreMetrics,bm:AutoScoreMetrics,a:SearchResult,b:SearchResult):number {
-  const ah=am.conservativeScore!==null||am.empiricalScore!==null, bh=bm.conservativeScore!==null||bm.empiricalScore!==null;
+  const ah=(am.expectedBestScore??0)>0, bh=(bm.expectedBestScore??0)>0;
   return Number(bh)-Number(ah)
     || Number(bm.n>=b.validationTarget)-Number(am.n>=a.validationTarget)
+    || compareNullableDescending(am.expectedBestScore,bm.expectedBestScore)
+    || a.candidate.cost-b.candidate.cost
     || compareNullableDescending(am.conservativeScore,bm.conservativeScore)
     || compareNullableDescending(am.empiricalScore,bm.empiricalScore)
     || bm.max-am.max;
@@ -135,7 +156,7 @@ export function compareAutoResults(a:SearchResult,b:SearchResult,attempts:number
 }
 export function rankedResults(results: SearchResult[], target: number, attempts: number, desired: number): SearchResult[] {
   if(target===0) return results.map(result=>({result,metrics:resultAutoScore(result,attempts,desired)}))
-    .sort((a,b)=>a.result.candidate.cost-b.result.candidate.cost||compareAutoMetricValues(a.metrics,b.metrics,a.result,b.result))
+    .sort((a,b)=>compareAutoMetricValues(a.metrics,b.metrics,a.result,b.result)||a.result.candidate.cost-b.result.candidate.cost)
     .map(row=>row.result);
   return [...results].sort((a, b) => {
     const am = resultMetrics(a, target, attempts), bm = resultMetrics(b, target, attempts);

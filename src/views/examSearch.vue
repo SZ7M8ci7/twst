@@ -75,7 +75,8 @@
       <v-tab value="results" data-testid="search-results-tab">{{ t('examComparison.results') }}</v-tab>
       <v-tab value="compare" data-testid="comparison-tab">{{ t('examComparison.tab') }}<span v-if="comparisonRef?.count" class="ml-1">({{ comparisonRef.count }})</span></v-tab>
     </v-tabs>
-    <ExamSearchResultsTable v-if="resultGroups.length" v-show="resultsTab === 'results'" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.variants.length }))"
+    <p v-if="resultGroups.length && resultsTab === 'results' && (evaluatedInput?.target ?? input.target) === 0" class="filter-help" data-testid="expected-best-explanation">{{ t('examSearch.expectedBestExplanation', { count: evaluatedInput?.attempts ?? input.attempts }) }}</p>
+    <ExamSearchResultsTable :attempts="evaluatedInput?.attempts ?? input.attempts" :auto-mode="(evaluatedInput?.target ?? input.target) === 0" v-if="resultGroups.length" v-show="resultsTab === 'results'" :rows="resultGroups.map(group => ({ result: group.primary, variantCount: group.variants.length }))"
       :card-images="cardImages" :card-label="cardLabel" :upgrade-summary="variantCardSummary" :busy="busy"
       :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds" @compare="addComparison"
       @preview="preview" @simulator="openSimulator" @variants="openVariants" />
@@ -86,7 +87,7 @@
       <v-card class="modal-card variants-card">
         <v-card-title class="modal-title">{{ t('examSearch.variantsTitle') }}</v-card-title>
         <v-card-text>
-          <ExamSearchResultsTable :rows="variantRows" :card-images="cardImages" :card-label="cardLabel"
+          <ExamSearchResultsTable :attempts="evaluatedInput?.attempts ?? input.attempts" :auto-mode="(evaluatedInput?.target ?? input.target) === 0" :rows="variantRows" :card-images="cardImages" :card-label="cardLabel"
             :upgrade-summary="variantCardSummary" :busy="busy" :comparison-full="(comparisonRef?.count ?? 0) >= 6" :compared-ids="comparisonRef?.selectedIds"
             @compare="addComparison" @preview="preview" @simulator="openSimulator" />
         </v-card-text>
