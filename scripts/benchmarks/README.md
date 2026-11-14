@@ -1,6 +1,6 @@
 # NRC19 paired search benchmark
 
-The current branch tests **expected best of the configured attempts**, explicitly chosen by the user. Read `EXPECTED-BEST.md`. Baseline8d68abb6 retains its original ranking; the after version changes actual development/finalist/display ranking, never using audit scores for selection. Burn-aware construction is omitted (`BURN-REPORT.md`); directed spell and observation-speed proposals also remain unadopted. Nothing is published or merged.
+The current branch adopts **expected best of the configured attempts**, explicitly chosen by the user, after complete primary and long confirmation. Read `EXPECTED-REPORT.md` and `RESULTS.ja.md` for results. Read `EXPECTED-BEST.md`. Baseline8d68abb6 retains its original ranking; the after version changes actual development/finalist/display ranking, never using audit scores for selection. Burn-aware construction is omitted (`BURN-REPORT.md`); directed spell and observation-speed proposals also remain unadopted. Nothing is published or merged.
 
 Use `PROTOCOL.md` as the fixed decision protocol. Run from the checkout root. The production baseline is commit `8d68abb6`; the historical subject list comes from `7350e969` and the fixed support/catalog identities from `8dda02ba` (518 cards). Node dependencies must be installed in each checkout. No browser or DOM is required for the real simulation engine.
 
