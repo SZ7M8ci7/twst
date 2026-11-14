@@ -41,7 +41,7 @@ index 00000000..eaddafeb
 +  return contenders.map(result => slots.get(result)!);
 +}
 diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
-index f7c9559f..56118dfb 100644
+index f7c9559f..e7592ec8 100644
 --- a/src/domain/examSearch/scheduler.ts
 +++ b/src/domain/examSearch/scheduler.ts
 @@ -1,3 +1,4 @@
@@ -49,12 +49,15 @@ index f7c9559f..56118dfb 100644
  import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandidates, type Catalog, type GenerationTask } from '@/domain/examSearch/candidateGenerator';
  import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
  import * as statistics from '@/domain/examSearch/statistics';
-@@ -414,12 +415,14 @@ export class SearchSession {
+@@ -414,12 +415,17 @@ export class SearchSession {
        // Give promising compositions in every resource band equal extra batches
        // before fitting plans. These remain development data, never holdout data.
        const contenders = this.contenders();
 -      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const result of contenders) {
-+      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const {result,ordinaryOnly} of coverageContenderSlots(contenders,this.pool)) {
++      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) {
++        // Stop before scanning/sorting the pool, including after an inner break.
++        if(this.stopped || performance.now()>=contenderDeadline) break;
++        for (const {result,ordinaryOnly} of coverageContenderSlots(contenders,this.pool)) {
          if(this.stopped || performance.now()>=contenderDeadline) break;
          if(result.development.scores.length>=512) continue;
          await this.engine.prepare(this.input,result.candidate);
@@ -67,6 +70,14 @@ index f7c9559f..56118dfb 100644
          for(let i=0;i<32 && result.development.scores.length<512 && !this.stopped && performance.now()<contenderDeadline;i++) {
            const seed=`${this.nonce}:development:${this.trialSerial++}`;
            const trial=this.engine.trial(seed,result.candidate.policy);
+@@ -431,6 +437,7 @@ export class SearchSession {
+           if(i%8===0)await progress('generate');
+         }
+       }
++      }
+       // Fit a small number of explicit plans on development seeds. At runtime a
+       // plan only chooses a pair if both cards are visible; otherwise the public
+       // observation policy takes over. Holdout trials never optimize their seed.
 diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
 index d4a8a872..b06339dd 100644
 --- a/src/views/examSimulator.vue
@@ -112,10 +123,10 @@ index 1d43fc45..0f7ebac2 100644
      scout: (seed, policy, cardIndex, idealHand, magic) => simulator.scoutResourceCritical(seed,policy,cardIndex,idealHand,magic),
      scoutTargets: () => simulator.resourceCriticalTargets(),
 diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
-index a497895c..55a2d6d5 100644
+index a497895c..b9b4868d 100644
 --- a/tests/exam-search.test.cjs
 +++ b/tests/exam-search.test.cjs
-@@ -2709,3 +2709,60 @@ test('invalid active search settings return translated non-legacy validation cod
+@@ -2709,3 +2709,114 @@ test('invalid active search settings return translated non-legacy validation cod
      assert.equal(text.examSearch.validation.target,undefined);
    }
  });
@@ -175,4 +186,58 @@ index a497895c..55a2d6d5 100644
 +  const base=['a','b','c','d'].map(id=>coverageRow(id,512));
 +  const slots=coverageContenderSlots(base,base);
 +  slots.forEach((slot,i)=>{assert.equal(slot.result,base[i]);assert.equal(slot.ordinaryOnly,false);});
++});
++
++function coverageSchedulerHarness() {
++  let now=0,scans=0;
++  const module={exports:{}};
++  const code=ts.transpileModule(fs.readFileSync(path.join(root,'src/domain/examSearch/scheduler.ts'),'utf8'),
++    {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText;
++  const requireForTest=id=>id==='@/domain/examSearch/coverage'
++    ?{coverageContenderSlots:(...args)=>{scans++;return coverageContenderSlots(...args);}}
++    :id.startsWith('@/')?load(`src/${id.slice(2)}.ts`):require(id);
++  vm.runInNewContext(code,{module,exports:module.exports,require:requireForTest,
++    performance:{now:()=>now},setTimeout,setImmediate,MessageChannel},{filename:'scheduler-F1-integration.ts'});
++  const input=fixture();input.preset={...input.preset,kind:'ATTACK'};
++  let current,session;const calls={ordinary:[],importance:[],scout:[]};
++  const engine={prepare:async(_,candidate)=>{current=candidate;},trial:()=>{
++    calls.ordinary.push(current.id);return {score:0,retired:true,finishTurn:1};}};
++  session=new module.exports.SearchSession(input,catalog,engine,'F1-integration');
++  session.partition={islandIndex:1,islandCount:2};
++  session.tasksReady=true;session.tasks=[];session.pool=[];session.pending=[];session.finalists=[];
++  session.diverseParents=()=>[];session.selectFinalists=()=>{};
++  session.scout=async result=>calls.scout.push(result.candidate.id);
++  session.importanceScreen=async result=>calls.importance.push(result.candidate.id);
++  return {session,calls,clock:value=>{now=value;},scans:()=>scans};
++}
++test('F1 scheduler suppresses IS/scout only for coverage and enforces 512 ordinary cap',async()=>{
++  const h=coverageSchedulerHarness();
++  const base=['a','b','c','d'].map(id=>coverageRow(id,511));
++  const fresh=coverageRow('fresh',510);
++  h.session.contenders=()=>{h.session.pool=[...base,fresh];return base;};
++  await h.session.run(1000,()=>{});
++  assert.equal(fresh.development.scores.length,512);
++  assert.equal(h.calls.ordinary.filter(id=>id==='fresh').length,2);
++  assert.ok(h.calls.scout.includes('a'));assert.ok(h.calls.importance.includes('a'));
++  assert.ok(!h.calls.scout.includes('fresh'));assert.ok(!h.calls.importance.includes('fresh'));
++  for(const row of [...base,fresh])assert.ok(row.development.scores.length<=512);
++});
++test('F1 scheduler never scans coverage pool after initial stop or expired deadline',async()=>{
++  for(const mode of ['stop','deadline']) {
++    const h=coverageSchedulerHarness();
++    h.session.contenders=()=>{if(mode==='stop')h.session.stop();else h.clock(650);return [];};
++    await h.session.run(1000,()=>{});
++    assert.equal(h.scans(),0,mode);
++  }
++});
++test('F1 scheduler exits outer batches after stop or deadline during the first batch',async()=>{
++  for(const mode of ['stop','deadline']) {
++    const h=coverageSchedulerHarness();
++    const base=['a','b','c','d'].map(id=>coverageRow(id,32));
++    h.session.contenders=()=>{h.session.pool=base;return base;};
++    h.session.engine.prepare=async()=>{if(mode==='stop')h.session.stop();else h.clock(650);};
++    await h.session.run(1000,()=>{});
++    assert.equal(h.scans(),1,mode);
++    assert.equal(h.calls.ordinary.length,0,mode);
++  }
 +});

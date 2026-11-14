@@ -1,7 +1,7 @@
 name: Synthetic screening independent source processes
 on:
   push:
-    branches: [codex/benchmark-product-ranked-next-20261114]
+    branches: [codex/benchmark-f1-ranked-20261114]
 permissions:
   contents: read
 jobs:
@@ -13,15 +13,9 @@ jobs:
       max-parallel: 20
       matrix:
         include:
-          - {"variant": "I1Z", "replicate": 0, "shard": 0, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 0, "shard": 1, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 0, "shard": 2, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 1, "shard": 0, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 1, "shard": 1, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 1, "shard": 2, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 2, "shard": 0, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 2, "shard": 1, "shardCount": 3}
-          - {"variant": "I1Z", "replicate": 2, "shard": 2, "shardCount": 3}
+          - {"variant": "F1", "replicate": 0, "shard": 0, "shardCount": 1}
+          - {"variant": "F1", "replicate": 1, "shard": 0, "shardCount": 1}
+          - {"variant": "F1", "replicate": 2, "shard": 0, "shardCount": 1}
     steps:
       - uses: actions/checkout@v4
         with:
