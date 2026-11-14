@@ -127,7 +127,7 @@ function saveJson(file, value) {
     const auditStart = performance.now();
     for (const [rank, row] of top.entries()) {
       const candidate = row.result.candidate;
-      const legality = constraintCheck(input, candidate, catalog, profile);
+      const legality = constraintCheck(input, candidate, catalog, profile, modules);
       if (!legality.ok) throw new Error(`Illegal candidate ${profile}/${caseId}: ${JSON.stringify(legality)}`);
       await engine.prepare(input, candidate);
       const scores = [], retired = { count: 0, turns: 0 };
