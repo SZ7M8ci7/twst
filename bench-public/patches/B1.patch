@@ -1,0 +1,239 @@
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..43366850 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -4,6 +4,7 @@ import * as statistics from '@/domain/examSearch/statistics';
+ import { lowerCostCandidates, trainedUpgradeCandidates, jointSpellCandidates, alternatePolicyCandidates, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
+ import { importanceUpperQuantile } from '@/domain/examSearch/importance';
+ import { diverseFinalists } from '@/domain/examSearch/finalists';
++import { uncertaintyContenders } from '@/domain/examSearch/uncertaintyAllocation';
+ 
+ import { yieldToHost as yieldEventLoop } from '@/utils/yieldToHost';
+ import { DISCOVERY_SAMPLES, VALIDATION_SAMPLES, MAX_FINALISTS, REFINED_VALIDATION_SAMPLES as CONTINUOUS_VALIDATION_SAMPLES } from '@/domain/examSearch/sampling';
+@@ -414,7 +415,11 @@ export class SearchSession {
+       // Give promising compositions in every resource band equal extra batches
+       // before fitting plans. These remain development data, never holdout data.
+       const contenders = this.contenders();
+-      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const result of contenders) {
++      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) {
++      if(this.stopped || performance.now()>=contenderDeadline) break;
++      // B1: keep ordinary champions; spend at most one existing slot per band
++      // on success uncertainty. This changes observation allocation, not rank.
++      for (const result of uncertaintyContenders(this.pool,contenders,this.input.attempts,this.nonce)) {
+         if(this.stopped || performance.now()>=contenderDeadline) break;
+         if(result.development.scores.length>=512) continue;
+         await this.engine.prepare(this.input,result.candidate);
+@@ -431,6 +436,7 @@ export class SearchSession {
+           if(i%8===0)await progress('generate');
+         }
+       }
++      }
+       // Fit a small number of explicit plans on development seeds. At runtime a
+       // plan only chooses a pair if both cards are visible; otherwise the public
+       // observation policy takes over. Holdout trials never optimize their seed.
+diff --git a/src/domain/examSearch/uncertaintyAllocation.ts b/src/domain/examSearch/uncertaintyAllocation.ts
+new file mode 100644
+index 00000000..d3a6cd1b
+--- /dev/null
++++ b/src/domain/examSearch/uncertaintyAllocation.ts
+@@ -0,0 +1,54 @@
++import type { SearchResult } from '@/domain/examSearch/types';
++import { interval, reachProbability } from '@/domain/examSearch/statistics';
++
++/** A repeated-look exploration heuristic, NOT a confidence interval, score
++ * bound or pruning certificate. A one-standard-error Wilson-shaped width is
++ * mapped to the chance of at least one positive score in the requested number
++ * of attempts. It ignores winning-score magnitude; ordinary Emax champions
++ * and independent validation remain responsible for the actual objective.
++ * Only ordinary observations count: importance samples use another law.
++ */
++export function successUncertaintyPriority(scores: readonly number[], attempts: number): number {
++  if (!Number.isInteger(attempts) || attempts < 1) return 0;
++  const positive = scores.reduce((count, score) => count + Number(Number.isFinite(score) && score > 0), 0);
++  const [lower, upper] = interval(positive, scores.length, 1);
++  return Math.max(0, reachProbability(upper, attempts) - reachProbability(lower, attempts));
++}
++
++function tieHash(value: string): number {
++  let hash = 2166136261;
++  for (let i = 0; i < value.length; i++) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
++  return hash >>> 0;
++}
++
++/** Replace at most the last contender in each cost band, without adding slots.
++ * Bands with fewer than four slots stay intact. For four slots the existing
++ * first three/champions stay intact.
++ * Recompute after every ordinary batch; no mutable cache/checkpoint state.
++ */
++export function uncertaintyContenders(
++  pool: readonly SearchResult[], baseline: readonly SearchResult[], attempts: number, nonce: string,
++): SearchResult[] {
++  const allocated: SearchResult[] = [];
++  for (const cost of [...new Set(baseline.map(result => result.candidate.cost))]) {
++    const band = baseline.filter(result => result.candidate.cost === cost);
++    if (band.length < 4 || band[band.length - 1].development.scores.some(score => Number.isFinite(score) && score > 0)) {
++      // Never evict an existing fourth contender with ordinary positive evidence.
++      allocated.push(...band); continue;
++    }
++    const protectedRows = band.slice(0, -1), protectedSet = new Set(protectedRows);
++    let chosen: SearchResult | undefined, best = -1, bestN = Infinity, bestTie = Infinity;
++    for (const result of pool) {
++      if (result.candidate.cost !== cost || protectedSet.has(result)) continue;
++      const scores = result.development.scores, n = scores.length;
++      if (n >= 512) continue;
++      const priority = successUncertaintyPriority(scores, attempts);
++      const tie = tieHash(`${nonce}:${result.candidate.id}`);
++      if (priority > best || (priority === best && (n < bestN || (n === bestN && tie < bestTie)))) {
++        chosen = result; best = priority; bestN = n; bestTie = tie;
++      }
++    }
++    allocated.push(...protectedRows, chosen ?? band[band.length - 1]);
++  }
++  return allocated;
++}
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index d4a8a872..b06339dd 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -763,7 +763,7 @@
+ 
+ <script setup lang="ts">
+ import { yieldToHost } from '@/utils/yieldToHost';
+-import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
++import { computed, markRaw, toRaw, nextTick, onMounted, ref, watch } from 'vue';
+ import ExamSearchPanel from '@/components/ExamSearchPanelLoader.vue';
+ import { useI18n } from 'vue-i18n';
+ import { useRouter } from 'vue-router';
+@@ -4302,7 +4302,7 @@ let resourcePairSpend:ReturnType<typeof createPairSpend>|undefined;
+ let resourceInitialRuntime:SimulationRuntimeCache|null|undefined;
+ let resourceInitialState:SimulationState|undefined;
+ let resourceInitialStats:SimulationStats|undefined;
+-async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
++async function prepareResourceCandidate(input: SearchInput, candidate: Candidate, immutableDeck = false) {
+   favorableEffects.value = input.favorableEffects === true;
+   resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
+   resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
+@@ -4348,6 +4348,8 @@ async function prepareResourceCandidate(input: SearchInput, candidate: Candidate
+       &&getBuddyStatusForCharacter(raw,buddyIndex,{totsu:slot.totsu,isActive:true}).includes('クリティカル'))scoutTargets.add(index);
+   }
+   resourceCriticalScoutTargets=[...scoutTargets].sort((a,b)=>a-b);
++  // Prepared resource candidates are immutable until the next prepare call.
++  if (immutableDeck) deck.value = markRaw([...toRaw(deck.value)]);
+   // Let reactive derived values invalidate before constructing the per-deck cache.
+   await nextTick();
+   simulationRuntimeCache = createSimulationRuntimeCache();
+diff --git a/src/workers/resourceBattleHost.ts b/src/workers/resourceBattleHost.ts
+index 1d43fc45..0f7ebac2 100644
+--- a/src/workers/resourceBattleHost.ts
++++ b/src/workers/resourceBattleHost.ts
+@@ -24,7 +24,7 @@ export function createResourceBattleHost(): BattleEngine {
+   app.use(createI18n({ legacy: false, locale: 'ja', messages: { ja } }));
+   app.provide(routerKey, { currentRoute: { value: { query: {} } } } as any);
+   const simulator = app.mount(node()) as any;
+-  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate),
++  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate, true),
+     trial: (seed, policy, log) => simulator.runResourceTrial(seed, policy, log),
+     scout: (seed, policy, cardIndex, idealHand, magic) => simulator.scoutResourceCritical(seed,policy,cardIndex,idealHand,magic),
+     scoutTargets: () => simulator.resourceCriticalTargets(),
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..b14fe470 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,97 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++const uncertaintyAllocation=load('src/domain/examSearch/uncertaintyAllocation.ts');
++const b1Row=(id,scores,cost=0)=>({candidate:{id,cost},development:{scores,retired:0,turns:0},validation:{scores:[],retired:0,turns:0},validationTarget:2048});
++test('B1 uncertainty separates zero observations from well-sampled failures',()=>{
++ const priority=uncertaintyAllocation.successUncertaintyPriority;
++ assert.equal(priority([],30),1);
++ assert.ok(priority(Array(32).fill(0),30)>priority(Array(192).fill(0),30));
++ assert.equal(priority([0,1,0],0),0);
++ assert.equal(priority([0,1,0],30),priority([0,999999,0],30),'not a winning-score bound');
++ assert.equal(priority([NaN,-1,0],30),priority([0,0,0],30),'invalid/nonpositive outcomes remain failed observations');
++});
++test('B1 responds to positive-count uncertainty and requested attempts, not just least n',()=>{
++ const priority=uncertaintyAllocation.successUncertaintyPriority,zero=Array(32).fill(0),mixed=[...Array(16).fill(1),...Array(16).fill(0)];
++ assert.ok(priority(mixed,1)>priority(zero,1));
++ assert.ok(priority(zero,30)>priority(mixed,30));
++ for(const n of [0,1,32,192,512])for(const m of [1,30,100000])for(const wins of [0,Math.floor(n/2),n]) {
++  const p=priority([...Array(wins).fill(1),...Array(n-wins).fill(0)],m);
++  assert.ok(Number.isFinite(p)&&p>=0&&p<=1);
++ }
++});
++test('B1 preserves existing champions and slot count while revisiting the whole pool',()=>{
++ const base=[b1Row('best',[100,0]),b1Row('second',[90,0]),b1Row('third',[80,0]),b1Row('old-tail',Array(512).fill(0))];
++ const outside=b1Row('unresolved',Array(32).fill(0)),pool=[...base,outside];
++ const before=JSON.stringify(pool),allocated=uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed');
++ assert.equal(allocated.length,base.length);
++ for(let i=0;i<3;i++)assert.equal(allocated[i],base[i]);
++ assert.equal(allocated[3],outside);assert.equal(JSON.stringify(pool),before);
++ outside.development.scores.push(...Array(480).fill(0));
++ const other=b1Row('new-unresolved',Array(16).fill(0));pool.push(other);
++ assert.equal(uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed')[3],other,'new batch sees updated observations');
++});
++test('B1 keeps cost bands and ignores validation, fitness and importance evidence',()=>{
++ const a=[b1Row('a0',[1],0),b1Row('a2',[2],0),b1Row('a3',[3],0),b1Row('a1',Array(32).fill(0),0)],b=[b1Row('b0',[1],1),b1Row('b2',[2],1),b1Row('b3',[3],1),b1Row('b1',Array(32).fill(0),1)];
++ const x=b1Row('x',Array(16).fill(0),0),y=b1Row('y',Array(16).fill(0),1),pool=[...a,...b,x,y],base=[...a,...b];
++ const select=()=>uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed').map(r=>r.candidate.id).join(',');
++ assert.equal(select(),'a0,a2,a3,x,b0,b2,b3,y');
++ x.importance={n:100000,observations:[{score:999999,weight:99999}],upperScore:999999};x.validation.scores=[999999];x.development.fitnessSum=999999;
++ assert.equal(select(),'a0,a2,a3,x,b0,b2,b3,y');
++ assert.equal(uncertaintyAllocation.uncertaintyContenders(pool,[a[0]],30,'fixed')[0],a[0]);
++ assert.equal(select(),select(),'stable ties/nonce and no allocation state');
++});
++test('B1 preserves a fourth ordinary-positive contender and rechecks the guard',()=>{
++ const base=[b1Row('champion',[100]),b1Row('second',[90]),b1Row('third',[80]),b1Row('fourth',[0,1])];
++ const unknown=b1Row('unknown',[]),pool=[...base,unknown];
++ assert.equal(uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed').map(r=>r.candidate.id).join(','),'champion,second,third,fourth');
++ base[3].development.scores=[0,0];
++ assert.equal(uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed')[3],unknown);
++ base[3].development.scores.push(1);
++ assert.equal(uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed')[3],base[3]);
++});
++test('B1 allocation differs from a count-only queue and reads each eligible ordinary sample once',()=>{
++ const champion=b1Row('champion',[10]),old=b1Row('old',Array(512).fill(0)),zero=b1Row('zero',Array(32).fill(0)),mixed=b1Row('mixed',[...Array(16).fill(1),...Array(16).fill(0)]);
++ const extra=[b1Row('second',[9]),b1Row('third',[8])],pool=[champion,...extra,old,zero,mixed],base=[champion,...extra,old];
++ assert.equal(uncertaintyAllocation.uncertaintyContenders(pool,base,1,'fixed')[3],mixed);
++ assert.equal(uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed')[3],zero);
++ let reads=0;const values=zero.development.scores;
++ Object.defineProperty(zero.development,'scores',{get(){reads++;return values;}});
++ Object.defineProperty(zero,'importance',{get(){throw Error('importance is not ordinary evidence');}});
++ Object.defineProperty(zero,'validation',{get(){throw Error('holdout leakage');}});
++ uncertaintyAllocation.uncertaintyContenders(pool,base,30,'fixed');assert.equal(reads,1);
++});
++test('B1 never replaces slots in bands narrower than four',()=>{
++ const rows=[b1Row('a',[1]),b1Row('b',[0]),b1Row('c',[0])],outside=b1Row('outside',[]);
++ for(const n of [1,2,3]) {
++  const baseline=rows.slice(0,n),selected=uncertaintyAllocation.uncertaintyContenders([...rows,outside],baseline,30,'narrow');
++  assert.equal(selected.length,n);for(let i=0;i<n;i++)assert.equal(selected[i],baseline[i]);
++ }
++});
++function b1SchedulerWithClock(now) {
++ const module={exports:{}};
++ const code=ts.transpileModule(fs.readFileSync(path.join(root,'src/domain/examSearch/scheduler.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021,esModuleInterop:true}}).outputText;
++ vm.runInNewContext(code,{module,exports:module.exports,require:id=>id.startsWith('@/')?load(`src/${id.slice(2)}.ts`):require(id),performance:{now},setTimeout,setImmediate,MessageChannel},{filename:'B1-clock-scheduler.ts'});
++ return module.exports.SearchSession;
++}
++test('B1 scheduler does no pool scan after stop/deadline and keeps the ordinary 512 cap',async()=>{
++ const original=uncertaintyAllocation.uncertaintyContenders;
++ try {
++  for(const mode of ['expired-before','stopped-before','expired-inside','cap']) {
++   let clock=0,scans=0,trials=0;
++   const ClockSession=b1SchedulerWithClock(()=>clock);
++   const base=[0,1,2,3].map(i=>b1Row('base-'+i,Array(512).fill(0))),outside=b1Row('outside',Array(mode==='cap'?511:32).fill(0)),pool=[...base,outside];
++   const engine={prepare:async()=>{},trial:()=>{trials++;if(mode==='expired-inside')clock=1000;return{score:0,retired:true,finishTurn:5};}};
++   const session=new ClockSession(fixture(),catalog,engine,'clock');
++   session.tasksReady=true;session.tasks=[];session.pool=[];session.pending=[];session.finalists=[];session.knownTasksTotal=0;
++   session.diverseParents=()=>[];session.selectFinalists=()=>{};
++   session.contenders=()=>{session.pool=pool;if(mode==='expired-before')clock=1000;if(mode==='stopped-before')session.stop();return base;};
++   uncertaintyAllocation.uncertaintyContenders=(...args)=>{scans++;return original(...args);};
++   await session.run(1000,()=>{});
++   if(mode.endsWith('-before')){assert.equal(scans,0,mode);assert.equal(trials,0,mode);}
++   if(mode==='expired-inside'){assert.equal(scans,1);assert.equal(trials,1);}
++   if(mode==='cap'){assert.equal(trials,1);assert.equal(outside.development.scores.length,512);assert.ok(pool.every(r=>r.development.scores.length<=512));}
++  }
++ } finally { uncertaintyAllocation.uncertaintyContenders=original; }
++});
