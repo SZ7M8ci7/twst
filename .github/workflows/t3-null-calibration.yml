@@ -1,0 +1,42 @@
+name: T3 fixed-work calibration with T1 null
+on:
+  push:
+    branches: [codex/t3-null-calibration-20261114]
+permissions:
+  contents: read
+jobs:
+  calibration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        replicate: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Prepare fixed T1 and T3 sources without modifying master
+        run: |
+          git worktree add --detach baseline 2ea835980091457bdaaaca7e90638c2e2f19ca19
+          git worktree add --detach candidate 2ea835980091457bdaaaca7e90638c2e2f19ca19
+          git -C baseline apply ../bench-public/t3-calibration/T1.patch
+          git -C candidate apply ../bench-public/t3-calibration/T1.patch
+          git -C candidate apply ../bench-public/t3-calibration/T3.patch
+          ln -s ../node_modules baseline/node_modules
+          ln -s ../node_modules candidate/node_modules
+          (cd candidate && node --test scripts/tests/exam-buff-coefficient-cache.test.cjs scripts/tests/exam-effect-rounding.test.cjs scripts/tests/exam-observation-equivalence.test.cjs && ../node_modules/.bin/tsc --noEmit)
+      - name: Independent source processes with rotated A-B-C order
+        run: node bench-public/t3-calibration/run.mjs baseline candidate ${{ matrix.replicate }} artifacts/t3-calibration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: t3-calibration-rep${{ matrix.replicate }}
+          path: artifacts/t3-calibration/*.json
+          retention-days: 14
