@@ -1,0 +1,94 @@
+From 72121395091b94e55aea300ed7758b874ec3e460 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 15 Nov 2026 07:43:04 +0900
+Subject: [PATCH] experiment: preserve ordinary-quality parent in loadout
+ refinement
+
+---
+ src/domain/examSearch/scheduler.ts | 18 ++++++++++++++-
+ tests/exam-search.test.cjs         | 36 ++++++++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+), 1 deletion(-)
+
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..ae45b95f 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -237,6 +237,22 @@ export class SearchSession {
+     // first can consume it before any cost-3 breakthrough gets a mutation.
+     return Array.from({length:limit},(_,index)=>bands.flatMap(band=>band[index]?[band[index]]:[])).flat();
+   }
++  private loadoutParents() {
++    const parents=this.diverseParents(2);
++    const costs=[...new Set(parents.map(result=>result.candidate.cost))];
++    const bands=costs.map(cost=>{
++      const band=parents.filter(result=>result.candidate.cost===cost);
++      if(band.length<2)return band;
++      const quality=this.pool.filter(result=>result.candidate.cost===cost
++        && result.development.scores.some(score=>Number.isFinite(score)&&score>0))
++        .sort(this.qualityComparator())[0];
++      // Keep the peak role and the same two-slot budget. Ordinary expected-best
++      // must have a chance at spell refinement even when importance differs.
++      if(quality&&!band.some(result=>result.candidate.id===quality.candidate.id))band[1]=quality;
++      return band;
++    });
++    return Array.from({length:2},(_,index)=>bands.flatMap(band=>band[index]?[band[index]]:[])).flat();
++  }
+   private closeLosses(limit:number) {
+     const counts=new Map<number,number>(),seen=new Set<string>();
+     const fitness=(result:SearchResult)=>(result.development.fitnessSum??0)/Math.max(1,result.development.scores.length);
+@@ -389,7 +405,7 @@ export class SearchSession {
+       }
+       // Cross multiple spell substitutions on measured compositions. A bounded
+       // round-robin gives each cost band time before deeper contender trials.
+-      const loadouts=this.diverseParents(2).map(parent=>[...alternatePolicyCandidates(this.input,parent.candidate),
++      const loadouts=this.loadoutParents().map(parent=>[...alternatePolicyCandidates(this.input,parent.candidate),
+         ...jointSpellCandidates(this.input,parent.candidate,this.catalog)]
+         .filter(candidate=>candidateSatisfiesConstraints(this.input,candidate,this.catalog)&&!this.seen.has(candidate.id)));
+       for(let index=0;index<249;index++)for(const options of loadouts) {
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..8ba9e1a1 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,39 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++function l1Row(id,cost,scores,importance=0){
++  return {candidate:{id,cost,cards:[{name:id,support:false}],challengeIds:[],policy:'effects-tail'},
++    development:{scores},validation:{scores:[]},validationTarget:2048,
++    importance:{n:32,observations:[],upperScore:importance}};
++}
++function l1Fixture(){
++  const session=new SearchSession(fixture(),catalog,{},'loadout-quality');
++  session.pool=[0,1].flatMap(cost=>[
++    l1Row(`l1-peak-${cost}`,cost,[60000,...Array(31).fill(0)]),
++    l1Row(`l1-weighted-${cost}`,cost,Array(32).fill(20000),90000),
++    l1Row(`l1-quality-${cost}`,cost,Array(32).fill(45000)),
++  ]);
++  return session;
++}
++test('L1 loadout preserves first peak parents and protects ordinary-positive quality within two slots',()=>{
++  const session=l1Fixture(),original=clone(session.pool);
++  assert.deepEqual(clone(session.diverseParents(2).map(r=>r.candidate.id)),['l1-peak-0','l1-peak-1','l1-weighted-0','l1-weighted-1']);
++  assert.deepEqual(clone(session.loadoutParents().map(r=>r.candidate.id)),['l1-peak-0','l1-peak-1','l1-quality-0','l1-quality-1']);
++  assert.deepEqual(clone(session.pool),original);
++});
++test('L1 all-failure bands and existing quality parents preserve prior order',()=>{
++  const session=l1Fixture();
++  for(const row of session.pool)row.development.scores.fill(0);
++  assert.deepEqual(clone(session.loadoutParents()),clone(session.diverseParents(2)));
++  const existing=l1Fixture();
++  existing.pool.find(r=>r.candidate.id==='l1-weighted-0').development.scores.fill(50000);
++  const actual=existing.loadoutParents().filter(r=>r.candidate.cost===0);
++  assert.deepEqual(clone(actual),clone(existing.diverseParents(2).filter(r=>r.candidate.cost===0)));
++});
++test('L1 does not manufacture a second slot for a single-parent cost band',()=>{
++  const session=l1Fixture();session.pool=session.pool.filter(r=>r.candidate.cost!==0||r.candidate.id==='l1-peak-0');
++  const rows=session.loadoutParents();
++  assert.equal(rows.length,3);assert.equal(rows.filter(r=>r.candidate.cost===0).length,1);
++  assert.equal(new Set(rows.map(r=>r.candidate.id)).size,3);
++});
+-- 
+2.52.0
+
