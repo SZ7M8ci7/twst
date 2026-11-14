@@ -1,11 +1,14 @@
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 const variant=process.argv[2];
-if(!['I1'].includes(variant))throw new Error('Unknown variant');
+if(!['I1Z'].includes(variant))throw new Error('Unknown variant');
 const plan=JSON.parse(fs.readFileSync('bench-public/plan-wave4.json'));
 const seed=Number(process.argv[3]);
 if(!Number.isInteger(seed)||seed<0||seed>2)throw new Error("Invalid replicate");
+const shard=Number(process.argv[4]);
+if(!Number.isInteger(shard)||shard<0||shard>3)throw new Error("Invalid shard");
 for(let i=0;i<plan.length;i++){
+ if(i%4!==shard)continue;
  const order=(seed+i)%2?['candidate','baseline']:['baseline','candidate'];
  for(const source of order){
   console.log(JSON.stringify({phase:'isolated-start',variant,source,seed,caseIndex:i,time:new Date().toISOString()}));

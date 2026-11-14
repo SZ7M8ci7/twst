@@ -1,7 +1,7 @@
 name: Synthetic screening independent source processes
 on:
   push:
-    branches: [codex/benchmark-i1-vs-t1-20261114]
+    branches: [codex/benchmark-i1z-vs-t1-20261114]
 permissions:
   contents: read
 jobs:
@@ -12,8 +12,9 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        variant: [I1]
+        variant: [I1Z]
         replicate: [0,1,2]
+        shard: [0,1,2,3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,16 +43,19 @@ jobs:
         env:
           VARIANT: ${{ matrix.variant }}
         run: |
-          node bench-public/run-isolated.mjs "$VARIANT" "${{ matrix.replicate }}"
-          node bench-public/audit-i1.mjs baseline "${{ matrix.replicate }}"
-          node bench-public/audit-i1.mjs candidate "${{ matrix.replicate }}"
+          node bench-public/run-isolated.mjs "$VARIANT" "${{ matrix.replicate }}" "${{ matrix.shard }}"
+          if [ "${{ matrix.shard }}" = 0 ]; then
+            node bench-public/audit-i1z.mjs baseline "${{ matrix.replicate }}"
+            node bench-public/audit-i1z.mjs candidate "${{ matrix.replicate }}"
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: paired-${{ matrix.variant }}-rep${{ matrix.replicate }}
+          name: paired-${{ matrix.variant }}-rep${{ matrix.replicate }}-shard${{ matrix.shard }}
           path: |
             artifacts/runner.json
             artifacts/fixed-*.json
             artifacts/nrc19/**/case-*.json
+            artifacts/nrc19/**/checkpoint-*.json
             artifacts/nrc19/**/plan-*.json
           retention-days: 14
