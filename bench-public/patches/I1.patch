@@ -1,0 +1,224 @@
+diff --git a/src/domain/examSearch/importance.ts b/src/domain/examSearch/importance.ts
+index 5d31d054..d3cb5593 100644
+--- a/src/domain/examSearch/importance.ts
++++ b/src/domain/examSearch/importance.ts
+@@ -23,3 +23,28 @@ export function importanceUpperQuantile(
+   }
+   return 0;
+ }
++
++/** Exploration-only plug-in estimate of the best ordinary score in `attempts`.
++ * Proposal weights restore ordinary upper-tail probability; their sum is NOT
++ * the denominator. Clipping the empirical tail and the nonlinear transform
++ * introduce finite-sample bias. Ordinary validation remains authoritative.
++ */
++export function importanceExpectedBestScore(
++  observations: readonly WeightedObservation[], attempts: number,
++): number {
++  const n = observations.length;
++  if (!n || !Number.isInteger(attempts) || attempts < 1
++    || observations.some(({score, weight}) => !Number.isFinite(score)
++      || !Number.isFinite(weight) || weight < 0)) return 0;
++  const positive = observations.filter(({score}) => score > 0).sort((a,b) => b.score-a.score);
++  let cumulativeWeight = 0, value = 0;
++  for (let index = 0; index < positive.length;) {
++    const score = positive[index].score;
++    while (index < positive.length && positive[index].score === score)
++      cumulativeWeight += positive[index++].weight;
++    const tail = Math.max(0, Math.min(1, cumulativeWeight / n));
++    const reach = tail === 1 ? 1 : -Math.expm1(attempts * Math.log1p(-tail));
++    value += (score - (positive[index]?.score ?? 0)) * reach;
++  }
++  return value;
++}
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index f7c9559f..2c4a4f47 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -2,7 +2,7 @@ import { buildTasksAsync, generateCandidatesAsync, generateNeighbors, crossCandi
+ import { emptySamples, MAX_ISLANDS, type BattleEngine, type MagicSlot, type Samples, type SearchInput, type SearchProgress, type SearchResult, type TaskPartition } from '@/domain/examSearch/types';
+ import * as statistics from '@/domain/examSearch/statistics';
+ import { lowerCostCandidates, trainedUpgradeCandidates, jointSpellCandidates, alternatePolicyCandidates, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
+-import { importanceUpperQuantile } from '@/domain/examSearch/importance';
++import { importanceExpectedBestScore } from '@/domain/examSearch/importance';
+ import { diverseFinalists } from '@/domain/examSearch/finalists';
+ 
+ import { yieldToHost as yieldEventLoop } from '@/utils/yieldToHost';
+@@ -84,15 +84,27 @@ export class SearchSession {
+   private evaluatedCount = 0;
+   private mutationRound = 0;
+   private partition: TaskPartition;
++  private importanceQualityCache = new WeakMap<NonNullable<SearchResult['importance']>,
++    {observations: object; length: number; attempts: number; value: number}>();
+   constructor(readonly input: SearchInput, private catalog: Catalog, private engine: BattleEngine, private nonce: string, checkpoint?: SessionCheckpoint, partition?: TaskPartition) {
+     this.partition = validateTaskPartition(checkpoint?.partition ?? partition);
+     if (checkpoint) {
+       this.cursor = checkpoint.cursor; this.seen = new Set(checkpoint.seen);
+       this.generatedCount = checkpoint.generatedCount ?? checkpoint.seen.length;
+       const valid = (result: SearchResult) => candidateSatisfiesConstraints(this.input,result.candidate,this.catalog);
+-      this.pool = checkpoint.pool.filter(valid);
+-      this.finalists = checkpoint.finalists.filter(valid);
+-      this.pending = checkpoint.pending.filter(valid); this.round = checkpoint.round;
++      // upperScore used to cache a quantile. Never reuse that old meaning.
++      const restored = (result: SearchResult): SearchResult => {
++        if (!result.importance) return result;
++        const prior = result.importance;
++        const observations = prior.observations;
++        const importance = observations && observations.length === prior.n
++          ? {...prior, upperScore: importanceExpectedBestScore(observations,this.input.attempts)}
++          : {n:0, observations:[], upperScore:0};
++        return {...result, importance};
++      };
++      this.pool = checkpoint.pool.filter(valid).map(restored);
++      this.finalists = checkpoint.finalists.filter(valid).map(restored);
++      this.pending = checkpoint.pending.filter(valid).map(restored); this.round = checkpoint.round;
+       this.elapsed = checkpoint.elapsed; this.trialSerial = checkpoint.trialSerial; this.nonce = checkpoint.nonce;
+       this.evaluatedCount = checkpoint.evaluatedCount ?? checkpoint.pool.length;
+       this.mutationRound = checkpoint.mutationRound ?? 0;
+@@ -167,14 +179,20 @@ export class SearchSession {
+     return (a: SearchResult, b: SearchResult) => qualityOf(b) - qualityOf(a);
+   }
+   private upperScore(result:SearchResult) {
+-    return result.importance?.upperScore??0;
++    const importance = result.importance, observations = importance?.observations;
++    if (!importance || !observations || importance.n !== observations.length) return 0;
++    const cached = this.importanceQualityCache.get(importance);
++    if (cached?.observations === observations && cached.length === observations.length
++      && cached.attempts === this.input.attempts) return cached.value;
++    const value = importanceExpectedBestScore(observations,this.input.attempts);
++    importance.upperScore = value;
++    this.importanceQualityCache.set(importance,
++      {observations,length:observations.length,attempts:this.input.attempts,value});
++    return value;
+   }
+   private autoScoreMetrics(samples: Samples) {
+     return statistics.autoScoreMetrics(samples,this.input.attempts,this.input.desiredProbability);
+   }
+-  private importanceProbability() {
+-    return -Math.expm1(Math.log1p(-this.input.desiredProbability) / this.input.attempts);
+-  }
+   private weightedChampion(results:SearchResult[]) {
+     return results.filter(r=>this.upperScore(r)>0)
+       .sort((a,b)=>this.upperScore(b)-this.upperScore(a))[0];
+@@ -192,7 +210,7 @@ export class SearchSession {
+       importance.observations!.push({score:trial.score,weight:trial.weight});
+       if(importance.n%8===0)await yieldEventLoop();
+     }
+-    importance.upperScore=importanceUpperQuantile(importance.observations!,this.importanceProbability());
++    this.upperScore(result);
+   }
+   private async scout(result:SearchResult,deadline:number,maximumTrials=32) {
+     if(!this.engine.scout||this.input.preset.kind==='DEFENCE'||this.input.favorableEffects)return;
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index d4a8a872..b06339dd 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -763,7 +763,7 @@
+ 
+ <script setup lang="ts">
+ import { yieldToHost } from '@/utils/yieldToHost';
+-import { computed, markRaw, nextTick, onMounted, ref, watch } from 'vue';
++import { computed, markRaw, toRaw, nextTick, onMounted, ref, watch } from 'vue';
+ import ExamSearchPanel from '@/components/ExamSearchPanelLoader.vue';
+ import { useI18n } from 'vue-i18n';
+ import { useRouter } from 'vue-router';
+@@ -4302,7 +4302,7 @@ let resourcePairSpend:ReturnType<typeof createPairSpend>|undefined;
+ let resourceInitialRuntime:SimulationRuntimeCache|null|undefined;
+ let resourceInitialState:SimulationState|undefined;
+ let resourceInitialStats:SimulationStats|undefined;
+-async function prepareResourceCandidate(input: SearchInput, candidate: Candidate) {
++async function prepareResourceCandidate(input: SearchInput, candidate: Candidate, immutableDeck = false) {
+   favorableEffects.value = input.favorableEffects === true;
+   resourcePerAttemptProbability=-Math.expm1(Math.log1p(-(input.desiredProbability??0.05))/(input.attempts??30));
+   resourcePreferredPlan = (candidate.preferredPlan ?? []).map(pair => [...pair]);
+@@ -4348,6 +4348,8 @@ async function prepareResourceCandidate(input: SearchInput, candidate: Candidate
+       &&getBuddyStatusForCharacter(raw,buddyIndex,{totsu:slot.totsu,isActive:true}).includes('クリティカル'))scoutTargets.add(index);
+   }
+   resourceCriticalScoutTargets=[...scoutTargets].sort((a,b)=>a-b);
++  // Prepared resource candidates are immutable until the next prepare call.
++  if (immutableDeck) deck.value = markRaw([...toRaw(deck.value)]);
+   // Let reactive derived values invalidate before constructing the per-deck cache.
+   await nextTick();
+   simulationRuntimeCache = createSimulationRuntimeCache();
+diff --git a/src/workers/resourceBattleHost.ts b/src/workers/resourceBattleHost.ts
+index 1d43fc45..0f7ebac2 100644
+--- a/src/workers/resourceBattleHost.ts
++++ b/src/workers/resourceBattleHost.ts
+@@ -24,7 +24,7 @@ export function createResourceBattleHost(): BattleEngine {
+   app.use(createI18n({ legacy: false, locale: 'ja', messages: { ja } }));
+   app.provide(routerKey, { currentRoute: { value: { query: {} } } } as any);
+   const simulator = app.mount(node()) as any;
+-  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate),
++  return { prepare: (input, candidate) => simulator.prepareResourceCandidate(input, candidate, true),
+     trial: (seed, policy, log) => simulator.runResourceTrial(seed, policy, log),
+     scout: (seed, policy, cardIndex, idealHand, magic) => simulator.scoutResourceCritical(seed,policy,cardIndex,idealHand,magic),
+     scoutTargets: () => simulator.resourceCriticalTargets(),
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index a497895c..80c7ca0c 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2709,3 +2709,33 @@ test('invalid active search settings return translated non-legacy validation cod
+     assert.equal(text.examSearch.validation.target,undefined);
+   }
+ });
++
++test('I1 importance objective ignores stale cache and invalidates on appended observations or attempts',()=>{
++  const input=fixture();input.attempts=30;
++  const session=new SearchSession(input,catalog,{},'i1-cache');
++  const result=islandResult('i1',60000,.0032);result.importance.upperScore=999999;
++  const expected=importance.importanceExpectedBestScore(result.importance.observations,30);
++  assert.ok(Math.abs(session.upperScore(result)-expected)<1e-8);
++  input.attempts=1;assert.ok(Math.abs(session.upperScore(result)-192)<1e-8);
++  result.importance.observations.push({score:0,weight:1.9968});result.importance.n++;
++  assert.ok(Math.abs(session.upperScore(result)-96)<1e-8);
++  result.importance.observations=[{score:100,weight:1},{score:100,weight:1}];
++  assert.equal(session.upperScore(result),100,'same-length replaced observation array invalidates the cache');
++});
++
++test('I1 resumed snapshots recompute legacy upperScore and leave old checkpoint untouched',()=>{
++  const input=fixture();input.attempts=30;
++  const cards=input.roster.slice(0,4).map(card=>variants.cardVariants(card,'SSR')[0]);
++  cards.push(variants.cardVariants(input.supports[0],'SSR',true)[0]);
++  const result={candidate:{id:'i1-resume',cards,challengeIds:[],cost:0,policy:'effects-score',estimate:1},
++    development:{scores:[0],retired:0,turns:1},validation:{scores:[],retired:0,turns:0},validationTarget:2048,
++    importance:{n:2,observations:[{score:60000,weight:.0032},{score:0,weight:1.9968}],upperScore:999999}};
++  const old={...result,candidate:{...result.candidate,id:'i1-legacy'},importance:{n:8,upperScore:123456}};
++  const checkpoint={cursor:0,seen:[],pool:[result,old],finalists:[result],pending:[result],round:0,elapsed:0,trialSerial:0,nonce:'resume'};
++  const session=new SearchSession(input,catalog,{},'resume',checkpoint),restored=session.checkpoint();
++  assert.equal(restored.pool.length,2);
++  const expected=importance.importanceExpectedBestScore(result.importance.observations,30);
++  for(const field of ['pool','finalists','pending'])assert.ok(Math.abs(restored[field][0].importance.upperScore-expected)<1e-8);
++  assert.equal(restored.pool[1].importance.upperScore,0);assert.equal(restored.pool[1].importance.n,0);
++  assert.equal(result.importance.upperScore,999999,'do not mutate the supplied snapshot');
++});
+diff --git a/tests/importance-expected.test.cjs b/tests/importance-expected.test.cjs
+new file mode 100644
+index 00000000..270a5a9d
+--- /dev/null
++++ b/tests/importance-expected.test.cjs
+@@ -0,0 +1,25 @@
++const {test}=require('node:test');const assert=require('node:assert/strict');
++const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
++const moduleValue={exports:{}};
++vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../src/domain/examSearch/importance.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2021}}).outputText,{module:moduleValue,exports:moduleValue.exports});
++const {importanceExpectedBestScore:estimate}=moduleValue.exports;
++const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-8*Math.max(1,Math.abs(b)),`${a} != ${b}`);
++function ordinary(scores,m){const sorted=[...scores].map(s=>Math.max(0,s)).sort((a,b)=>a-b),n=sorted.length;return sorted.reduce((v,s,i)=>v+s*(((i+1)/n)**m-(i/n)**m),0);}
++test('I1 unit weights equal ordinary empirical expected maximum, attempts 1/30',()=>{
++ for(let mask=0;mask<256;mask++){const scores=Array.from({length:8},(_,i)=>mask&(1<<i)?[0,50,100,100][i%4]:0);for(const m of [1,30])close(estimate(scores.map(score=>({score,weight:1})),m),ordinary(scores,m));}
++});
++test('I1 preserves proposal count, failures, duplicate score mass and input',()=>{
++ const a=[{score:100,weight:.4},{score:50,weight:.8},{score:0,weight:5},{score:100,weight:.2}];const saved=JSON.stringify(a);
++ close(estimate(a,1),(100*.6+50*.8)/4);close(estimate(a,30),50*(1-(1-.6/4)**30)+50*(1-(1-1.4/4)**30));assert.equal(JSON.stringify(a),saved);
++});
++test('I1 distinguishes rare true probabilities without a threshold discontinuity',()=>{
++ const value=p=>estimate([{score:60000,weight:2*p},{score:0,weight:2*(1-p)}],30);
++ for(const p of [.0016,.0004])close(value(p),60000*(1-(1-p)**30));assert.ok(value(.0016)>value(.0004));
++});
++test('I1 handles empty, zero, invalid and clipped overweight tails',()=>{
++ assert.equal(estimate([],30),0);assert.equal(estimate([{score:0,weight:1},{score:-10,weight:1}],30),0);
++ for(const m of [0,-1,1.5,NaN,Infinity])assert.equal(estimate([{score:10,weight:1}],m),0);
++ for(const r of [{score:NaN,weight:1},{score:10,weight:-1},{score:10,weight:Infinity}])assert.equal(estimate([r],30),0);
++ close(estimate([{score:100,weight:4},{score:50,weight:1}],30),100);
++ close(estimate([{score:100,weight:0},{score:50,weight:0}],30),0);
++});
