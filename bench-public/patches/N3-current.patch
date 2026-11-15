@@ -1,0 +1,250 @@
+diff --git a/src/domain/examSearch/scheduler.ts b/src/domain/examSearch/scheduler.ts
+index bd0bd059..5a9bc934 100644
+--- a/src/domain/examSearch/scheduler.ts
++++ b/src/domain/examSearch/scheduler.ts
+@@ -10,11 +10,29 @@ import { DISCOVERY_SAMPLES, VALIDATION_SAMPLES, MAX_FINALISTS, REFINED_VALIDATIO
+ const WIDE_DISCOVERY_SAMPLES = 8;
+ const WIDE_SCOUT_SAMPLES = 8;
+ const MAX_RECENT_CANDIDATES = 4096;
++interface InitialFrontier {
++  target: number;
++  groups: string[][];
++  ready: boolean;
++}
++// Candidate objects remain solely in pending: legacy readers can still drain
++// every generated row even when they do not understand the optional frontier.
++export function roundRobinPending(rows: SearchResult[], groups: readonly string[][]): SearchResult[] {
++  const byId = new Map(rows.map(row => [row.candidate.id, row]));
++  const ordered: SearchResult[] = [];
++  const take = (id: string) => { const row = byId.get(id); if (row) { ordered.push(row); byId.delete(id); } };
++  for (let i = 0; i < Math.max(0, ...groups.map(group => group.length)); i++)
++    for (const group of groups) if (group[i]) take(group[i]);
++  // Restored/filtered rows without metadata must never be discarded.
++  ordered.push(...byId.values());
++  return ordered;
++}
+ export interface SessionCheckpoint {
+   cursor: number; seen: string[]; pool: SearchResult[]; finalists: SearchResult[]; pending: SearchResult[];
+   round: number; elapsed: number; trialSerial: number; nonce: string;
+   evaluatedCount?: number; tasksTotal?: number;
+   mutationRound?: number;
++  observedCursor?: number; initialFrontier?: InitialFrontier;
+   generatedCount?: number;
+   partition?: TaskPartition;
+   parallel?: { baseNonce: string; checkpoints: SessionCheckpoint[]; owners: Record<string, number> };
+@@ -71,6 +89,8 @@ export class SearchSession {
+   private tasksReady = false;
+   private knownTasksTotal = 0;
+   private cursor = 0;
++  private observedCursor = 0;
++  private initialFrontier?: InitialFrontier;
+   private seen = new Set<string>();
+   private generatedCount = 0;
+   private continuous = false;
+@@ -87,7 +107,13 @@ export class SearchSession {
+   constructor(readonly input: SearchInput, private catalog: Catalog, private engine: BattleEngine, private nonce: string, checkpoint?: SessionCheckpoint, partition?: TaskPartition) {
+     this.partition = validateTaskPartition(checkpoint?.partition ?? partition);
+     if (checkpoint) {
+-      this.cursor = checkpoint.cursor; this.seen = new Set(checkpoint.seen);
++      this.cursor = checkpoint.cursor;
++      this.observedCursor = checkpoint.observedCursor ?? checkpoint.cursor;
++      if ((input.additionalLevelCap ?? 0) > 0 && checkpoint.initialFrontier) {
++        const saved = checkpoint.initialFrontier;
++        this.initialFrontier = { target: saved.target, ready: saved.ready, groups: saved.groups.map(group => [...group]) };
++      }
++      this.seen = new Set(checkpoint.seen);
+       this.generatedCount = checkpoint.generatedCount ?? checkpoint.seen.length;
+       const valid = (result: SearchResult) => candidateSatisfiesConstraints(this.input,result.candidate,this.catalog);
+       this.pool = checkpoint.pool.filter(valid);
+@@ -102,7 +128,10 @@ export class SearchSession {
+   checkpoint(): SessionCheckpoint {
+     return { cursor: this.cursor, seen: [...this.seen], pool: this.pool, finalists: this.finalists, pending: this.pending,
+       round: this.round, elapsed: this.elapsed, trialSerial: this.trialSerial, nonce: this.nonce, evaluatedCount: this.evaluatedCount, tasksTotal: this.knownTasksTotal, mutationRound: this.mutationRound,
+-      partition: this.partition, generatedCount: this.generatedCount };
++      partition: this.partition, generatedCount: this.generatedCount,
++      ...((this.input.additionalLevelCap ?? 0) > 0 ? { observedCursor: this.observedCursor,
++        ...(this.initialFrontier ? { initialFrontier: { ...this.initialFrontier,
++          groups: this.initialFrontier.groups.map(group => [...group]) } } : {}) } : {}) };
+   }
+   private remember(id: string) {
+     if (!this.seen.has(id)) { this.seen.add(id); this.generatedCount++; }
+@@ -351,12 +380,42 @@ export class SearchSession {
+       }
+       let emptyMutations = 0;
+       while (!this.stopped && performance.now() < discoveryEnd && (this.pending.length || this.cursor < this.tasks.length || this.pool.length)) {
++        const frontierEnabled = (this.input.additionalLevelCap ?? 0) > 0;
++        // Finish a window's observations before scheduling its mutation. A
++        // generation cursor alone must not advance the refinement cadence.
++        if (frontierEnabled && !this.pending.length && this.initialFrontier?.ready) {
++          this.observedCursor = this.cursor; this.initialFrontier = undefined;
++        }
++        const stopFrontier = () => this.stopped || performance.now() >= discoveryEnd;
++        if (frontierEnabled && (this.initialFrontier && !this.initialFrontier.ready
++          || !this.pending.length && !this.initialFrontier && this.cursor < this.tasks.length
++            && !(this.pool.length > 0 && this.observedCursor >= (this.mutationRound + 1) * 8))) {
++          this.initialFrontier ??= { target: Math.min(this.tasks.length, (Math.floor(this.cursor / 8) + 1) * 8), groups: [], ready: false };
++          const frontier = this.initialFrontier;
++          while (this.cursor < frontier.target && !stopFrontier()) {
++            const candidates = await generateCandidatesAsync(this.input, this.tasks[this.cursor], this.catalog, stopFrontier);
++            if (!candidates) break; // incomplete generation commits nothing
++            const group: string[] = [];
++            for (const candidate of candidates) if (candidateSatisfiesConstraints(this.input, candidate, this.catalog) && !this.seen.has(candidate.id)) {
++              this.remember(candidate.id); group.push(candidate.id);
++              this.pending.push({ candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES });
++            }
++            frontier.groups.push(group); this.cursor++;
++          }
++          if (this.cursor < frontier.target) break;
++          frontier.ready = true;
++          this.pending = roundRobinPending(this.pending, frontier.groups);
++          if (!this.pending.length) {
++            this.observedCursor = this.cursor; this.initialFrontier = undefined;
++            await progress('generate'); continue;
++          }
++        }
+         if (!this.pending.length) {
+           const stop = () => this.stopped || performance.now() >= discoveryEnd;
+           let candidates;
+           // Refine actual promising teams while the larger catalogue is still
+           // being scanned. Otherwise a full collection never reaches refinement.
+-          const refineNow = this.pool.length > 0 && this.cursor >= (this.mutationRound + 1) * 8;
++          const refineNow = this.pool.length > 0 && (frontierEnabled ? this.observedCursor : this.cursor) >= (this.mutationRound + 1) * 8;
+           if (this.cursor < this.tasks.length && !refineNow) {
+             candidates = await generateCandidatesAsync(this.input, this.tasks[this.cursor], this.catalog, stop);
+             if (candidates) this.cursor++;
+@@ -392,6 +451,10 @@ export class SearchSession {
+         }
+         if (result.development.scores.length >= discoverySamples) {
+           this.pool.push(result); this.pending.shift(); this.evaluatedCount++;
++          if (frontierEnabled && !this.pending.length) {
++            this.observedCursor = this.cursor;
++            if (this.initialFrontier?.ready) this.initialFrontier = undefined;
++          }
+           this.trimPool();
+         }
+         await progress('generate');
+diff --git a/tests/exam-search.test.cjs b/tests/exam-search.test.cjs
+index 9de42b35..1a0608ea 100644
+--- a/tests/exam-search.test.cjs
++++ b/tests/exam-search.test.cjs
+@@ -2850,3 +2850,120 @@ test('training cost bands keep their leading candidate without letting level var
+  assert.equal(resumed.length,8);assert.equal(new Set(resumed.map(r=>r.candidate.cards[0].name)).size,5,'retained same-team cost winners do not consume all challenger slots with level variants');
+  for(let cost=0;cost<4;cost++)assert.ok(resumed.some(r=>r.candidate.id===`best-${cost}`));
+ });
++
++// N3: no battle model, fixed task/candidate lists and unchanged ordinary quotas.
++async function n3Run({cap=20,checkpoint,interruptTask=-1,stopAfter=1,totalTasks=8,empty=false,emptyBefore=0,duplicate=false,stopOnMutation=false}={}) {
++  const input=fixture();input.additionalLevelCap=cap;input.preset.specialChallenges=[];
++  const template=generation.generateCandidates(input,generation.buildTasks(input,catalog)[0],catalog)[0];
++  const tasks=Array.from({length:totalTasks},(_,index)=>({index,cost:0}));
++  const original=generation.generateCandidatesAsync,originalNeighbors=generation.generateNeighbors,calls=[],prepared=[],seeds=[],mutations=[];let session,active;
++  generation.generateNeighbors=async()=>{mutations.push(clone(session.checkpoint()));session.stop();return [];};
++  generation.generateCandidatesAsync=async(_input,task)=>{
++    calls.push(task.index);
++    if(task.index===interruptTask){session.stop();return null;}
++    return empty||task.index<emptyBefore?[]:[0,1].map(i=>({...clone(template),id:duplicate&&i===1?'shared':`task-${task.index}-row-${i}`}));
++  };
++  const engine={prepare:async(_input,candidate)=>{active=candidate.id;prepared.push(active);},trial:seed=>{
++    seeds.push({seed,id:active});if(seeds.length===stopAfter)session.stop();return {score:1,retired:false,finishTurn:1};}};
++  try{
++    session=new SearchSession(input,catalog,engine,'n3-fixed',checkpoint);
++    session.tasksReady=true;session.tasks=tasks;session.knownTasksTotal=tasks.length;
++    session.diverseParents=()=>stopOnMutation?session.pool.slice(0,1):[];session.contenders=()=>[];
++    await session.run(10000,()=>{});
++    return {checkpoint:clone(session.checkpoint()),calls,prepared,seeds,input,mutations};
++  }finally{generation.generateCandidatesAsync=original;generation.generateNeighbors=originalNeighbors;}
++}
++test('N3 first8 tasks round-robin preserves candidate set and ordinary quota',async()=>{
++  const x=await n3Run({stopAfter:33});
++  assert.deepEqual(x.calls,[0,1,2,3,4,5,6,7]);
++  assert.equal(x.checkpoint.cursor,8);assert.equal(x.checkpoint.observedCursor,0);
++  assert.deepEqual(x.prepared,['task-0-row-0','task-1-row-0']);
++  assert.equal(x.checkpoint.pool[0].development.scores.length,32);
++  assert.equal(x.checkpoint.pending[0].development.scores.length,1);
++  const rows=[...x.checkpoint.pool,...x.checkpoint.pending];assert.equal(rows.length,16);
++  assert.equal(new Set(rows.map(r=>r.candidate.id)).size,16);
++  assert(rows.every(r=>variants.candidateSatisfiesConstraints(x.input,r.candidate,catalog)));
++});
++test('N3 partial generation stop persists completed tasks and restores without loss or repeat',async()=>{
++  const x=await n3Run({interruptTask:3});
++  assert.equal(x.checkpoint.cursor,3);assert.equal(x.checkpoint.observedCursor,0);
++  assert.equal(x.checkpoint.initialFrontier.ready,false);assert.equal(x.checkpoint.pending.length,6);
++  assert.equal(x.seeds.length,0);
++  const y=await n3Run({checkpoint:x.checkpoint,stopAfter:1});
++  assert.deepEqual(y.calls,[3,4,5,6,7]);assert.equal(y.checkpoint.pending.length,16);
++  assert.equal(y.checkpoint.pending[0].candidate.id,'task-0-row-0');
++  assert.equal(y.checkpoint.initialFrontier.ready,true);
++  const z=await n3Run({checkpoint:y.checkpoint,stopAfter:32});
++  assert.deepEqual(z.calls,[]);assert.deepEqual(z.prepared,['task-0-row-0','task-1-row-0']);
++  assert.equal(z.checkpoint.pool[0].development.scores.length,32);
++  assert.equal(z.checkpoint.pending[0].development.scores.length,1);
++  assert.equal(new Set([...y.seeds,...z.seeds].map(s=>s.seed)).size,33);
++});
++test('N3 cap0 retains single-task generation and legacy checkpoint shape',async()=>{
++  const x=await n3Run({cap:0,stopAfter:33});
++  assert.deepEqual(x.calls,[0]);assert.deepEqual(x.prepared,['task-0-row-0','task-0-row-1']);
++  assert(!('initialFrontier'in x.checkpoint));assert(!('observedCursor'in x.checkpoint));
++});
++test('N3 frontier ordering tolerates legal-filtered rows and untagged legacy pending',()=>{
++  const {roundRobinPending}=load('src/domain/examSearch/scheduler.ts');
++  const rows=['a','c','unknown'].map(id=>({candidate:{id}}));
++  assert.deepEqual(clone(roundRobinPending(rows,[['a','missing'],['c']])).map(r=>r.candidate.id),['a','c','unknown']);
++  assert.deepEqual(rows.map(r=>r.candidate.id),['a','c','unknown']);
++});
++test('N3 advances observation cursor only after a full window and preserves short terminal windows',async()=>{
++  const x=await n3Run({stopAfter:512});
++  assert.equal(x.checkpoint.cursor,8);assert.equal(x.checkpoint.observedCursor,8);
++  assert.equal(x.checkpoint.mutationRound,0);assert.equal(x.checkpoint.pending.length,0);
++  assert(!x.checkpoint.initialFrontier);assert.equal(x.seeds.length,16*32);
++  const y=await n3Run({stopAfter:192,totalTasks:3});
++  assert.deepEqual(y.calls,[0,1,2]);assert.equal(y.checkpoint.observedCursor,3);
++  assert.equal(y.checkpoint.pending.length,0);assert(!y.checkpoint.initialFrontier);
++});
++test('N3 all-empty tasks finish both windows without mutation or dangling frontier',async()=>{
++  const x=await n3Run({totalTasks:10,empty:true});
++  assert.deepEqual(x.calls,Array.from({length:10},(_,i)=>i));
++  assert.equal(x.checkpoint.cursor,10);assert.equal(x.checkpoint.observedCursor,10);
++  assert.equal(x.checkpoint.pending.length,0);assert.equal(x.seeds.length,0);assert(!x.checkpoint.initialFrontier);
++});
++test('N3 legacy pending drains before prefetch and JSON checkpoint is repeatable',async()=>{
++  const old=await n3Run({cap:0,stopAfter:1});
++  const x=await n3Run({checkpoint:old.checkpoint,stopAfter:1});
++  assert.deepEqual(x.calls,[]);assert.deepEqual(x.prepared,['task-0-row-0']);
++  assert.equal(x.checkpoint.pending[0].development.scores.length,2);
++  const a=await n3Run({checkpoint:clone(x.checkpoint),stopAfter:1});
++  const b=await n3Run({checkpoint:clone(x.checkpoint),stopAfter:1});
++  assert.deepEqual(a.seeds,b.seeds);assert.deepEqual(a.checkpoint.pending,b.checkpoint.pending);
++});
++test('N3 empty first window still prefetches all of second window before ordinary work',async()=>{
++  const x=await n3Run({totalTasks:16,emptyBefore:8,stopAfter:1});
++  assert.deepEqual(x.calls,Array.from({length:16},(_,i)=>i));
++  assert.deepEqual(x.prepared,['task-8-row-0']);assert.equal(x.checkpoint.observedCursor,8);
++});
++test('N3 cross-task duplicate is observed once and mutation waits for observation completion',async()=>{
++  const x=await n3Run({duplicate:true,stopAfter:Infinity,stopOnMutation:true});
++  assert.equal(x.seeds.length,9*32);assert.equal(x.prepared.filter(id=>id==='shared').length,1);
++  assert.equal(x.mutations.length,1);assert.equal(x.mutations[0].observedCursor,8);
++  assert.equal(x.mutations[0].pending.length,0);assert.equal(x.mutations[0].mutationRound,1);
++});
++test('N3 partial frontier survives actual compressed session storage and island packaging',async()=>{
++  const x=await n3Run({interruptTask:3});
++  x.checkpoint.seen.push('padding'.repeat(30000));
++  const checkpoint=islands.createParallelCheckpoint([x.checkpoint],'n3-fixed');
++  const storage=load('src/storage/examSearchStorage.ts');
++  const value={input:x.input,version:load('src/domain/examSearch/types.ts').ENGINE_VERSION,catalogVersion:'test-catalog',checkpoint};
++  const raw=storage.serializeSearchSession(value);assert.equal(JSON.parse(raw).checkpointEncoding,'lz-utf16-v1');
++  storedValues.set('twst-exam-resource-search-v1-session',raw);
++  const loaded=clone(storage.loadSearchSession());assert.deepEqual(loaded.checkpoint.parallel.checkpoints[0],x.checkpoint);
++  const y=await n3Run({checkpoint:loaded.checkpoint.parallel.checkpoints[0]});assert.deepEqual(y.calls,[3,4,5,6,7]);
++  assert.equal(y.checkpoint.pending.length,16);
++});
++test('N3 restore does not resurrect a pending row removed by checkpoint constraint filtering',async()=>{
++  const x=await n3Run({interruptTask:3});
++  const removed=x.checkpoint.pending[0].candidate.id;
++  x.checkpoint.pending=x.checkpoint.pending.filter(r=>r.candidate.id!==removed);
++  const y=await n3Run({checkpoint:x.checkpoint});
++  assert.equal(y.checkpoint.pending.length,15);
++  assert(!y.checkpoint.pending.some(r=>r.candidate.id===removed));
++  assert(!y.prepared.includes(removed));
++  assert.equal(new Set(y.checkpoint.pending.map(r=>r.candidate.id)).size,15);
++});
