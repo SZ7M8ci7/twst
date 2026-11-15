@@ -1007,6 +1007,7 @@
     "variants": "追加培养比较",
     "failure": "搜索失败",
     "saveFailed": "无法保存设置，继续搜索。",
+    "transferFailed": "无法打开详细模拟，请重试。",
     "saving": "正在保存",
     "sessionSaveFailed": "无法保存搜索数据。重新加载后，将无法从本次结果继续搜索。",
     "retrySave": "重新保存搜索数据",

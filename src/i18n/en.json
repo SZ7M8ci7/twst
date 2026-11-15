@@ -1007,6 +1007,7 @@
     "variants": "Compare training",
     "failure": "Search failed",
     "saveFailed": "Settings could not be saved. Search continues.",
+    "transferFailed": "Could not open the detailed simulation. Please try again.",
     "saving": "Saving",
     "sessionSaveFailed": "This search could not be saved. After reloading, you cannot resume from this result.",
     "retrySave": "Retry saving search",

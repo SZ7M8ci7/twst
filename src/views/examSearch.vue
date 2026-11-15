@@ -159,7 +159,7 @@ import { sharedExamConditionsKey, type SharedExamConditions } from '@/utils/shar
 import { useHandCollectionStore } from '@/store/handCollection';
 import { getInputMaxLevel } from '@/constants/levels';
 import { localizeCharacterName, localizeCostumeName, localizeGameText } from '@/utils/localizedDisplay';
-import { loadExamSearch, saveExamSearch, loadSearchSession, saveSearchSession, saveSearchTransfer, loadSearchSeedTeams, type SavedSearchSession } from '@/storage/examSearchStorage';
+import { loadExamSearch, saveExamSearch, loadSearchSession, saveSearchSession, createSearchTransfer, INLINE_SEARCH_TRANSFER, loadSearchSeedTeams, type SavedSearchSession } from '@/storage/examSearchStorage';
 import { groupSearchResults, resultDeckKey } from '@/domain/examSearch/resultGroups';
 import { validateInput, invalidSearchCards, examUsesSupport } from '@/domain/examSearch/variants';
 import { constrainCheckpoint } from '@/domain/examSearch/requiredCheckpoint';
@@ -612,10 +612,13 @@ function preview(result: SearchResult) {
 }
 function openSimulator(result: SearchResult) {
   try {
-    const id = saveSearchTransfer(clone(evaluatedInput.value!), clone(result.candidate), result.validationBest ? clone(result.validationBest) : undefined);
-    const url = router.resolve({ name: 'examSimulator', query: { resourceSearch: id } }).href;
+    const transfer = createSearchTransfer(evaluatedInput.value!, result.candidate, result.validationBest);
+    const url = router.resolve({ name: 'examSimulator', query: { resourceSearch: INLINE_SEARCH_TRANSFER }, hash: `#${transfer}` }).href;
     window.open(url, '_blank', 'noopener,noreferrer');
-  } catch { error.value = t('examSearch.saveFailed'); }
+  } catch (cause) {
+    console.warn('Exam simulator transfer failed', cause);
+    error.value = t('examSearch.transferFailed');
+  }
 }
 function variantCardSummary(result: SearchResult) {
   return result.candidate.cards.filter(card => !card.support && (card.totsu > card.originalTotsu || card.additionalLevels))

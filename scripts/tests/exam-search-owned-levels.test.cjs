@@ -162,8 +162,10 @@ test('favorable effects default off, persist, invalidate old results and reach w
   assert.equal(workers.at(-1).messages[0].input.favorableEffects, true);
   view.favorableEffects.value = false;
   assert.equal(view.favorableEffects.value, true, 'cannot change the active search conditions');
-  const candidate = { cards: [], challengeIds: [], cost: 0, policy: 'balanced', id: 'test', estimate: 0 };
-  const transferId = persistence.saveSearchTransfer(clone(view.input.value), candidate);
+  const candidate = { cards: view.input.value.roster.slice(0, 5).map(card => ({ ...card,
+    originalTotsu: card.totsu, support: false, selectedMagic: [1, 2] })),
+    challengeIds: [], cost: 0, policy: 'balanced', id: 'test', estimate: 0 };
+  const transferId = persistence.createSearchTransfer(clone(view.input.value), candidate);
   assert.equal(persistence.loadSearchTransfer(transferId).input.favorableEffects, true);
   await workers.at(-1).respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
   view.favorableEffects.value = false;
@@ -584,7 +586,7 @@ for (const unified of [false, true]) {
     }
     assert.ok(spells.every(candidate => additionalLevelCost(candidate.cards) === 10), 'spell changes retain the allocation');
     assert.ok(cheaper.every(candidate => additionalLevelCost(candidate.cards) === 10), 'reducing limit breaks does not remove separate friendship training');
-    const id = persistence.saveSearchTransfer(input, parent);
+    const id = persistence.createSearchTransfer(input, parent);
     const transfer = persistence.loadSearchTransfer(id);
     assert.deepEqual(clone(transfer.candidate.cards), clone(parent.cards));
     assert.equal(transfer.input.additionalLevelCap, 10);

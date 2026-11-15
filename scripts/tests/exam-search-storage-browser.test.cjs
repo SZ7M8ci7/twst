@@ -65,6 +65,85 @@ async function abortWrites(page) {
     window.restoreWrites = () => { IDBObjectStore.prototype.put = original; };
   });
 }
+test('simulator transfer survives full storage, unavailable IndexedDB and a separate tab without changing saved data', async t => {
+  const page = await pageFor(t), saved = session();
+  saved.input.preset.enemies = [];
+  saved.input.roster = Array.from({ length: 535 }, (_, i) => ({ ...saved.input.roster[i % 5], name: `owned-${i}` }));
+  saved.input.supports = structuredClone(saved.input.roster);
+  saved.input.seedTeams = [['not-needed-for-replay']];
+  saved.input.favorableEffects = true;
+  saved.input.forceFinisherTripleCritical = true;
+  const candidate = saved.checkpoint.finalists[0].candidate;
+  candidate.preferredPlan = [['0-M2', '1-M1']];
+  candidate.preferredPlanMode = 'priority';
+  const best = { seed: 'exact-best-seed', score: 49955 };
+  const token = await page.evaluate(({ input, candidate, best, setupKey }) => {
+    localStorage.setItem(setupKey, JSON.stringify(input));
+    localStorage.setItem('twst-hand-collection', 'keep-cards');
+    localStorage.setItem('twst_saved_decks', 'keep-decks');
+    localStorage.setItem(`${setupKey}-transfer-old`, JSON.stringify({ id: 'old', createdAt: 1 }));
+    let low = 0, high = 6 * 1024 * 1024;
+    while (high - low > 1) {
+      const mid = Math.floor((low + high) / 2);
+      try { localStorage.setItem('other-data', 'x'.repeat(mid)); low = mid; } catch { high = mid; }
+    }
+    let full = false;
+    try { localStorage.setItem('new-transfer', JSON.stringify({ input, candidate, best })); }
+    catch (error) { full = error.name === 'QuotaExceededError'; }
+    if (!full) throw Error('must reproduce quota failure before verifying the fix');
+    IDBFactory.prototype.open = () => { throw Error('IndexedDB unavailable'); };
+    return ExamStorage.createSearchTransfer(input, candidate, best);
+  }, { input: saved.input, candidate, best, setupKey });
+  const snapshot = page => page.evaluate(() => Object.fromEntries(Object.keys(localStorage).sort().map(k => [k, localStorage.getItem(k)])));
+  const before = await snapshot(page);
+  const second = await page.context().newPage();
+  await second.goto(`${url}/?resourceSearch=inline#${token}`);
+  assert.equal(await second.evaluate(() => window.opener), null);
+  const restored = await second.evaluate(() => ExamStorage.loadSearchTransfer(location.hash.slice(1)));
+  assert.deepEqual(restored.candidate, candidate);
+  assert.deepEqual(restored.best, best);
+  assert.deepEqual(restored.input.preset, saved.input.preset);
+  assert.equal(restored.input.favorableEffects, true);
+  assert.equal(restored.input.forceFinisherTripleCritical, true);
+  assert.deepEqual(restored.input.roster, []);
+  assert.deepEqual(restored.input.supports, []);
+  assert.equal(restored.input.seedTeams, undefined);
+  await second.reload();
+  assert.deepEqual(await second.evaluate(() => ExamStorage.loadSearchTransfer(location.hash.slice(1))), restored);
+  assert.deepEqual(await snapshot(second), before);
+  // Inline links remain usable even when reading storage itself is forbidden.
+  assert.deepEqual(await second.evaluate(() => {
+    Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('blocked', 'SecurityError'); } });
+    return ExamStorage.loadSearchTransfer(location.hash.slice(1));
+  }), restored);
+  measurements.push({ case: 'quota-independent simulator transfer', tokenLength: token.length, separateTab: true, losslessReload: true, savedDataUnchanged: true });
+});
+
+test('legacy simulator links remain readable and expired or malformed links never delete saved data', async t => {
+  const page = await pageFor(t), saved = session();
+  const candidate = saved.checkpoint.finalists[0].candidate;
+  const value = { id: 'old-link', input: saved.input, candidate, best: { seed: 'legacy', score: 42 }, createdAt: Date.now() };
+  const result = await page.evaluate(({ value, setupKey }) => {
+    const key = `${setupKey}-transfer-${value.id}`;
+    localStorage.setItem(key, JSON.stringify(value));
+    const valid = ExamStorage.loadSearchTransfer(value.id);
+    const expired = JSON.stringify({ ...value, createdAt: 1 });
+    localStorage.setItem(key, expired);
+    const invalid = ExamStorage.loadSearchTransfer(value.id);
+    sessionStorage.setItem(`${setupKey}-transfer`, JSON.stringify({ ...value, id: 'session-link' }));
+    return { valid, invalid, retained: localStorage.getItem(key) === expired,
+      legacySession: ExamStorage.loadSearchTransfer('session-link'),
+      malformed: ['resource-inline-v1-', 'resource-inline-v1-broken'].map(id => ExamStorage.loadSearchTransfer(id)) };
+  }, { value, setupKey });
+  const normalized = structuredClone(value);
+  delete normalized.input.target;
+  delete normalized.input.tolerance;
+  assert.deepEqual(result.valid, normalized);
+  assert.equal(result.invalid, null);
+  assert.equal(result.retained, true);
+  assert.deepEqual(result.legacySession, { ...normalized, id: 'session-link' });
+  assert.deepEqual(result.malformed, [null, null]);
+});
 for (const compressed of [false, true]) {
   test(`migrates ${compressed ? 'compressed' : 'plain'} legacy data losslessly and survives a reload`, { timeout: 60000 }, async t => {
     const page = await pageFor(t), saved = session(compressed ? 50000 : 8);

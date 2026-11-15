@@ -6,7 +6,9 @@ import { readExamSearchRecord, writeExamSearchRecord } from '@/storage/examSearc
 const { compressToUTF16, decompressFromUTF16 } = LZString;
 const KEY = 'twst-exam-resource-search-v1';
 const TRANSFER_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_TRANSFERS = 20;
+const INLINE_TRANSFER_PREFIX = 'resource-inline-v1-';
+export const INLINE_SEARCH_TRANSFER = 'inline';
+interface SearchTransfer { input: SearchInput; candidate: Candidate; best?: { seed: string; score: number } }
 export interface SavedSearchSession { input: SearchInput; checkpoint: SessionCheckpoint; catalogVersion: string; version: string }
 const SESSION_KEY = `${KEY}-session`;
 interface StoredSession {
@@ -37,7 +39,6 @@ function validRecord(value: StoredSession | undefined): value is StoredSession {
   return value?.format === 1 && Number.isFinite(value.savedAt) && !!value.session?.input && Array.isArray(value.session?.checkpoint?.finalists);
 }
 const transferStorageKey = (id: string) => `${KEY}-transfer-${id}`;
-const transferKeyPrefix = `${KEY}-transfer-`;
 // Legacy fields are accepted on disk but must never reintroduce a removed mode.
 // Do not mutate the stored record: setup revision matching uses the raw bytes.
 function currentInput(value: SearchInput & { target?: unknown; tolerance?: unknown }): SearchInput {
@@ -59,30 +60,38 @@ export function loadExamSearch(): SearchInput | null {
     return currentInput(input);
   } catch { return null; }
 }
-export function saveSearchTransfer(input: SearchInput, candidate: Candidate, best?: { seed: string; score: number }): string {
-  const id = `resource-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  const now = Date.now();
-  const entries: Array<{ key: string; createdAt: number }> = [];
-  const transferKeys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-    .filter((key): key is string => !!key?.startsWith(transferKeyPrefix));
-  for (const key of transferKeys) {
-    try {
-      const createdAt = Number(JSON.parse(localStorage.getItem(key) ?? 'null')?.createdAt);
-      if (!Number.isFinite(createdAt) || now - createdAt > TRANSFER_TTL_MS) localStorage.removeItem(key);
-      else entries.push({ key, createdAt });
-    } catch { localStorage.removeItem(key); }
-  }
-  entries.sort((a, b) => b.createdAt - a.createdAt).slice(MAX_TRANSFERS - 1).forEach(entry => localStorage.removeItem(entry.key));
-  localStorage.setItem(transferStorageKey(id), JSON.stringify({ id, input, candidate, best, createdAt: now }));
-  return id;
+export function createSearchTransfer(input: SearchInput, candidate: Candidate, best?: SearchTransfer['best']): string {
+  // Simulation uses candidate.cards, not the full search roster or its filters.
+  // Keep the replay self-contained in the URL fragment: no storage writes,
+  // quota-dependent cleanup, IndexedDB wait, or opener connection is needed.
+  const conditions: SearchInput = { ...currentInput(input), roster: [], supports: [] };
+  delete conditions.seedTeams;
+  delete conditions.excludedSupportNames;
+  delete conditions.requiredCards;
+  delete conditions.requiredCharacters;
+  const transfer: SearchTransfer = { input: conditions, candidate, best };
+  return INLINE_TRANSFER_PREFIX + LZString.compressToEncodedURIComponent(JSON.stringify(transfer));
 }
-export function loadSearchTransfer(id: string): { input: SearchInput; candidate: Candidate; best?: { seed: string; score: number } } | null {
+export function loadSearchTransfer(id: string): SearchTransfer | null {
   try {
+    if (id.startsWith(INLINE_TRANSFER_PREFIX)) {
+      const raw = LZString.decompressFromEncodedURIComponent(id.slice(INLINE_TRANSFER_PREFIX.length));
+      if (!raw) return null;
+      const value = JSON.parse(raw) as SearchTransfer;
+      if (!value?.input?.preset || !Array.isArray(value.input.preset.enemies)
+        || !Array.isArray(value.candidate?.cards) || value.candidate.cards.length !== 5
+        || !Array.isArray(value.candidate.challengeIds)
+        || value.candidate.cards.some(card => !card?.name || !Number.isFinite(card.level) || !Number.isFinite(card.totsu)
+          || !Array.isArray(card.magicLevels) || card.magicLevels.length !== 3
+          || !Array.isArray(card.buddyLevels) || card.buddyLevels.length !== 3
+          || !Array.isArray(card.selectedMagic) || card.selectedMagic.length !== 2)
+        || (value.best && (typeof value.best.seed !== 'string' || !Number.isFinite(value.best.score)))) return null;
+      return { ...value, input: currentInput(value.input) };
+    }
     const key = transferStorageKey(id);
     const value = JSON.parse(localStorage.getItem(key) ?? 'null');
     if (value?.id === id) {
       if (Number.isFinite(Number(value.createdAt)) && Date.now() - Number(value.createdAt) > TRANSFER_TTL_MS) {
-        localStorage.removeItem(key);
         return null;
       }
       return { ...value, input: currentInput(value.input) };

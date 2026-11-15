@@ -792,7 +792,7 @@ import { examPresetDefinitions, type ExamPresetDefinition, type ExamSpecialChall
 import { buildConstrainedEnemyActionDeck } from '@/utils/enemyActionDeck';
 import { chooseObservedPair, chooseFlexiblePlanPair, remainingContinuousHealing, createPairSpend, type BattleObservation, type FlexiblePlanStep } from '@/domain/examSearch/policy';
 import type { SearchInput, Candidate, PolicyKind } from '@/domain/examSearch/types';
-import { loadSearchTransfer, loadExamSearch, initializeExamSearchStorage } from '@/storage/examSearchStorage';
+import { loadSearchTransfer, INLINE_SEARCH_TRANSFER, loadExamSearch, initializeExamSearchStorage } from '@/storage/examSearchStorage';
 import { snapshotExamConditions, type SharedExamConditions } from '@/utils/sharedExamConditions';
 import { loadExamSimulatorDeckImportState, saveDeckSimulatorImportState } from '@/storage/simulatorStorage';
 import {
@@ -2002,7 +2002,7 @@ watch(activeTab, (tab) => {
 watch(activeFlow, (flow) => {
   const tab = flow;
   if (router.currentRoute.value.query.tab !== tab) {
-    void router.replace({ query: { ...router.currentRoute.value.query, tab } });
+    void router.replace({ query: { ...router.currentRoute.value.query, tab }, hash: router.currentRoute.value.hash });
   }
 });
 watch(() => router.currentRoute.value.query.tab, () => {
@@ -2012,7 +2012,8 @@ watch(() => router.currentRoute.value.query.tab, () => {
 
 function restoreInitialExamDeck() {
   const transferId = router.currentRoute.value.query.resourceSearch;
-  const resourceTransfer = typeof transferId === 'string' ? loadSearchTransfer(transferId) : null;
+  const transferToken = transferId === INLINE_SEARCH_TRANSFER ? router.currentRoute.value.hash.slice(1) : transferId;
+  const resourceTransfer = typeof transferToken === 'string' ? loadSearchTransfer(transferToken) : null;
   if (resourceTransfer) {
     void prepareResourceCandidate(resourceTransfer.input, resourceTransfer.candidate).then(async () => {
       await Promise.all(deck.value.map(async slot => {
