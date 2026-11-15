@@ -1,0 +1,39 @@
+name: T4 fixed-work calibration with current-baseline null
+on:
+  push:
+    branches: [codex/t4-null-calibration-20261115]
+permissions:
+  contents: read
+jobs:
+  calibration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        replicate: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Prepare fixed current baseline and pure T4 sources without modifying master
+        run: |
+          git worktree add --detach baseline ba08481a26f079b830bfcb29e1067da4c0897cf1
+          git worktree add --detach candidate ba08481a26f079b830bfcb29e1067da4c0897cf1
+          git -C candidate apply ../bench-public/t4-calibration/T4.patch
+          ln -s ../node_modules baseline/node_modules
+          ln -s ../node_modules candidate/node_modules
+      - name: Independent source processes with rotated A-B-C order
+        run: node bench-public/t4-calibration/run.mjs baseline candidate ${{ matrix.replicate }} artifacts/t4-calibration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: t4-calibration-rep${{ matrix.replicate }}
+          path: artifacts/t4-calibration/*.json
+          retention-days: 14

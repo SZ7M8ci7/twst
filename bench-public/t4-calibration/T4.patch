@@ -1,0 +1,57 @@
+diff --git a/scripts/tests/exam-utility-text.test.cjs b/scripts/tests/exam-utility-text.test.cjs
+new file mode 100644
+index 00000000..acc7d66b
+--- /dev/null
++++ b/scripts/tests/exam-utility-text.test.cjs
+@@ -0,0 +1,15 @@
++const assert=require('node:assert/strict'),{test}=require('node:test'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript');
++const src=fs.readFileSync(path.join(__dirname,'../../src/views/examSimulator.vue'),'utf8').match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1];
++const ast=ts.createSourceFile('exam.ts',src,ts.ScriptTarget.Latest,true),f=ast.statements.find(n=>ts.isFunctionDeclaration(n)&&n.name.text==='hasPlayerUtilityEffect');assert.ok(f);
++const context={};vm.createContext(context);vm.runInContext(ts.transpileModule(f.getText(ast),{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,context);
++const current=(labels,heal)=>context.hasPlayerUtilityEffect(labels.map(buffOption=>({buff:{buffOption}})),heal);
++const reference=(labels,heal)=>/解除|無効/.test(`${labels.join(' ')} ${heal}`);
++test('T4 exact join-predicate equivalence for boundary, null, undefined and Japanese labels',()=>{
++ const values=['','解','除','無','効','解除','無効','解 除','無 効','回復','回復解除','無効化','\n解除\n','解\n除','x解除x','😀無効',null,undefined,0,false];
++ let checked=0;for(const a of values)for(const b of values)for(const h of values){assert.equal(current([a,b],h),reference([a,b],h),JSON.stringify([a,b,h]));checked++;}assert.equal(checked,8000);
++ for(const h of values)assert.equal(current([],h),reference([],h));
++});
++test('T4 utility remains one boolean for repeated matching labels; separators prevent cross-boundary token matches',()=>{
++ assert.equal(current(['解除','無効','解除'],'解除'),true);assert.equal(Number(current(['解除','無効'],'無効')),1);
++ assert.equal(current(['解','除'],'無 効'),false);assert.equal(current(['無'],'効'),false);
++});
+diff --git a/src/views/examSimulator.vue b/src/views/examSimulator.vue
+index dfbf0dc5..d66c2d07 100644
+--- a/src/views/examSimulator.vue
++++ b/src/views/examSimulator.vue
+@@ -4548,11 +4548,13 @@ function observeResourceBattle(turnIndex: number, visible: string[], state: Simu
+       if (index === 0) firstDamage = d;
+       duo += Number(activeDuo && parsed.magicSlot === 2);
+       const slot = deck.value[parsed.deckIndex];
+-      const effects = effectAware ? getPlayerEffectPlans(id, ids[1 - index], parsed).map(plan => plan.buff.buffOption).join(' ')
+-        : slot.magicEffects[parsed.magicSlot];
+-      const text = `${effects} ${slot.magicHeals[parsed.magicSlot]}`;
+-      if (!effectAware && text.includes('回復') && !isPlayerCursed(predicted, parsed.deckIndex)) heal += slot.customHp * 0.15;
+-      if (/解除|無効/.test(text)) utility++;
++      if (effectAware) {
++        if (hasPlayerUtilityEffect(getPlayerEffectPlans(id, ids[1 - index], parsed), slot.magicHeals[parsed.magicSlot])) utility++;
++      } else {
++        const text = `${slot.magicEffects[parsed.magicSlot]} ${slot.magicHeals[parsed.magicSlot]}`;
++        if (text.includes('回復') && !isPlayerCursed(predicted, parsed.deckIndex)) heal += slot.customHp * 0.15;
++        if (/解除|無効/.test(text)) utility++;
++      }
+       if (effectAware) {
+         const compatibility = getCompatibility(magic.element, target);
+         defense += compatibility === 'advantage' ? 1 : compatibility === 'disadvantage' ? -1 : 0;
+@@ -5585,6 +5587,12 @@ function getPlayerEffectPlans(magicId: string, pairedMagicId: string, parsed: Pa
+   return plans;
+ }
+ 
++// Joined labels are separated by a space, which cannot occur inside either
++// literal token. Preserve the boolean (one utility increment), not match count.
++function hasPlayerUtilityEffect(plans: ReturnType<typeof getPlayerEffectPlans>, healing: string) {
++  return plans.some(plan => /解除|無効/.test(plan.buff.buffOption)) || /解除|無効/.test(healing);
++}
++
+ function isAttackScoreBuff(buff: ParsedBuff) {
+   return ['ATKUP', 'ダメージUP', '属性ダメUP', 'クリティカル'].includes(buff.buffOption);
+ }
