@@ -1,0 +1,38 @@
+diff --git a/build/examAutoBestWorkerHostPlugin.mts b/build/examAutoBestWorkerHostPlugin.mts
+index 67111e04..487f4b1c 100644
+--- a/build/examAutoBestWorkerHostPlugin.mts
++++ b/build/examAutoBestWorkerHostPlugin.mts
+@@ -30,6 +30,15 @@ export function examAutoBestWorkerHostPlugin(): Plugin {
+         genDefaultAs: '__examAutoBestWorkerHost',
+       }).content
+ 
++      // The headless host never starts the interactive screen run. Its explicit
++      // worker stop protocol remains intact; display invalidation need not deep-
++      // traverse the full reactive deck after every resource candidate prepare.
++      const displayInvalidationWatch = /watch\(\s*\[exam, enemySlots, deck, turnPlans, selectedSpecialChallengeIds, favorableEffects, forceFinisherTripleCritical\],\s*\(\) => \{\s*clearResults\(\);\s*if \(isRunning\.value\) requestSimulationStop\(\);\s*\},\s*\{ deep: true \},?\s*\);/g
++      if ([...code.matchAll(displayInvalidationWatch)].length !== 1) {
++        throw new Error('Expected exactly one headless display-invalidation watcher')
++      }
++      code = code.replace(displayInvalidationWatch, '')
++
+       code = code
+         .replace("import ExamSearchPanel from '@/components/ExamSearchPanelLoader.vue';", 'const ExamSearchPanel = null;')
+         .replace("import { Bar } from 'vue-chartjs';", 'const Bar = null;')
+diff --git a/tests/exam-worker-watch.test.cjs b/tests/exam-worker-watch.test.cjs
+new file mode 100644
+index 00000000..043fd816
+--- /dev/null
++++ b/tests/exam-worker-watch.test.cjs
+@@ -0,0 +1,12 @@
++const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ts=require('typescript'),vm=require('node:vm');
++const root=path.join(__dirname,'..'),plugin=fs.readFileSync(path.join(root,'build/examAutoBestWorkerHostPlugin.mts'),'utf8'),vue=fs.readFileSync(path.join(root,'src/views/examSimulator.vue'),'utf8');
++const start=plugin.indexOf('      const displayInvalidationWatch ='),end=plugin.indexOf('\n      code = code\n',start);assert.ok(start>0&&end>start);const transform=code=>{const ctx={code};vm.createContext(ctx);vm.runInContext(ts.transpileModule(plugin.slice(start,end),{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,ctx);return ctx.code;};
++test('worker transform removes only exact UI invalidation watcher, preserving sync and stop protocol',()=>{const after=transform(vue);assert.ok(after.length<vue.length);assert.ok(after.includes('watch(exam, markEnemyConditionsTouched, { deep: true });'));assert.ok(after.includes('watch(enemySlots, markEnemyConditionsTouched, { deep: true });'));assert.ok(after.includes("watch(() => exam.value.enemyElement"));assert.ok(after.includes('watch(maxTurnCount'));assert.ok(after.includes('function requestAutoBestWorkerStop() {\n  stopRequested.value = true;'));assert.ok(after.includes('if (resetStop) stopRequested.value = false;'));assert.ok(after.includes('if (stopRequested.value) {'));assert.ok(after.includes('function clearResults()'));});
++test('worker watcher matching fails closed for missing or modified side effects and duplicate blocks',()=>{const once=transform(vue);assert.throws(()=>transform(once),/exactly one/);assert.throws(()=>transform(vue.replace('if (isRunning.value) requestSimulationStop();','if (isRunning.value) { requestSimulationStop(); }')),/exactly one/);assert.throws(()=>transform(vue+'\n'+vue),/exactly one/);});
++test('explicit worker stop/reset protocol works without display watcher',async()=>{
++ const script=vue.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)[1],ast=ts.createSourceFile('exam.ts',script,ts.ScriptTarget.Latest,true),names=['requestAutoBestWorkerStop','runAutoBestWorkerPartition'];
++ const fn=ast.statements.filter(n=>ts.isFunctionDeclaration(n)&&names.includes(n.name.text));assert.equal(fn.length,2);
++ let searches=0;const context={simulationRuntimeCache:{},stopRequested:{value:false},searchAutoBestSeed:async()=>{searches++;return {searched:true};}};vm.createContext(context);vm.runInContext(ts.transpileModule(fn.map(n=>n.getText(ast)).join('\n'),{compilerOptions:{target:ts.ScriptTarget.ES2021}}).outputText,context);
++ context.requestAutoBestWorkerStop();const stopped=await context.runAutoBestWorkerPartition(null,'fixed',{start:0,end:1});assert.equal(stopped.cancelled,true);assert.equal(searches,0);
++ const resumed=await context.runAutoBestWorkerPartition(null,'fixed',{start:0,end:1},undefined,true);assert.equal(resumed.searched,true);assert.equal(searches,1);assert.equal(context.stopRequested.value,false);
++});
