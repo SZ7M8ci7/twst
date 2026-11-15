@@ -1,0 +1,74 @@
+name: Current-master pure T4 and null paired ABBA screening
+on:
+  push:
+    branches: [codex/benchmark-T4-current-null-20261115]
+permissions:
+  contents: read
+jobs:
+  screening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        include:
+          - {"variant": "T4", "replicate": 0, "shard": 0, "shardCount": 2}
+          - {"variant": "T4", "replicate": 0, "shard": 1, "shardCount": 2}
+          - {"variant": "T4", "replicate": 1, "shard": 0, "shardCount": 2}
+          - {"variant": "T4", "replicate": 1, "shard": 1, "shardCount": 2}
+          - {"variant": "T4", "replicate": 2, "shard": 0, "shardCount": 2}
+          - {"variant": "T4", "replicate": 2, "shard": 1, "shardCount": 2}
+          - {"variant": "null", "replicate": 0, "shard": 0, "shardCount": 2}
+          - {"variant": "null", "replicate": 0, "shard": 1, "shardCount": 2}
+          - {"variant": "null", "replicate": 1, "shard": 0, "shardCount": 2}
+          - {"variant": "null", "replicate": 1, "shard": 1, "shardCount": 2}
+          - {"variant": "null", "replicate": 2, "shard": 0, "shardCount": 2}
+          - {"variant": "null", "replicate": 2, "shard": 1, "shardCount": 2}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - name: Prepare independent baseline and variant
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          git worktree add --detach baseline ba08481a26f079b830bfcb29e1067da4c0897cf1
+          git worktree add --detach candidate ba08481a26f079b830bfcb29e1067da4c0897cf1
+          if [ "$VARIANT" = "T4" ]; then git -C candidate apply ../bench-public/patches/T4-current.patch; fi
+          echo "Variant applied: $VARIANT"
+          ln -s ../node_modules baseline/node_modules
+          ln -s ../node_modules candidate/node_modules
+          (cd candidate && node --test tests/exam-search.test.cjs && if [ -f scripts/tests/exam-utility-text.test.cjs ]; then node --test scripts/tests/exam-utility-text.test.cjs; fi && ../node_modules/.bin/tsc --noEmit)
+          node bench-public/generate.mjs
+          mkdir -p artifacts
+          node -e 'console.log(JSON.stringify({runner:process.env.RUNNER_NAME,hostname:require("os").hostname(),cpus:require("os").cpus().length,start:new Date().toISOString()}))' > artifacts/runner.json
+      - name: Paired 11-case screening and frozen rare audit
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          node bench-public/run-production.mjs "$VARIANT" "${{ matrix.replicate }}" "${{ matrix.shard }}" "${{ matrix.shardCount }}"
+          if [ "${{ matrix.shard }}" = "0" ]; then
+            for CAP in 0 20; do
+            for LANE in A1 B1 B2 A2; do
+              SOURCE=baseline; if [[ "$LANE" == B* ]]; then SOURCE=candidate; fi
+              node bench-public/audit-production.mjs "$SOURCE" "${{ matrix.replicate }}" "$VARIANT" "$LANE" "$CAP"
+            done
+            done
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paired-${{ matrix.variant }}-rep${{ matrix.replicate }}-shard${{ matrix.shard }}
+          path: |
+            artifacts/runner.json
+            artifacts/fixed-*.json
+            artifacts/nrc19/**/case-*.json
+            artifacts/nrc19/**/checkpoint-*.json
+            artifacts/nrc19/**/plan-*.json
+          retention-days: 14
