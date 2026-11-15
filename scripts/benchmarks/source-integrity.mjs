@@ -1,0 +1,3 @@
+import fs from 'node:fs';import path from 'node:path';import {createHash} from 'node:crypto';
+export const fileHash=p=>createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+export function sourceDigest(root){const files=[...fs.readdirSync(path.join(root,'src'),{recursive:true}).filter(f=>/\.(ts|vue|json)$/.test(f)).map(f=>'src/'+f),...fs.readdirSync(path.join(root,'build'),{recursive:true}).filter(f=>/\.(ts|mts|js)$/.test(f)).map(f=>'build/'+f),'vite.config.mts','package-lock.json'];return createHash('sha256').update(JSON.stringify(files.sort().map(f=>[f,fs.readFileSync(path.join(root,f),'utf8')]))).digest('hex');}

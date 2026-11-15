@@ -1,0 +1,57 @@
+[
+  {
+    "profile": "synthetic-1",
+    "id": "第19回統一火BS",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-2",
+    "id": "第19回統一水BS",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-3",
+    "id": "第19回統一木DF",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-4",
+    "id": "第19回統一無DF",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-3",
+    "id": "第19回統一全ATK",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-1",
+    "id": "第18回統一全BS",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-4",
+    "id": "第18回統一水ATK",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-5",
+    "id": "第19回統一水BS",
+    "additionalLevelCap": 0
+  },
+  {
+    "profile": "synthetic-1",
+    "id": "第19回統一火BS",
+    "additionalLevelCap": 20
+  },
+  {
+    "profile": "synthetic-3",
+    "id": "第19回統一木DF",
+    "additionalLevelCap": 20
+  },
+  {
+    "profile": "synthetic-3",
+    "id": "第19回統一全ATK",
+    "additionalLevelCap": 20
+  }
+]
