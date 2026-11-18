@@ -1,7 +1,7 @@
 import type { Candidate, SearchCard, SearchInput } from '@/domain/examSearch/types';
 import { getFriendshipLevelBonus, getMaxLevelAtLimitBreak } from '@/constants/levels';
 
-type Catalog = Record<string, { rare: string }>;
+type Catalog = Record<string, { rare: string; costume?: string }>;
 type Estimate = (cards: SearchCard[]) => number;
 const LEVEL_STEP = 5;
 
@@ -23,7 +23,12 @@ export function withinLevelBudget(input: Pick<SearchInput, 'additionalLevelCap'>
   return remainders.length === 0 || remainders.length === 1 && used === budget;
 }
 
-function capacity(card: SearchCard, catalog: Catalog): number {
+export function usesRegisteredDormTraining(input: SearchInput, costume?: string): boolean {
+  return input.rosterSource === 'ownedMax' && input.excludeDormFromUpgrades === true && costume === '寮服';
+}
+
+function capacity(input: SearchInput, card: SearchCard, catalog: Catalog): number {
+  if (usesRegisteredDormTraining(input, catalog[card.name].costume)) return 0;
   return cardCapacity(card, catalog[card.name].rare);
 }
 
@@ -53,7 +58,7 @@ export function* levelAllocationSteps(input: SearchInput, parent: Candidate, cat
   const budget = input.additionalLevelCap ?? 0;
   if (!budget) return withinLevelBudget(input, parent.cards, catalog) ? [parent] : [];
   const baseline = parent.cards.map(card => allocate(card, 0));
-  const caps = baseline.map(card => capacity(card, catalog));
+  const caps = baseline.map(card => capacity(input, card, catalog));
   const total = Math.min(budget, caps.reduce((sum, cap) => sum + cap, 0));
   if (!total) return [parent];
   const cache = new Map<string, Candidate>();
@@ -119,7 +124,7 @@ export function levelAllocationNeighbors(input: SearchInput, parent: Candidate, 
   const budget = input.additionalLevelCap ?? 0;
   if (!budget) return [];
   const amounts = parent.cards.map(card => card.additionalLevels ?? 0);
-  const caps = parent.cards.map(card => capacity(card, catalog));
+  const caps = parent.cards.map(card => capacity(input, card, catalog));
   const used = additionalLevelCost(parent.cards);
   const rows = new Map<string, Candidate>();
   const add = (values: number[]) => {

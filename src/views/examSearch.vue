@@ -7,9 +7,14 @@
       <ExamSearchPresetPicker v-if="!embedded" @select="selectPreset" />
       <p v-if="!embedded" class="selected-exam">{{ t('examSearch.exam') }}: <strong>{{ localizeGameText(input.preset.title, locale) }}</strong></p>
       <div class="roster-source-setting">
-        <div class="selection-label">{{ t('examSearch.rosterSource') }}</div>
-        <v-switch v-model="useHandCollection" data-testid="search-use-hand-collection" color="primary" inset hide-details density="compact" :disabled="busy" :label="t('examSearch.useHandCollection')" />
-        <p class="filter-help">{{ t(useHandCollection ? 'simulator.ownedCardsDescription' : 'simulator.allCardsDescription') }}</p>
+        <v-radio-group v-model="rosterSource" data-testid="search-roster-source" :label="t('examSearch.rosterSource')"
+          inline color="primary" hide-details density="compact" :disabled="busy">
+          <v-radio value="owned" :label="t('examSearch.rosterOptions.owned')" />
+          <v-radio value="allMax" :label="t('examSearch.rosterOptions.allMax')" />
+          <v-radio value="ownedMax" :label="t('examSearch.rosterOptions.ownedMax')" />
+        </v-radio-group>
+        <p class="filter-help">{{ t(rosterSource === 'ownedMax' && excludeDormFromUpgrades
+          ? 'examSearch.ownedMaxDormDescription' : rosterDescriptions[rosterSource]) }}</p>
       </div>
       <div class="required-card-setting">
         <div class="selection-label">{{ t('examSearch.cardFilter') }}<span class="optional-label">{{ t('examSearch.optional') }}</span></div>
@@ -111,7 +116,7 @@
       </v-card>
     </v-dialog>
     <Teleport to="body"><SimCharaModal v-if="cardFilterOpen" data-testid="card-filter-dialog"
-      :catalog-mode="!useHandCollection"
+      :catalog-mode="rosterSource === 'allMax'"
       @select="selectRequiredCard" @close="cardFilterOpen = false" /></Teleport>
     <v-dialog v-model="characterFilterOpen" max-width="640" scrollable class="search-character-dialog" data-testid="character-filter-dialog">
       <v-card class="modal-card character-filter-card">
@@ -158,13 +163,14 @@ import { examPresetDefinitions, type ExamPresetDefinition } from '@/utils/examPr
 import { sharedExamConditionsKey, type SharedExamConditions } from '@/utils/sharedExamConditions';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { getInputMaxLevel } from '@/constants/levels';
+import { usesRegisteredDormTraining } from '@/domain/examSearch/levelAllocation';
 import { localizeCharacterName, localizeCostumeName, localizeGameText } from '@/utils/localizedDisplay';
 import { loadExamSearch, saveExamSearch, loadSearchSession, saveSearchSession, createSearchTransfer, INLINE_SEARCH_TRANSFER, loadSearchSeedTeams, type SavedSearchSession } from '@/storage/examSearchStorage';
 import { groupSearchResults, resultDeckKey } from '@/domain/examSearch/resultGroups';
 import { validateInput, invalidSearchCards, examUsesSupport } from '@/domain/examSearch/variants';
 import { constrainCheckpoint } from '@/domain/examSearch/requiredCheckpoint';
 import { rankedResults } from '@/domain/examSearch/statistics';
-import type { RosterCard, SearchInput, SearchProgress, SearchResult } from '@/domain/examSearch/types';
+import type { RosterCard, RosterSource, SearchInput, SearchProgress, SearchResult } from '@/domain/examSearch/types';
 import { ENGINE_VERSION } from '@/domain/examSearch/types';
 import { loadSimulatorWindowState, loadStoredAutoSaveDeck, loadStoredSavedDecks } from '@/storage/simulatorStorage';
 import { groupExamBattleLog, type BattleLogActionElement, type BattleLogGroup } from '@/utils/examBattleLog';
@@ -242,9 +248,18 @@ const continuation = new SearchContinuation(resumeBatch, saved => {
 });
 function finishRequest(saved=true) { continuation.finish(saved); }
 const hand = useHandCollectionStore();
-const useHandCollection = computed({
-  get: () => input.value.useHandCollection !== false,
-  set: (value: boolean) => { if (!busy.value) input.value.useHandCollection = value; },
+const rosterDescriptions: Record<RosterSource, string> = {
+  owned: 'simulator.ownedCardsDescription',
+  allMax: 'simulator.allCardsDescription',
+  ownedMax: 'examSearch.ownedMaxDescription',
+};
+const rosterSource = computed<RosterSource>({
+  get: () => input.value.rosterSource ?? (input.value.useHandCollection === false ? 'allMax' : 'owned'),
+  set: value => {
+    if (busy.value) return;
+    input.value.rosterSource = value;
+    delete input.value.useHandCollection;
+  },
 });
 const favorableEffects = computed({
   get: () => input.value.favorableEffects === true,
@@ -349,11 +364,6 @@ watch(characterFilter, names => {
 watch([() => input.value.budget, () => input.value.additionalLevelCap, () => input.value.attempts], () => {
   if (!busy.value) invalidateActiveSearch();
 });
-watch([favorableEffects, forceFinisherTripleCritical, excludeDormFromUpgrades], () => {
-  invalidateActiveSearch();
-  finishRequest();
-  if (!saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');
-});
 function toggleCharacterFilter(name: string) {
   characterFilter.value = characterFilter.value.includes(name)
     ? characterFilter.value.filter(value => value !== name)
@@ -434,15 +444,18 @@ onMounted(() => {
   const selected = presets.find(p => p.id === input.value.preset.id);
   if (selected) emit('select-preset', selected);
 });
-// Both roster sources assume maxed magic and buddy skills.
+// All roster sources assume maxed magic and buddy skills.
 function maxSkillsCard(name: string, level: number, totsu: number): RosterCard {
   return { name, level, totsu, magicLevels: [10, 10, 10], buddyLevels: [10, 10, 10], allowUpgrade: true };
+}
+function fullyTrainedCard(card: typeof cards[number]): RosterCard {
+  return maxSkillsCard(card.name, getInputMaxLevel(card.rare), 4);
 }
 function syncSupports() {
   const excluded = new Set(excludedSupportNames.value);
   const previous = new Map(input.value.supports.map(card => [card.name, card]));
   input.value.supports=examUsesSupport(input.value.preset)?cards.filter(card => !excluded.has(card.name))
-    .map(c => previous.get(c.name) ?? maxSkillsCard(c.name,c.rare==='SSR'?120:c.rare==='SR'?90:70,4)):[];
+    .map(c => previous.get(c.name) ?? fullyTrainedCard(c)):[];
 }
 function setSupportCandidates(names: string[]) {
   if (busy.value || !usesSupport.value) return;
@@ -458,20 +471,24 @@ type StoredTeam={deckCharacters?: {name?:string}[]};
 const savedTeams=[loadSimulatorWindowState(),loadStoredAutoSaveDeck<StoredTeam>(),...loadStoredSavedDecks<StoredTeam>()]
   .map(team=>team?.deckCharacters?.map(c=>c?.name??'')??[]).filter(team=>team.length===5&&team.every(name=>!!catalog[name]));
 input.value.seedTeams??=savedTeams;
-watch([useHandCollection, () => hand.ownedCards.map(c => [c.cardName, c.level, c.totsu] as const)], ([useOwned, owned], [previousUseOwned]) => {
-  const roster = useOwned
-    ? owned.filter(([name, level]) => catalog[name] && level >= 1)
-      .map(([name, level, totsu]) => maxSkillsCard(name, level, totsu))
-    : cards.map(card => maxSkillsCard(card.name, getInputMaxLevel(card.rare), 4));
-  const sourceChanged = previousUseOwned !== undefined && previousUseOwned !== useOwned;
-  if (!sourceChanged && JSON.stringify(input.value.roster) === JSON.stringify(roster)) return;
-  input.value.roster = roster;
-  // Collection changes can arrive from another tab, including between batches.
-  // Discard results and cancel continuation before an old roster can resume.
-  invalidateActiveSearch();
-  finishRequest();
-  if (sourceChanged && !saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');
-}, { immediate: true });
+const searchRoster = computed(() => {
+  if (rosterSource.value === 'allMax') return cards.map(fullyTrainedCard);
+  return hand.ownedCards.filter(c => catalog[c.cardName] && c.level >= 1)
+    .map(c => rosterSource.value === 'ownedMax' && !usesRegisteredDormTraining(input.value, catalog[c.cardName].costume)
+      ? fullyTrainedCard(catalog[c.cardName])
+      : maxSkillsCard(c.cardName, c.level, c.totsu));
+});
+watch([searchRoster, rosterSource, excludeDormFromUpgrades, favorableEffects, forceFinisherTripleCritical],
+  ([roster, ...settings], [previousRoster, ...previousSettings]) => {
+    const settingsChanged = previousRoster !== undefined && settings.some((value, i) => value !== previousSettings[i]);
+    if (!settingsChanged && JSON.stringify(input.value.roster) === JSON.stringify(roster)) return;
+    input.value.roster = roster;
+    // Collection changes can arrive from another tab, including between batches.
+    // Discard results and cancel continuation before an old roster can resume.
+    invalidateActiveSearch();
+    finishRequest();
+    if (settingsChanged && !saveExamSearch(input.value)) error.value = t('examSearch.saveFailed');
+  }, { immediate: true });
 if (persistedSession.value && JSON.stringify(persistedSession.value.input) === JSON.stringify(input.value)) {
   evaluatedInput.value = clone(input.value);
   runFingerprint.value = JSON.stringify(input.value);

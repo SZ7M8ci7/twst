@@ -905,7 +905,13 @@
     "favorableEffects": "Resolve chance effects in your favor",
     "favorableEffectsHelp": "Only active effects with a chance below 100% are fixed in your favor: your evasion, criticals, curse and freeze succeed; your blindness misses and enemy evasion, criticals and freeze do not trigger. Blinded enemies miss. Effects with a 100% chance still trigger normally for both sides. Hand order, damage variance and effects without chance rolls are unchanged.",
     "favorableEffectsActive": "Chance effects: fixed in your favor",
-    "useHandCollection": "Use my collection",
+    "rosterOptions": {
+      "owned": "My collection",
+      "allMax": "All cards, maxed",
+      "ownedMax": "My collection, maxed"
+    },
+    "ownedMaxDescription": "Search with owned cards of level 1 or higher at maximum level and full limit break.",
+    "ownedMaxDormDescription": "Owned cards of level 1 or higher are eligible. Dorm Uniform cards keep their registered level and limit breaks. All other owned cards are maxed.",
     "allCards": "Search all cards",
     "continuous": "Search until stopped",
     "continuousHelp": "Keep finding new teams and evaluating promising candidates. Progress is saved periodically and can be resumed after stopping.",

@@ -1,7 +1,7 @@
 import type { RosterCard, SearchInput, SearchCard, Candidate, PolicyKind } from '@/domain/examSearch/types';
 import { isM3Unlocked } from '@/utils/totsu';
 import { getInputMaxLevel, getFriendshipLevelBonus, getMaxLevelAtLimitBreak } from '@/constants/levels';
-import { withinLevelBudget } from '@/domain/examSearch/levelAllocation';
+import { usesRegisteredDormTraining, withinLevelBudget } from '@/domain/examSearch/levelAllocation';
 
 export function examUsesSupport(preset: SearchInput['preset']): boolean {
   return preset.title.includes('統一') || (preset.specialChallenges?.length??0)>0;
@@ -47,9 +47,15 @@ export function candidateIncludesRequired(input: SearchInput, candidate: Pick<Ca
 export function candidateSatisfiesConstraints(input: SearchInput, candidate: Pick<Candidate, 'cards'>,
   catalog?: Record<string, { chara?: string; rare?: string; costume?: string }>): boolean {
   return withinLevelBudget(input, candidate.cards, catalog) && candidateIncludesRequired(input, candidate, catalog)
-    && (!input.excludeDormFromUpgrades || candidate.cards.every(card => card.support
-      || catalog?.[card.name]?.costume !== '寮服'
-      || card.totsu <= (input.roster.find(original => original.name === card.name)?.totsu ?? card.originalTotsu)));
+    && (!input.excludeDormFromUpgrades || candidate.cards.every(card => {
+      const costume = catalog?.[card.name]?.costume;
+      if (card.support || costume !== '寮服') return true;
+      const original = input.roster.find(entry => entry.name === card.name);
+      if (usesRegisteredDormTraining(input, costume)) {
+        return original?.level === card.level && original.totsu === card.totsu;
+      }
+      return card.totsu <= (original?.totsu ?? card.originalTotsu);
+    }));
 }
 
 export function challengeVariants(input: Pick<SearchInput, 'preset' | 'challengeLocks' | 'maxRemoved'>): string[][] {

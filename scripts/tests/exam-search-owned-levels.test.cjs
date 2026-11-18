@@ -86,7 +86,7 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
   const source = read('src/views/examSearch.vue').split('<script setup lang="ts">')[1].split('</script>')[0]
     .replaceAll('import.meta.url', JSON.stringify('file:///examSearch.vue'));
   const viewContext = { ...context, exports: {}, require: localRequire };
-  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, useHandCollection, favorableEffects, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave, setSupportCandidates, selectPreset, applySharedConditions, sessionSaved, retrySave, preview };'), viewContext));
+  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { input, hand, rosterSource, favorableEffects, rosterReady, canResume, progress, evaluatedInput, busy, error, continuousSearch, start, resume, requestStopAndSave, setSupportCandidates, selectPreset, applySharedConditions, sessionSaved, retrySave, preview };'), viewContext));
   function supportPicker(modelValue, includeAllRarities = true) {
     const props = vue.reactive({ modelValue, includeAllRarities, focusRequest: null, disabled: false });
     const mounted = [];
@@ -110,28 +110,28 @@ test('owned Lv0 cards are excluded while Lv1+ training is preserved', t => {
 
 test('all-card search uses every rarity at maximum training and persists the selected source', async t => {
   const { view, persistence, workers } = runtime(t, [handCard(names[0], 35), handCard(names[1], 0)]);
-  view.useHandCollection.value = false;
+  view.rosterSource.value = 'allMax';
   await vue.nextTick();
   const expected = cards.map(card => rosterCard(card.name, card.rare === 'SSR' ? 120 : card.rare === 'SR' ? 90 : 70, 4));
   assert.deepEqual(clone(view.input.value.roster), expected);
   assert.equal(view.rosterReady.value, true);
-  assert.equal(persistence.loadExamSearch().useHandCollection, false);
+  assert.equal(persistence.loadExamSearch().rosterSource, 'allMax');
   view.start(1000);
   assert.deepEqual(clone(workers[0].messages[0].input.roster), expected);
-  view.useHandCollection.value = true;
-  assert.equal(view.useHandCollection.value, false, 'source cannot change while searching');
+  view.rosterSource.value = 'owned';
+  assert.equal(view.rosterSource.value, 'allMax', 'source cannot change while searching');
   await workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
   assert.equal(view.canResume.value, true);
   view.hand.updateHandCard(names[0], { level: 42 });
   await vue.nextTick();
   assert.equal(view.canResume.value, true, 'hand edits do not invalidate all-card results');
   assert.deepEqual(clone(view.input.value.roster), expected);
-  view.useHandCollection.value = true;
+  view.rosterSource.value = 'owned';
   await vue.nextTick();
   assert.deepEqual(clone(view.input.value.roster), [rosterCard(names[0], 42)]);
   assert.equal(view.canResume.value, false);
   assert.equal(view.progress.value, null);
-  assert.equal(persistence.loadExamSearch().useHandCollection, true);
+  assert.equal(persistence.loadExamSearch().rosterSource, 'owned');
 });
 
 test('all-card sessions restore without depending on collection ownership', t => {
@@ -139,10 +139,83 @@ test('all-card sessions restore without depending on collection ownership', t =>
   input.useHandCollection = false;
   input.roster = cards.map(card => rosterCard(card.name, card.rare === 'SSR' ? 120 : card.rare === 'SR' ? 90 : 70, 4));
   const { view } = runtime(t, [], input, checkpoint());
-  assert.equal(view.useHandCollection.value, false);
+  assert.equal(view.rosterSource.value, 'allMax');
   assert.equal(view.rosterReady.value, true);
   assert.equal(view.canResume.value, true);
   assert.deepEqual(clone(view.input.value.roster), input.roster);
+});
+
+test('maxed collection searches only eligible owned cards and restores their actual training when switched back', async t => {
+  const sr = cards.find(card => card.rare === 'SR').name;
+  const r = cards.find(card => card.rare === 'R').name;
+  const handCards = [handCard(names[0], 1), handCard(sr, 27), handCard(r, 12), handCard(names[1]), handCard(names[2]),
+    handCard(names[3], 0), handCard(names[4], 39, false), handCard('unknown-card')];
+  const { view, persistence, workers } = runtime(t, handCards);
+  assert.equal(view.rosterSource.value, 'owned');
+  const actual = clone(view.input.value.roster);
+  view.rosterSource.value = 'ownedMax';
+  await vue.nextTick();
+  const expected = [rosterCard(names[0], 120, 4), rosterCard(sr, 90, 4), rosterCard(r, 70, 4),
+    rosterCard(names[1], 120, 4), rosterCard(names[2], 120, 4)];
+  assert.deepEqual(clone(view.input.value.roster), expected);
+  assert.equal(persistence.loadExamSearch().rosterSource, 'ownedMax');
+  view.start(1000);
+  assert.deepEqual(clone(workers[0].messages[0].input.roster), expected);
+  await workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  const restored = runtime(t, handCards, persistence.loadExamSearch(), checkpoint()).view;
+  assert.equal(restored.rosterSource.value, 'ownedMax');
+  assert.equal(restored.canResume.value, true);
+  view.rosterSource.value = 'owned';
+  await vue.nextTick();
+  assert.deepEqual(clone(view.input.value.roster), actual);
+  assert.equal(view.canResume.value, false);
+  restored.hand.updateHandCard(names[0], { level: 2 });
+  await vue.nextTick();
+  assert.equal(restored.canResume.value, true);
+  restored.hand.updateHandCard(names[0], { level: 0 });
+  await vue.nextTick();
+  assert.equal(restored.canResume.value, false);
+  assert.equal(restored.rosterReady.value, false);
+});
+
+test('maxed collection with dorm exclusion keeps registered dorm levels and limit breaks throughout search', async t => {
+  const dorm = cards.find(card => card.costume === '寮服');
+  const otherNames = names.map(name => catalog[name].chara).filter(chara => chara !== dorm.chara).slice(0, 4)
+    .map(chara => cards.find(card => card.chara === chara && card.rare === 'SSR' && card.costume !== '寮服').name);
+  const collection = [{ ...handCard(dorm.name, 76), totsu: 1 }, ...otherNames.map(name => handCard(name, 50))];
+  const { view, load, persistence, workers } = runtime(t, collection);
+  view.rosterSource.value = 'ownedMax';
+  await vue.nextTick();
+  assert.deepEqual(clone(view.input.value.roster[0]), rosterCard(dorm.name, 120, 4));
+  view.input.value.budget = 4;
+  view.input.value.additionalLevelCap = 20;
+  view.input.value.excludeDormFromUpgrades = true;
+  await vue.nextTick();
+  const expected = [rosterCard(dorm.name, 76, 1), ...otherNames.map(name => rosterCard(name, 120, 4))];
+  assert.deepEqual(clone(persistence.loadExamSearch().roster), expected);
+  view.start(1000);
+  const input = workers[0].messages[0].input;
+  assert.deepEqual(clone(input.roster), expected);
+  const { buildTasks, generateCandidates } = load('src/domain/examSearch/candidateGenerator.ts');
+  const tasks = buildTasks(input, catalog);
+  assert.ok(tasks.every(task => task.cost === 0));
+  const candidates = generateCandidates(input, tasks[0], catalog);
+  assert.ok(candidates.length);
+  for (const candidate of candidates) {
+    const card = candidate.cards.find(card => card.name === dorm.name);
+    assert.deepEqual([card.level, card.totsu], [76, 1]);
+  }
+  const { candidateSatisfiesConstraints } = load('src/domain/examSearch/variants.ts');
+  const stale = clone(candidates[0]);
+  stale.cards.find(card => card.name === dorm.name).level += 5;
+  assert.equal(candidateSatisfiesConstraints(input, stale, catalog), false);
+  await workers[0].respond({ progress: { phase: 'done', results: [], tasksDone: 1 }, checkpoint: checkpoint(), catalogVersion: 'test' });
+  const saved = persistence.loadExamSearch();
+  assert.equal(runtime(t, collection, saved, checkpoint()).view.canResume.value, true);
+  view.input.value.excludeDormFromUpgrades = false;
+  await vue.nextTick();
+  assert.deepEqual(clone(persistence.loadExamSearch().roster[0]), rosterCard(dorm.name, 120, 4));
+  assert.equal(view.canResume.value, false);
 });
 
 test('favorable effects default off, persist, invalidate old results and reach workers and transfers', async t => {

@@ -20,8 +20,10 @@ export interface SearchCard extends RosterCard {
   selectedMagic: [MagicSlot, MagicSlot];
   support: boolean;
 }
+export type RosterSource = 'owned' | 'allMax' | 'ownedMax';
 export interface SearchInput {
-  /** Omitted in legacy saves, which always used the hand collection. */
+  rosterSource?: RosterSource;
+  /** Used by saves created before the three-way roster selector. */
   useHandCollection?: boolean;
   /** Resolve existing chance-based effects in the player's favor. */
   favorableEffects?: boolean;
