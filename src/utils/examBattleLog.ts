@@ -57,6 +57,7 @@ function buildExamBattleLogEntry(line: string, options: BattleLogParserOptions):
   const displayLine = formatBattleLogLine(line);
   const emphasized = isHighlightedLogLine(line);
   if (isSystemLogLine(line)) return { line, displayLine, side: 'system', emphasized };
+  if (/^\d+T\s+相手継続回復[:：]/.test(line)) return { line, displayLine, side: 'enemy', emphasized };
   if (line.includes('相手効果') || line.includes(' 相手 ')) {
     const label = enemyLogLabel(displayLine);
     return {
@@ -172,6 +173,7 @@ function enemyLogTargetElement(line: string): BattleLogActionElement | undefined
 
 function enemyLogTargetLabel(line: string, sourceLabel: string) {
   const targetText = line.split('->')[1] || '';
+  if (targetText.trimStart().startsWith('相手全体 /')) return '相手全体';
   const match = targetText.match(/^\s*([^:：\s/]+)[:：]/);
   const targetLabel = match?.[1] || '';
   if (!targetLabel || targetLabel === sourceLabel) return '';
@@ -180,6 +182,12 @@ function enemyLogTargetLabel(line: string, sourceLabel: string) {
 
 function playerLogTargetLabel(line: string) {
   if ((!line.includes(' 自分 ') && !line.includes('自分効果')) || line.includes('自分回復')) return '';
+  // Ally effects already name their recipients in the detail text. Only an
+  // opposing target belongs in the enemy column.
+  if (line.includes('自分効果')) {
+    const target = line.split(' -> ')[1]?.split(' / ')[0] ?? '';
+    if (!target.includes(':') && !['敵', '相手全体', '相手選択'].includes(target)) return '';
+  }
   const match = line.match(/\s->\s*([^:：\s/]+)(?:[:：]|\s*\/)/);
   return match?.[1] || '敵';
 }

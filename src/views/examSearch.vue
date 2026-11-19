@@ -137,7 +137,9 @@
         <v-card-actions><v-spacer /><v-btn data-testid="character-filter-close" color="primary" variant="tonal" @click="characterFilterOpen = false">{{ t('common.close') }}</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
-    <v-dialog v-model="previewOpen" max-width="1120"><v-card class="pa-4 modal-card"><h2 class="modal-title">{{ previewIsBest ? t('examSimulator.bestScoreLogWithScore', { score: previewScore.toLocaleString() }) : t('examSearch.previewTitle') }}</h2><ExamBattleLog :groups="previewGroups" :default-img="defaultImg" :enemy-label="t('examSimulator.enemy')" :localize="localizePreviewText" :element-icon="previewElementIcon" /><v-btn @click="previewOpen = false">{{ t('examSearch.close') }}</v-btn></v-card></v-dialog>
+    <ExamBattleLogDialog v-model="previewOpen" :groups="previewGroups"
+      :title="previewIsBest ? t('examSimulator.bestScoreLogWithScore', { score: previewScore.toLocaleString() }) : t('examSearch.previewTitle')"
+      :default-img="defaultImg" :localize="localizePreviewText" :element-icon="previewElementIcon" />
   </v-container>
 </template>
 
@@ -149,7 +151,7 @@ import cards from '@/assets/chara.json';
 import charactersInfo from '@/assets/characters_info.json';
 import ExamSearchPresetPicker from '@/components/ExamSearchPresetPicker.vue';
 import SimCharaModal from '@/components/SimCharaModal.vue';
-import ExamBattleLog from '@/components/ExamBattleLog.vue';
+import ExamBattleLogDialog from '@/components/ExamBattleLogDialog.vue';
 import ExamSearchResultsTable from '@/components/ExamSearchResultsTable.vue';
 import ExamFormationComparison from '@/components/ExamFormationComparison.vue';
 import SupportBody from '@/components/SupportBody.vue';

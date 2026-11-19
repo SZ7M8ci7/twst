@@ -830,6 +830,8 @@
     "retireTurn": "Retire Turn",
     "noNonZeroScores": "No non-zero score results",
     "openLog": "Open Log",
+    "saveLogImage": "Save image",
+    "saveLogImageFailed": "Could not save the image. Please try again.",
     "bestScoreLog": "Best Score Log",
     "bestScoreLogWithScore": "Best Score Log: {score}",
     "enemyActionTitle": "{name} Actions",

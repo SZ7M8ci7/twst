@@ -20,38 +20,25 @@ withDefaults(defineProps<{
         v-for="(entry, index) in group.entries"
         :key="`${group.title}-${index}-${entry.line}`"
         class="battle-log-row"
-        :class="[entry.side, { emphasized: entry.emphasized }]"
+        :class="[entry.side, { emphasized: entry.emphasized,
+          'source-only': entry.side !== 'system' && !entry.targetIcon && !entry.targetLabel }]"
       >
-        <template v-if="entry.side === 'enemy'">
-          <div class="log-marker">
-            <div class="log-combatant enemy-combatant">{{ localize(entry.label || enemyLabel) }}</div>
+        <template v-if="entry.side !== 'system'">
+          <div class="log-marker log-source">
+            <div v-if="entry.side === 'enemy'" class="log-combatant">{{ localize(entry.label || enemyLabel) }}</div>
+            <img v-else class="log-avatar" :src="entry.icon || defaultImg" alt="" />
             <img v-if="entry.sourceElement" class="log-element-icon" :src="elementIcon(entry.sourceElement)" alt="" />
           </div>
-          <div class="log-arrow">→</div>
+          <span class="log-arrow action-arrow" aria-hidden="true">→</span>
           <div class="log-bubble">{{ localize(entry.displayLine) }}</div>
           <template v-if="entry.targetIcon || entry.targetLabel">
-            <div class="log-arrow">→</div>
-            <div class="log-marker">
+            <span class="log-arrow" aria-hidden="true">→</span>
+            <div class="log-marker log-target">
               <img v-if="entry.targetIcon" class="log-avatar" :src="entry.targetIcon" alt="" />
-              <div v-else class="log-combatant target-combatant">{{ localize(entry.targetLabel || '') }}</div>
+              <div v-else class="log-combatant">{{ localize(entry.targetLabel || '') }}</div>
               <img v-if="entry.targetElement" class="log-element-icon" :src="elementIcon(entry.targetElement)" alt="" />
             </div>
           </template>
-        </template>
-        <template v-else-if="entry.side === 'player'">
-          <template v-if="entry.targetLabel">
-            <div class="log-marker">
-              <div class="log-combatant target-combatant">{{ localize(entry.targetLabel) }}</div>
-              <img v-if="entry.targetElement" class="log-element-icon" :src="elementIcon(entry.targetElement)" alt="" />
-            </div>
-            <div class="log-arrow">←</div>
-          </template>
-          <div class="log-bubble">{{ localize(entry.displayLine) }}</div>
-          <div class="log-arrow">←</div>
-          <div class="log-marker">
-            <img class="log-avatar" :src="entry.icon || defaultImg" alt="" />
-            <img v-if="entry.sourceElement" class="log-element-icon" :src="elementIcon(entry.sourceElement)" alt="" />
-          </div>
         </template>
         <div v-else class="log-system-line">{{ localize(entry.displayLine) }}</div>
       </div>
@@ -60,12 +47,6 @@ withDefaults(defineProps<{
 </template>
 
 <style scoped>
-.log-body {
-  max-height: 68vh;
-  overflow: auto;
-  padding-right: 4px;
-}
-
 .log-turn-group {
   display: grid;
   gap: 6px;
@@ -97,8 +78,11 @@ withDefaults(defineProps<{
   min-width: 0;
 }
 
-.battle-log-row.enemy { justify-content: flex-start; padding-right: 0; }
-.battle-log-row.player { justify-content: flex-end; padding-left: 0; }
+.battle-log-row.enemy { --log-border: #e4d3c9; --log-bg: #fff8f4; }
+.battle-log-row.player { --log-border: #cadcea; --log-bg: #f4f9fd; flex-direction: row-reverse; }
+.battle-log-row.enemy.emphasized { --log-border: #d8a48c; --log-bg: #fff2eb; }
+.battle-log-row.player.emphasized { --log-border: #8fbad7; --log-bg: #eef7fc; }
+.battle-log-row.player .log-arrow { transform: scaleX(-1); }
 .battle-log-row.system { justify-content: center; }
 
 .log-combatant {
@@ -146,19 +130,61 @@ withDefaults(defineProps<{
   word-break: break-word;
 }
 
-.log-bubble { flex: 1 1 auto; background: #fbfcfd; }
+.log-bubble { flex: 1 1 auto; border-color: var(--log-border); background: var(--log-bg); }
 
-.battle-log-row.emphasized .log-bubble,
+.battle-log-row.emphasized .log-bubble { font-weight: 800; }
 .battle-log-row.emphasized .log-system-line { border-color: #8fbad7; background: #eef7fc; font-weight: 800; }
-.battle-log-row.enemy .log-bubble { border-color: #e4d3c9; background: #fff8f4; }
-.battle-log-row.player .log-bubble { border-color: #cadcea; background: #f4f9fd; }
-.battle-log-row.enemy.emphasized .log-bubble { border-color: #d8a48c; background: #fff2eb; }
-.battle-log-row.player.emphasized .log-bubble { border-color: #8fbad7; background: #eef7fc; }
 
 .log-system-line { width: 100%; color: #5d7080; background: #f7f9fb; text-align: center; }
 
 @media (max-width: 720px) {
-  .battle-log-row { align-items: flex-start; flex-wrap: wrap; }
-  .log-bubble { flex-basis: calc(100% - 56px); }
+  .battle-log-row.player,
+  .battle-log-row.enemy {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-areas: "enemy arrow player" "detail detail detail";
+    gap: 4px 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--log-border);
+    border-radius: 8px;
+    background: var(--log-bg);
+  }
+
+  .player.source-only {
+    grid-template-columns: minmax(0, 1fr) fit-content(40%);
+    grid-template-areas: "detail player";
+  }
+  .enemy.source-only {
+    grid-template-columns: fit-content(40%) minmax(0, 1fr);
+    grid-template-areas: "enemy detail";
+  }
+  .battle-log-row.source-only { padding-block: 4px; }
+  .action-arrow { display: none; }
+  .log-arrow { grid-area: arrow; }
+  .enemy .log-source, .player .log-target { grid-area: enemy; justify-self: start; }
+  .player .log-source, .enemy .log-target { grid-area: player; justify-self: end; }
+  .log-marker { min-width: 0; max-width: 100%; }
+  .log-combatant {
+    flex: 0 1 auto;
+    min-width: 0;
+    height: auto;
+    min-height: 28px;
+    padding-block: 3px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .log-bubble {
+    grid-area: detail;
+    justify-self: stretch;
+    padding: 0;
+    border: 0;
+  }
+  .log-bubble, .log-system-line {
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .log-system-line { text-align: start; }
 }
 </style>

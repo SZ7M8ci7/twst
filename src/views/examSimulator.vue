@@ -660,23 +660,8 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="logDialogOpen" max-width="1120">
-      <v-card class="modal-card">
-        <v-card-title class="modal-title">
-          <span data-testid="best-log-title">{{ bestLogTitle }}</span>
-          <v-btn icon="mdi-close" variant="text" @click="logDialogOpen = false" />
-        </v-card-title>
-        <v-card-text>
-          <ExamBattleLog
-            :groups="groupedBestLog"
-            :default-img="defaultImg"
-            :enemy-label="t('examSimulator.enemy')"
-            :localize="localizeExamLogText"
-            :element-icon="elementIcon"
-          />
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    <ExamBattleLogDialog v-model="logDialogOpen" :title="bestLogTitle" :groups="groupedBestLog"
+      :default-img="defaultImg" :localize="localizeExamLogText" :element-icon="elementIcon" />
 
     <div v-if="settingsSaveDialogOpen" class="saved-deck-modal-overlay" @click.self="settingsSaveDialogOpen = false">
       <div class="saved-deck-modal-content">
@@ -778,7 +763,7 @@ import charactersInfo from '@/assets/characters_info.json';
 import { useCharacterStore, type Character } from '@/store/characters';
 import SimCharaModal from '@/components/SimCharaModal.vue';
 import SimCharaDetailModal from '@/components/SimCharaDetailModal.vue';
-import ExamBattleLog from '@/components/ExamBattleLog.vue';
+import ExamBattleLogDialog from '@/components/ExamBattleLogDialog.vue';
 import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { atkbuffDict, calculateCharacterStats, criticalDict, dmgbuffDict, healContinueDict, healDict, magicDict, recalculateATK, recalculateHP } from '@/utils/calculations';

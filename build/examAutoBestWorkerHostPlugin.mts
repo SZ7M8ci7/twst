@@ -54,7 +54,7 @@ export function examAutoBestWorkerHostPlugin(): Plugin {
         )
         .replace("import SimCharaModal from '@/components/SimCharaModal.vue';", 'const SimCharaModal = null;')
         .replace("import SimCharaDetailModal from '@/components/SimCharaDetailModal.vue';", 'const SimCharaDetailModal = null;')
-        .replace("import ExamBattleLog from '@/components/ExamBattleLog.vue';", 'const ExamBattleLog = null;')
+        .replace("import ExamBattleLogDialog from '@/components/ExamBattleLogDialog.vue';", 'const ExamBattleLogDialog = null;')
         .replace('Chart.register(...registerables);', '')
         .replace(
           /onMounted\(\(\) => \{[\s\S]*?savedExamSettings\.value = loadSavedExamSimulatorSettings\(\);[\s\S]*?\}\);/,

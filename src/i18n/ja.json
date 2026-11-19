@@ -830,6 +830,8 @@
     "retireTurn": "リタイアターン",
     "noNonZeroScores": "スコア0以外の結果なし",
     "openLog": "ログを開く",
+    "saveLogImage": "画像を保存",
+    "saveLogImageFailed": "画像を保存できませんでした。もう一度お試しください。",
     "bestScoreLog": "最高スコアログ",
     "bestScoreLogWithScore": "最高スコアログ: {score}",
     "enemyActionTitle": "{name} の行動",

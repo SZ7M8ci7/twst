@@ -830,6 +830,8 @@
     "retireTurn": "退出回合",
     "noNonZeroScores": "没有非零分数的结果",
     "openLog": "打开日志",
+    "saveLogImage": "保存图片",
+    "saveLogImageFailed": "图片保存失败，请重试。",
     "bestScoreLog": "最高分日志",
     "bestScoreLogWithScore": "最高分日志：{score}",
     "enemyActionTitle": "{name}的行动",
