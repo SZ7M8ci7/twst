@@ -212,6 +212,7 @@ import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 const { t, locale } = useI18n();
 const props = defineProps({
   catalogMode: { type: Boolean, default: false },
+  allowedCardNames: { type: Set, default: null },
   charaIndex: {
     type: Number,
     default: -1 // -1は新規追加を意味する
@@ -1112,6 +1113,7 @@ const updateFilteredCharacters = async () => {
   
   // 新しい配列を作成（Vue リアクティブシステム対応）
   let filtered = [...characters.value.filter(character => {
+    if (props.allowedCardNames && !props.allowedCardNames.has(character.name)) return false;
     // visibleフラグをチェック（FilterModalから適用されたフィルター）
     if (props.catalogMode ? catalogVisibleNames.value && !catalogVisibleNames.value.has(character.name) : !character.visible) return false;
     
@@ -1267,6 +1269,8 @@ watch([
 });
 
 // 手持ちコレクション設定変更時に候補キャラクターの表示を更新
+watch(() => props.allowedCardNames, () => { void updateFilteredCharacters(); });
+
 watch(() => useHandCollection.value, () => {
   updateFilteredCharacters();
 });

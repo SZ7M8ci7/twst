@@ -4,17 +4,16 @@
       <h3>{{ $t('infoModal.about') }}</h3>
       <p>{{ $t('infoModal.text1') }}</p>
       <p>{{ $t('infoModal.text2') }}</p>
-      <p>{{ $t('infoModal.text3') }}<span class="bold">{{ $t('infoModal.text4') }}</span></p>
-      <p>{{ $t('infoModal.text5') }}</p>
       <p>{{ $t('infoModal.text6') }}</p>
       <p>{{ $t('infoModal.text7') }}</p>
-      <p>{{ $t('infoModal.text13') }}</p>
     </div>
     <div class="section">
       <h3>{{ $t('infoModal.setting') }}</h3>
-      <p>{{ $t('infoModal.text8') }}</p>
-      <p>{{ $t('infoModal.text9') }}</p>
-      <p>{{ $t('infoModal.text10') }}</p>
+      <ol>
+        <li v-for="step in ['chooseRoster', 'choosePreset', 'chooseSupport', 'start']" :key="step">
+          {{ $t('infoModal.' + step) }}
+        </li>
+      </ol>
       <p>{{ $t('infoModal.text11') }}</p>
       <p>{{ $t('infoModal.text12') }}</p>
     </div>
@@ -50,8 +49,11 @@
   background-color: #19d241;
   color: white;
 }
-.bold {
-  font-weight: bold;
+ol {
+  padding-inline-start: 1.5em;
+}
+li {
+  margin-bottom: 0.5em;
 }
 .section {
   margin: 10px;

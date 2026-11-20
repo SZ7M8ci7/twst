@@ -6,16 +6,13 @@
     <v-tabs v-model="tab" color="indigo-darken-2" fixed-tabs
       :show-arrows="false"
       :mobile-breakpoint="Infinity">
-      <v-tab value="search">{{ $t('search.characterList') }}</v-tab>
+      <v-tab value="settings">{{ $t('search.settings') }}</v-tab>
       <v-tab value="support">{{ $t('search.support') }}</v-tab>
       <v-tab value="result">{{ $t('search.result') }}</v-tab>
     </v-tabs>
     <v-card-text class="search-page-card-text">
       <KeepAlive>
-        <SearchBody
-          v-if="tab === 'search'"
-          :focus-request="focusRequest"
-        />
+        <DeckSearchSettings v-if="tab === 'settings'" />
         <SupportBody
           v-else-if="tab === 'support'"
           :focus-request="focusRequest"
@@ -33,22 +30,23 @@
 import { nextTick, onMounted, ref } from 'vue';
 import { waitForLayoutStability } from '@/utils/scrollPosition';
 import SearchHeader from '@/components/SearchHeader.vue';
-import SearchBody from '@/components/SearchBody.vue';
+import DeckSearchSettings from '@/components/DeckSearchSettings.vue';
+import { hydrateCharacterImageUrls } from '@/utils/characterAssets';
 import SupportBody from '@/components/SupportBody.vue';
 import ResultBody from '@/components/ResultBody.vue';
 import { useCharacterStore } from '@/store/characters';
 
-type SearchTab = 'search' | 'support' | 'result';
+type SearchTab = 'settings' | 'support' | 'result';
 
 type FocusRequest = {
   requestId: number;
   characterName: string;
-  targetTab: Exclude<SearchTab, 'result'>;
+  targetTab: 'support';
 };
 
 const characterStore = useCharacterStore();
 
-const tab = ref<SearchTab>('search');
+const tab = ref<SearchTab>('settings');
 const focusRequest = ref<FocusRequest | null>(null);
 let focusRequestSequence = 0;
 
@@ -69,7 +67,7 @@ const handleFocusCharacterSetting = async (payload: Omit<FocusRequest, 'requestI
 };
 
 onMounted(() => {
-  characterStore.handlePageChange('searchPage');
+  void hydrateCharacterImageUrls(characterStore.characters, 'name', { fallbackName: 'notyet' });
 });
 </script>
 <style scoped>

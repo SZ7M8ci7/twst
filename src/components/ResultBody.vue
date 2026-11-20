@@ -116,11 +116,11 @@
               </div>
             </td>
             <td v-for="n in 5" :key="`chara${n}`">
-              <button
-                type="button"
-                class="result-icon-button"
-                :aria-label="extractCharacterName(item.simuURL, n) || undefined"
-                @click="focusCharacterSetting(item.simuURL, n)"
+              <component
+                :is="n === 5 && allowSameCharacter ? 'button' : 'span'"
+                :class="{ 'result-icon-button': n === 5 && allowSameCharacter }"
+                :aria-label="n === 5 && allowSameCharacter ? extractCharacterName(item.simuURL, n) || undefined : undefined"
+                @click="n === 5 && allowSameCharacter && focusSupport(item.simuURL)"
               >
                 <img
                   :src="item[`chara${n}`]"
@@ -129,9 +129,9 @@
                   loading="lazy"
                   decoding="async"
                   :class="['result-icon-image', { 'black-border': n === 5 && allowSameCharacter }]"
-                  alt=""
+                  :alt="extractCharacterName(item.simuURL, n) || ''"
                 >
-              </button>
+              </component>
             </td>
             <td>
               <button
@@ -154,17 +154,14 @@
 import { useSearchResultStore } from '@/store/searchResult';
 import { storeToRefs } from 'pinia';
 import { computed, ref, watch } from 'vue';
-import { useSearchSettingsStore } from '@/store/searchSetting';
 import { useI18n } from 'vue-i18n';
 
 const emit = defineEmits<{
-  (e: 'focus-character-setting', payload: { characterName: string; targetTab: 'search' | 'support' }): void;
+  (e: 'focus-character-setting', payload: { characterName: string; targetTab: 'support' }): void;
 }>();
 
 const searchResultStore = useSearchResultStore();
-const searchSettingsStore = useSearchSettingsStore();
-const { results } = storeToRefs(searchResultStore);
-const allowSameCharacter = computed(() => searchSettingsStore.allowSameCharacter);
+const { results, resultsUseSupport: allowSameCharacter } = storeToRefs(searchResultStore);
 const { t } = useI18n();
 const hoveredDetailKey = ref('');
 const characterNameCache = new Map<string, Array<string | null>>();
@@ -238,13 +235,13 @@ function extractCharacterName(url: string, slot: number): string | null {
   return getCharacterNames(url)[slot - 1] ?? null;
 }
 
-function focusCharacterSetting(url: string, slot: number) {
-  const characterName = extractCharacterName(url, slot);
+function focusSupport(url: string) {
+  const characterName = extractCharacterName(url, 5);
   if (!characterName) return;
 
   emit('focus-character-setting', {
     characterName,
-    targetTab: allowSameCharacter.value && slot === 5 ? 'support' : 'search',
+    targetTab: 'support',
   });
 }
 
@@ -347,7 +344,6 @@ function toDisplayIndex(index: string | number): number {
   width: 50px;
   height: 50px;
   object-fit: cover;
-  cursor: pointer;
 }
 
 .sim-open-button {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { useDisplay } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import ExamBattleLog from './ExamBattleLog.vue';
 import { downloadBattleLogImage } from '@/utils/battleLogImage';
@@ -14,6 +15,7 @@ const props = defineProps<{
   elementIcon: (element: BattleLogActionElement) => string;
 }>();
 const { t } = useI18n();
+const { width } = useDisplay();
 const sheet = ref<HTMLElement | null>(null);
 const saving = ref(false);
 const saveFailed = ref(false);
@@ -35,7 +37,7 @@ async function saveImage() {
 </script>
 
 <template>
-  <v-dialog v-model="open" :fullscreen="$vuetify.display.width <= 720" max-width="1480"
+  <v-dialog v-model="open" :fullscreen="width <= 720" max-width="1480"
     content-class="battle-log-overlay" scrollable>
     <v-card class="battle-log-card">
       <v-card-title class="battle-log-heading">

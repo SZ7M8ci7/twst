@@ -318,6 +318,9 @@ async function restoreFromSearchParams(urlParams: URLSearchParams) {
           // 共通関数を使用してキャラクター選択処理を実行（手持ち設定を無視してカスタムレベル使用）
           const processedChara = await processCharacterSelection({ ...foundCharacter }, characterLevel, true);
           
+          const totsu = urlParams.get('totsu' + i);
+          if (totsu !== null && /^[0-4]$/.test(totsu)) processedChara.totsu = Number(totsu);
+
           // デュオキャラクターの効果を設定
           if (processedChara.duo && simulatorStore.charaDict[processedChara.duo]) {
             processedChara.magic2Power = 'デュオ';

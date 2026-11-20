@@ -8,6 +8,8 @@ import { useCharacterStore } from '@/store/characters';
 import { useSearchResultStore } from '@/store/searchResult';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { markRaw } from 'vue';
+import { buildDeckSearchRoster } from './roster';
+import { useHandCollectionStore } from '@/store/handCollection';
 
 function createDeckSearchSettings(): DeckSearchSettings {
   const searchSettingsStore = useSearchSettingsStore();
@@ -69,7 +71,8 @@ function createDeckSearchSettings(): DeckSearchSettings {
 export async function runDeckSearch(t: (key: string) => string) {
   const characterStore = useCharacterStore();
   const searchResultStore = useSearchResultStore();
-  const { characters } = storeToRefs(characterStore);
+  const searchSettings = useSearchSettingsStore();
+  const hand = useHandCollectionStore();
   const { totalResults, nowResults, results, isSearching, errorMessage } = storeToRefs(searchResultStore);
   const timing = typeof performance !== 'undefined'
     ? {
@@ -85,8 +88,12 @@ export async function runDeckSearch(t: (key: string) => string) {
 
   errorMessage.value = '';
 
+  results.value = [];
+  totalResults.value = 0;
+  nowResults.value = 0;
+  searchResultStore.resultsUseSupport = searchSettings.allowSameCharacter;
   const context: DeckSearchContext = {
-    characters: characters.value,
+    ...buildDeckSearchRoster(characterStore.characters, hand.handCollection, searchSettings),
     settings: createDeckSearchSettings(),
     controls: {
       isSearching: () => isSearching.value,

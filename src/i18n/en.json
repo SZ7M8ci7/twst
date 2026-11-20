@@ -203,6 +203,8 @@
     "noDataText": "Adjust the filter settings."
   },
   "search": {
+    "requiredCards": "Required cards",
+    "ownedDescription": "Search with owned cards at Lv1 or higher using their registered levels and limit breaks.",
     "characterList": "Character List",
     "result": "Result",
     "filter": "Filter",
@@ -249,17 +251,14 @@
     "close": "Close",
     "text1": "This tool is designed for exploring decks for defense exams and magical assault practice.",
     "text2": "Based on the input levels, it exhaustively searches all possible decks and displays the optimal results.",
-    "text3": "As all processing is done on the device,",
-    "text4": "it can be very time-consuming.Characters that are unlikely to be used (such as SR or R) should have their level set to 0 to exclude them from the search.",
-    "text5": "Since all cards are calculated with maximum enhancement, please consider the results as a rough estimate.",
     "text6": "Also, the damage dealt is selected from the highest two among M1, M2, and M3; therefore, it is often not possible to achieve both healing or evasion and high damage.",
     "text7": "Self 3T buffs and ally buffs are not considered, so you can deal more damage in some combinations.",
-    "text8": "The sort setting sorts the results by the specified key. ",
-    "text9": "The minimum value setting will not add decks with values below the specified value to the search results. Since this leads to improved processing speed, please set a value that can eliminate values that are not considered.",
-    "text10": "The maximum number of results sets the display limit, which affects the sorting speed of the search results, so it is better not to increase it unnecessarily for faster processing.",
     "text11": "The 'No Buddy' result indicates the number of characters without an HP buddy.",
     "text12": "If you want to create a deck with an HP buddy for everyone in magical assault practice, it is recommended to set the sort order to ascending for sort key 1.",
-    "text13": "The Edit button is used when you want to temporarily change a character's stats. After making changes, the calculations will use the new values when starting an exploration, but the original values will be restored upon refreshing the screen."
+    "chooseRoster": "Choose the card pool in Search Settings. Use your collection at its registered levels and limit breaks, train those same cards to maximum, or search all cards at maximum, including unowned cards.",
+    "choosePreset": "Choose an exam preset and adjust the sort order and minimum values. Sort keys are applied from top to bottom. Decks below any minimum are excluded.",
+    "chooseSupport": "Use + under Required cards to choose a specific costume. If you also select a required character, each deck must meet both conditions. To borrow a card, enable support and choose candidates in the Support tab.",
+    "start": "Start the search to see decks matching the current settings in Results. Select SIM to open a deck in the simulator."
   },
   "filterModal": {
     "costumeSearch": "Costume Search",
@@ -482,8 +481,10 @@
     "damageDetail": "Damage Detail"
   },
   "error": {
+    "requiredCardLimit": "Choose up to five required cards, or four when using support.",
+    "requiredCardUnavailable": "A required card is outside the search pool. Change your selection or the search pool.",
     "requiredCharacter": "Required character level must be at least 1",
-    "fewCharacter": "Too few level-set characters."
+    "fewCharacter": "Too few eligible cards. You need five of your own cards, or four when using support. Check ownership and levels in your collection or change the search pool."
   },
   "hand": {
     "filter": "Filter",

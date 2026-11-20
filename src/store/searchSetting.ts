@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import type { RosterSource } from '@/domain/examSearch/types';
 import charactersData from '@/assets/chara.json';
 
 // types/searchSettingsTypes.ts
@@ -38,7 +39,8 @@ export interface SearchSettingsState {
   allowSameCharacter: boolean;
   selectedSupportCharacters: string[];
   appliedPresetName: string;
-  appliedPresetToken: number;
+  rosterSource: RosterSource;
+  requiredCards: string[];
 }
 
 // SSRキャラクターの名前を取得する関数
@@ -77,7 +79,8 @@ export const createDefaultSearchSettingsState = (): SearchSettingsState => ({
   allowSameCharacter: false,
   selectedSupportCharacters: getInitialSSRCharacters(),
   appliedPresetName: '',
-  appliedPresetToken: 0,
+  rosterSource: 'owned',
+  requiredCards: [],
 });
 
 export const useSearchSettingsStore = defineStore('searchSettings', {

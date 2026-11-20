@@ -1,5 +1,17 @@
 <template>
-  <div class="modal-background">
+  <div class="deck-search-settings">
+    <v-radio-group v-model="searchSettingsStore.rosterSource" :label="$t('examSearch.rosterSource')"
+      inline color="primary" hide-details density="compact">
+      <v-radio value="owned" :label="$t('examSearch.rosterOptions.owned')" />
+      <v-radio value="allMax" :label="$t('examSearch.rosterOptions.allMax')" />
+      <v-radio value="ownedMax" :label="$t('examSearch.rosterOptions.ownedMax')" />
+    </v-radio-group>
+    <p class="roster-description">
+      {{ $t(rosterDescriptions[searchSettingsStore.rosterSource]) }}
+      <router-link v-if="searchSettingsStore.rosterSource !== 'allMax'" :to="{ name: 'handCollection' }">
+        {{ $t('simulator.manageCardSettings') }}
+      </router-link>
+    </p>
     <!-- プリセットセクション -->
     <v-card-title class="preset-title">{{ $t('settingModal.searchPreset') }}</v-card-title>
     <v-card-text class="preset-section ma-0 pa-2">
@@ -143,6 +155,7 @@
             :max="10"
           />
       </v-card-text>
+      <DeckSearchRequiredCards class="mt-4" />
       <v-card-title>{{ $t('settingModal.mustCharacter') }}</v-card-title>
       <v-card-text class="ma-0 pa-0">
         <div class="must-character-grid">
@@ -172,32 +185,20 @@
           hide-details
         />
       </v-card-text>
-    <div class="button-container">
-      <v-btn class="button" @click="cancel">{{ $t('settingModal.cancel') }}</v-btn>
-      <v-btn class="button apply-button" @click="applyFilter" :disabled="sortOptions.length==0">{{ $t('settingModal.ok') }}</v-btn>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { createDefaultSearchSettingsState, useSearchSettingsStore, type SearchSettingsState } from '@/store/searchSetting';
-import { onBeforeMount, onMounted } from 'vue';
-import { cloneDeep } from 'lodash';
+import DeckSearchRequiredCards from './DeckSearchRequiredCards.vue';
 import { useI18n } from 'vue-i18n';
-const { t } = useI18n();
 import characterData from '@/assets/characters_info.json';
 import { enName2jpName, getAvailableSortProps } from '@/components/common'
 import { loadImageUrls } from '@/utils/characterAssets'
 import { SEARCH_PRESET_CONFIGURATIONS as PRESET_CONFIGURATIONS, type SearchPreset } from '@/constants/searchPresets';
 
-interface SortOption {
-  prop: string;
-  order: string;
-}
-interface MustCharacterOption {
-  prop: string;
-}
+const { t } = useI18n();
 
 interface MinimumSettingOption {
   prop: MinimumSettingKey | '';
@@ -328,10 +329,14 @@ const defaultMinimumSettingValues = minimumSettingDefinitions.reduce((acc, defin
 const searchSettingsStore = useSearchSettingsStore();
 const maxResult = ref(searchSettingsStore.maxResult);
 const attackNum = ref(searchSettingsStore.attackNum);
-let initialSortOptions: SortOption[] = [];
-const sortOptions = ref<SortOption[]>([]);
-const minimumSettings = ref<MinimumSettingOption[]>([]);
-const mustCharacterSelection = ref<string[]>([]);
+const rosterDescriptions = {
+  owned: 'search.ownedDescription',
+  allMax: 'simulator.allCardsDescription',
+  ownedMax: 'examSearch.ownedMaxDescription',
+};
+const sortOptions = ref(searchSettingsStore.sortOptions.map(option => ({ ...option })));
+const minimumSettings = ref(buildMinimumSettingRows(getMinimumSettingValues(searchSettingsStore)));
+const mustCharacterSelection = ref(searchSettingsStore.mustCharacters.map(option => enName2jpName[option.prop] || option.prop));
 const mustCharacterIconUrls = ref<Record<string, string>>({});
 
 // Keep stable keys as values; only the labels depend on the current language.
@@ -343,24 +348,12 @@ const mustCharacterList = (characterData as MustCharacterInfo[]).filter(
   (character) => character.name_ja !== 'サム'
 );
 
-onBeforeMount(() => {
-  // sortOptionsの初期状態を保持するためのリアクティブな参照
-  initialSortOptions = cloneDeep(searchSettingsStore.sortOptions ?? []);
-  // ユーザーによる変更を保持するためのリアクティブな参照
-  sortOptions.value = cloneDeep(initialSortOptions);
-  mustCharacterSelection.value = (searchSettingsStore.mustCharacters ?? [])
-    .map((option) => enName2jpName[option.prop] || option.prop)
-    .filter((name): name is string => typeof name === 'string' && name.length > 0);
-  minimumSettings.value = buildMinimumSettingRows(getMinimumSettingValues(searchSettingsStore));
-  selectedPreset.value = searchSettingsStore.appliedPresetName ?? '';
-});
-
 onMounted(async () => {
   mustCharacterIconUrls.value = await loadImageUrls(characterData, (item: MustCharacterInfo) => item.name_en, 'icon/');
 });
 
 const allowSameCharacter = ref(searchSettingsStore.allowSameCharacter);
-const selectedPreset = ref('');
+const selectedPreset = ref(searchSettingsStore.appliedPresetName);
 const isApplyingPreset = ref(false);
 
 function getMinimumSettingValues(source: Pick<SearchSettingsState, MinimumSettingKey>): Record<MinimumSettingKey, number> {
@@ -461,10 +454,6 @@ function toggleMustCharacter(name: string) {
   }
   mustCharacterSelection.value = [...mustCharacterSelection.value, name];
 }
-const emit = defineEmits(['close']);
-let hasLoggedMaxResultNormalization = false;
-let hasLoggedAttackNumNormalization = false;
-
 function toFiniteInt(value: unknown, fallback: number, min?: number, max?: number): number {
   const parsed = Number(value);
   let normalized = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
@@ -473,37 +462,9 @@ function toFiniteInt(value: unknown, fallback: number, min?: number, max?: numbe
   return normalized;
 }
 
-function applyFilter() {
+function updateSettings() {
   const convertedMustCharacters = [...mustCharacterSelection.value];
-  const storedMustCharacters: MustCharacterOption[] = convertedMustCharacters.map((name) => ({ prop: name }));
-
-  const rawMaxResult = maxResult.value;
-  const normalizedMaxResult = toFiniteInt(rawMaxResult, 30, 0);
-  if (
-    !hasLoggedMaxResultNormalization &&
-    (typeof rawMaxResult !== 'number' || normalizedMaxResult !== rawMaxResult)
-  ) {
-    hasLoggedMaxResultNormalization = true;
-    console.warn('[SearchSettings][diagnostic] maxResult was normalized', {
-      rawValue: rawMaxResult,
-      rawType: typeof rawMaxResult,
-      normalizedValue: normalizedMaxResult,
-    });
-  }
-
-  const rawAttackNum = attackNum.value;
-  const normalizedAttackNum = toFiniteInt(rawAttackNum, 10, 1, 10);
-  if (
-    !hasLoggedAttackNumNormalization &&
-    (typeof rawAttackNum !== 'number' || normalizedAttackNum !== rawAttackNum)
-  ) {
-    hasLoggedAttackNumNormalization = true;
-    console.warn('[SearchSettings][diagnostic] attackNum was normalized', {
-      rawValue: rawAttackNum,
-      rawType: typeof rawAttackNum,
-      normalizedValue: normalizedAttackNum,
-    });
-  }
+  const storedMustCharacters = convertedMustCharacters.map((name) => ({ prop: name }));
 
   const normalizedMinimumSettings = minimumSettingDefinitions.reduce((acc, definition) => {
     acc[definition.key] = 0;
@@ -518,20 +479,13 @@ function applyFilter() {
   searchSettingsStore.updateSearchSettings({
     ...normalizedMinimumSettings,
     sortOptions: sortOptions.value.map((option) => ({ ...option })),
-    maxResult: normalizedMaxResult,
-    attackNum: normalizedAttackNum,
+    maxResult: toFiniteInt(maxResult.value, 30, 0),
+    attackNum: toFiniteInt(attackNum.value, 10, 1, 10),
     allowSameCharacter: allowSameCharacter.value,
     mustCharacters: storedMustCharacters,
     convertedMustCharacters: convertedMustCharacters,
     appliedPresetName: selectedPreset.value,
-    appliedPresetToken: searchSettingsStore.appliedPresetToken + 1,
   });
-  emit('close');
-}
-// キャンセルを押した場合、sortOptionsを元の状態に戻す
-function cancel() {
-  searchSettingsStore.sortOptions = [...initialSortOptions]; 
-  emit('close'); // モーダルを閉じる
 }
 
 function toDisplayIndex(index: string | number): number {
@@ -546,37 +500,18 @@ watch(
   },
   { deep: true, flush: 'sync' }
 );
+watch([sortOptions, minimumSettings, maxResult, attackNum, allowSameCharacter, mustCharacterSelection, selectedPreset],
+  updateSettings, { deep: true });
 </script>
 <style scoped>
-.character-list > .character-item {
-  display: inline-flex; /* or 'inline-block' */
-  align-items:center;
-  width: 110px;
-  text-align: left;
+.deck-search-settings {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 8px;
 }
-
-.modal-background {
-  background-color: white;
-  padding: 20px; /* パディングを調整 */
-  border-radius: 8px; /* 角を丸くする */
-  max-height: 95vh; /* Maximum height - 80% of the viewport height */
-  overflow-y: auto; /* Enable vertical scrolling if content overflows */
-}
-
-.button-container {
-  display: flex;
-  gap: 10px; /* ボタン間のスペース */
-  justify-content: center;
-  padding-top: 14px;
-}
-
-.button, .apply-button {
-  width: 150px; /* ボタンの幅を統一 */
-}
-
-.apply-button {
-  background-color: #19d241;
-  color: white;
+.roster-description {
+  margin: 4px 0 16px;
+  font-size: 0.875rem;
 }
 .sort-option {
   display: flex;

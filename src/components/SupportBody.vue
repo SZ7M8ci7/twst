@@ -89,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useCharacterStore } from '@/store/characters';
 import { useSearchSettingsStore } from '@/store/searchSetting';
 import { storeToRefs } from 'pinia';
@@ -109,7 +109,7 @@ interface CharacterInfo {
 type FocusRequest = {
   requestId: number;
   characterName: string;
-  targetTab: 'search' | 'support';
+  targetTab: 'support';
 };
 
 const props = defineProps<{
@@ -276,10 +276,6 @@ watch(
     void focusCharacterSetting(props.focusRequest);
   }
 );
-
-onMounted(() => {
-  if (props.modelValue === undefined) selectAll();
-});
 
 onBeforeUnmount(() => {
   if (focusHighlightTimeout !== null) {

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="ツイステツール置き場の一般利用者向け手順書。手持ち登録、スクショ取込、編成探索、シミュレーション、保存とバックアップを説明します。">
+<title>ツイステツール置き場｜利用手順書</title>
+<style>
+:root{color-scheme:light;--ink:#24343a;--sub:#51666e;--accent:#116d65;--line:#dce5e5;--paper:#fff;--bg:#f3f6f5}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:28px}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Yu Gothic UI","Yu Gothic","Meiryo",sans-serif;font-size:16px;line-height:1.85}
+a{color:var(--accent);text-underline-offset:.2em}a:hover{text-decoration-thickness:2px}a:focus-visible,button:focus-visible,.table-scroll:focus-visible{outline:3px solid #dc8d34;outline-offset:4px}
+.skip{position:absolute;left:12px;top:-80px;z-index:5;background:#fff;padding:8px 15px}.skip:focus{top:12px}
+.shell{max-width:1440px;margin:auto;display:grid;grid-template-columns:278px minmax(0,1fr);gap:32px;padding:32px}
+aside{position:sticky;top:28px;align-self:start;max-height:calc(100vh - 56px);overflow:auto;padding:12px 8px 16px 0}
+.brand{font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--accent);margin:0 0 6px}.aside-title{font-size:20px;font-weight:800;line-height:1.5;margin:0 0 22px}
+nav{display:grid;gap:4px}nav a{padding:8px 12px;text-decoration:none;border-radius:7px;color:var(--sub);font-size:13px;line-height:1.6;border-left:3px solid transparent}nav a:hover,nav a[aria-current="location"]{color:var(--accent);background:#e4eeeb;border-left-color:var(--accent)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;align-items:center}button{font:inherit;font-size:13px;font-weight:700;border:1px solid var(--accent);background:var(--accent);color:white;border-radius:7px;padding:9px 14px;cursor:pointer}.aside-note{font-size:12px;color:var(--sub);margin-top:12px}
+main{min-width:0}.hero{padding:38px 42px;background:#173e3c;color:white;border-radius:16px;margin-bottom:24px}.eyebrow{color:#afd9cd;font-size:12px;font-weight:700;letter-spacing:.16em}.hero h1{font-size:clamp(26px,3vw,38px);line-height:1.45;margin:12px 0 24px;letter-spacing:.01em}.hero h1 span{font-size:.7em;font-weight:500}.hero p{font-size:14px;line-height:1.9;color:#e3eeeb;margin:12px 0}.hero p:first-of-type{font-size:12px;color:#bcd2cc}.flow{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px;align-items:center}.flow a{color:white;border:1px solid #76928b;border-radius:999px;padding:5px 13px;font-size:12px;text-decoration:none}.flow span{color:#a9c9bf;font-size:13px}
+section{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin:0 0 22px;padding:34px 42px;scroll-margin-top:24px}
+h2{font-size:23px;line-height:1.6;margin:0 0 24px;padding-bottom:17px;border-bottom:2px solid #c9ded6;color:#164c46;letter-spacing:.01em}
+h3{font-size:18px;line-height:1.65;margin:34px 0 14px}h3:first-child{margin-top:0}p{margin:14px 0}ol,ul{padding-left:1.7em;margin:16px 0}li{padding-left:.2em;margin:9px 0}li::marker{font-weight:700;color:var(--accent)}strong{font-weight:750;color:#143f3a}blockquote{margin:22px 0;padding:6px 18px;background:#eef6f1;border-left:4px solid #579579;border-radius:0 7px 7px 0;font-size:14px}blockquote p{margin:12px 0}
+.table-scroll{overflow-x:auto;margin:22px 0;border:1px solid var(--line);border-radius:8px}table{width:100%;border-collapse:collapse;font-size:14px;line-height:1.8}th,td{text-align:left;vertical-align:top;padding:12px 14px;border-bottom:1px solid var(--line);min-width:130px}th{background:#edf3f1;color:#244c45;font-weight:700}tr:last-child td{border-bottom:0}td:first-child{font-weight:600;min-width:160px}tbody tr:nth-child(even){background:#fafcfb}hr{border:0;border-top:1px solid var(--line);margin:28px 0}code{background:#eef2f1;padding:2px 5px;border-radius:4px;font-family:monospace}.footer{color:var(--sub);font-size:12px;text-align:center;padding:4px 0 25px}
+@media(max-width:1050px){.shell{grid-template-columns:220px minmax(0,1fr);gap:20px;padding:20px}section,.hero{padding:28px}nav a{font-size:12px;padding:8px}.aside-title{font-size:18px}}
+@media(max-width:760px){body{font-size:15px}.shell{display:block;padding:14px}aside{position:static;max-height:none;padding:12px 4px 22px}.aside-title{margin-bottom:12px}nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:3px}nav a{background:#eaf0ed;padding:8px;line-height:1.65}.actions{margin-top:14px}.aside-note{margin:8px 0 0}.hero,section{padding:24px 20px;border-radius:10px}.hero h1{font-size:27px}h2{font-size:21px}h3{font-size:17px}th,td{min-width:125px;padding:10px 12px}td:first-child{min-width:135px}.flow{gap:6px}.flow a{padding:4px 10px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@page{size:A4;margin:17mm 16mm}
+@media print{body{background:white;color:#111;font-size:10pt;line-height:1.75}.shell{display:block;max-width:none;padding:0}aside,.skip,.flow,.footer{display:none}main{width:100%}.hero{background:white;color:#111;padding:0 0 20pt;margin:0 0 20pt;border-radius:0;border-bottom:2pt solid #333}.hero h1{font-size:24pt;margin:6pt 0 14pt}.hero p,.hero p:first-of-type,.eyebrow{color:#333}section{padding:0;margin:0 0 24pt;border:0;border-radius:0}h2{font-size:16pt;padding-bottom:8pt;margin:18pt 0 12pt;color:#111;break-after:avoid}h3{font-size:12pt;margin:16pt 0 8pt;break-after:avoid}li{margin:5pt 0}blockquote{border:1pt solid #aaa;border-left:3pt solid #666;background:white;font-size:9pt;break-inside:avoid}.table-scroll{overflow:visible;border:0;margin:12pt 0}table{font-size:9pt;table-layout:fixed;overflow-wrap:anywhere}th,td,td:first-child{min-width:0;padding:7pt;border:1pt solid #bbb}thead{display:table-header-group}tr{break-inside:avoid}a,strong{color:#111}a{text-decoration:none}p{orphans:3;widows:3}}
+</style>
+</head>
+<body>
+<a class="skip" href="#content">本文へ移動</a>
+<div class="shell">
+<aside aria-label="手順書の目次">
+<p class="brand">TWST TOOL GUIDE</p>
+<p class="aside-title">ツイステツール置き場<br>利用手順書</p>
+<nav aria-label="章へ移動"><a href="#start">1. まず手持ちを登録する</a>
+<a href="#exam">2. 試験を選ぶ</a>
+<a href="#search">3. 編成を探す</a>
+<a href="#simulation">4. 編成をシミュレーションする</a>
+<a href="#save">5. 結果を保存する</a>
+<a href="#help">6. 困ったとき</a></nav>
+<div class="actions"><button id="print" type="button">印刷・PDF保存</button><a href="USER_GUIDE.md" download>Markdown版</a></div>
+<p class="aside-note">ページ内の語句は、ブラウザーの検索<br>（Ctrl + F / ⌘ + F）で探せます。</p>
+</aside>
+<main id="content">
+<header class="hero">
+<div class="eyebrow">USER GUIDE / 一般利用者向け</div>
+<h1>ツイステツール置き場<br><span>利用手順書</span></h1>
+<p>初めて使う人向けの簡易ガイドです。試験で使う編成を探し、結果を確認する大まかな流れだけを記載します。</p>
+
+<div class="flow" aria-label="基本の流れ"><a href="#start">手持ちを登録</a><span aria-hidden="true">→</span><a href="#search">編成を探す</a><span aria-hidden="true">→</span><a href="#simulation">試験で確認</a><span aria-hidden="true">→</span><a href="#save">保存する</a></div>
+</header>
+<section id="start" aria-labelledby="title-start"><h2 id="title-start">1. まず手持ちを登録する</h2>
+<ul>
+<li>左上のメニューから「手持ち設定」を開く。</li>
+<li>持っているカードの「所持」にチェックを入れる。</li>
+<li>カードの「Lv」と「凸数」を入力する。</li>
+<li>「保存」を押す。</li>
+<li>スクショから登録する場合は「スクショから取り込む」を使う。</li>
+<li>初めての利用では、取り込み後に内容を確認して「保存」を押す。</li>
+</ul>
+</section>
+<section id="exam" aria-labelledby="title-exam"><h2 id="title-exam">2. 試験を選ぶ</h2>
+<ul>
+<li>メニューの「試験」→「試験シミュレータ」を開く。</li>
+<li>「通常試験」または「統一試験」から対象の試験を選ぶ。</li>
+<li>過去の試験は「過去分」から選ぶ。</li>
+<li>「試験条件」で敵属性・難易度・敵HP・特別課題を確認する。</li>
+</ul>
+</section>
+<section id="search" aria-labelledby="title-search"><h2 id="title-search">3. 編成を探す</h2>
+<ul>
+<li>「編成探索」タブを開く。</li>
+<li>必ず入れたいカードがあれば「カード指定」で選ぶ。</li>
+<li>必ず入れたいキャラクターがあれば「キャラ指定」で選ぶ。</li>
+<li>「探索条件を変更」で追加凸と挑戦回数を設定する。</li>
+<li>手持ちのまま探す場合は追加凸を0にする。</li>
+<li>「編成探索」を押す。</li>
+<li>結果の5枚、追加凸、最高スコア、95パーセンタイルを確認する。</li>
+<li>候補を詳しく見るときは「詳細シミュレーション」を開く。</li>
+<li>通常試験は自前5枚、統一試験は自前4枚とサポート1枚が基本です。</li>
+</ul>
+</section>
+<section id="simulation" aria-labelledby="title-simulation"><h2 id="title-simulation">4. 編成をシミュレーションする</h2>
+<ul>
+<li>「詳細シミュレーション」→「編成」で5枚、Lv、凸、使用魔法を確認する。</li>
+<li>「行動」で自分の行動パターンを設定する。</li>
+<li>自動で試す場合は「シミュ」→「自動最善」を選ぶ。</li>
+<li>自分で設定した行動を試す場合は「通常」を選ぶ。</li>
+<li>回数を入力して「実行」を押す。</li>
+<li>「スコア分布」「達成確率」「リタイア理由」「ログ」を確認する。</li>
+<li>条件を変えるときは、試験条件・編成・行動を見直して再実行する。</li>
+</ul>
+</section>
+<section id="save" aria-labelledby="title-save"><h2 id="title-save">5. 結果を保存する</h2>
+<ul>
+<li>残したい編成は「編成」から名前を付けて保存する。</li>
+<li>保存されるのは編成と行動設定です。試験条件や実行結果は別に確認する。</li>
+<li>手持ち設定は「データ」→「JSON保存」でバックアップする。</li>
+<li>別の環境で使うときは「JSON読込」後に「保存」を押す。</li>
+<li>デッキ探索ツールで登録したLv・凸数を使うときは、「検索設定」の探索対象で「手持ち」を選んで「探索開始」を押す。</li>
+<li>「必須カード」で衣装まで指定できる。「必須キャラクター」と併用すると、両方の条件を満たす編成を探せる。</li>
+</ul>
+</section>
+<section id="help" aria-labelledby="title-help"><h2 id="title-help">6. 困ったとき</h2>
+<ul>
+<li>カードが候補に出ないときは、手持ち設定の所持・Lv・保存状態を確認する。</li>
+<li>デッキ探索で最大Lv・完凸の編成を試すときは、「手持ち内全カード完凸」または「全カード完凸」を選ぶ。</li>
+<li>「許容組み合わせなし」と出たら、「行動」で候補を増やすか「自動最善」を使う。</li>
+<li>すべてリタイアするときは、HP・回復・敵条件・特別課題を確認する。</li>
+<li>探索に時間がかかるときは、対象カード・結果上限・挑戦回数を減らす。</li>
+<li>画面が狭いときは、表を横にスクロールする。</li>
+</ul>
+<hr>
+<p>画面名や表示内容は、公開版の更新により変わる場合があります。</p>
+</section>
+<div class="footer">ツイステツール置き場 利用手順書 · 2026年9月22日版</div>
+</main>
+</div>
+<script>
+document.getElementById('print').addEventListener('click', () => window.print());
+const navigation = [...document.querySelectorAll('nav a')];
+const observer = new IntersectionObserver(entries => {
+  const visible = entries.filter(entry => entry.isIntersecting);
+  if (!visible.length) return;
+  const id = visible[0].target.id;
+  navigation.forEach(link => {
+    if (link.hash === '#' + id) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+}, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+document.querySelectorAll('main section').forEach(section => observer.observe(section));
+</script>
+</body>
+</html>

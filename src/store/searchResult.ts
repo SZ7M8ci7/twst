@@ -72,6 +72,7 @@ export interface SearchResultState {
   totalResults: number;
   nowResults: number;
   results: any[];
+  resultsUseSupport: boolean;
   isSearching: boolean;
   errorMessage: string;
 }
@@ -81,6 +82,7 @@ export const useSearchResultStore = defineStore('searchResult', {
     totalResults: 0,
     nowResults: 0,
     results: [],
+    resultsUseSupport: false,
     isSearching: false,
     errorMessage: '',
   }),

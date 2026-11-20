@@ -1,7 +1,8 @@
 import type { Character } from '@/store/characters'
 import { normalizeLegacyDeckBuffs, parseMagicBuffsFromEtc } from '@/utils/buffParser';
 import { calculateLegacyBuddyContinueHealAmount, getBuddyStatusForCharacter, getBuddyStatusSummary } from '@/utils/buddyEffects';
-import { isM3Unlocked } from '@/utils/totsu';
+import { calculateStatFromLevel } from '@/utils/calculations';
+import { isM3Unlocked, isMaxLimitBreak } from '@/utils/totsu';
 import { DeckSearchResultsManager, type DeckResult } from './TopNResultsManager';
 import { toRaw } from 'vue';
 const charaIdMap = new Map<string, number>();
@@ -129,6 +130,7 @@ export interface DeckSearchControls {
 
 export interface DeckSearchContext {
   characters: Character[];
+  supportCharacters?: Character[];
   settings: DeckSearchSettings;
   controls: DeckSearchControls;
 }
@@ -2340,6 +2342,7 @@ export function calcDeckStatus(
       const encodedName = charaAny.encodedName ?? (charaAny.encodedName = encodeURIComponent(chara.name));
       simuURL += '&name' + (index + 1) + '=' + encodedName;
       simuURL += '&level' + (index + 1) + '=' + chara.level;
+      simuURL += '&totsu' + (index + 1) + '=' + chara.totsu;
     }
     if (!skipHpMetrics) deckTotalHP += baseHP;
     if (!skipAuxMetrics) {
@@ -3703,7 +3706,7 @@ export async function calcDecks(
   for (let i = 0; i < sourceCharacters.length; i++) {
     const chara = toRaw(sourceCharacters[i]) as Character;
     if (chara.required && chara.level == 0) {
-      controls.setErrorMessage(t('error.requiredCharacter'));
+      controls.setErrorMessage(t('error.requiredCardUnavailable'));
       return
     }
   }
@@ -3714,27 +3717,20 @@ export async function calcDecks(
   const maxLevelCharacters: Character[] = [];
   for (let i = 0; i < sourceCharacters.length; i++) {
     const chara = toRaw(sourceCharacters[i]) as Character;
-    let maxCardLevel = 120;  // Default max level for SSR
-    if (chara.rare == 'SR') {
-      maxCardLevel = 90;     // Max level for SR
-    } else if (chara.rare == 'R') {
-      maxCardLevel = 70;     // Max level for R
-    }
     if (chara.level > 0) {
-      const bonusHP = chara.base_hp * 0.2;
-      const bonusATK = chara.base_atk * 0.2;
-      const HPperLv = (chara.hp - 2 * bonusHP - chara.base_hp) / (maxCardLevel - 1);
-      const ATKperLv = (chara.atk - 2 * bonusATK - chara.base_atk) / (maxCardLevel - 1);
-      const leveldiff = maxCardLevel - chara.level;
+      const fullLimitBreak = isMaxLimitBreak(chara.totsu);
       nonZeroLevelCharacters.push(getSearchWorkCharacter(
         chara,
         'normal',
         chara.level,
-        chara.hp - HPperLv * leveldiff,
-        chara.atk - ATKperLv * leveldiff,
+        calculateStatFromLevel(chara.hp, chara.base_hp, chara.rare, chara.level, fullLimitBreak),
+        calculateStatFromLevel(chara.atk, chara.base_atk, chara.rare, chara.level, fullLimitBreak),
       ));
     }
-    if (selectedSupportCharacterSet !== null && chara.rare == 'SSR' && selectedSupportCharacterSet.has(chara.name)) {
+  }
+  for (const source of context.supportCharacters ?? sourceCharacters) {
+    const chara = toRaw(source);
+    if (selectedSupportCharacterSet?.has(chara.name) && chara.rare === 'SSR') {
       maxLevelCharacters.push(getSearchWorkCharacter(
         chara,
         'support',
@@ -3750,7 +3746,7 @@ export async function calcDecks(
   markTiming('afterCharacterPrepMs');
 
   const listLength = nonZero.length;
-  if (listLength < 5) {
+  if (listLength < (settings.allowSameCharacter ? 4 : 5)) {
     controls.setErrorMessage(t('error.fewCharacter'));
     return;
   }
@@ -4050,8 +4046,8 @@ export async function calcDecks(
   for (let i = 0; i < nonZero.length; i++) {
     if (nonZero[i].required) requiredCount += 1;
   }
-  if (requiredCount > 5) {
-    controls.setErrorMessage('必須設定されたキャラが多すぎます');
+  if (requiredCount > (settings.allowSameCharacter ? 4 : 5)) {
+    controls.setErrorMessage(t('error.requiredCardLimit'));
     return;
   }
   controls.setResults([]);
@@ -5020,11 +5016,11 @@ export async function calcDecks(
     const encoded3 = c3Any.encodedName ?? (c3Any.encodedName = encodeURIComponent(c3.name));
     const encoded4 = c4Any.encodedName ?? (c4Any.encodedName = encodeURIComponent(c4.name));
     const simuURL =
-      '&name1=' + encoded0 + '&level1=' + c0.level +
-      '&name2=' + encoded1 + '&level2=' + c1.level +
-      '&name3=' + encoded2 + '&level3=' + c2.level +
-      '&name4=' + encoded3 + '&level4=' + c3.level +
-      '&name5=' + encoded4 + '&level5=' + c4.level;
+      '&name1=' + encoded0 + '&level1=' + c0.level + '&totsu1=' + c0.totsu +
+      '&name2=' + encoded1 + '&level2=' + c1.level + '&totsu2=' + c1.totsu +
+      '&name3=' + encoded2 + '&level3=' + c2.level + '&totsu3=' + c2.totsu +
+      '&name4=' + encoded3 + '&level4=' + c3.level + '&totsu4=' + c3.totsu +
+      '&name5=' + encoded4 + '&level5=' + c4.level + '&totsu5=' + c4.totsu;
     return [
       hp,
       ehp,
@@ -16665,6 +16661,12 @@ export async function calcDecks(
   for(let i = 0; i < requiredCount; i++) {
     lengthes[i] = i+1;
   }
+  if (requiredCount === 5) {
+    controls.setTotalResults(1);
+    processCombinationCore(nonZero.slice(0, 5));
+    await appendResult();
+    return;
+  }
   // 同キャラ編成有り
   if (settings.allowSameCharacter) {
     let lastRenderTime = Date.now();
@@ -16673,18 +16675,6 @@ export async function calcDecks(
     let searchCheckCounter = 0;
     const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
     controls.setTotalResults(beforeLastLoops * (maxLevel.length) / factorialize(4 - requiredCount));
-    if (requiredCount == 5) {
-      controls.setTotalResults(1);
-      combination[0] = nonZero[0];
-      combination[1] = nonZero[1];
-      combination[2] = nonZero[2];
-      combination[3] = nonZero[3];
-      combination[4] = nonZero[4];
-      processCombinationCore(combination);
-      controls.setNowResults(nowResultsCount);
-      await waitForBrowserPaint();
-      return
-    }
     if (canUseHpPrimarySupportFastPath) {
       markFastPath('same-support-hp-primary');
       markTiming('beforeMainLoopMs');
@@ -17494,18 +17484,6 @@ export async function calcDecks(
   } else {
     const beforeLastLoops = (lengthes[0] * (lengthes[1] - 1) * (lengthes[2] - 2) * (lengthes[3] - 3));
     controls.setTotalResults(beforeLastLoops * (lengthes[4] - 4) / factorialize(5 - requiredCount));
-    if (requiredCount == 5) {
-      controls.setTotalResults(1);
-      combination[0] = nonZero[0];
-      combination[1] = nonZero[1];
-      combination[2] = nonZero[2];
-      combination[3] = nonZero[3];
-      combination[4] = nonZero[4];
-      processCombinationCore(combination);
-      controls.setNowResults(nowResultsCount);
-      await waitForBrowserPaint();
-      return
-    }
     if (canUseDamagePrimaryFixedTwoFastLoop) {
       markFastPath('fixed-two-damage-primary');
       markTiming('beforeMainLoopMs');

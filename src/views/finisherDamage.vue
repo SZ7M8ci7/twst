@@ -417,7 +417,6 @@ import { useSearchSettingsStore, createDefaultSearchSettingsState } from '@/stor
 import { storeToRefs } from 'pinia';
 import { createCharacterInfoMap, CharacterCardInfo } from '@/components/common';
 import { loadImageUrls } from '@/utils/characterAssets';
-import { loadSearchCharacterPreferences } from '@/storage/searchPreferences';
 import CharacterIconWithType from '@/components/CharacterIconWithType.vue';
 import { onMounted, ref, Ref, computed, onBeforeUnmount, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -473,7 +472,6 @@ const elementIcons = {
 };
 
 const loading = ref(true);
-const savedCharacterLevels = ref<Record<string, number>>({});
 
 // CharacterIconWithTypeコンポーネントに渡すためのアイコン辞書
 const iconsForCharacterIconWithType = computed(() => {
@@ -485,7 +483,6 @@ const iconsForCharacterIconWithType = computed(() => {
 });
 
 onMounted(async () => {
-  loadSavedCharacterLevels();
   try {
     // 1. Piniaストアのcharactersからメイン画像URLを取得
     const mainImageUrls = await loadImageUrls(characters.value, 'name');
@@ -1243,19 +1240,10 @@ function getPlacementLabel(placement: SearchPlacement): string {
     : t('finisherDamage.supportLabel');
 }
 
-function loadSavedCharacterLevels() {
-  try {
-    savedCharacterLevels.value = loadSearchCharacterPreferences().levels;
-  } catch (error) {
-    console.warn('Failed to load character levels from storage:', error);
-    savedCharacterLevels.value = {};
-  }
-}
-
-function getCardLevel(cardName: string): number {
-  const storeLevel = characters.value.find(character => character.name === cardName)?.level ?? 0;
-  const savedLevel = savedCharacterLevels.value[cardName] ?? 0;
-  return Math.max(storeLevel, savedLevel);
+function availableInRoster(cardName: string): boolean {
+  if (!useHandCollection.value) return true;
+  const card = getReadOnlyHandCard(cardName);
+  return card.isOwned && card.level > 0;
 }
 
 function hasSpecificBufferCard(entry: DeckSearchDamageEntry): boolean {
@@ -1266,14 +1254,14 @@ function isDeckSearchOptionDisabled(
   entry: DeckSearchDamageEntry,
   option: DeckSearchOption
 ): boolean {
-  if (option.finisherPlacement === 'hand' && getCardLevel(entry.finisherCardName) <= 0) {
+  if (option.finisherPlacement === 'hand' && !availableInRoster(entry.finisherCardName)) {
     return true;
   }
 
   if (
     option.bufferPlacement === 'hand' &&
     hasSpecificBufferCard(entry) &&
-    getCardLevel(entry.bufferName) <= 0
+    !availableInRoster(entry.bufferName)
   ) {
     return true;
   }
@@ -1328,19 +1316,6 @@ function getRequiredBuddyCharacterNames(cardName: string): string[] {
   return buddyNames;
 }
 
-function resetRequiredCards() {
-  characters.value.forEach(character => {
-    character.required = false;
-  });
-}
-
-function setRequiredCard(cardName: string) {
-  const target = characters.value.find(character => character.name === cardName);
-  if (target) {
-    target.required = true;
-  }
-}
-
 async function openDeckSearchFromDamageEntry(
   entry: DeckSearchDamageEntry,
   element: ElementType,
@@ -1352,13 +1327,13 @@ async function openDeckSearchFromDamageEntry(
   const preset = SEARCH_PRESET_CONFIGURATIONS.find(config => config.name === getBasicExamPresetName(element));
   if (!preset) return;
 
-  resetRequiredCards();
+  const requiredCards = new Set<string>();
 
   const mustCharacterNames = new Set<string>(getRequiredBuddyCharacterNames(entry.finisherCardName));
   let selectedSupportCharacters = [...defaults.selectedSupportCharacters];
 
   if (option.finisherPlacement === 'hand') {
-    setRequiredCard(entry.finisherCardName);
+    requiredCards.add(entry.finisherCardName);
   } else {
     selectedSupportCharacters = [entry.finisherCardName];
   }
@@ -1368,7 +1343,7 @@ async function openDeckSearchFromDamageEntry(
 
   if (option.bufferPlacement === 'hand') {
     if (isSpecificBufferCard) {
-      setRequiredCard(entry.bufferName);
+      requiredCards.add(entry.bufferName);
     } else if (bufferCharacterName) {
       mustCharacterNames.add(bufferCharacterName);
     }
@@ -1385,6 +1360,8 @@ async function openDeckSearchFromDamageEntry(
   searchSettingsStore.updateSearchSettings({
     ...defaults,
     ...preset.minSettings,
+    requiredCards: [...requiredCards],
+    rosterSource: useHandCollection.value ? 'owned' : 'allMax',
     sortOptions: preset.sortOptions.map(sortOption => ({ ...sortOption })),
     attackNum: preset.attackNum ?? defaults.attackNum,
     allowSameCharacter: true,
@@ -1394,8 +1371,7 @@ async function openDeckSearchFromDamageEntry(
   });
 
   await router.push({
-    name: 'search',
-    query: { openSettings: '1' }
+    name: 'search'
   });
 }
 

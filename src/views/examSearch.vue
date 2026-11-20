@@ -16,22 +16,8 @@
         <p class="filter-help">{{ t(rosterSource === 'ownedMax' && excludeDormFromUpgrades
           ? 'examSearch.ownedMaxDormDescription' : rosterDescriptions[rosterSource]) }}</p>
       </div>
-      <div class="required-card-setting">
-        <div class="selection-label">{{ t('examSearch.cardFilter') }}<span class="optional-label">{{ t('examSearch.optional') }}</span></div>
-        <div class="required-card-slots">
-          <div v-for="slot in 5" :key="slot" class="required-card-slot">
-            <button type="button" :data-testid="`required-card-slot-${slot - 1}`" class="required-card-pick"
-              :aria-label="`${t('examSearch.cardFilter')} ${slot}${requiredCardSlots[slot - 1] ? ': ' + cardLabel(requiredCardSlots[slot - 1]) : ''}`"
-              @click="openRequiredCard(slot - 1)">
-              <img v-if="requiredCardSlots[slot - 1]" :src="cardImages[requiredCardSlots[slot - 1]] || defaultImg" :alt="cardLabel(requiredCardSlots[slot - 1])" />
-              <span v-else aria-hidden="true">＋</span>
-            </button>
-            <button v-if="requiredCardSlots[slot - 1]" type="button" class="required-card-clear"
-              :data-testid="`required-card-clear-${slot - 1}`" :aria-label="`${t('examSearch.clear')}: ${t('examSearch.cardFilter')} ${slot} ${cardLabel(requiredCardSlots[slot - 1])}`"
-              @click="clearRequiredCard(slot - 1)">×</button>
-          </div>
-        </div>
-      </div>
+      <RequiredCardPicker v-model="requiredCards" :label="t('examSearch.cardFilter')"
+        :catalog-mode="rosterSource === 'allMax'" />
       <div class="character-setting">
         <div class="selection-label">{{ t('examSearch.characterFilter') }}<span class="optional-label">{{ t('examSearch.optional') }}</span></div>
         <v-btn data-testid="character-filter-open" class="character-picker-open" variant="outlined" :disabled="busy" @click="characterFilterOpen = true">
@@ -115,9 +101,6 @@
         <v-card-actions><v-spacer /><v-btn data-testid="search-settings-close" color="primary" variant="tonal" @click="searchSettingsOpen = false">{{ t('common.close') }}</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
-    <Teleport to="body"><SimCharaModal v-if="cardFilterOpen" data-testid="card-filter-dialog"
-      :catalog-mode="rosterSource === 'allMax'"
-      @select="selectRequiredCard" @close="cardFilterOpen = false" /></Teleport>
     <v-dialog v-model="characterFilterOpen" max-width="640" scrollable class="search-character-dialog" data-testid="character-filter-dialog">
       <v-card class="modal-card character-filter-card">
         <v-card-title class="modal-title">{{ t('examSearch.characterFilter') }}</v-card-title>
@@ -150,7 +133,7 @@ import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import cards from '@/assets/chara.json';
 import charactersInfo from '@/assets/characters_info.json';
 import ExamSearchPresetPicker from '@/components/ExamSearchPresetPicker.vue';
-import SimCharaModal from '@/components/SimCharaModal.vue';
+import RequiredCardPicker from '@/components/RequiredCardPicker.vue';
 import ExamBattleLogDialog from '@/components/ExamBattleLogDialog.vue';
 import ExamSearchResultsTable from '@/components/ExamSearchResultsTable.vue';
 import ExamFormationComparison from '@/components/ExamFormationComparison.vue';
@@ -232,10 +215,8 @@ const excludedSupportNames = ref<string[]>(Array.isArray(input.value.excludedSup
 const rosterReady = computed(() => input.value.roster.length >= (usesSupport.value?4:5) && (!usesSupport.value||input.value.supports.length>=1));
 const cardImages = ref<Record<string, string>>({});
 const characterIconImages = ref<Record<string, string>>({});
-const cardFilterOpen = ref(false), characterFilterOpen = ref(false);
-const selectingRequiredCardIndex = ref(0);
+const characterFilterOpen = ref(false);
 const requiredCards = ref<string[]>(Array.isArray(input.value.requiredCards) ? [...input.value.requiredCards] : []);
-const requiredCardSlots = ref(Array.from({ length: 5 }, (_, index) => requiredCards.value[index] ?? ''));
 const characterFilter = ref<string[]>([...(input.value.requiredCharacters ?? [])]);
 const persistedSession = ref<SavedSearchSession | null>(loadSearchSession());
 const sessionSaved = ref(true);
@@ -337,27 +318,6 @@ watch(requiredCards, names => {
   input.value.requiredCards = [...normalized];
   if (!busy.value) invalidateActiveSearch();
 }, { deep: true });
-function openRequiredCard(index: number) {
-  selectingRequiredCardIndex.value = index;
-  cardFilterOpen.value = true;
-}
-function selectRequiredCard(card: { name: string }) {
-  const next = [...requiredCardSlots.value];
-  const index = selectingRequiredCardIndex.value;
-  const previous = next.indexOf(card.name);
-  if (previous >= 0 && previous !== index) next[previous] = next[index];
-  next[index] = card.name;
-  requiredCardSlots.value = next;
-  requiredCards.value = next.filter(Boolean);
-  cardFilterOpen.value = false;
-}
-function clearRequiredCard(index: number) {
-  requiredCardSlots.value[index] = '';
-  requiredCards.value = requiredCardSlots.value.filter(Boolean);
-}
-watch(requiredCards, names => {
-  for (const name of names) if (!cardImages.value[name]) void loadCharacterImageUrl(name).then(url => { cardImages.value[name] = url; });
-}, { immediate: true });
 watch(characterFilter, names => {
   if (JSON.stringify(input.value.requiredCharacters ?? []) === JSON.stringify(names)) return;
   input.value.requiredCharacters = [...names];
@@ -671,7 +631,7 @@ onBeforeUnmount(() => {
 .continuous-help { color: #657582; font-size: .85rem; }
 .roster-source-setting { display: grid; justify-items: start; gap: 8px; padding: 12px 0; }
 .roster-source-setting .filter-help { margin: 0; }
-.required-card-setting, .character-setting { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 16px; padding: 12px 0; }
+.character-setting { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 16px; padding: 12px 0; }
 .selection-label { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
 .optional-label { font-size: .75rem; color: #657582; font-weight: normal; }
 .character-picker-open { justify-self: start; }
@@ -679,11 +639,6 @@ onBeforeUnmount(() => {
 .search-content > .actions .resource-start { order: 0; }
 .search-content > .actions .search-settings-open { order: 2; }
 .result-tabs { margin: 12px 0; border-bottom: 1px solid #d9e2ea; }
-.required-card-slots { display: grid; grid-template-columns: repeat(5, minmax(0, 72px)); gap: 10px; }
-.required-card-slot { position: relative; min-width: 0; }
-.required-card-pick { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border: 1px solid #c6d1dc; border-radius: 6px; overflow: hidden; background: white; color: #1976d2; font-size: 24px; }
-.required-card-pick img { width: 100%; height: 100%; object-fit: cover; }
-.required-card-clear { position: absolute; top: -7px; right: -7px; width: 22px; height: 22px; background: white; border: 1px solid #c6d1dc; border-radius: 50%; line-height: 18px; }
 .search-settings-open { margin-left: 0; }
 .filter-count { min-width: 1.4em; margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: #e8eef4; font-size: .8em; }
 .filter-help { color: #52616d; font-size: .85rem; }
@@ -706,7 +661,7 @@ onBeforeUnmount(() => {
 .v-dialog.search-character-dialog :deep(.character-filter-card > .v-card-text) { min-height: 0; padding: 12px 16px; }
 @media (max-width: 600px) {
   .search-settings-open { margin-left: 0; }
-  .required-card-setting, .character-setting { grid-template-columns: 1fr; gap: 8px; }
+  .character-setting { grid-template-columns: 1fr; gap: 8px; }
   .actions .resource-start { flex: 1; }
 }
 h1 { font-size: 1.6rem; margin-bottom: 12px; } h2 { font-size: 1.15rem; margin: 20px 0 10px; }
