@@ -6,15 +6,17 @@ import type { SearchInput, Candidate, SearchProgress } from '@/domain/examSearch
 import { MAX_ISLANDS } from '@/domain/examSearch/types';
 import type { SessionCheckpoint } from '@/domain/examSearch/scheduler';
 import { displayProgress } from '@/domain/examSearch/statistics';
+import { benchmarkWinner } from '@/domain/examSearch/benchmark';
+import { BENCHMARK_ISLANDS, benchmarkIslandWork, type BenchmarkDepth, type BenchmarkWork } from '@/domain/examSearch/benchmarkWork';
 
 const catalog = Object.fromEntries(cards.map(c => [c.name, c]));
 const catalogVersion = JSON.stringify(cards).split('').reduce((hash, c) => Math.imul(hash ^ c.charCodeAt(0), 16777619), 2166136261).toString(16);
 type ParallelCheckpoint = SessionCheckpoint & { parallel?: { baseNonce: string; checkpoints: SessionCheckpoint[]; owners: Record<string, number> } };
-type Request = { method: 'start'; id: number; input: SearchInput; durationMs: number; continuous?: boolean }
+type Request = { method: 'start'; id: number; input: SearchInput; durationMs?: number; continuous?: boolean; benchmarkDepth?: BenchmarkDepth }
   | { method: 'resume' | 'evaluate'; id: number; durationMs: number; continuous?: boolean; input?: SearchInput; checkpoint?: ParallelCheckpoint; catalogVersion?: string; candidateId?: string }
   | { method: 'stop'; id: number }
   | { method: 'preview'; id: number; input: SearchInput; candidate: Candidate; best?: {seed:string;score:number} };
-type ChildRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; continuous?: boolean; deadline: number; nonce: string; serialize: false }
+type ChildRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; work?: BenchmarkWork; continuous?: boolean; deadline: number; nonce: string; serialize: false }
   | { method: 'resume' | 'evaluate'; id: number; island: number; durationMs: number; continuous?: boolean; deadline: number; input: SearchInput; checkpoint: SessionCheckpoint; catalogVersion: string; serialize: false; candidateId?: string; nonce?: string }
   | { method: 'stop'; id: number }
   | { method: 'preview'; id: number; island: number; input: SearchInput; candidate: Candidate; best?: {seed:string;score:number} };
@@ -25,6 +27,7 @@ type ChildMessage = { id: number; island: number; progress?: SearchProgress; che
 type Child = { worker?: Pick<Worker, 'postMessage' | 'terminate'>; island: number; finished: boolean; validMessageSeen: boolean; retryCount: number;
   originalRequest?: ChildOperationRequest; bootstrapStage?: 'loading' | 'loaded'; bootstrapUrl?: string };
 type Operation = {
+  winnerOnly: boolean;
   id: number; method: Request['method']; input: SearchInput; startedAt: number; deadline: number; baseElapsed: number; baseNonce: string;
   children: Child[]; checkpoints: Array<SessionCheckpoint | undefined>; progresses: Array<SearchProgress | undefined>;
   owners: Record<string, number>; required: Set<number>; stopping: boolean;
@@ -40,6 +43,8 @@ function checkpointProgress(checkpoint: SessionCheckpoint, input: SearchInput): 
     tasksDone: checkpoint.cursor, tasksTotal: checkpoint.tasksTotal ?? checkpoint.cursor, elapsedMs: checkpoint.elapsed, results: finalists }, input.attempts, input.desiredProbability);
 }
 function postAggregate(op: Operation, finalPhase?: 'done' | 'stopped') {
+  // Benchmark duplicates are merged in island order, independent of message arrival.
+  if (op.winnerOnly) return;
   const merged = aggregateIslandProgress(op.progresses, op.owners);
   op.owners = merged.owners;
   const progress = { ...merged.progress, elapsedMs: op.baseElapsed + Math.max(0, Date.now() - op.startedAt), ...(finalPhase ? { phase: finalPhase } : {}) };
@@ -92,10 +97,14 @@ function handleChild(op: Operation, child: Child, data: ChildMessage) {
   const merged = mergeIslandResults(checkpoints.map(checkpoint => checkpoint.finalists
     .filter(result=>candidateSatisfiesConstraints(op.input,result.candidate,catalog))), op.owners);
   op.owners = merged.owners;
-  const checkpoint = createParallelCheckpoint(checkpoints, op.baseNonce, op.owners, op.baseElapsed + Date.now() - op.startedAt) as ParallelCheckpoint;
-  checkpoint.finalists = merged.results;
-  postAggregate(op, op.stopping ? 'stopped' : 'done');
-  self.postMessage({ id: op.id, checkpoint, catalogVersion });
+  if (op.winnerOnly) {
+    self.postMessage({ id: op.id, winner: benchmarkWinner(merged.results) });
+  } else {
+    const checkpoint = createParallelCheckpoint(checkpoints, op.baseNonce, op.owners, op.baseElapsed + Date.now() - op.startedAt) as ParallelCheckpoint;
+    checkpoint.finalists = merged.results;
+    postAggregate(op, op.stopping ? 'stopped' : 'done');
+    self.postMessage({ id: op.id, checkpoint, catalogVersion });
+  }
   terminateChildren(op); operation = null; requestActive = false;
 }
 function startupFailureMessage(child: Child, event: { message?: string }) {
@@ -164,10 +173,11 @@ function sendChildRequest(child: Child, request: ChildOperationRequest) {
 }
 function makeOperation(data: Request, checkpoints: SessionCheckpoint[], owners: Record<string, number>, baseNonce: string, count: number,
   activeIslands = Array.from({ length: count }, (_, island) => island), baseElapsedOverride?: number): Operation {
-  const startedAt = Date.now(), requestedMs = 'durationMs' in data ? data.durationMs : 180000;
+  const startedAt = Date.now(), requestedMs = 'durationMs' in data ? data.durationMs ?? 180000 : 180000;
   const totalMs = Math.max(0, Math.min(180000, requestedMs));
   const reserveMs = count > 3 ? Math.min(8000, totalMs * 0.05) : Math.min(4000, totalMs * 0.025);
-  const deadline = startedAt + totalMs - reserveMs;
+  const fixedWork = data.method === 'start' && data.benchmarkDepth !== undefined;
+  const deadline = fixedWork ? Infinity : startedAt + totalMs - reserveMs;
   const input = 'input' in data && data.input ? data.input : ({} as SearchInput);
   const baseElapsed = baseElapsedOverride ?? (checkpoints.length ? Math.max(...checkpoints.map(checkpoint => checkpoint.elapsed ?? 0)) : 0);
   const progresses = Array.from({ length: count }, (_, island) => checkpoints[island] ? checkpointProgress(checkpoints[island]!, input) :
@@ -175,6 +185,7 @@ function makeOperation(data: Request, checkpoints: SessionCheckpoint[], owners: 
   const children: Child[] = Array.from({ length: count }, (_, island) => ({ worker: undefined, island,
     finished: !activeIslands.includes(island), validMessageSeen: false, retryCount: 0 }));
   const op: Operation = { id: data.id, method: data.method, input, startedAt, deadline, baseElapsed, baseNonce,
+    winnerOnly: fixedWork,
     children, checkpoints: Array.from({ length: count }, (_, i) => checkpoints[i]), progresses: Array.from({ length: count }, (_, i) => progresses[i]),
     owners: { ...owners }, required: new Set<number>(), stopping: false };
   try {
@@ -195,7 +206,8 @@ function sendOperation(op: Operation, data: SearchRequest, checkpoints: SessionC
     if (child.finished || !child.worker) continue;
     const island = child.island; op.required.add(island);
     if (data.method === 'start') {
-      sendChildRequest(child, { method: 'start', id: op.id, island, islandCount: op.children.length, input: data.input, durationMs: data.durationMs, continuous: data.continuous, deadline: op.deadline,
+      sendChildRequest(child, { method: 'start', id: op.id, island, islandCount: op.children.length, input: data.input, durationMs: data.durationMs ?? 0, continuous: data.continuous, deadline: op.deadline,
+        work: data.benchmarkDepth && benchmarkIslandWork(data.input.preset, data.benchmarkDepth, island),
         nonce: `${op.baseNonce}:island:${island}`, serialize: false });
     } else {
       const checkpoint = checkpoints[island];
@@ -209,7 +221,8 @@ function sendOperation(op: Operation, data: SearchRequest, checkpoints: SessionC
 function startSearch(data: Extract<Request,{method:'start'}>) {
   const issue = validateInput(data.input, catalog); if (issue) throw new Error(issue);
   const cores = globalThis.navigator?.hardwareConcurrency, memory = (globalThis.navigator as Navigator & { deviceMemory?: number })?.deviceMemory;
-  const count = typeof Worker === 'undefined' ? 1 : chooseIslandCount(cores, memory), baseNonce = `${Date.now()}:${Math.random()}`;
+  const count = data.benchmarkDepth ? BENCHMARK_ISLANDS : typeof Worker === 'undefined' ? 1 : chooseIslandCount(cores, memory);
+  const baseNonce = `${Date.now()}:${Math.random()}`;
   operation = makeOperation(data, [], {}, baseNonce, count); sendOperation(operation, data, []);
 }
 function resumeSearch(data: Extract<Request,{method:'resume'|'evaluate'}>) {

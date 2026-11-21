@@ -30,6 +30,6 @@ export function createResourceBattleHost(): BattleEngine {
     scoutTargets: () => simulator.resourceCriticalTargets(),
     importanceTrial: (seed,policy) => simulator.runResourceImportanceTrial(seed,policy),
     replay: (seed, plan, log) => simulator.replayResourceTrial(seed, plan, log),
-    learnPlan: (seed, durationMs) => simulator.learnResourcePlan(seed, durationMs),
-    learnCriticalPlan: (seed,durationMs,cardIndex,idealHand,magic) => simulator.learnResourceCriticalPlan(seed,durationMs,cardIndex,idealHand,magic) };
+    learnPlan: (seed, budget) => simulator.learnResourcePlan(seed, budget),
+    learnCriticalPlan: (seed,budget,cardIndex,idealHand,magic) => simulator.learnResourceCriticalPlan(seed,budget,cardIndex,idealHand,magic) };
 }

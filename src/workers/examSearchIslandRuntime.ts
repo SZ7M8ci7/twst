@@ -5,12 +5,13 @@ import { validateInput } from '@/domain/examSearch/variants';
 import type { SearchInput, Candidate } from '@/domain/examSearch/types';
 import { displayProgress } from '@/domain/examSearch/statistics';
 import { runSessionWithinBudget } from './examSearchRun';
+import type { BenchmarkWork } from '@/domain/examSearch/benchmarkWork';
 
 const catalog = Object.fromEntries(cards.map(c => [c.name, c]));
 // Invalidate persisted statistics whenever source combat data changes.
 const catalogVersion = JSON.stringify(cards).split('').reduce((hash, c) => Math.imul(hash ^ c.charCodeAt(0), 16777619), 2166136261).toString(16);
 
-export type IslandRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; continuous?: boolean; deadline?: number; nonce: string; serialize?: boolean }
+export type IslandRequest = { method: 'start'; id: number; island: number; islandCount: number; input: SearchInput; durationMs: number; work?: BenchmarkWork; continuous?: boolean; deadline?: number; nonce: string; serialize?: boolean }
   | { method: 'resume' | 'evaluate'; id: number; island: number; durationMs: number; continuous?: boolean; deadline?: number; input?: SearchInput; checkpoint?: SessionCheckpoint; catalogVersion?: string; candidateId?: string; nonce?: string; serialize?: boolean }
   | { method: 'stop'; id: number }
   | { method: 'preview'; id: number; island: number; input: SearchInput; candidate: Candidate; best?: {seed:string;score:number} };
@@ -50,6 +51,11 @@ export function createIslandRuntime(emit: (message: IslandMessage) => void) {
         session = new SearchSession(data.input, catalog, engine, data.nonce ?? data.checkpoint.nonce, data.checkpoint);
       }
       if (!session) throw new Error('session');
+      if (data.method === 'start' && data.work) {
+        if (!stopRequested) await session.run(data.work, () => {});
+        emit({ id: data.id, island: data.island, checkpoint: session.checkpoint(), catalogVersion });
+        return;
+      }
       if (data.method === 'evaluate') session.refineValidation(data.candidateId ?? '');
       const deadline = data.deadline ?? Date.now() + Math.max(0, Math.min(180000, data.durationMs));
       const runner = { run: (duration: number, publish: Parameters<SearchSession['run']>[1]) =>

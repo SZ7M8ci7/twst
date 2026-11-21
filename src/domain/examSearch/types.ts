@@ -103,6 +103,7 @@ export interface SearchProgress {
   elapsedMs: number;
   results: SearchResult[];
 }
+export type PlanSearchBudget = number | { nodes: number };
 export interface BattleEngine {
   prepare(input: SearchInput, candidate: Candidate): Promise<void>;
   trial(seed: string, policy: PolicyKind, log?: boolean): BattleTrial;
@@ -110,8 +111,8 @@ export interface BattleEngine {
   scoutTargets?(): number[];
   importanceTrial?(seed:string,policy:PolicyKind):BattleTrial & {weight:number};
   replay?(seed: string, plan: [string, string][], log?: boolean): BattleTrial;
-  learnPlan?(seed: string, durationMs: number): Promise<[string, string][] | null>;
-  learnCriticalPlan?(seed:string,durationMs:number,cardIndex:number,idealHand?:boolean,magic?:MagicSlot):Promise<[string,string][]|null>;
+  learnPlan?(seed: string, budget: PlanSearchBudget): Promise<[string, string][] | null>;
+  learnCriticalPlan?(seed:string,budget:PlanSearchBudget,cardIndex:number,idealHand?:boolean,magic?:MagicSlot):Promise<[string,string][]|null>;
 }
 export interface BattleTrial { score: number; retired: boolean; finishTurn: number; fitness?: number; log?: string[]; plan?: [string, string][] }
 export const ENGINE_VERSION = 'exam-resource-search-141';

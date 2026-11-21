@@ -4,6 +4,7 @@ import * as statistics from '@/domain/examSearch/statistics';
 import { lowerCostCandidates, trainedUpgradeCandidates, jointSpellCandidates, alternatePolicyCandidates, candidateSatisfiesConstraints } from '@/domain/examSearch/variants';
 import { importanceUpperQuantile } from '@/domain/examSearch/importance';
 import { diverseFinalists } from '@/domain/examSearch/finalists';
+import type { BenchmarkWork } from './benchmarkWork';
 
 import { yieldToHost as yieldEventLoop } from '@/utils/yieldToHost';
 import { DISCOVERY_SAMPLES, VALIDATION_SAMPLES, MAX_FINALISTS, REFINED_VALIDATION_SAMPLES as CONTINUOUS_VALIDATION_SAMPLES } from '@/domain/examSearch/sampling';
@@ -319,7 +320,9 @@ export class SearchSession {
     this.finalists=[...retained,...selected.slice(0,MAX_FINALISTS-retained.length).map(r=>({...r,validation:emptySamples(),validationBest:undefined,validationTarget:VALIDATION_SAMPLES}))];
     this.round++;
   }
-  async run(durationMs: number, publish: (progress: SearchProgress) => void, continuous = false) {
+  async run(budget: number | BenchmarkWork, publish: (progress: SearchProgress) => void, continuous = false) {
+    const work = typeof budget === 'number' ? undefined : budget;
+    const durationMs = typeof budget === 'number' ? budget : Infinity;
     this.stopped = false;
     this.continuous = continuous;
     if (continuous) { this.trimPool(); this.trimHistory(); }
@@ -330,6 +333,10 @@ export class SearchSession {
     const loadoutDeadline = start + durationMs * 0.55;
     const contenderDeadline = start + durationMs * 0.65;
     const planDeadline = start + durationMs * 0.7;
+    const trainingDeadline = start + durationMs * 0.75;
+    const candidateLimit = work?.candidates ?? Infinity;
+    const loadoutLimit = Math.floor(candidateLimit * 0.94);
+    const planBudget = work ? { nodes: 1024 } : 250;
     const report = (phase: SearchProgress['phase']) => publish({ phase, generated: this.generatedCount,
       evaluated: this.evaluatedCount, tasksDone: this.cursor, tasksTotal: this.knownTasksTotal,
       elapsedMs: this.elapsed + performance.now() - start, results: this.finalists });
@@ -349,60 +356,68 @@ export class SearchSession {
           this.tasksReady=true;this.knownTasksTotal=this.tasks.length;
         }
       }
-      let emptyMutations = 0;
-      while (!this.stopped && performance.now() < discoveryEnd && (this.pending.length || this.cursor < this.tasks.length || this.pool.length)) {
-        if (!this.pending.length) {
-          const stop = () => this.stopped || performance.now() >= discoveryEnd;
-          let candidates;
-          // Refine actual promising teams while the larger catalogue is still
-          // being scanned. Otherwise a full collection never reaches refinement.
-          const refineNow = this.pool.length > 0 && this.cursor >= (this.mutationRound + 1) * 8;
-          if (this.cursor < this.tasks.length && !refineNow) {
-            candidates = await generateCandidatesAsync(this.input, this.tasks[this.cursor], this.catalog, stop);
-            if (candidates) this.cursor++;
-          } else {
-            const parents = this.diverseParents(4);
-            const parent = parents[this.mutationRound++ % parents.length];
-            candidates = await generateNeighbors(this.input, parent.candidate, this.catalog, this.seen, stop);
-            const partner=parents.find(r=>r!==parent && r.candidate.cost===parent.candidate.cost) ?? parents.find(r=>r!==parent);
-            if(partner && !stop()) candidates.push(...crossCandidates(this.input,parent.candidate,partner.candidate,this.catalog,this.seen));
-            if (!candidates.length && ++emptyMutations >= parents.length && this.cursor >= this.tasks.length) break;
-            if (candidates.length) emptyMutations = 0;
+      const discover = async (limit: number) => {
+        let emptyMutations = 0;
+        while (!this.stopped && this.evaluatedCount < limit && performance.now() < discoveryEnd && (this.pending.length || this.cursor < this.tasks.length || this.pool.length)) {
+          if (!this.pending.length) {
+            const stop = () => this.stopped || performance.now() >= discoveryEnd;
+            let candidates;
+            let parentCount = 0;
+            // Refine actual promising teams while the larger catalogue is still
+            // being scanned. Otherwise a full collection never reaches refinement.
+            const refineNow = this.pool.length > 0 && this.cursor >= (this.mutationRound + 1) * 8;
+            if (this.cursor < this.tasks.length && !refineNow) {
+              candidates = await generateCandidatesAsync(this.input, this.tasks[this.cursor], this.catalog, stop);
+              if (candidates) this.cursor++;
+            } else {
+              const parents = this.diverseParents(4);
+              parentCount = parents.length;
+              const parent = parents[this.mutationRound++ % parents.length];
+              candidates = await generateNeighbors(this.input, parent.candidate, this.catalog, this.seen, stop);
+              const partner=parents.find(r=>r!==parent && r.candidate.cost===parent.candidate.cost) ?? parents.find(r=>r!==parent);
+              if(partner && !stop()) candidates.push(...crossCandidates(this.input,parent.candidate,partner.candidate,this.catalog,this.seen));
+            }
+            if (!candidates) break;
+            for (const candidate of candidates) if (candidateSatisfiesConstraints(this.input,candidate,this.catalog) && !this.seen.has(candidate.id)) {
+              this.remember(candidate.id);
+              this.pending.push({ candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES });
+            }
+            if (parentCount) {
+              emptyMutations = this.pending.length ? 0 : emptyMutations + 1;
+              if (emptyMutations >= parentCount && this.cursor >= this.tasks.length) break;
+            }
           }
-          if (!candidates) break;
-          for (const candidate of candidates) if (candidateSatisfiesConstraints(this.input,candidate,this.catalog) && !this.seen.has(candidate.id)) {
-            this.remember(candidate.id);
-            this.pending.push({ candidate, development: emptySamples(), validation: emptySamples(), validationTarget: VALIDATION_SAMPLES });
+          const result = this.pending[0];
+          if (!result) { await progress('generate'); continue; }
+          await this.engine.prepare(this.input, result.candidate);
+          await this.scout(result,discoveryEnd,discoveryScoutSamples);
+          await this.importanceScreen(result,discoveryEnd,16);
+          while (result.development.scores.length < discoverySamples && !this.stopped && performance.now() < discoveryEnd) {
+            const seed=`${this.nonce}:development:${this.trialSerial++}`;
+            const trial = this.engine.trial(seed, result.candidate.policy);
+            if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
+            result.development.scores.push(trial.score);
+            result.development.fitnessSum = (result.development.fitnessSum ?? 0) + (trial.fitness ?? trial.score);
+            result.development.retired += Number(trial.retired);
+            result.development.turns += trial.finishTurn;
+            if (result.development.scores.length % 8 === 0) await progress('generate');
           }
+          if (result.development.scores.length >= discoverySamples) {
+            this.pool.push(result); this.pending.shift(); this.evaluatedCount++;
+            this.trimPool();
+          }
+          await progress('generate');
         }
-        const result = this.pending[0];
-        if (!result) { await progress('generate'); continue; }
-        await this.engine.prepare(this.input, result.candidate);
-        await this.scout(result,discoveryEnd,discoveryScoutSamples);
-        await this.importanceScreen(result,discoveryEnd,16);
-        while (result.development.scores.length < discoverySamples && !this.stopped && performance.now() < discoveryEnd) {
-          const seed=`${this.nonce}:development:${this.trialSerial++}`;
-          const trial = this.engine.trial(seed, result.candidate.policy);
-          if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
-          result.development.scores.push(trial.score);
-          result.development.fitnessSum = (result.development.fitnessSum ?? 0) + (trial.fitness ?? trial.score);
-          result.development.retired += Number(trial.retired);
-          result.development.turns += trial.finishTurn;
-          if (result.development.scores.length % 8 === 0) await progress('generate');
-        }
-        if (result.development.scores.length >= discoverySamples) {
-          this.pool.push(result); this.pending.shift(); this.evaluatedCount++;
-          this.trimPool();
-        }
-        await progress('generate');
-      }
+      };
+      // Keep room for the simulator's spell substitutions and fitted plans.
+      await discover(Math.ceil(candidateLimit * 0.78));
       // Cross multiple spell substitutions on measured compositions. A bounded
       // round-robin gives each cost band time before deeper contender trials.
       const loadouts=this.diverseParents(2).map(parent=>[...alternatePolicyCandidates(this.input,parent.candidate),
         ...jointSpellCandidates(this.input,parent.candidate,this.catalog)]
         .filter(candidate=>candidateSatisfiesConstraints(this.input,candidate,this.catalog)&&!this.seen.has(candidate.id)));
       for(let index=0;index<249;index++)for(const options of loadouts) {
-        if(this.stopped||performance.now()>=loadoutDeadline)break;
+        if(this.stopped||this.evaluatedCount>=loadoutLimit||performance.now()>=loadoutDeadline)break;
         const candidate=options[index];if(!candidate||this.seen.has(candidate.id))continue;
         const result:SearchResult={candidate,development:emptySamples(),validation:emptySamples(),validationTarget:VALIDATION_SAMPLES};
         await this.engine.prepare(this.input,candidate);
@@ -423,7 +438,8 @@ export class SearchSession {
       // Give promising compositions in every resource band equal extra batches
       // before fitting plans. These remain development data, never holdout data.
       const contenders = this.contenders();
-      for (let batch=0;batch<(wideInitialScreen?16:15);batch++) for (const result of contenders) {
+      const contenderBatches = Math.min(wideInitialScreen ? 16 : 15, Math.ceil(candidateLimit / 24));
+      for (let batch=0;batch<contenderBatches;batch++) for (const result of contenders) {
         if(this.stopped || performance.now()>=contenderDeadline) break;
         if(result.development.scores.length>=512) continue;
         await this.engine.prepare(this.input,result.candidate);
@@ -446,14 +462,14 @@ export class SearchSession {
       if (this.engine.learnPlan && !this.stopped) {
         const parents = this.diverseParents(3).slice(0,12);
         for (let planRound=0;planRound<3;planRound++) for (const parent of parents) {
-          if (this.stopped || performance.now() >= planDeadline) break;
+          if (this.stopped || this.evaluatedCount >= candidateLimit || performance.now() >= planDeadline) break;
           await this.engine.prepare(this.input,parent.candidate);
           let plan;
           if(planRound===0&&(parent.criticalScout?.score??0)>(parent.developmentBest?.score??0))plan=parent.criticalScout?.plan;
           // Keep the observed plan first, then optimize a template without a
           // particular hand draw. Only ordinary trials below can rank it.
           if(planRound===1&&parent.criticalScout?.cardIndex!==undefined&&this.engine.learnCriticalPlan)
-            plan=await this.engine.learnCriticalPlan(parent.criticalScout.seed??`${this.nonce}:ideal-critical-plan-development:${this.trialSerial++}`,250,parent.criticalScout.cardIndex,true,parent.criticalScout.magic);
+            plan=await this.engine.learnCriticalPlan(parent.criticalScout.seed??`${this.nonce}:ideal-critical-plan-development:${this.trialSerial++}`,planBudget,parent.criticalScout.cardIndex,true,parent.criticalScout.magic);
           if(!plan&&planRound<=1&&parent.developmentBest&&parent.developmentBest.score>0) {
             const observed=this.engine.trial(parent.developmentBest.seed,parent.candidate.policy,true);
             if(observed.score!==parent.developmentBest.score)throw new Error('Development trial replay mismatch');
@@ -462,11 +478,12 @@ export class SearchSession {
           // An observed successful development run is often a better starting
           // point than an unrelated draw. It is never a validation/audit seed.
           if(!plan&&planRound===2&&parent.criticalScout?.cardIndex!==undefined&&this.engine.learnCriticalPlan)
-            plan=await this.engine.learnCriticalPlan(`${this.nonce}:critical-plan-development:${this.trialSerial++}`,250,parent.criticalScout.cardIndex,false,parent.criticalScout.magic);
-          plan??=await this.engine.learnPlan(`${this.nonce}:plan-development:${this.trialSerial++}`, 250);
+            plan=await this.engine.learnCriticalPlan(`${this.nonce}:critical-plan-development:${this.trialSerial++}`,planBudget,parent.criticalScout.cardIndex,false,parent.criticalScout.magic);
+          plan??=await this.engine.learnPlan(`${this.nonce}:plan-development:${this.trialSerial++}`, planBudget);
           if (!plan || this.stopped) continue;
           const planModes=this.input.preset.kind==='BASIC'?['flexible','turn','priority'] as const:['turn','priority'] as const;
           for (const preferredPlanMode of planModes) {
+          if (this.evaluatedCount >= candidateLimit) break;
           const candidate = { ...parent.candidate, preferredPlan: plan, preferredPlanMode,
             id: JSON.stringify([parent.candidate.cards.map(c=>[c.name,c.level,c.totsu,c.selectedMagic,c.support]),parent.candidate.challengeIds,parent.candidate.policy,plan,preferredPlanMode]) };
           if (this.seen.has(candidate.id)) continue;
@@ -501,13 +518,13 @@ export class SearchSession {
         ...trainedUpgradeCandidates(this.input,parent.candidate,this.catalog),
       ]) {
         if (!candidateSatisfiesConstraints(this.input,candidate,this.catalog)) continue;
-        if(this.stopped||performance.now()>=deadline-durationMs*0.25)break;
+        if(this.stopped||this.evaluatedCount>=candidateLimit||performance.now()>=trainingDeadline)break;
         if(this.seen.has(candidate.id))continue;
         const result:SearchResult={candidate,development:emptySamples(),validation:emptySamples(),validationTarget:VALIDATION_SAMPLES};
         await this.engine.prepare(this.input,candidate);
-        await this.scout(result,deadline-durationMs*0.25,8);
-        await this.importanceScreen(result,deadline-durationMs*0.25,32);
-        for(let i=0;i<64&&!this.stopped&&performance.now()<deadline-durationMs*0.25;i++) {
+        await this.scout(result,trainingDeadline,8);
+        await this.importanceScreen(result,trainingDeadline,32);
+        for(let i=0;i<64&&!this.stopped&&performance.now()<trainingDeadline;i++) {
           const seed=`${this.nonce}:development:${this.trialSerial++}`;
           const trial=this.engine.trial(seed,candidate.policy);
           if(!result.developmentBest||trial.score>result.developmentBest.score)result.developmentBest={seed,score:trial.score};
@@ -518,8 +535,10 @@ export class SearchSession {
         }
         if(result.development.scores.length===64){this.pool.push(result);this.remember(candidate.id);this.evaluatedCount++;}
       }
+      if (work && this.evaluatedCount < candidateLimit) await discover(candidateLimit);
       const previous = this.finalists;
       this.selectFinalists();
+      if (work) for (const result of this.finalists) result.validationTarget = work.validationTrials;
       if (continuous) this.continueValidation(previous);
     }
     // Reuse prepared deck/runtime caches for 64 trials, but keep the same

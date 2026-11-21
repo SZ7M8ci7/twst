@@ -21,16 +21,8 @@
           </th>
           <td class="deck-cell">
             <div class="result-deck">
-              <figure v-for="card in row.result.candidate.cards" :key="`${card.support}:${card.name}`" :title="cardLabel(card.name)">
-                <div class="result-card-image">
-                  <img :src="cardImages[card.name] || defaultImg" :alt="cardLabel(card.name)" loading="lazy" />
-                  <span v-if="card.support" class="support-badge">S</span>
-                  <span class="card-level">Lv{{ card.level }}</span>
-                </div>
-                <figcaption class="selected-magic-icons" :aria-label="`M${card.selectedMagic.join('/M')}`">
-                  <span v-for="magic in [1, 2, 3]" :key="magic" class="magic-icon" :class="{ selected: card.selectedMagic.includes(magic as 1 | 2 | 3) }">M{{ magic }}</span>
-                </figcaption>
-              </figure>
+              <ExamResultCard v-for="card in row.result.candidate.cards" :key="`${card.support}:${card.name}`"
+                :card="card" :label="cardLabel(card.name)" :src="cardImages[card.name]" />
             </div>
           </td>
           <td class="extra-cell">
@@ -53,7 +45,7 @@
 import { useI18n } from 'vue-i18n';
 import type { SearchResult } from '@/domain/examSearch/types';
 import { resultScoreDistribution } from '@/domain/examSearch/statistics';
-import defaultImg from '@/assets/img/default.webp';
+import ExamResultCard from '@/components/ExamResultCard.vue';
 
 defineProps<{
   rows: { result: SearchResult; variantCount?: number }[];
@@ -85,13 +77,6 @@ tbody tr:last-child > * { border-bottom: 0; }
 .deck-cell { width: 342px; }
 .extra-cell { font-size: 12px; max-width: 125px; overflow-wrap: anywhere; }
 .extra-cell > span { display: block; }
-.card-level {
-  position: absolute; right: 0; bottom: 0;
-  color: #fff; font-size: 10px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
-  text-shadow: -1px -1px 0 #14202b, 0 -1px 0 #14202b, 1px -1px 0 #14202b,
-    -1px 0 0 #14202b, 1px 0 0 #14202b,
-    -1px 1px 0 #14202b, 0 1px 0 #14202b, 1px 1px 0 #14202b;
-}
 .score-cell { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; }
 thead .score-cell { font-size: 12px; white-space: normal; }
 .max-cell { font-weight: 700; }
@@ -99,13 +84,6 @@ thead .score-cell { font-size: 12px; white-space: normal; }
 .actions-cell .v-btn { display: flex; width: 100%; min-height: 30px; height: auto; padding: 5px 6px; font-size: 12px; letter-spacing: 0; }
 .actions-cell :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .result-deck { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
-figure { margin: 0; min-width: 0; border: 1px solid #ccd8e2; border-radius: 5px; overflow: hidden; }
-.result-card-image { position: relative; aspect-ratio: 1; overflow: hidden; background: #eef3f7; }
-.result-card-image img { display: block; width: 100%; height: auto; object-fit: cover; }
-.selected-magic-icons { display: flex; gap: 2px; padding: 2px; background: #152336c9; }
-.magic-icon { flex: 1; border-radius: 2px; text-align: center; font-size: 9px; line-height: 14px; color: #ffffff66; }
-.magic-icon.selected { background: #fff; color: #173e65; font-weight: 800; }
-.support-badge { position: absolute; left: 3px; top: 3px; padding: 0 3px; border-radius: 3px; background: #14202bcc; color: #fff; font-size: 10px; font-weight: 800; }
 .variants-button { display: block; padding: 4px 0; color: #1768a7; text-align: left; font-size: 12px; }
 .variant-summary, .variant-count { display: block; }
 .variant-count { margin-top: 3px; font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }

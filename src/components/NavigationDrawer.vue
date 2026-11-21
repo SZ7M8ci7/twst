@@ -176,6 +176,7 @@ const navGroups: NavGroup[] = [
       { routeName: 'calcATK', titleKey: 'tool.attackExamScoreCalculator' },
       { routeName: 'calcDEF', titleKey: 'tool.defencexamScoreCalculator' },
       { routeName: 'examSimulator', titleKey: 'tool.examSimulator' },
+      { routeName: 'examBenchmark', titleKey: 'tool.examBenchmark' },
       { routeName: 'sim', titleKey: 'tool.sim' },
       { routeName: 'search', titleKey: 'tool.deckExplorationTools' },
       { routeName: 'relation', titleKey: 'tool.mutualDuo' },

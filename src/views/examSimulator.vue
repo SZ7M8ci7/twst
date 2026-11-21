@@ -76,6 +76,9 @@
             <span class="muted">{{ t('examSimulator.examConditions') }}</span>
             <strong>{{ activePreset ? displayPresetTitle(activePreset.title) : t('examSimulator.customExam') }}</strong>
           </div>
+          <v-btn variant="text" color="primary" :disabled="commonConditionsBusy" :to="{ name: 'examBenchmark' }">
+            {{ t('tool.examBenchmark') }}
+          </v-btn>
           <v-btn data-testid="exam-details-open" color="primary" variant="outlined" :disabled="commonConditionsBusy" @click="enemyConditionsDialogOpen = true">
             {{ t('examSimulator.examDetails') }}
           </v-btn>
@@ -777,7 +780,7 @@ import { clampTotsuCount, isM3Unlocked, isMaxLimitBreak, isTotsuBuddyEnhanced } 
 import { examPresetDefinitions, type ExamPresetDefinition, type ExamSpecialChallengeDefinition, type ExamSpecialChallengeEffect } from '@/utils/examPresets';
 import { buildConstrainedEnemyActionDeck } from '@/utils/enemyActionDeck';
 import { chooseObservedPair, chooseFlexiblePlanPair, remainingContinuousHealing, createPairSpend, type BattleObservation, type FlexiblePlanStep } from '@/domain/examSearch/policy';
-import type { SearchInput, Candidate, PolicyKind } from '@/domain/examSearch/types';
+import type { SearchInput, Candidate, PolicyKind, PlanSearchBudget } from '@/domain/examSearch/types';
 import { loadSearchTransfer, INLINE_SEARCH_TRANSFER, loadExamSearch, initializeExamSearchStorage } from '@/storage/examSearchStorage';
 import { snapshotExamConditions, type SharedExamConditions } from '@/utils/sharedExamConditions';
 import { loadExamSimulatorDeckImportState, saveDeckSimulatorImportState } from '@/storage/simulatorStorage';
@@ -4092,6 +4095,7 @@ async function searchAutoBestSeed(
   initialPruneBenchmark?: AutoBestPruneBenchmark,
   trainingPolicy?: PolicyKind,
   trainingDeadline?: number,
+  trainingNodes?: number,
 ): Promise<AutoBestSeedSearchResult> {
   const frames: Array<{
     checkpoint: AutoBestCheckpoint;
@@ -4114,6 +4118,8 @@ async function searchAutoBestSeed(
   const branchRng = createRng(seedText);
   const rootSlice=trainingDeadline===undefined?Infinity:Math.max(1,(trainingDeadline-getSimulationClock())/4);
   let rootDeadline=Infinity;
+  const nodesPerOpening = Math.ceil((trainingNodes ?? Infinity) / 4);
+  let rootNodeLimit = Infinity;
   const pruneLateAttackBranches = (simulationRuntimeCache?.examKind ?? exam.value.kind) === 'ATTACK';
   let pruneBenchmark = initialPruneBenchmark ? { ...initialPruneBenchmark } : undefined;
 
@@ -4185,6 +4191,10 @@ async function searchAutoBestSeed(
   processResult(initialResult, 0);
 
   while (frames.length > 0) {
+    if (trainingNodes !== undefined) {
+      if (exploredNodes >= trainingNodes) break;
+      if (frames.length > 1 && exploredNodes >= rootNodeLimit) { frames.length = 1; currentPath.length = 0; }
+    }
     if(trainingDeadline!==undefined) {
       const now=getSimulationClock();
       if(now>=trainingDeadline){cancelled=true;break;}
@@ -4200,6 +4210,7 @@ async function searchAutoBestSeed(
     }
     const pair = frame.candidates[frame.nextIndex++];
     if(trainingDeadline!==undefined&&frame.depth===0)rootDeadline=getSimulationClock()+rootSlice;
+    if(trainingNodes!==undefined&&frame.depth===0)rootNodeLimit=exploredNodes+nodesPerOpening;
     currentPath[frame.depth] = pair;
     currentPath.length = frame.depth + 1;
     branchRng.setState(frame.checkpoint.rngState);
@@ -4399,24 +4410,26 @@ function resourceTrialFitness(result: SimulationStats) {
     + 500 * result.finishTurn : result.score;
 }
 
-async function learnResourcePlan(seed: string, durationMs: number): Promise<PlayerPair[] | null> {
+async function learnResourcePlan(seed: string, budget: PlanSearchBudget): Promise<PlayerPair[] | null> {
   // Offline training only. The resulting fixed instructions are evaluated on
   // independent seeds; validation never invokes this hindsight optimizer.
-  const start = getSimulationClock(), previousStop = stopRequested.value;
+  const deadline = typeof budget === 'number' ? getSimulationClock() + budget : undefined;
+  const nodes = typeof budget === 'number' ? undefined : budget.nodes;
+  const previousStop = stopRequested.value;
   stopRequested.value = false;
   try {
     const result = await searchAutoBestSeed(seed, () => {
-      if (getSimulationClock() - start >= durationMs) stopRequested.value = true;
-    }, undefined, undefined, resourceTrainingPolicy,start+durationMs);
+      if (deadline !== undefined && getSimulationClock() >= deadline) stopRequested.value = true;
+    }, undefined, undefined, resourceTrainingPolicy, deadline, nodes);
     return result.bestPlan.length ? result.bestPlan.map(pair => [...pair]) : null;
   } finally { stopRequested.value = previousStop; }
 }
 
-async function learnResourceCriticalPlan(seed:string,durationMs:number,cardIndex:number,idealHand=false,magic?:MagicSlot):Promise<PlayerPair[]|null> {
+async function learnResourceCriticalPlan(seed:string,budget:PlanSearchBudget,cardIndex:number,idealHand=false,magic?:MagicSlot):Promise<PlayerPair[]|null> {
   if(!Number.isInteger(cardIndex)||cardIndex<0||cardIndex>=deck.value.length)throw new Error('Invalid critical scout card');
   const previous=resourceCriticalScoutCard,previousMagic=resourceCriticalScoutMagic,previousHits=resourceCriticalScoutHits,previousIdealHand=resourceIdealHandTraining;
   resourceCriticalScoutCard=cardIndex;resourceCriticalScoutMagic=magic;resourceCriticalScoutHits=0;resourceIdealHandTraining=idealHand;
-  try {return await learnResourcePlan(seed,durationMs);}
+  try {return await learnResourcePlan(seed,budget);}
   finally {resourceCriticalScoutCard=previous;resourceCriticalScoutMagic=previousMagic;resourceCriticalScoutHits=previousHits;resourceIdealHandTraining=previousIdealHand;}
 }
 
