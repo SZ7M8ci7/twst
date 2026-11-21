@@ -56,13 +56,18 @@ const data = computed(() => ({
     };
   }),
 }));
+const scoreMin = computed(() => {
+  const scores = data.value.datasets.flatMap(line => line.data).filter((score): score is number => score !== null);
+  if (!scores.length) return 0;
+  return Math.floor(Math.min(...scores) * 0.8 / 10_000) * 10_000;
+});
 const options = computed<ChartOptions<'radar'>>(() => {
   const labels = pointLabels.value;
   const format = formatter.value;
   return {
     responsive: true, maintainAspectRatio: false, animation: false,
     scales: { r: {
-      min: props.ratio ? ratioMin.value : 0, suggestedMax: 1,
+      min: props.ratio ? ratioMin.value : scoreMin.value, suggestedMax: 1,
       grid: { color: context => props.ratio && context.tick.value === 1 ? '#8599a9' : '#dce4eb' },
       ticks: { maxTicksLimit: 6, precision: props.ratio ? undefined : 0,
         color: '#516574', font: { size: 10 }, callback: value => format.format(Number(value)) },
