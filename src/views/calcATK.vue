@@ -111,6 +111,7 @@ import { Chart, registerables } from 'chart.js';
 import DoughnutGraph from '@/components/DoughnutGraph.vue';
 import { useI18n } from 'vue-i18n';
 import { useSimulatorStore } from '@/store/simulatorStore';
+import { calculateAttackExamScore } from '@/utils/attackExamScore';
 import { getCompatibilityType, getMagicTargetAttribute } from '@/utils/simulatorAttributes';
 Chart.register(...registerables);
 
@@ -143,38 +144,19 @@ const table = ref({
   equalSingle: 0,
   disadvantageSingle: 0,
 });
-const totalTable = computed(() =>
-  Number(table.value.advantageCombo) +
-  Number(table.value.equalCombo) +
-  Number(table.value.disadvantageCombo) +
-  Number(table.value.advantageSingle) +
-  Number(table.value.equalSingle) +
-  Number(table.value.disadvantageSingle)
-);
-const damageScore = computed(() => Number((damage.value / 208).toFixed(0)));
-const buffScore = computed(() => buff.value * 120);
-const blockHealScore = computed(() => blockHeal.value * 180);
-const advantageComboScore = computed(() => table.value.advantageCombo * 210);
-const equalComboScore = computed(() => table.value.equalCombo * 180);
-const disadvantageComboScore = computed(() => table.value.disadvantageCombo * 150);
-const advantageSingleScore = computed(() => table.value.advantageSingle * 150);
-const equalSingleScore = computed(() => table.value.equalSingle * 120);
-const disadvantageSingleScore = computed(() => table.value.disadvantageSingle * 90);
-const basicScore = computed(() => 11036 + enemyHP.value * 0.080471);
-const moveMinusScore = computed(() => 641.2 + enemyHP.value * 0.002048);
-const baseScore = computed(() =>
-  basicScore.value
-  - moveMinusScore.value * totalTable.value
-  + damageScore.value
-  + buffScore.value
-  + blockHealScore.value
-  + advantageComboScore.value
-  + equalComboScore.value
-  + disadvantageComboScore.value
-  + advantageSingleScore.value
-  + equalSingleScore.value
-  + disadvantageSingleScore.value);
-const score = computed(() => (baseScore.value * difficulty.value).toFixed())
+const breakdown = computed(() => calculateAttackExamScore({
+  enemyMaxHp: Number(enemyHP.value),
+  playerDamage: Number(damage.value),
+  scoreBuff: Number(buff.value),
+  healBlock: Number(blockHeal.value),
+  advantageCombo: Number(table.value.advantageCombo),
+  equalCombo: Number(table.value.equalCombo),
+  disadvantageCombo: Number(table.value.disadvantageCombo),
+  advantageSingle: Number(table.value.advantageSingle),
+  equalSingle: Number(table.value.equalSingle),
+  disadvantageSingle: Number(table.value.disadvantageSingle),
+}, difficulty.value));
+const score = computed(() => String(breakdown.value.score));
 const colors = [
   '#FAD9C8', // 行動回数
   '#FAF2C8', // 有利連撃
@@ -188,16 +170,16 @@ const colors = [
   '#F2C8FA', // 不利単発
 ];
 const scores = computed(() => [
-  { label: t('attack.numberOfActions'), value: Number(((basicScore.value - moveMinusScore.value * totalTable.value) * difficulty.value).toFixed()), color: colors[0] },
-  { label: t('attack.numberOfAdvantage2'), value: advantageComboScore.value * difficulty.value, color: colors[1] },
-  { label: t('attack.damage'), value: damageScore.value * difficulty.value, color: colors[2] },
-  { label: t('attack.nullifingHPRestoration'), value: blockHealScore.value * difficulty.value, color: colors[3] },
-  { label: t('attack.numberOfDisadvantage2'), value: equalComboScore.value * difficulty.value, color: colors[4] },
-  { label: t('attack.buff'), value: buffScore.value * difficulty.value, color: colors[5] },
-  { label: t('attack.numberOfAdvantage1'), value: advantageSingleScore.value * difficulty.value, color: colors[6] },
-  { label: t('attack.numberOfNeutral2'), value: disadvantageComboScore.value * difficulty.value, color: colors[7] },
-  { label: t('attack.numberOfDisadvantage1'), value: equalSingleScore.value * difficulty.value, color: colors[8] },
-  { label: t('attack.numberOfNeutral1'), value: disadvantageSingleScore.value * difficulty.value, color: colors[9] },
+  { label: t('attack.numberOfActions'), value: Number(((breakdown.value.basic - breakdown.value.actionPenalty) * difficulty.value).toFixed()), color: colors[0] },
+  { label: t('attack.numberOfAdvantage2'), value: breakdown.value.advantageCombo * difficulty.value, color: colors[1] },
+  { label: t('attack.damage'), value: Math.round(breakdown.value.damage * difficulty.value), color: colors[2] },
+  { label: t('attack.nullifingHPRestoration'), value: breakdown.value.healBlock * difficulty.value, color: colors[3] },
+  { label: t('attack.numberOfDisadvantage2'), value: breakdown.value.equalCombo * difficulty.value, color: colors[4] },
+  { label: t('attack.buff'), value: breakdown.value.buff * difficulty.value, color: colors[5] },
+  { label: t('attack.numberOfAdvantage1'), value: breakdown.value.advantageSingle * difficulty.value, color: colors[6] },
+  { label: t('attack.numberOfNeutral2'), value: breakdown.value.disadvantageCombo * difficulty.value, color: colors[7] },
+  { label: t('attack.numberOfDisadvantage1'), value: breakdown.value.equalSingle * difficulty.value, color: colors[8] },
+  { label: t('attack.numberOfNeutral1'), value: breakdown.value.disadvantageSingle * difficulty.value, color: colors[9] },
 ].sort((a, b) => b.value - a.value));
 // チャート用のデータ
 const data = computed(() => {

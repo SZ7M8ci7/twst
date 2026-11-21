@@ -30,7 +30,7 @@ const input = { preset: { ...preset, difficulty: preset.difficulty ?? 1.5 }, ros
 const candidate = { id: 'transfer-browser', cards: roster.map((c, i) => ({ ...c, originalTotsu: c.totsu,
   support: i === 4, selectedMagic: i === 4 ? [2, 3] : [1, 2] })),
   challengeIds: (preset.specialChallenges ?? []).map(c => c.id), cost: 0, policy: 'effects', estimate: 0 };
-const version = fs.readFileSync(path.join(root, 'src/domain/examSearch/types.ts'), 'utf8').match(/ENGINE_VERSION = '([^']+)'/)[1];
+const version = require('./helpers/exam-runtime.cjs').load('src/domain/examSearch/types.ts').searchEngineVersion(preset.kind);
 const key = 'twst-exam-resource-search-v1';
 const errors = [];
 

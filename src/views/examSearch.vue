@@ -156,7 +156,7 @@ import { validateInput, invalidSearchCards, examUsesSupport } from '@/domain/exa
 import { constrainCheckpoint } from '@/domain/examSearch/requiredCheckpoint';
 import { rankedResults } from '@/domain/examSearch/statistics';
 import type { RosterCard, RosterSource, SearchInput, SearchProgress, SearchResult } from '@/domain/examSearch/types';
-import { ENGINE_VERSION } from '@/domain/examSearch/types';
+import { searchEngineVersion } from '@/domain/examSearch/types';
 import { loadSimulatorWindowState, loadStoredAutoSaveDeck, loadStoredSavedDecks } from '@/storage/simulatorStorage';
 import { groupExamBattleLog, type BattleLogActionElement, type BattleLogGroup } from '@/utils/examBattleLog';
 import { SearchContinuation } from '@/utils/examSearchContinuation';
@@ -490,7 +490,7 @@ function getWorker() {
     }
     if (data.checkpoint && evaluatedInput.value) {
       // Pass the plain worker snapshot to IndexedDB, not Vue's reactive proxy.
-      const session = { input: clone(evaluatedInput.value), checkpoint: data.checkpoint, catalogVersion: data.catalogVersion, version: ENGINE_VERSION };
+      const session = { input: clone(evaluatedInput.value), checkpoint: data.checkpoint, catalogVersion: data.catalogVersion, version: searchEngineVersion(evaluatedInput.value.preset.kind) };
       persistedSession.value = session;
       lastCheckpoint = session;
       await persistCheckpoint(session, data.id);

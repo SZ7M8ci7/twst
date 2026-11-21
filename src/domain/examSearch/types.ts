@@ -115,4 +115,7 @@ export interface BattleEngine {
 }
 export interface BattleTrial { score: number; retired: boolean; finishTurn: number; fitness?: number; log?: string[]; plan?: [string, string][] }
 export const ENGINE_VERSION = 'exam-resource-search-141';
+export function searchEngineVersion(kind: ExamPresetDefinition['kind']) {
+  return kind === 'ATTACK' ? `${ENGINE_VERSION}-atk5` : ENGINE_VERSION;
+}
 export const emptySamples = (): Samples => ({ scores: [], retired: 0, turns: 0 });

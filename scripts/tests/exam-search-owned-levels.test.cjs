@@ -79,7 +79,7 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
   const persistence = load('src/storage/examSearchStorage.ts');
   persistence.saveExamSearch(savedInput);
   if (savedCheckpoint) persistence.saveSearchSession({ input: savedInput, checkpoint: savedCheckpoint,
-    version: load('src/domain/examSearch/types.ts').ENGINE_VERSION, catalogVersion: 'test' });
+    version: load('src/domain/examSearch/types.ts').searchEngineVersion(savedInput.preset.kind), catalogVersion: 'test' });
   setActivePinia(createPinia());
   const scope = vue.effectScope();
   t.after(() => scope.stop());
@@ -101,6 +101,18 @@ function runtime(t, handCards, savedInput = searchInput(), savedCheckpoint) {
   return { view: viewContext.view, load, workers, timers, persistence, supportPicker, storage,
     flushTimers() { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(callback => callback()); } };
 }
+
+test('resuming an ATTACK search requires scores from the current formula', async t => {
+  const { persistence, load } = runtime(t, []);
+  const { ENGINE_VERSION, searchEngineVersion } = load('src/domain/examSearch/types.ts');
+  const input = searchInput();
+  input.preset.kind = 'ATTACK';
+  const session = { input, checkpoint: checkpoint(), version: ENGINE_VERSION, catalogVersion: 'test' };
+  await persistence.saveSearchSession(session);
+  assert.equal(persistence.loadSearchSession(), null);
+  await persistence.saveSearchSession({ ...session, version: searchEngineVersion('ATTACK') });
+  assert.equal(persistence.loadSearchSession().checkpoint.cursor, 1);
+});
 
 test('owned Lv0 cards are excluded while Lv1+ training is preserved', t => {
   const { view } = runtime(t, [handCard(names[0], 0), handCard(names[1], 1),

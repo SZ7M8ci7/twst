@@ -768,6 +768,7 @@ import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAsse
 import { getStatScalingMaxLevel } from '@/constants/levels';
 import { atkbuffDict, calculateCharacterStats, criticalDict, dmgbuffDict, healContinueDict, healDict, magicDict, recalculateATK, recalculateHP } from '@/utils/calculations';
 import { criticalRatePowerScale, criticalTailMultiplier, criticalProposal } from '@/utils/criticalRates';
+import { calculateAttackExamScore } from '@/utils/attackExamScore';
 import { evasionRateByPower } from '@/utils/evasionRates';
 import { parseMagicBuffsFromEtc, type ParsedBuff } from '@/utils/buffParser';
 import { getPowerOption, processCharacterSelection } from '@/utils/characterSelection';
@@ -7181,22 +7182,7 @@ function calculateScore(stats: SimulationStats) {
     return Math.round(base * difficulty * turns[turnIndex] + stats.specialChallengeScore);
   }
   if (examKind === 'ATTACK') {
-    const actionCount = stats.advantageCombo + stats.equalCombo + stats.disadvantageCombo + stats.advantageSingle + stats.equalSingle + stats.disadvantageSingle;
-    const damageScore = Math.round(stats.playerDamage / 208);
-    const basicScore = 11036 + safeNumber(stats.enemyMaxHp) * 0.080471;
-    const moveMinusScore = 641.2 + safeNumber(stats.enemyMaxHp) * 0.002048;
-    const base = basicScore
-      - moveMinusScore * actionCount
-      + damageScore
-      + stats.scoreBuff * 120
-      + Math.min(1, stats.healBlock) * 180
-      + stats.advantageCombo * 210
-      + stats.equalCombo * 180
-      + stats.disadvantageCombo * 150
-      + stats.advantageSingle * 150
-      + stats.equalSingle * 120
-      + stats.disadvantageSingle * 90;
-    return Math.round(base * difficulty + stats.specialChallengeScore);
+    return calculateAttackExamScore(stats, difficulty, stats.specialChallengeScore, 'score');
   }
   const turns = [0.8, 0.85, 0.9, 0.95, 1];
   const turnMultiplier = turns[clamp(stats.finishTurn - 1, 0, turns.length - 1)];
@@ -7238,37 +7224,23 @@ function pushScoreBreakdownLog(stats: SimulationStats) {
   }
 
   if (exam.value.kind === 'ATTACK') {
-    const actionCount = stats.advantageCombo + stats.equalCombo + stats.disadvantageCombo + stats.advantageSingle + stats.equalSingle + stats.disadvantageSingle;
-    const damageScore = Math.round(stats.playerDamage / 208);
-    const basicScore = 11036 + safeNumber(stats.enemyMaxHp) * 0.080471;
-    const moveMinusScore = 641.2 + safeNumber(stats.enemyMaxHp) * 0.002048;
-    const base = basicScore
-      - moveMinusScore * actionCount
-      + damageScore
-      + stats.scoreBuff * 120
-      + Math.min(1, stats.healBlock) * 180
-      + stats.advantageCombo * 210
-      + stats.equalCombo * 180
-      + stats.disadvantageCombo * 150
-      + stats.advantageSingle * 150
-      + stats.equalSingle * 120
-      + stats.disadvantageSingle * 90;
+    const parts = calculateAttackExamScore(stats, exam.value.difficulty, stats.specialChallengeScore);
     const components = [
-      scoreComponent('基礎', basicScore),
-      scoreComponent('行動数補正', -moveMinusScore * actionCount, `${actionCount}回`),
-      scoreComponent('与ダメ', damageScore, `総与ダメ${formatNumber(stats.playerDamage)}`),
-      scoreComponent('バフ', stats.scoreBuff * 120, `${stats.scoreBuff}回`),
-      scoreComponent('回復阻害', Math.min(1, stats.healBlock) * 180, `${Math.min(1, stats.healBlock)}回`),
-      scoreComponent('有利連撃', stats.advantageCombo * 210, `${stats.advantageCombo}回`),
-      scoreComponent('等倍連撃', stats.equalCombo * 180, `${stats.equalCombo}回`),
-      scoreComponent('不利連撃', stats.disadvantageCombo * 150, `${stats.disadvantageCombo}回`),
-      scoreComponent('有利単発', stats.advantageSingle * 150, `${stats.advantageSingle}回`),
-      scoreComponent('等倍単発', stats.equalSingle * 120, `${stats.equalSingle}回`),
-      scoreComponent('不利単発', stats.disadvantageSingle * 90, `${stats.disadvantageSingle}回`),
+      scoreComponent('基礎', parts.basic),
+      scoreComponent('行動数補正', -parts.actionPenalty, `${parts.actionCount}回`),
+      scoreComponent('与ダメ', parts.damage, `総与ダメ${formatNumber(stats.playerDamage)}`),
+      scoreComponent('バフ', parts.buff, `${stats.scoreBuff}回`),
+      scoreComponent('回復阻害', parts.healBlock, `${Math.min(1, stats.healBlock)}回`),
+      scoreComponent('有利連撃', parts.advantageCombo, `${stats.advantageCombo}回`),
+      scoreComponent('等倍連撃', parts.equalCombo, `${stats.equalCombo}回`),
+      scoreComponent('不利連撃', parts.disadvantageCombo, `${stats.disadvantageCombo}回`),
+      scoreComponent('有利単発', parts.advantageSingle, `${stats.advantageSingle}回`),
+      scoreComponent('等倍単発', parts.equalSingle, `${stats.equalSingle}回`),
+      scoreComponent('不利単発', parts.disadvantageSingle, `${stats.disadvantageSingle}回`),
       scoreComponent('特別課題', stats.specialChallengeScore, `${stats.specialChallengeLabels.length}件`),
     ];
     pushLog(stats, `スコア内訳: ATTACK ${components.join(' / ')}`);
-    pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(base)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} + 特別課題 ${formatNumber(stats.specialChallengeScore)} = ${formatNumber(stats.score)}`);
+    pushLog(stats, `スコア内訳: 小計 ${formatScoreNumber(parts.subtotal)} × 難易度 ${formatScoreNumber(exam.value.difficulty)} + 特別課題 ${formatNumber(stats.specialChallengeScore)} = ${formatNumber(stats.score)}`);
     return;
   }
 

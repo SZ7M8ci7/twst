@@ -1,6 +1,6 @@
 import type { SearchInput, Candidate } from '@/domain/examSearch/types';
 import type { SessionCheckpoint } from '@/domain/examSearch/scheduler';
-import { ENGINE_VERSION } from '@/domain/examSearch/types';
+import { searchEngineVersion } from '@/domain/examSearch/types';
 import LZString from 'lz-string';
 import { readExamSearchRecord, writeExamSearchRecord } from '@/storage/examSearchDatabase';
 const { compressToUTF16, decompressFromUTF16 } = LZString;
@@ -189,7 +189,7 @@ export function saveSearchSession(value: SavedSearchSession, serialized?: string
 export function loadSearchSession(): SavedSearchSession | null {
   try {
     const value = readStoredRecord()?.session;
-    if (value?.version !== ENGINE_VERSION || !['seen', 'pool', 'pending', 'finalists'].every(key =>
+    if (!value?.input?.preset || value.version !== searchEngineVersion(value.input.preset.kind) || !['seen', 'pool', 'pending', 'finalists'].every(key =>
       Array.isArray(value?.checkpoint?.[key as keyof SessionCheckpoint]))) return null;
     // Old explicit-target checkpoints contain samples selected for a different
     // objective. Keep their seed-team recovery, but never resume that search.

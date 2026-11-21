@@ -33,7 +33,8 @@ const keys = ['playerAttackDowns', 'playerDamageDowns', 'playerEvasions', 'enemy
   'playerDamageTakenUps', 'playerContinueHeals', 'playerImmunities', 'playerGuts', 'playerBuffs', 'enemyAttackUps',
   'enemyDamageUps', 'enemyGuts', 'enemyContinueHeals'];
 function runtime() {
-  const c = { ...load('src/utils/calculations.ts'), ...load('src/utils/enemyActionDeck.ts'), simulationRuntimeCache: null,
+  const c = { ...load('src/utils/calculations.ts'), ...load('src/utils/enemyActionDeck.ts'),
+    ...load('src/utils/attackExamScore.ts'), simulationRuntimeCache: null,
     favorableEffects: { value: false }, forceFinisherTripleCritical: { value: false }, fixedEnemyActionElement: { value: null },
     exam: { value: { kind: 'DEFENCE', difficulty: 1.5 } }, enemySlots: { value: [] },
     deck: { value: [{ character: { chara: 'fixture' } }] }, charaDormMap: { fixture: 'その他' },
