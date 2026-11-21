@@ -755,6 +755,12 @@
     "examImportFailed": "試験シミュレータの編成を復元できませんでした。"
   },
   "benchmark": {
+    "analysis": "分析",
+    "analysisGroup": "集計軸",
+    "byElement": "属性別",
+    "byKind": "種別別",
+    "analysisMetric": "指標",
+    "meanRatio": "試験ごとの「手持ち最高点 ÷ 完凸最高点」の平均",
     "filter": "フィルタ",
     "noMatches": "選択した条件に一致する結果はありません。",
     "topToBottom": "上から",

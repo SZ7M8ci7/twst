@@ -79,18 +79,19 @@
               </v-card-actions>
             </v-card>
           </v-dialog>
-          <div v-if="ranReference" class="selection-mode" role="radiogroup" :aria-label="t('benchmark.resultRoster')">
+          <div v-if="ranReference && resultTab !== 'analysis'" class="selection-mode" role="radiogroup" :aria-label="t('benchmark.resultRoster')">
             <label v-for="source in rosterChoices" :key="source">
               <input v-model="lane" type="radio" name="benchmark-result-roster" :value="source">
               <span>{{ t(source === 'owned' ? 'examSearch.rosterOptions.owned' : 'benchmark.reference') }}</span>
             </label>
           </div>
-          <span v-if="winners.length">{{ t('benchmark.meanHighest') }} <b>{{ number(summary.meanHighest) }}</b></span>
+          <span v-if="winners.length && resultTab !== 'analysis'">{{ t('benchmark.meanHighest') }} <b>{{ number(summary.meanHighest) }}</b></span>
         </div>
       </div>
       <v-tabs v-model="resultTab" density="compact" color="primary">
         <v-tab value="teams">{{ t('examSearch.table.deck') }}</v-tab>
         <v-tab value="ranking">{{ t('benchmark.ranking') }}</v-tab>
+        <v-tab value="analysis">{{ t('benchmark.analysis') }}</v-tab>
       </v-tabs>
       <p v-if="!details.length" class="empty-results" role="status">{{ t(busy && queue.some(matchesResultFilters) ? 'benchmark.running' : 'benchmark.noMatches') }}</p>
       <div v-else-if="resultTab === 'teams'" class="table-scroll">
@@ -132,6 +133,21 @@
           </tr></tbody>
         </table>
       </div>
+      <div v-else-if="resultTab === 'analysis'" class="analysis">
+        <div class="analysis-controls">
+          <select v-model="analysisGroup" :aria-label="t('benchmark.analysisGroup')">
+            <option value="element">{{ t('benchmark.byElement') }}</option>
+            <option value="kind">{{ t('benchmark.byKind') }}</option>
+          </select>
+          <select v-model="analysisMetric" :aria-label="t('benchmark.analysisMetric')">
+            <option v-if="ranReference" value="ratio">{{ t('benchmark.scoreRatio') }}</option>
+            <option value="score">{{ t('basic.score') }}</option>
+          </select>
+        </div>
+        <BenchmarkRadar v-if="hasAnalysisData" :axes="analysisAxes"
+          :ratio="analysisMetric === 'ratio'" :with-reference="ranReference" />
+        <p v-else role="status">{{ t(busy ? 'benchmark.running' : 'benchmark.noTrials') }}</p>
+      </div>
       <ol v-else-if="winners.length" class="ranking">
         <li v-for="card in summary.ranking" :key="card.name" :title="`${cardTitle(card.name)} · ${t('benchmark.adoption')} ${card.exams}/${winners.length}`">
           <img :src="images[card.name] || fallback" :alt="cardTitle(card.name)" loading="lazy">
@@ -159,6 +175,7 @@ import { groupBenchmarkPresets, summarizeBenchmark, type BenchmarkWinner } from 
 import type { RosterCard, SearchInput } from '@/domain/examSearch/types';
 import type { BenchmarkDepth } from '@/domain/examSearch/benchmarkWork';
 import ExamResultCard from '@/components/ExamResultCard.vue';
+import BenchmarkRadar from '@/components/BenchmarkRadar.vue';
 
 const { t, locale } = useI18n();
 const route = useRoute();
@@ -230,7 +247,9 @@ function matchesResultFilters(preset: ExamPresetDefinition) {
   const filters = resultFilters.value;
   return filters.elements.includes(preset.enemyElement) && filters.kinds.includes(preset.kind) && filters.series.includes(resultSeries(preset));
 }
-const resultTab = ref<'teams' | 'ranking'>('teams');
+const resultTab = ref<'teams' | 'ranking' | 'analysis'>('teams');
+const analysisGroup = ref<'element' | 'kind'>('element');
+const analysisMetric = ref<'ratio' | 'score'>('ratio');
 const comparisonColumns = [
   { key: 'gap', label: 'benchmark.scoreGap', formula: 'benchmark.gapFormula' },
   { key: 'ratio', label: 'benchmark.scoreRatio', formula: 'benchmark.ratioFormula' },
@@ -264,6 +283,26 @@ const teamRows = computed(() => {
   });
 });
 const winners = computed(() => details.value.flatMap(row => row.winner ? [row.winner] : []));
+function averageMeasured(values: (number | null | undefined)[]) {
+  const measured = values.filter((value): value is number => value != null);
+  return { value: measured.length ? measured.reduce((a, b) => a + b, 0) / measured.length : null, count: measured.length };
+}
+const analysisAxes = computed(() => {
+  const byElement = analysisGroup.value === 'element';
+  const axes = byElement
+    ? elements.map(key => ({ key, label: display(key) }))
+    : kinds.map(key => ({ key, label: kindAbbreviations[key] }));
+  return axes.map(({ key, label }) => {
+    const group = details.value.filter(row => (byElement ? row.preset.enemyElement : row.preset.kind) === key);
+    return { label,
+      ratio: averageMeasured(group.map(row => row.ratio)),
+      owned: averageMeasured(group.map(row => row.owned?.winner?.highest)),
+      reference: averageMeasured(group.map(row => row.reference?.winner?.highest)),
+    };
+  });
+});
+const hasAnalysisData = computed(() => analysisAxes.value.some(axis =>
+  analysisMetric.value === 'ratio' ? axis.ratio.count > 0 : axis.owned.count + axis.reference.count > 0));
 const summary = computed(() => summarizeBenchmark(winners.value));
 const busy = ref(false);
 const stopped = ref(false);
@@ -294,6 +333,7 @@ async function start() {
   completed.value = 0;
   ranReference.value = reference;
   lane.value = reference && !queue.value.some(p => collection.length >= required(p)) ? 'reference' : 'owned';
+  analysisMetric.value = reference && lane.value === 'owned' ? 'ratio' : 'score';
   for (const group of filterGroups.value) resultFilters.value[group.key] = group.options.map(option => option.value);
   sort.value = null;
   resultTab.value = 'teams';
@@ -395,6 +435,9 @@ input { accent-color: #1867ad; vertical-align: middle; }
 .filter-options label { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; cursor: pointer; }
 .empty-results { padding: 6px 8px; font-size: 12px; }
 .results .v-tab { min-width: 60px; font-size: 12px; }
+.analysis { padding: 8px; }
+.analysis-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.analysis p { margin-top: 8px; }
 .table-scroll { overflow-x: auto; }
 .team-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .team-table th, .team-table td { padding: 4px 6px; border-top: 1px solid #e0e7ed; text-align: right; }

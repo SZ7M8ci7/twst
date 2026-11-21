@@ -755,6 +755,12 @@
     "examImportFailed": "无法恢复考试模拟器中的队伍。"
   },
   "benchmark": {
+    "analysis": "分析",
+    "analysisGroup": "分组方式",
+    "byElement": "按属性",
+    "byKind": "按考试类型",
+    "analysisMetric": "指标",
+    "meanRatio": "各场考试的持有卡最高分与满突破最高分之比的平均值",
     "filter": "筛选",
     "noMatches": "没有符合所选条件的结果。",
     "topToBottom": "从上到下",

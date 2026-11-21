@@ -755,6 +755,12 @@
     "examImportFailed": "Could not restore the deck from the Exam Simulator."
   },
   "benchmark": {
+    "analysis": "Analysis",
+    "analysisGroup": "Group by",
+    "byElement": "By element",
+    "byKind": "By exam type",
+    "analysisMetric": "Metric",
+    "meanRatio": "Mean of each exam’s ratio of owned to fully uncapped peak score",
     "filter": "Filter",
     "noMatches": "No results match the selected filters.",
     "topToBottom": "Top to bottom",
