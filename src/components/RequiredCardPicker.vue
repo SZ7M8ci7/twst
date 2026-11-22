@@ -7,7 +7,9 @@
           :aria-label="`${label} ${slot}${requiredCardSlots[slot - 1] ? ': ' + cardLabel(requiredCardSlots[slot - 1]) : ''}`"
           @click="openRequiredCard(slot - 1)">
           <img v-if="requiredCardSlots[slot - 1]" :src="cardImages[requiredCardSlots[slot - 1]] || defaultImg" :alt="cardLabel(requiredCardSlots[slot - 1])" />
-          <span v-else aria-hidden="true">＋</span>
+          <svg v-else aria-hidden="true" width="20" height="20" viewBox="0 0 20 20">
+            <path d="M3 10h14M10 3v14" fill="none" stroke="currentColor" stroke-width="2" />
+          </svg>
         </button>
         <button v-if="requiredCardSlots[slot - 1]" type="button" class="required-card-clear"
           :data-testid="`required-card-clear-${slot - 1}`" :aria-label="`${t('examSearch.clear')}: ${label} ${slot} ${cardLabel(requiredCardSlots[slot - 1])}`"

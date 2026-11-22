@@ -22,13 +22,14 @@ const props = defineProps<{
   axes: ({ label: string } & Record<SeriesKey, Measure>)[];
   ratio: boolean;
   withReference: boolean;
+  referenceLabel: string;
 }>();
 const { locale, t } = useI18n();
 const caption = computed(() => t(props.ratio ? 'benchmark.meanRatio' : 'benchmark.meanHighest'));
 const series = computed(() => {
   const keys: SeriesKey[] = props.ratio ? ['ratio'] : props.withReference ? ['owned', 'reference'] : ['owned'];
   const names = { ratio: 'scoreRatio', owned: 'ownedPeak', reference: 'referencePeak' };
-  return keys.map(key => ({ key, label: t(`benchmark.${names[key]}`) }));
+  return keys.map(key => ({ key, label: key === 'reference' ? props.referenceLabel : t(`benchmark.${names[key]}`) }));
 });
 const ratioMin = computed(() => {
   const lowest = Math.min(0.8, ...props.axes.map(axis => axis.ratio.value ?? Infinity));

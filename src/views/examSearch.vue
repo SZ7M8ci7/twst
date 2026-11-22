@@ -101,25 +101,7 @@
         <v-card-actions><v-spacer /><v-btn data-testid="search-settings-close" color="primary" variant="tonal" @click="searchSettingsOpen = false">{{ t('common.close') }}</v-btn></v-card-actions>
       </v-card>
     </v-dialog>
-    <v-dialog v-model="characterFilterOpen" max-width="640" scrollable class="search-character-dialog" data-testid="character-filter-dialog">
-      <v-card class="modal-card character-filter-card">
-        <v-card-title class="modal-title">{{ t('examSearch.characterFilter') }}</v-card-title>
-        <v-card-text>
-          <p class="filter-help">{{ t('examSearch.characterFilterHelp', { count: characterFilter.length }) }}</p>
-          <div class="character-filter-list">
-            <label v-for="character in visibleCharacterOptions" :key="character.name" class="character-filter-option" :class="{ selected: characterFilter.includes(character.name) }" :title="localizeCharacterName(character.name, locale)">
-              <input type="checkbox" class="sr-only" :data-character-name="character.name" :aria-label="localizeCharacterName(character.name, locale)" :checked="characterFilter.includes(character.name)" :disabled="!characterFilter.includes(character.name) && characterFilter.length >= 5" @change="toggleCharacterFilter(character.name)" />
-              <span class="character-icon-wrap">
-                <img :src="characterIconImages[character.name] || defaultImg" :alt="localizeCharacterName(character.name, locale)" class="character-icon" loading="lazy" />
-                <span v-if="characterFilter.includes(character.name)" class="character-selected-mark">✓</span>
-              </span>
-            </label>
-          </div>
-          <p v-if="!visibleCharacterOptions.length" class="filter-empty">{{ t('examSearch.filterEmpty') }}</p>
-        </v-card-text>
-        <v-card-actions><v-spacer /><v-btn data-testid="character-filter-close" color="primary" variant="tonal" @click="characterFilterOpen = false">{{ t('common.close') }}</v-btn></v-card-actions>
-      </v-card>
-    </v-dialog>
+    <RequiredCharacterDialog v-model="characterFilter" v-model:open="characterFilterOpen" />
     <ExamBattleLogDialog v-model="previewOpen" :groups="previewGroups"
       :title="previewIsBest ? t('examSimulator.bestScoreLogWithScore', { score: previewScore.toLocaleString() }) : t('examSearch.previewTitle')"
       :default-img="defaultImg" :localize="localizePreviewText" :element-icon="previewElementIcon" />
@@ -131,14 +113,14 @@ import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { onBeforeRouteLeave, useRouter } from 'vue-router';
 import cards from '@/assets/chara.json';
-import charactersInfo from '@/assets/characters_info.json';
+import RequiredCharacterDialog from '@/components/RequiredCharacterDialog.vue';
 import ExamSearchPresetPicker from '@/components/ExamSearchPresetPicker.vue';
 import RequiredCardPicker from '@/components/RequiredCardPicker.vue';
 import ExamBattleLogDialog from '@/components/ExamBattleLogDialog.vue';
 import ExamSearchResultsTable from '@/components/ExamSearchResultsTable.vue';
 import ExamFormationComparison from '@/components/ExamFormationComparison.vue';
 import SupportBody from '@/components/SupportBody.vue';
-import { loadCachedImageUrl, loadCharacterImageUrl } from '@/utils/characterAssets';
+import { loadCharacterImageUrl } from '@/utils/characterAssets';
 import defaultImg from '@/assets/img/default.webp';
 import fireIcon from '@/assets/img/fire.webp';
 import waterIcon from '@/assets/img/water.webp';
@@ -214,7 +196,6 @@ const excludedSupportNames = ref<string[]>(Array.isArray(input.value.excludedSup
     : []);
 const rosterReady = computed(() => input.value.roster.length >= (usesSupport.value?4:5) && (!usesSupport.value||input.value.supports.length>=1));
 const cardImages = ref<Record<string, string>>({});
-const characterIconImages = ref<Record<string, string>>({});
 const characterFilterOpen = ref(false);
 const requiredCards = ref<string[]>(Array.isArray(input.value.requiredCards) ? [...input.value.requiredCards] : []);
 const characterFilter = ref<string[]>([...(input.value.requiredCharacters ?? [])]);
@@ -266,12 +247,6 @@ const attemptsError = computed(() => Number.isInteger(input.value.attempts) && i
   ? '' : t('examSearch.validation.attempts'));
 const cardLabel = (name: string) => catalog[name] ? `${localizeCharacterName(catalog[name].chara, locale.value)} / ${localizeCostumeName(catalog[name], locale.value)}` : name;
 const canResume = computed(() => !!progress.value && runFingerprint.value === JSON.stringify(input.value) && !!persistedSession.value);
-const characterOptions = computed(() => charactersInfo.map(character => character.name_ja).filter(name => cards.some(card => card.chara === name)));
-const characterChoices = computed(() => characterOptions.value.map(name => ({
-  name,
-  iconName: charactersInfo.find(character => character.name_ja === name)?.name_en ?? name,
-})));
-const visibleCharacterOptions = characterChoices;
 const results = computed(() => evaluatedInput.value ? rankedResults(progress.value?.results ?? [], evaluatedInput.value.attempts, evaluatedInput.value.desiredProbability) : []);
 const visibleResults = results;
 const deckKey = resultDeckKey;
@@ -300,13 +275,6 @@ watch(supportPickerOpen, open => {
     void loadCharacterImageUrl(card.name).then(url => { cardImages.value[card.name] = url; });
   }
 });
-watch([() => visibleCharacterOptions.value.map(character => character.name), characterFilterOpen], ([names, open]) => {
-  if (!open) return;
-  for (const name of names) {
-    const iconName = characterChoices.value.find(character => character.name === name)?.iconName ?? name;
-    if (!characterIconImages.value[name]) void loadCachedImageUrl(iconName, 'icon/').then(url => { characterIconImages.value[name] = url; });
-  }
-}, { immediate: true });
 watch(requiredCards, names => {
   const normalized = [...new Set(names)].slice(0, 5);
   if (JSON.stringify(normalized) !== JSON.stringify(names)) {
@@ -326,11 +294,6 @@ watch(characterFilter, names => {
 watch([() => input.value.budget, () => input.value.additionalLevelCap, () => input.value.attempts], () => {
   if (!busy.value) invalidateActiveSearch();
 });
-function toggleCharacterFilter(name: string) {
-  characterFilter.value = characterFilter.value.includes(name)
-    ? characterFilter.value.filter(value => value !== name)
-    : characterFilter.value.length < 5 ? [...characterFilter.value, name] : characterFilter.value;
-}
 function invalidateActiveSearch() {
   resultsTab.value = 'results';
   // Results and resume state belong to the previous conditions. Leave the saved
@@ -642,23 +605,8 @@ onBeforeUnmount(() => {
 .search-settings-open { margin-left: 0; }
 .filter-count { min-width: 1.4em; margin-left: 6px; padding: 1px 5px; border-radius: 999px; background: #e8eef4; font-size: .8em; }
 .filter-help { color: #52616d; font-size: .85rem; }
-.character-filter-option { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 8px; border: 1px solid #dde6ed; border-radius: 8px; background: #fbfcfd; cursor: pointer; }
-.character-filter-option.selected { border-color: #d9a65d; background: #fff7ec; }
-.character-filter-option input { flex: 0 0 auto; accent-color: #b16a21; }
-.character-icon-wrap { position: relative; flex: 0 0 auto; display: block; }
-.character-filter-option:focus-within { outline: 2px solid #b16a21; outline-offset: 2px; }
-.character-filter-option span { min-width: 0; overflow-wrap: anywhere; font-size: .85rem; }
-.character-filter-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; margin: 12px 2px 4px; }
-.character-filter-option { flex-direction: column; justify-content: flex-start; text-align: center; padding: 4px; gap: 4px; }
-.character-icon { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; background: #eef3f7; }
-.character-filter-option:not(.selected) .character-icon { opacity: .5; }
-.character-selected-mark { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #b16a21; color: #fff; font-size: 13px !important; font-weight: 800; }
-.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .filter-empty { color: #8b4a10; }
 .resource-start { min-width: 180px; }
-.character-filter-option:has(input:disabled) { opacity: .45; cursor: default; }
-.v-dialog.search-character-dialog :deep(.v-card.character-filter-card) { overflow: hidden; }
-.v-dialog.search-character-dialog :deep(.character-filter-card > .v-card-text) { min-height: 0; padding: 12px 16px; }
 @media (max-width: 600px) {
   .search-settings-open { margin-left: 0; }
   .character-setting { grid-template-columns: 1fr; gap: 8px; }

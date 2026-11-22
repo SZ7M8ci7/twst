@@ -37,12 +37,30 @@
           </label>
         </div>
         <label><input v-model="includeReference" type="checkbox" :disabled="busy"> {{ t('benchmark.includeReference') }}</label>
+        <select v-if="includeReference" v-model="referenceSource" :disabled="busy" :aria-label="t('benchmark.referenceSource')">
+          <option v-for="source in referenceSources" :key="source" :value="source">{{ t('examSearch.rosterOptions.' + source) }}</option>
+        </select>
       </div>
-      <div v-if="selectionMode === 'manual'" class="choices">
-        <label v-for="preset in available" :key="preset.id">
-          <input v-model="manualIds" type="checkbox" :value="preset.id" :disabled="busy"> {{ display(preset.title) }}
-        </label>
-      </div>
+      <fieldset class="restrictions" :disabled="busy">
+        <RequiredCardPicker v-model="requiredCards" :label="t('examSearch.cardFilter')" :catalog-mode="includeReference && referenceSource === 'allMax'" />
+        <button type="button" class="compact-button" @click="characterDialog = true">
+          {{ t('examSearch.characterFilter') }}<span v-if="requiredCharacters.length"> {{ requiredCharacters.length }}/5</span>
+        </button>
+        <RequiredCharacterDialog v-model="requiredCharacters" v-model:open="characterDialog" />
+      </fieldset>
+      <template v-if="selectionMode === 'manual'">
+        <div class="bulk-actions" role="group" :aria-label="t('benchmark.bulkSelect')">
+          <button type="button" class="compact-button" :disabled="busy || !available.length" @click="selectExams(available)">{{ t('support.selectAll') }}</button>
+          <button type="button" class="compact-button" :disabled="busy || !selected.length" @click="clearVisibleExams">{{ t('support.deselectAll') }}</button>
+          <button v-for="group in bulkGroups" :key="group.key" type="button" class="compact-button" :disabled="busy"
+            @click="selectExams(group.exams)">{{ group.label }}</button>
+        </div>
+        <div class="choices">
+          <label v-for="preset in available" :key="preset.id">
+            <input v-model="manualIds" type="checkbox" :value="preset.id" :disabled="busy"> {{ display(preset.title) }}
+          </label>
+        </div>
+      </template>
       <div class="actions">
         <v-btn v-if="!busy" color="primary" size="small" :disabled="!canStart" @click="start">{{ t('benchmark.start') }}</v-btn>
         <v-btn v-else variant="outlined" size="small" @click="stop">{{ t('examSimulator.stop') }}</v-btn>
@@ -82,7 +100,7 @@
           <div v-if="ranReference && resultTab !== 'analysis'" class="selection-mode" role="radiogroup" :aria-label="t('benchmark.resultRoster')">
             <label v-for="source in rosterChoices" :key="source">
               <input v-model="lane" type="radio" name="benchmark-result-roster" :value="source">
-              <span>{{ t(source === 'owned' ? 'examSearch.rosterOptions.owned' : 'benchmark.reference') }}</span>
+              <span>{{ t('examSearch.rosterOptions.' + (source === 'owned' ? 'owned' : ranReferenceSource)) }}</span>
             </label>
           </div>
           <span v-if="winners.length && resultTab !== 'analysis'">{{ t('benchmark.meanHighest') }} <b>{{ number(summary.meanHighest) }}</b></span>
@@ -145,7 +163,7 @@
           </select>
         </div>
         <BenchmarkRadar v-if="hasAnalysisData" :axes="analysisAxes"
-          :ratio="analysisMetric === 'ratio'" :with-reference="ranReference" />
+          :ratio="analysisMetric === 'ratio'" :with-reference="ranReference" :reference-label="t('examSearch.rosterOptions.' + ranReferenceSource)" />
         <p v-else role="status">{{ t(busy ? 'benchmark.running' : 'benchmark.noTrials') }}</p>
       </div>
       <ol v-else-if="winners.length" class="ranking">
@@ -176,8 +194,10 @@ import type { RosterCard, SearchInput } from '@/domain/examSearch/types';
 import type { BenchmarkDepth } from '@/domain/examSearch/benchmarkWork';
 import ExamResultCard from '@/components/ExamResultCard.vue';
 import BenchmarkRadar from '@/components/BenchmarkRadar.vue';
+import RequiredCardPicker from '@/components/RequiredCardPicker.vue';
+import RequiredCharacterDialog from '@/components/RequiredCharacterDialog.vue';
 
-const { t, locale } = useI18n();
+const { t, te, locale } = useI18n();
 const route = useRoute();
 const kinds: ExamPresetKind[] = ['BASIC', 'ATTACK', 'DEFENCE'];
 const elements: ExamPresetElement[] = ['火', '水', '木', '無', '全'];
@@ -203,11 +223,35 @@ const hand = useHandCollectionStore();
 const owned = computed(() => hand.ownedCards.filter(c => catalog.has(c.cardName) && c.level >= 1)
   .map(c => maxSkillsCard(c.cardName, c.level, c.totsu)));
 const includeReference = ref(true);
+const referenceSources = ['allMax', 'ownedMax'] as const;
+type ReferenceSource = typeof referenceSources[number];
+const referenceSource = ref<ReferenceSource>('allMax');
+const ranReferenceSource = ref<ReferenceSource>('allMax');
+const requiredCards = ref<string[]>([]);
+const requiredCharacters = ref<string[]>([]);
+const characterDialog = ref(false);
+const referenceRoster = computed(() => {
+  if (referenceSource.value === 'allMax') return fullRoster;
+  const names = new Set(owned.value.map(card => card.name));
+  return fullRoster.filter(card => names.has(card.name));
+});
 const searchDepth = ref<BenchmarkDepth>('standard');
 const required = (p: ExamPresetDefinition) => examUsesSupport(p) ? 4 : 5;
-const canStart = computed(() => selected.value.some(p => includeReference.value || owned.value.length >= required(p)));
+const canStart = computed(() => selected.value.some(p => owned.value.length >= required(p)
+  || (includeReference.value && referenceRoster.value.length >= required(p))));
 const display = (value: string) => localizeGameText(value, locale.value);
 const kindAbbreviations = { BASIC: 'BS', ATTACK: 'ATK', DEFENCE: 'DF' } as const;
+const bulkGroups = computed(() => [
+  ...elements.map(key => ({ key, label: display(key), exams: available.value.filter(p => p.enemyElement === key) })),
+  ...kinds.map(key => ({ key, label: kindAbbreviations[key], exams: available.value.filter(p => p.kind === key) })),
+].filter(group => group.exams.length));
+function selectExams(exams: ExamPresetDefinition[]) {
+  manualIds.value = [...new Set([...manualIds.value, ...exams.map(p => p.id)])];
+}
+function clearVisibleExams() {
+  const visibleIds = new Set(available.value.map(p => p.id));
+  manualIds.value = manualIds.value.filter(id => !visibleIds.has(id));
+}
 function shortExamLabel(preset: ExamPresetDefinition) {
   return t('benchmark.normalGroup', {
     element: display(preset.enemyElement), kind: kindAbbreviations[preset.kind],
@@ -325,6 +369,9 @@ async function start() {
   if (busy.value || !canStart.value) return;
   const collection = owned.value;
   const reference = includeReference.value;
+  const maxRoster = referenceRoster.value;
+  ranReferenceSource.value = referenceSource.value;
+  const constraints = { requiredCards: [...requiredCards.value], requiredCharacters: [...requiredCharacters.value] };
   const depth = searchDepth.value;
   const run = new AbortController();
   controller = run;
@@ -345,12 +392,13 @@ async function start() {
     const hasOwned = collection.length >= required(preset);
     const jobs: Promise<void>[] = [];
     async function evaluate(source: Lane, roster: RosterCard[]) {
-      const result = await search(preset, source, roster, depth, run.signal);
+      const result = await search(preset, source, roster, constraints, depth, run.signal);
       if (!run.signal.aborted) row[source] = result;
     }
     if (hasOwned) jobs.push(evaluate('owned', collection));
     else row.owned = { winner: null, missing: required(preset) };
-    if (reference) jobs.push(evaluate('reference', fullRoster));
+    if (reference && maxRoster.length >= required(preset)) jobs.push(evaluate('reference', maxRoster));
+    else if (reference) row.reference = { winner: null, missing: required(preset) };
     await Promise.all(jobs);
     if (run.signal.aborted) return;
     completed.value++;
@@ -360,7 +408,8 @@ async function start() {
   releaseWorkers();
 }
 
-function search(preset: ExamPresetDefinition, source: Lane, roster: RosterCard[], depth: BenchmarkDepth, signal: AbortSignal): Promise<Outcome> {
+function search(preset: ExamPresetDefinition, source: Lane, roster: RosterCard[],
+  constraints: Pick<SearchInput, 'requiredCards' | 'requiredCharacters'>, depth: BenchmarkDepth, signal: AbortSignal): Promise<Outcome> {
   return new Promise(resolve => {
     const id = ++requestId;
     let worker: Worker | undefined;
@@ -384,13 +433,15 @@ function search(preset: ExamPresetDefinition, source: Lane, roster: RosterCard[]
       workers.set(source, worker);
       worker.onmessage = ({ data }: MessageEvent<{ id: number; winner?: BenchmarkWinner | null; error?: string }>) => {
         if (data.id !== id) return;
-        if (data.error) finish({ winner: null, error: data.error });
-        else if (data.winner !== undefined) finish({ winner: data.winner });
+        if (data.error) {
+          const key = 'examSearch.validation.' + data.error;
+          finish({ winner: null, error: te(key) ? t(key) : data.error });
+        } else if (data.winner !== undefined) finish({ winner: data.winner });
       };
       worker.onerror = event => finish({ winner: null, error: event.message || t('examSearch.failure') });
       worker.onmessageerror = () => finish({ winner: null, error: t('examSearch.failure') });
       const input: SearchInput = {
-        preset: { ...preset, difficulty: preset.difficulty ?? 1.5 }, rosterSource: source === 'owned' ? 'owned' : 'allMax', roster,
+        preset: { ...preset, difficulty: preset.difficulty ?? 1.5 }, rosterSource: source === 'owned' ? 'owned' : ranReferenceSource.value, roster, ...constraints,
         supports: examUsesSupport(preset) ? fullRoster : [], budget: 0, itemsPerLimitBreak: 1,
         attempts: 30, desiredProbability: 0.05, challengeLocks: {}, maxRemoved: 1,
       };
@@ -411,6 +462,15 @@ h1 { margin-bottom: 8px; font-size: 18px; }
 .condition-fields select { width: 100%; min-width: 0; }
 select { appearance: auto; min-height: 30px; padding: 2px 6px; color: inherit; background: white; border: 1px solid #b4c2ce; border-radius: 4px; }
 .options, .actions { margin-top: 8px; }
+.restrictions, .bulk-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; margin-top: 8px; }
+.restrictions { border: 0; padding: 0; min-width: 0; }
+.restrictions :deep(.required-card-setting) { grid-template-columns: auto 1fr; gap: 8px; padding: 0; }
+.restrictions :deep(.selection-label) { font-size: 12px; }
+.restrictions :deep(.optional-label) { display: none; }
+.restrictions :deep(.required-card-slots) { grid-template-columns: repeat(5, 30px); gap: 4px; }
+.restrictions :deep(.required-card-clear) { width: 16px; height: 16px; line-height: 12px; top: -4px; right: -3px; }
+.compact-button { padding: 3px 8px; min-height: 28px; border: 1px solid #b4c2ce; border-radius: 4px; font-size: 12px; }
+.compact-button:disabled { opacity: .5; }
 .options label, .choices label { cursor: pointer; }
 .selection-mode { display: inline-flex; max-width: 100%; padding: 2px; border: 1px solid #b4c2ce; border-radius: 5px; background: #f2f6f9; }
 .selection-mode label { position: relative; }
