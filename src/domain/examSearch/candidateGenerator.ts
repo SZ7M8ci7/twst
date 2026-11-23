@@ -546,7 +546,7 @@ export function createEstimator(input: SearchInput, task: GenerationTask, catalo
           },0)/Math.max(1,publicActions.length):0;
           const defensive = input.preset.kind === 'DEFENCE'
             ? defenseCompatibility(attr) + evasionValue + (/ATKDOWN|ダメージDOWN/.test(text) ? 2500 : 0) : 0;
-          const instantPower=text.match(/(?<!継続)回復\(([^)]+)\)/)?.[1];
+          const instantPower = text.replace(/継続回復/g, ' ').match(/回復\(([^)]+)\)/)?.[1];
           const actualInstant=input.preset.kind==='DEFENCE'&&instantPower?atk*(healDict[`回復(${instantPower})${c.magicLevels[m-1]}`]??0):0;
           const continuing=input.preset.kind==='DEFENCE'?buffsFor(c).filter(b=>b.magicOption===`M${m}`&&b.buffOption==='継続回復')
             .reduce((sum,b)=>sum+hp*(healContinueDict[`継続回復(${b.powerOption})${c.magicLevels[m-1]}`]??0)*Math.min(5,b.durationTurns??3),0):0;
