@@ -76,9 +76,6 @@
             <span class="muted">{{ t('examSimulator.examConditions') }}</span>
             <strong>{{ activePreset ? displayPresetTitle(activePreset.title) : t('examSimulator.customExam') }}</strong>
           </div>
-          <v-btn variant="text" color="primary" :disabled="commonConditionsBusy" :to="{ name: 'examBenchmark' }">
-            {{ t('tool.examBenchmark') }}
-          </v-btn>
           <v-btn data-testid="exam-details-open" color="primary" variant="outlined" :disabled="commonConditionsBusy" @click="enemyConditionsDialogOpen = true">
             {{ t('examSimulator.examDetails') }}
           </v-btn>

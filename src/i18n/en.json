@@ -1,4 +1,65 @@
 {
+  "pageHelp": {
+    "mobile": {
+      "title": "Using the tools on a phone",
+      "browser": "Links in X may open in its in-app browser, where some features may not work as expected. Copy the link and open it directly in Safari or Chrome.",
+      "storage": "Mobile browsers may automatically clear saved data for sites you haven’t used in a while. On iPhone, adding the tools to your Home Screen can help protect your saved data.",
+      "install": "How to add the tools to your iPhone Home Screen",
+      "share": "Open the tools’ home page in Safari and tap Share.",
+      "home": "Choose Add to Home Screen. If you don’t see it, tap More if available, or scroll down the share menu.",
+      "add": "Turn on Open as Web App if the option appears. Change the name if you like, then tap Add in the upper right.",
+      "launch": "Use the new Home Screen icon each time you open the tools.",
+      "transfer": "The Home Screen web app stores your collection separately from Safari. To bring an existing collection over, download it from Card Settings → Manage JSON in the original browser. Open the Home Screen icon and import the file under Manage JSON."
+    },
+    "language": "Display language",
+    "label": "Help for this page",
+    "pageTitle": "How to use {page}",
+    "welcome": "Getting started with the Twisted Wonderland tools",
+    "overview": "Use these tools to test exam teams, plan spell upgrades, and choose furniture for your Guest Room. To find a team for your first exam, start with your own cards.",
+    "startCollection": "Open Card Settings",
+    "register": "Record the cards you own. You can also import your collection from screenshots.",
+    "openExam": "Find a team in the Exam Simulator",
+    "findTeam": "Choose a Regular Exam or Unified Exam. If you’ve saved your collection, just press Search teams with the default settings to find candidate teams.",
+    "tryUpgrades": "To try future upgrades, open Change search conditions, set Extra limit breaks or Extra level cap, and search again. Compare the teams and scores with the results for your current collection.",
+    "scoreLogTitle": "Check the Best Score Log",
+    "scoreLogSteps": "In the search results, select Best-score sequence to see the actions that earned the highest score, turn by turn.",
+    "benchmark": {
+      "select": "Filter the exams by series, type, or enemy element. Use Latest per group to check recent exams together. To run specific past exams, switch to Choose individual exams and check the ones you want. You can select just one or several.",
+      "compare": "Enable this option to compare your current collection with a maxed roster. All cards, maxed includes cards you don’t own. My collection, maxed uses only the cards you own, fully upgraded. Select a roster and press Run benchmark, then open Deck to compare the best scores and the point gap for each exam.",
+      "ranking": "Cards are ranked by how often they appear in the highest-scoring teams found across the selected exams. Run the comparison with My collection, maxed and view its ranking to see which of your cards appear most often after upgrades and decide which ones to train first."
+    },
+    "manualExam": {
+      "title": "Optional: Detailed Simulation",
+      "intro": "Open Detailed simulation on a search result to try actions with that team. To build your own, choose five cards and their spells under Deck, then run either mode below.",
+      "autoBest": "Under Sim, choose Auto Best, enter the number of runs, and press Run. The simulator searches for high-scoring action sequences using the spells you selected.",
+      "normal": "Under Actions, add the spell pairs you allow for each turn. Under Priority, put your first choice at the top. Under Sim, select Normal, enter the number of runs, and press Run. Each turn, the simulator uses the highest-priority pair available in your hand. For Omni exams, leave Prioritize Element Matchup off to use this order.",
+      "probability": "To estimate how often your plan reaches a target score, check the line in Score Distribution / Success Rate after a Normal run. Each point shows the percentage of all trials that reached at least the lower end of that score band."
+    },
+    "pages": {
+      "handCollection": "To add cards from screenshots, open “Import screenshots” and follow the instructions there. You can also mark cards as owned and set their levels and limit breaks manually. You can save up to five collections and switch between them at any time using the dropdown at the top of the page. To transfer your collection, download the file from “Manage JSON”, then import it from “Manage JSON” in another browser or on another device.",
+      "examSimulator": "Start with Search to find teams for the exam using the cards you already own.",
+      "examBenchmark": "Benchmark past exams together to see what scores your current collection can reach in each one. To cover multiple exams quickly, the benchmark searches fewer teams and actions per exam. Its best score can be lower than what a longer team search finds for the same exam in the Exam Simulator.",
+      "calcBASIC": "Select the difficulty and enter total damage and the number of Duo spells. Enter the attack counts by elemental advantage, neutral matchup, and disadvantage to see the score breakdown.",
+      "calcATK": "Choose the difficulty and enter enemy HP, total damage, buffs, and healing blocks. Enter single-hit and multi-hit attack counts by elemental matchup to calculate the score.",
+      "calcDEF": "Choose the difficulty and finishing turn. Enter starting HP, remaining HP, and damage dealt, then add evades and debuffs to see their effect on the score.",
+      "sim": "Choose your cards and spells. The simulator automatically applies the buddy bonuses and spell effects that activate in your deck, then shows its HP and total damage over 3, 4, or 5 turns. Add buffs or debuffs to see how much the damage changes under the battle conditions you expect.",
+      "search": "Open the search settings to choose a card pool, sort order, and any required cards. Select your collection to use the levels and limit breaks you saved. Start the search and review the teams on the results tab.",
+      "relation": "Choose an element and select mutual Duo or triple Duo. Limit the list to your collection to see which of your cards can activate those Duos together.",
+      "buddyDuo": "Use the button above the table to choose a relationship. Select the number where two characters meet to view the cards that connect them.",
+      "finisherDamage": "Choose your collection or all cards. Select an enemy element at the top of the table to sort by damage, then select a damage value to see the card combinations behind it.",
+      "retire": "Choose a character and element, then enter the action you want to track. Tap the number beside it each time it happens. Reset the counters when you start a new attempt.",
+      "hand": "Add cards to the deck and choose their spell pairs. Select two spells from the hand to advance a turn. When you redraw, mark the hand OK or NG to track how often you get the hand you want.",
+      "comfort": "Select the furniture you can use and set your room rank in the calculation settings. Start the calculation, then check the details for a furniture combination and its comfort score.",
+      "invite": "Choose a guest and your target dorm and theme ratings. Enter how many of each piece of furniture you can use. Start the calculation and check the results for a room setup.",
+      "simulator": "Use the plus sign to add cards and set their levels and spells. Switch the enemy element to check total HP and estimated damage over different numbers of turns.",
+      "drop": "Select the normal or boosted drop rate. Enter the number of starshards and the AP you plan to spend to see total AP and estimated drops for each alchemy item.",
+      "sam": "Enter the quantities of items you plan to sell. The calculator shows the recycling medals you would receive and the estimated yields from Sam’s item gacha.",
+      "grow": "Enter the rarity, spell element, current level (Fr), target level (To), and quantity. Add more upgrades with the plus button to total the required books and madol.",
+      "data": "Use the search box or filters to narrow the card list and compare stats and buddies in the table. You can limit it to your collection or download the list as an Excel file.",
+      "statusPlot": "Choose current stats or all buddy bonuses to compare cards by HP and ATK. Select a point on the plot to see the card it represents.",
+      "other": "Select a tool name to open its calculator or information page in a new tab."
+    }
+  },
   "tool": {
     "examBenchmark": "Exam Benchmark",
     "alchemyDropCountCalculator": "Alchemy drop count calculator",

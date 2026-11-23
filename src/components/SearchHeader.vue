@@ -1,8 +1,5 @@
 <template>
   <v-row class="mb-1 search-header-row" justify="center" align="center">
-    <v-col cols="12" sm="auto">
-      <v-btn block @click="isInfoModalVisible = true">{{ $t('search.howToUse') }}</v-btn>
-    </v-col>
     <v-col cols="6" sm="auto">
       <v-btn block color="red" @click="stopSearch" :disabled="!isSearching">{{ $t('search.cancelSearch') }}</v-btn>
     </v-col>
@@ -15,9 +12,6 @@
       <div>{{ $t('search.processingSpeed') }}: {{ processingSpeed }}{{ $t('search.itemsPerSecond') }}</div>
     </v-col>
   </v-row>
-  <v-dialog v-model="isInfoModalVisible" persistent :max-width="dialogWidth">
-    <Info-modal @close="isInfoModalVisible = false" />
-  </v-dialog>
   <v-dialog v-model="isErrorModalVisible" persistent :max-width="dialogWidth">
     <error-modal @close="isErrorModalVisible = false" />
   </v-dialog>
@@ -25,7 +19,6 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import InfoModal from "@/components/InfoModal.vue";
 import ErrorModal from "@/components/ErrorModal.vue";
 import { storeToRefs } from "pinia";
 import { runDeckSearch } from '@/domain/deckSearch/runDeckSearch';
@@ -38,7 +31,6 @@ const searchResultStore = useSearchResultStore();
 const { totalResults, nowResults, isSearching, errorMessage } = storeToRefs(searchResultStore);
 
 // モーダルの表示状態を管理するためのリアクティブな変数
-const isInfoModalVisible = ref(false);
 const isErrorModalVisible = ref(false);
 const dialogWidth = computed(() => {
   const screenWidth = window.innerWidth;

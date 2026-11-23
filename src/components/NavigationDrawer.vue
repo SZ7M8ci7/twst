@@ -1,16 +1,15 @@
 <template>
   <div class="toolbar-items">
     <v-app-bar-nav-icon :aria-label="t('common.navigationMenu')" :aria-expanded="drawer" @click.stop="drawer = !drawer"></v-app-bar-nav-icon>
-    <div class="language-links">
-      <button type="button" lang="ja" aria-label="日本語" :aria-pressed="locale === 'ja'" :class="{ 'text-muted': locale !== 'ja' }" @click="changeLanguage('ja')">JA</button>
-      <span>/</span>
-      <button type="button" lang="en" aria-label="English" :aria-pressed="locale === 'en'" :class="{ 'text-muted': locale !== 'en' }" @click="changeLanguage('en')">EN</button>
-      <span>/</span>
-      <button type="button" lang="zh-CN" aria-label="中文（简体）" :aria-pressed="locale === 'zh-CN'" :class="{ 'text-muted': locale !== 'zh-CN' }" @click="changeLanguage('zh-CN')">中文</button>
-    </div>
+    <select v-model="locale" class="language-select" :aria-label="t('pageHelp.language')">
+      <option value="ja" lang="ja">日本語</option>
+      <option value="en" lang="en">English</option>
+      <option value="zh-CN" lang="zh-CN">简体中文</option>
+    </select>
     <select id="global-hand-slot-select" class="global-hand-slot-select" :aria-label="t('handCollection.switchSet')" :value="activeSlot" :disabled="switchingSlot || handCollectionStore.saving || handCollectionStore.loadFailed || handCollectionStore.hasConflict" @change="changeHandSlot">
       <option v-for="slot in slots" :key="slot.slot" :value="slot.slot">{{ t('handCollection.slotLabel', { number: slot.slot }) }} — {{ slot.savedSet?.name || t('handCollection.emptySlot') }}</option>
     </select>
+    <PageHelp :title-key="pageTitleKey" />
   </div>
   <v-alert v-if="handCollectionStore.loadFailed || handCollectionStore.hasConflict" type="warning" variant="tonal" density="compact" class="mx-2 mb-2">
     {{ handCollectionStore.hasConflict ? t('handCollection.saveConflict') : t('handCollection.loadError') }}
@@ -107,12 +106,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute } from 'vue-router';
+import PageHelp from './PageHelp.vue';
 import { storeToRefs } from 'pinia';
 import { useHandCollectionStore } from '@/store/handCollection';
 import { useI18n } from 'vue-i18n';
 import { useLocale } from 'vuetify';
-import { normalizeLocale, saveLocale, type SupportedLocale } from '@/i18n/locales';
+import { normalizeLocale, saveLocale } from '@/i18n/locales';
 const drawer = ref(false);
 const handCollectionStore = useHandCollectionStore();
 const { activeSlot, slots, hasUnsavedChanges } = storeToRefs(handCollectionStore);
@@ -220,9 +221,13 @@ const navGroups: NavGroup[] = [
   },
 ];
 
-function changeLanguage(lang: SupportedLocale) {
-  locale.value = lang;
-}
+const route = useRoute();
+const toolLinks = navGroups.flatMap(group => group.items);
+const pageTitleKey = computed(() => {
+  if (route.name === 'handCollection') return 'tool.handCollection';
+  if (route.name === 'simulator') return 'tool.deckSimulator';
+  return toolLinks.find(item => item.routeName === route.name)?.titleKey;
+});
 
 function closeDrawer() {
   drawer.value = false;
@@ -239,31 +244,6 @@ function navStyle(group: NavGroup) {
 a {
   text-decoration: none;
   color: inherit;
-}
-
-.language-links {
-  margin-left: 4px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-.language-links button {
-  margin: 0 4px;
-  cursor: pointer;
-}
-
-.language-links button[aria-pressed="true"] {
-  font-weight: 700;
-}
-
-.language-links button:focus-visible {
-  outline: 2px solid #1565c0;
-  outline-offset: 3px;
-}
-
-.language-links .text-muted {
-  color: #888;
 }
 
 .app-navigation-drawer {
@@ -375,23 +355,26 @@ a.router-link-active .drawer-root-hand {
   min-width: 0;
   padding-right: 8px;
 }
+.language-select,
 .global-hand-slot-select {
   appearance: auto;
-  margin-left: auto;
-  min-width: 0;
-  width: min(320px, 40vw);
   height: 36px;
-  padding: 4px 24px 4px 8px;
+  padding: 4px 8px;
   border: 1px solid #cbd5e3;
   border-radius: 6px;
   background: white;
   font-size: .85rem;
   text-overflow: ellipsis;
 }
+.global-hand-slot-select {
+  margin-left: auto;
+  min-width: 0;
+  width: min(320px, 40vw);
+}
+.language-select:focus-visible,
 .global-hand-slot-select:focus-visible { outline: 2px solid #1565c0; outline-offset: 2px; }
 .global-hand-slot-select:disabled { opacity: .6; }
 @media (max-width: 600px) {
-  .language-links button { margin-inline: 2px; }
   .global-hand-slot-select { flex: 1; width: auto; max-width: 210px; font-size: .75rem; }
 }
 
