@@ -23,41 +23,44 @@ const isFresh = (response) => {
   return cachedAt > 0 && Date.now() - cachedAt < CACHE_MAX_AGE_MS
 }
 
-const withCacheMetadata = async (response) => {
+const withCacheMetadata = (response) => {
   const headers = new Headers(response.headers)
   headers.set(CACHE_TIMESTAMP_HEADER, String(Date.now()))
   headers.set('Cache-Control', `public, max-age=${CACHE_MAX_AGE_SECONDS}`)
 
-  return new Response(await response.blob(), {
+  return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
     headers,
   })
 }
 
-const fetchAndCache = async (request, cache) => {
-  const response = await fetch(request)
-  if (!response.ok) return response
-
-  const cachedResponse = await withCacheMetadata(response.clone())
-  await cache.put(request, cachedResponse.clone())
-  return cachedResponse
-}
-
 const cacheFirst = async (request) => {
-  const cache = await caches.open(CACHE_NAME)
-  const cachedResponse = await cache.match(request)
+  let cache, cachedResponse
+  try {
+    cache = await caches.open(CACHE_NAME)
+    cachedResponse = await cache.match(request)
+  } catch {
+    return fetch(request)
+  }
 
   if (cachedResponse && isFresh(cachedResponse)) {
     return cachedResponse
   }
 
+  let response
   try {
-    return await fetchAndCache(request, cache)
+    response = await fetch(request)
   } catch (error) {
     if (cachedResponse) return cachedResponse
     throw error
   }
+  if (response.ok) {
+    try {
+      await cache.put(request, withCacheMetadata(response.clone()))
+    } catch { /* The network response is usable even when the cache is full. */ }
+  }
+  return response
 }
 
 self.addEventListener('install', (event) => {

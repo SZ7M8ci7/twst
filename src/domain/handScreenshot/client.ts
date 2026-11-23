@@ -57,12 +57,12 @@ export class ScreenshotSession {
           const height = Math.min(stripHeight, bitmap.height - y);
           const scout = crop(bitmap, { x: 0, y, width: bitmap.width, height }, Math.round(bitmap.width * scale), Math.round(height * scale));
           const image = scout.getContext('2d')!.getImageData(0, 0, scout.width, scout.height);
+          scout.width = scout.height = 1;
           const result = await this.request({ type: 'detect', image }, [image.data.buffer]);
           for (const box of result.boxes as Box[]) {
             const original = { x: box.x / scale, y: y + box.y / scale, width: box.width / scale, height: box.height / scale };
             if (!boxes.some(b => Math.abs(b.x - original.x) < original.width * .4 && Math.abs(b.y - original.y) < original.height * .4)) boxes.push(original);
           }
-          scout.width = scout.height = 1;
           if (y + height >= bitmap.height) break;
         }
       }
@@ -71,10 +71,12 @@ export class ScreenshotSession {
       for (const box of boxes) {
         this.abort.signal.throwIfAborted();
         const canvas = crop(bitmap, box, 128, 128), image = canvas.getContext('2d')!.getImageData(0, 0, 128, 128);
+        canvas.width = canvas.height = 1;
         const { result } = await this.request({ type: 'match', image, box, fileIndex }, [image.data.buffer]);
         const context = crop(bitmap, { ...box, height: Math.min(box.width * 1.28, bitmap.height-box.y) }, 256, Math.round(Math.min(box.width*1.28,bitmap.height-box.y)/box.width*256));
         result.thumbnail = context.toDataURL('image/webp', .9);
         const pixels = context.getContext('2d')!.getImageData(0,0,context.width,context.height);
+        context.width = context.height = 1;
         result.groovyStatus = readGroovyStatus(pixels, {
           width: box.width,
           // A manual region or incomplete card cannot prove a missing ribbon.
@@ -98,11 +100,14 @@ export class ScreenshotSession {
               // encoder can otherwise send to a worker that was just terminated.
               const raw = crop(bitmap, levelBox);
               const prepared = prepareLevelImage(raw.getContext('2d')!.getImageData(0,0,raw.width,raw.height));
+              raw.width = raw.height = 1;
               if (!prepared) { detections.push(result); progress(detections.length, boxes.length); continue; }
               const levels = await recognizeLevels(this.ocr, prepared, pixels => {
                 const clean = document.createElement('canvas'); clean.width=pixels.width; clean.height=pixels.height;
                 clean.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(pixels.data),pixels.width,pixels.height),0,0);
-                return clean.toDataURL('image/png');
+                const url = clean.toDataURL('image/png');
+                clean.width = clean.height = 1;
+                return url;
               }, this.abort.signal);
               if (levels) Object.assign(result, levels);
             }
@@ -122,6 +127,7 @@ export class ScreenshotSession {
           const y=row.box.y+row.box.width*.96;
           const strip=crop(bitmap,{x:row.box.x,y,width:row.box.width,height:Math.min(row.box.width*.32,bitmap.height-y)},256,82);
           row.uncapThumbnail=strip.toDataURL('image/webp',.95);
+          strip.width = strip.height = 1;
         }
       }
       return detections;

@@ -23,7 +23,7 @@ function detection(cardKey = first, variant = 'normal', overrides = {}) {
 
 // Execute the actual component setup and store, replacing only browser boundaries
 // and screenshot recognition. Computed properties and edits use real Vue reactivity.
-function runtime(t) {
+function runtime(t, analyze) {
   const cache = new Map(), values = new Map();
   const storage = { getItem: key => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
@@ -32,7 +32,10 @@ function runtime(t) {
   class ScreenshotSession {
     constructor() { this.abort = new AbortController(); }
     async load() {}
-    async analyze() { return nextResults.map(row => ({ ...row })); }
+    async analyze(file, index) {
+      if (analyze) return analyze(this, file, index);
+      return nextResults.map(row => ({ ...row }));
+    }
     stop() { this.abort.abort(); }
   }
   function localRequire(id) {
@@ -60,7 +63,7 @@ function runtime(t) {
   const context = { exports: {}, require: localRequire, window, console, AbortController, DOMException,
     URL: { createObjectURL: () => `blob:test-${++url}`, revokeObjectURL() {} } };
   const source = read('src/components/HandScreenshotImport.vue').split('<script setup lang="ts">')[1].split('</script>')[0];
-  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { rows, visibleRows, primaryRows, groovyStatusByCard, reviewOnly, needsReview, store, applied, apply, undo, activeId, pickCard, clearCard, selectFiles, levelMode };'), context));
+  scope.run(() => vm.runInNewContext(compile(source + '\nglobalThis.view = { rows, visibleRows, primaryRows, groovyStatusByCard, reviewOnly, needsReview, store, applied, apply, undo, activeId, pickCard, clearCard, selectFiles, levelMode, error, cancel };'), context));
   return { view: context.view, load, results: rows => { nextResults = rows; } };
 }
 
@@ -137,6 +140,31 @@ test('supplemental evidence is limited to imported cards and conflicts remain un
   assert.equal(view.groovyStatusByCard.value.get(first), 'present');
   view.levelMode.value = 'current';
   assert.equal(view.groovyStatusByCard.value.get(first), 'present', 'level mode never changes ribbon evidence');
+});
+
+test('a recognition worker failure preserves only completed screenshots for review', async t => {
+  const visited = [];
+  const { view } = runtime(t, (session, file, index) => {
+    visited.push(file.name);
+    if (index === 0) return [detection()];
+    session.stop();
+    throw new Error('Image recognition worker failed');
+  });
+  await view.selectFiles([{ name: 'one.png' }, { name: 'two.png' }, { name: 'three.png' }]);
+  assert.deepEqual(visited, ['one.png', 'two.png']);
+  assert.deepEqual(Array.from(view.rows.value, row => row.selected), [first]);
+  assert.equal(view.error.value, 'screenshot.interrupted');
+  assert.equal(view.applied.value, false);
+});
+
+test('cancelling a batch discards its staged screenshots', async t => {
+  const { view } = runtime(t, (_session, _file, index) => {
+    if (index === 1) view.cancel();
+    return [detection()];
+  });
+  await view.selectFiles([{ name: 'one.png' }, { name: 'two.png' }]);
+  assert.equal(view.rows.value.length, 0);
+  assert.equal(view.error.value, '');
 });
 
 test('replacing images removes the previous ribbon warning', async t => {

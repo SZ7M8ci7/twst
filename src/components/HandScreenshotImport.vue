@@ -27,7 +27,7 @@
         <div v-if="sources.length && !busy" class="export-toolbar"><v-btn variant="outlined" prepend-icon="mdi-image-multiple-outline" :disabled="!primaryRows.length || exporting" @click="openExport">{{ t('screenshot.exportButton') }}</v-btn></div>
         <section v-for="(fileIndex,position) in primaryFileOrder" :key="sources[fileIndex].url" class="source-group" :aria-label="sources[fileIndex].name">
           <header class="source-group-heading">
-            <img :src="sources[fileIndex].url" alt="" /><div><strong>{{ t('screenshot.imageNumber',{number:position+1}) }}</strong><span :title="sources[fileIndex].name">{{ sources[fileIndex].name }}</span></div>
+            <img v-if="!busy" :src="sources[fileIndex].url" alt="" loading="lazy" /><div><strong>{{ t('screenshot.imageNumber',{number:position+1}) }}</strong><span :title="sources[fileIndex].name">{{ sources[fileIndex].name }}</span></div>
             <span v-if="!busy" class="source-count">{{ t('screenshot.detectedCount',{count:rows.filter(row=>row.fileIndex===fileIndex).length}) }}</span>
             <v-btn size="small" variant="text" :disabled="busy" @click="openSource(fileIndex)">{{ t('screenshot.viewOriginal') }}</v-btn>
           </header>
@@ -327,19 +327,22 @@ async function recognize(manual?: { box: Box; fileIndex: number }) {
           applyMaxLevelUncaps(row,catalog.get(row.selected)?.rare);
         }
         staged.push(...detected);
-      } catch (cause) {
+      } catch {
         assertCurrent();
-        if (localSession.abort.signal.aborted) throw cause;
+        if (localSession.abort.signal.aborted) {
+          error.value = t('screenshot.interrupted', { name: operationFiles[fileIndex].name });
+          break;
+        }
         error.value = t('screenshot.fileError', { name: operationFiles[fileIndex].name });
       }
       progress.value=(imageIndex+1)/targets.length*100;
     }
-    assertCurrent(); localSession.abort.signal.throwIfAborted();
+    assertCurrent();
     rows.value = manual ? [...rows.value, ...staged] : staged;
     resultContextRevision = contextRevision;
     await focusRow(manual ? staged.find(row=>row.displayMode!=='uncaps') : primaryRows.value[0]);
     assertCurrent();
-    status.value = staged.length ? t('screenshot.done') : t('screenshot.noCards');
+    status.value = error.value ? '' : staged.length ? t('screenshot.done') : t('screenshot.noCards');
   } catch (cause) {
     if (!isCurrent()) return;
     if (cause instanceof Error && cause.name === 'AbortError') status.value = t('screenshot.cancelled');

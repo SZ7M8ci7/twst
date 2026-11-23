@@ -1267,6 +1267,7 @@
     "loading": "Preparing recognition data. The first download may take a while.",
     "processing": "Analyzing ({current}/{total} images): {name}",
     "fileError": "Could not analyze {name}. Use PNG/JPEG/WebP files up to 30 MB and 24 megapixels.",
+    "interrupted": "Image recognition stopped at {name}. Review and apply any results shown, then import this image and the remaining images again.",
     "done": "Analysis complete. Review the candidates and levels.",
     "noCards": "No card frames found. Drag around a card’s artwork in the source image to add it.",
     "cancelled": "Analysis cancelled. Your collection was not changed.",
