@@ -158,24 +158,24 @@
       <DeckSearchRequiredCards class="mt-4" />
       <v-card-title>{{ $t('settingModal.mustCharacter') }}</v-card-title>
       <v-card-text class="ma-0 pa-0">
-        <div class="must-character-grid">
-          <button
-            v-for="character in mustCharacterList"
-            :key="character.name_ja"
-            type="button"
-            :class="['must-character-button', { 'must-character-button--selected': mustCharacterSelection.includes(character.name_ja) }]"
-            @click="toggleMustCharacter(character.name_ja)"
-            :aria-label="character.name_ja"
-            :aria-pressed="mustCharacterSelection.includes(character.name_ja)"
-          >
-            <img
-              v-if="mustCharacterIconUrls[character.name_en]"
-              :src="mustCharacterIconUrls[character.name_en]"
-              :alt="character.name_ja"
-              class="must-character-icon"
-            />
-          </button>
+        <DeckSearchCharacterGrid v-model="mustCharacterSelection" :label="$t('settingModal.mustCharacter')" />
+        <p v-if="searchSettingsStore.hasExcludedRequiredCharacter" role="alert" class="text-error text-body-2">
+          {{ $t('error.requiredCharacterOutsideCandidates') }}
+        </p>
+      </v-card-text>
+      <v-card-title>{{ $t('settingModal.candidateCharacters') }}</v-card-title>
+      <v-card-text class="ma-0 pa-0">
+        <p>{{ $t('settingModal.candidateCharactersHelp') }}</p>
+        <div class="d-flex flex-wrap align-center ga-2 my-2">
+          <span>{{ searchSettingsStore.candidateCharacters.length }} / {{ deckSearchCharacters.length }}</span>
+          <v-btn size="small" variant="outlined" @click="searchSettingsStore.candidateCharacters = [...defaultSearchSettings.candidateCharacters]">
+            {{ $t('support.selectAll') }}
+          </v-btn>
+          <v-btn size="small" variant="outlined" @click="searchSettingsStore.candidateCharacters = []">
+            {{ $t('support.deselectAll') }}
+          </v-btn>
         </div>
+        <DeckSearchCharacterGrid v-model="searchSettingsStore.candidateCharacters" :label="$t('settingModal.candidateCharacters')" />
       </v-card-text>
       <v-card-text class="sort-option mt-2 mb-2 pa-0">
         <v-checkbox
@@ -189,13 +189,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { createDefaultSearchSettingsState, useSearchSettingsStore, type SearchSettingsState } from '@/store/searchSetting';
+import { computed, ref, watch } from 'vue';
+import { createDefaultSearchSettingsState, deckSearchCharacters, useSearchSettingsStore, type SearchSettingsState } from '@/store/searchSetting';
 import DeckSearchRequiredCards from './DeckSearchRequiredCards.vue';
 import { useI18n } from 'vue-i18n';
-import characterData from '@/assets/characters_info.json';
+import DeckSearchCharacterGrid from './DeckSearchCharacterGrid.vue';
 import { enName2jpName, getAvailableSortProps } from '@/components/common'
-import { loadImageUrls } from '@/utils/characterAssets'
 import { SEARCH_PRESET_CONFIGURATIONS as PRESET_CONFIGURATIONS, type SearchPreset } from '@/constants/searchPresets';
 
 const { t } = useI18n();
@@ -203,12 +202,6 @@ const { t } = useI18n();
 interface MinimumSettingOption {
   prop: MinimumSettingKey | '';
   value: number;
-}
-
-interface MustCharacterInfo {
-  name_ja: string;
-  name_en: string;
-  dorm: string;
 }
 
 type PresetMatrixColumnKey = 'fire' | 'water' | 'flora' | 'all' | 'neutral';
@@ -337,21 +330,12 @@ const rosterDescriptions = {
 const sortOptions = ref(searchSettingsStore.sortOptions.map(option => ({ ...option })));
 const minimumSettings = ref(buildMinimumSettingRows(getMinimumSettingValues(searchSettingsStore)));
 const mustCharacterSelection = ref(searchSettingsStore.mustCharacters.map(option => enName2jpName[option.prop] || option.prop));
-const mustCharacterIconUrls = ref<Record<string, string>>({});
 
 // Keep stable keys as values; only the labels depend on the current language.
 const availableSortProps = computed(() => getAvailableSortProps((key) => key)
   .map((key) => ({ title: t(key), value: key })));
 const sortOrderItems = computed(() => ['settingModal.asc', 'settingModal.desc']
   .map((key) => ({ title: t(key), value: key })));
-const mustCharacterList = (characterData as MustCharacterInfo[]).filter(
-  (character) => character.name_ja !== 'サム'
-);
-
-onMounted(async () => {
-  mustCharacterIconUrls.value = await loadImageUrls(characterData, (item: MustCharacterInfo) => item.name_en, 'icon/');
-});
-
 const allowSameCharacter = ref(searchSettingsStore.allowSameCharacter);
 const selectedPreset = ref(searchSettingsStore.appliedPresetName);
 const isApplyingPreset = ref(false);
@@ -447,13 +431,6 @@ function removeSortOption(index: string | number) {
   sortOptions.value.splice(Number(index), 1);
 }
 
-function toggleMustCharacter(name: string) {
-  if (mustCharacterSelection.value.includes(name)) {
-    mustCharacterSelection.value = mustCharacterSelection.value.filter((characterName) => characterName !== name);
-    return;
-  }
-  mustCharacterSelection.value = [...mustCharacterSelection.value, name];
-}
 function toFiniteInt(value: unknown, fallback: number, min?: number, max?: number): number {
   const parsed = Number(value);
   let normalized = Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
@@ -528,51 +505,6 @@ watch([sortOptions, minimumSettings, maxResult, attackNum, allowSameCharacter, m
   display: flex;
   justify-content: center; /* Center the button horizontally */
   padding: 0px 0px 5px 0px; /* Add some padding above and below the button */
-}
-
-.must-character-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-  gap: 6px;
-}
-
-.must-character-button {
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
-  opacity: 0.55;
-}
-
-.must-character-button:hover {
-  transform: translateY(-1px);
-  opacity: 0.75;
-}
-
-.must-character-button--selected {
-  border-color: #1976d2;
-  background: #eef5ff;
-  box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2);
-  opacity: 1;
-}
-
-.must-character-icon {
-  width: 30px;
-  height: 30px;
-  object-fit: cover;
-  border-radius: 6px;
-  display: block;
-  filter: grayscale(1);
-  transition: filter 0.15s ease, opacity 0.15s ease;
-}
-
-.must-character-button--selected .must-character-icon {
-  filter: grayscale(0);
 }
 
 /* プリセット関連のスタイル */
@@ -720,16 +652,6 @@ watch([sortOptions, minimumSettings, maxResult, attackNum, allowSameCharacter, m
   .matrix-preset-button {
     font-size: 0.68rem;
     min-height: 32px;
-  }
-
-  .must-character-grid {
-    grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
-    gap: 5px;
-  }
-
-  .must-character-icon {
-    width: 28px;
-    height: 28px;
   }
 }
 

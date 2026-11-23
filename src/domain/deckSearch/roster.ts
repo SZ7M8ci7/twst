@@ -13,8 +13,9 @@ export function isDeckSearchCardEligible(name: string, collection: HandCollectio
 export function buildDeckSearchRoster(
   catalog: Character[],
   collection: HandCollection,
-  settings: Pick<SearchSettingsState, 'rosterSource' | 'requiredCards' | 'allowSameCharacter' | 'selectedSupportCharacters' | 'appliedPresetName'>,
+  settings: Pick<SearchSettingsState, 'rosterSource' | 'candidateCharacters' | 'requiredCards' | 'allowSameCharacter' | 'selectedSupportCharacters' | 'appliedPresetName'>,
 ) {
+  const candidates = new Set(settings.candidateCharacters);
   const required = new Set(settings.requiredCards);
   const supports = new Set(settings.selectedSupportCharacters);
   const disabledAttribute = SEARCH_PRESET_CONFIGURATIONS.find(preset => preset.name === settings.appliedPresetName)
@@ -37,17 +38,19 @@ export function buildDeckSearchRoster(
   const characters: Character[] = [];
   const supportCharacters: Character[] = [];
   for (const card of catalog) {
+    const isCandidate = candidates.has(card.chara);
+    const isRequired = required.has(card.name);
+    if (!isCandidate && !isRequired) continue;
     const maxLevel = getInputMaxLevel(card.rare);
     const owned = collection[card.name];
-    const isRequired = required.has(card.name);
-    if (isDeckSearchCardEligible(card.name, collection, settings.rosterSource)) {
+    if (isCandidate && isDeckSearchCardEligible(card.name, collection, settings.rosterSource)) {
       characters.push(settings.rosterSource === 'owned'
         ? prepare(card, owned.level, owned.totsu, isRequired)
         : prepare(card, maxLevel, MAX_TOTSU, isRequired));
     } else if (isRequired) {
       characters.push(prepare(card, 0, 0, true));
     }
-    if (settings.allowSameCharacter && card.rare === 'SSR' && supports.has(card.name)) {
+    if (isCandidate && settings.allowSameCharacter && card.rare === 'SSR' && supports.has(card.name)) {
       supportCharacters.push(prepare(card, maxLevel, MAX_TOTSU, false));
     }
   }

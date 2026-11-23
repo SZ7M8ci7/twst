@@ -434,6 +434,8 @@
     "yes": "はい",
     "no": "いいえ",
     "mustCharacter": "必須キャラクター",
+    "candidateCharacters": "キャラクター候補",
+    "candidateCharactersHelp": "選んだキャラクターのカードだけでデッキを探索します。サポートにも適用されます。",
     "searchPreset": "検索プリセット",
     "presetMatrix": {
       "basic": "BS",
@@ -543,6 +545,7 @@
     "damageDetail": "キャラ別与ダメ内訳"
   },
   "error": {
+    "requiredCharacterOutsideCandidates": "候補から外れている必須キャラクターがいます。必須キャラクターか候補の選択を変更してください。",
     "requiredCardLimit": "必須カードは通常5枚、サポート利用時は4枚までです。",
     "requiredCardUnavailable": "探索対象に含まれない必須カードがあります。必須カードの選択か探索対象を変更してください。",
     "requiredCharacter": "必須キャラのレベルは1以上にして下さい",

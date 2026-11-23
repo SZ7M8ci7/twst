@@ -223,4 +223,20 @@ test('required cards and required characters both constrain every deck, includin
   }
   assert.equal((await run(catalog.slice(0, 5), [catalog[6]])).decks.length, 0);
   assert.equal((await run(catalog.slice(0, 5), [], true)).error, 'error.requiredCardLimit');
+
+  const candidates = catalog.slice(1, 7);
+  assert.ok(catalog.every(card => settings.candidateCharacters.includes(card.chara)));
+  settings.candidateCharacters = candidates.map(card => card.chara);
+  const { decks } = await run([candidates[0]], [candidates[1]]);
+  assert.ok(decks.length > 1);
+  for (const names of decks) {
+    assert.ok(names.includes(candidates[0].name) && names.includes(candidates[1].name));
+    assert.ok(names.every(name => candidates.some(card => card.name === name)));
+  }
+  assert.equal((await run([], [], true)).decks.length, 0, 'the selected support is outside the pool');
+  await run([], [catalog[0]]);
+  assert.equal(settings.hasExcludedRequiredCharacter, true);
+  assert.equal((await run([catalog[0]], [])).error, 'error.requiredCardUnavailable');
+  settings.candidateCharacters = [];
+  assert.equal((await run([], [])).error, 'error.fewCharacter');
 });

@@ -92,6 +92,10 @@ export async function runDeckSearch(t: (key: string) => string) {
   totalResults.value = 0;
   nowResults.value = 0;
   searchResultStore.resultsUseSupport = searchSettings.allowSameCharacter;
+  if (searchSettings.hasExcludedRequiredCharacter) {
+    errorMessage.value = t('error.requiredCharacterOutsideCandidates');
+    return;
+  }
   const context: DeckSearchContext = {
     ...buildDeckSearchRoster(characterStore.characters, hand.handCollection, searchSettings),
     settings: createDeckSearchSettings(),

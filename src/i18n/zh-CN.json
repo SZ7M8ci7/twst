@@ -434,6 +434,8 @@
     "yes": "是",
     "no": "否",
     "mustCharacter": "必选角色",
+    "candidateCharacters": "候选角色",
+    "candidateCharactersHelp": "仅使用所选角色的卡牌搜索队伍，支援卡也受此限制。",
     "searchPreset": "搜索预设",
     "presetMatrix": {
       "basic": "BS",
@@ -543,6 +545,7 @@
     "damageDetail": "各角色伤害明细"
   },
   "error": {
+    "requiredCharacterOutsideCandidates": "有必选角色不在候选范围内。请调整必选角色或候选角色。",
     "requiredCardLimit": "最多可指定5张必选卡牌，使用支援时最多4张。",
     "requiredCardUnavailable": "有必选卡牌不在当前搜索范围内。请调整必选卡牌或搜索范围。",
     "requiredCharacter": "请将必选角色的等级设为1或以上",

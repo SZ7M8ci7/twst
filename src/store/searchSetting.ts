@@ -1,6 +1,10 @@
 import { defineStore } from 'pinia';
 import type { RosterSource } from '@/domain/examSearch/types';
 import charactersData from '@/assets/chara.json';
+import charactersInfo from '@/assets/characters_info.json';
+
+const cardCharacterNames = new Set(charactersData.map(card => card.chara));
+export const deckSearchCharacters = charactersInfo.filter(character => cardCharacterNames.has(character.name_ja));
 
 // types/searchSettingsTypes.ts
 export interface SortOption {
@@ -36,6 +40,7 @@ export interface SearchSettingsState {
   sortOptions: SortOption[];
   mustCharacters: MustCharacterOption[];
   convertedMustCharacters: string[];
+  candidateCharacters: string[];
   allowSameCharacter: boolean;
   selectedSupportCharacters: string[];
   appliedPresetName: string;
@@ -76,6 +81,7 @@ export const createDefaultSearchSettingsState = (): SearchSettingsState => ({
   ],
   mustCharacters: [],
   convertedMustCharacters: [],
+  candidateCharacters: deckSearchCharacters.map(character => character.name_ja),
   allowSameCharacter: false,
   selectedSupportCharacters: getInitialSSRCharacters(),
   appliedPresetName: '',
@@ -85,6 +91,10 @@ export const createDefaultSearchSettingsState = (): SearchSettingsState => ({
 
 export const useSearchSettingsStore = defineStore('searchSettings', {
   state: (): SearchSettingsState => createDefaultSearchSettingsState(),
+  getters: {
+    hasExcludedRequiredCharacter: state =>
+      state.convertedMustCharacters.some(name => !state.candidateCharacters.includes(name)),
+  },
   actions: {
     updateSearchSettings(newSettings: Partial<SearchSettingsState>) {
       Object.assign(this, newSettings);

@@ -434,6 +434,8 @@
     "yes": "Yes",
     "no": "No",
     "mustCharacter": "Required Character",
+    "candidateCharacters": "Candidate Characters",
+    "candidateCharactersHelp": "Only cards belonging to selected characters can appear in a deck, including the support slot.",
     "searchPreset": "Search Preset",
     "presetMatrix": {
       "basic": "BS",
@@ -543,6 +545,7 @@
     "damageDetail": "Damage Detail"
   },
   "error": {
+    "requiredCharacterOutsideCandidates": "A required character is outside the candidate pool. Change the required characters or include that character in the pool.",
     "requiredCardLimit": "Choose up to five required cards, or four when using support.",
     "requiredCardUnavailable": "A required card is outside the search pool. Change your selection or the search pool.",
     "requiredCharacter": "Required character level must be at least 1",
