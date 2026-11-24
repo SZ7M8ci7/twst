@@ -72,7 +72,11 @@
           <footer class="export-actions"><v-btn v-if="exportPages.length" variant="text" prepend-icon="mdi-sort" @click="clearExport">{{ t('screenshot.editExportOrder') }}</v-btn><v-btn v-else color="primary" :loading="exporting" :disabled="exporting" @click="createExport">{{ t('screenshot.previewExport') }}</v-btn></footer>
         </v-card>
       </v-dialog>
-      <SimCharaModal v-if="pickerOpen" catalog-mode @close="pickerOpen=false" @select="pickCard" @clear="clearCard" />
+      <SimCharaModal v-if="pickerOpen" catalog-mode @close="pickerOpen=false" @select="pickCard">
+        <template #toolbar-actions>
+          <v-btn variant="text" @click="clearCard">{{ t('screenshot.skip') }}</v-btn>
+        </template>
+      </SimCharaModal>
       <v-dialog v-model="sourceOpen" max-width="900" :persistent="busy" class="screenshot-modal">
         <v-card class="import-dialog source-dialog">
           <header class="modal-heading"><h2>{{ t('screenshot.original') }}</h2><v-btn class="heading-close" icon="mdi-close" variant="text" :aria-label="t('screenshot.close')" :disabled="busy" @click="sourceOpen=false" /></header>

@@ -1,7 +1,10 @@
 <template>
   <v-dialog :model-value="true" max-width="1200" @update:model-value="!$event && closeModal()">
     <div class="modal-content">
-      <div class="picker-toolbar"><v-btn v-if="catalogMode" variant="text" @click="emit('clear')">{{ t('screenshot.skip') }}</v-btn><v-btn variant="text" @click="closeModal">{{ t('common.close') }}</v-btn></div>
+      <div class="picker-toolbar">
+        <slot name="toolbar-actions" />
+        <v-btn variant="text" @click="closeModal">{{ t('common.close') }}</v-btn>
+      </div>
       <!-- タブセクション -->
       <div class="tab-section">
         <div class="tab-header">
@@ -1005,7 +1008,7 @@ function getMemberNameSet(candidateCharacter = null, excludeIndex = null) {
 // Props定義
 
 
-const emit = defineEmits(['close', 'select', 'clear']);
+const emit = defineEmits(['close', 'select']);
 const catalogFilterSelection = ref(null);
 const catalogVisibleNames = ref(null);
 function updateCatalogVisibility({ selection, cardNames }) {

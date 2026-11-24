@@ -20,7 +20,7 @@
   <Teleport to="body">
     <SimCharaModal v-if="selectingIndex !== null" data-testid="card-filter-dialog"
       :catalog-mode="catalogMode" :allowed-card-names="allowedCardNames"
-      @select="selectRequiredCard" @close="selectingIndex = null" @clear="selectingIndex = null" />
+      @select="selectRequiredCard" @close="selectingIndex = null" />
   </Teleport>
 </template>
 
